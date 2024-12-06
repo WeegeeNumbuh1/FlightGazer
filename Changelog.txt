@@ -1,0 +1,116 @@
+FlightGazer Changelog
+
+v.1.3.0 (planned)
+    - NEW: User selectable units
+        - No longer hard-coded to aeronautical units
+        - Added additional internal logic to handle different units
+        - Adjusted docstrings
+    - NEW: Backward compatibility with older settings files
+
+v.1.2.1 - 2024-11-26
+    - Add another fallback for checking if another instance of FlightGazer is running, now internal to the python script
+    - New process-related stats on console output
+
+v.1.2.0 - 2024-11-25
+    - New uninstall script
+    - Initialization script now accepts optional arguments which trigger the same options in the python script
+        - Can now run automatically inside tmux if present
+    - Initialization script now checks if there is an already running instance of FlightGazer
+
+v.1.1.1 - 2024-11-23
+    - Create this changelog file
+    - Small code refactoring
+    - Small console output text changes and display value tweaks
+    - Additional thread termination handling
+    - Reload current running stats from stats file if it's the same date (useful for if we restart the script)
+        - Write out stats upon exit so we don't lose data
+    - Finally fix display driver thread not exiting when exit signals are sent (apparently was not fixed from v.0.9.0)
+
+v.1.1.0 - 2024-11-15
+    - Add new "No Filters" mode which outputs all detected planes from dump1090 regardless of set range
+        - This mode disables API fetching and forces the display to only run as a clock
+            - Since our range is no longer small, there is no point using the plane selector algorithm nor doing API fetches
+        - This mode is perfect for ADS-B sites that don't receive a lot of traffic (think <200/day)
+        - This mode has the same functionality as v.0.1.0
+    - Add installation of tmux to the initialization script for convienence
+
+v.1.0.2 - 2024-11-12
+    - NEW: Added option to only display output to console (just like how pre-1.0.0 versions were when I was still debugging it)
+    - Adjusted when we write to stats file during the day (23:59, before we do the stats reset at midnight, 00:00)
+    - Handle case when we use the python script outside of the initialization script and don't pass any arguments
+
+v.1.0.1 - 2024-11-11
+    - FIXED: permissions issue of writing to stats file
+        - This was caused by rgbmatrix dropping permissions after we initialized/checked we can write to the file
+        - Only workaround for now is to keep rgbmatrix retaining root perms during runtime
+        - Added logic to display initialization to check if we can drop permissions if we have a stats file/want to write to a stats file
+    - Refactored exit text to eliminate reentrant errors
+    - Added LED_PWM_BITS setting to adjust display output (default in rgbmatrix is 11, we default to 8 for balance of flicker reduction and color reproduction)
+
+v.1.0.0 - 2024-11-10
+    - MILESTONE: Core functionality fully realized 👍
+    - Finally solve biggest hurdle of creating logic to match desired display output onto a physical RGB-Matrix display
+    - Add argument parsing for python script for the initialization script
+        - Initialization script will trigger different modes depending on if we are using an interactive terminal
+        - Default mode is to run silently when we're started by a Raspberry pi's rc.local file
+    - Retain RGBMatrixEmulator as a selectable option in case we don't have an actual RGB-Matrix display to output to
+        - Add in additional logic for switchover capability
+
+v.0.9.0 - 2024-11-09
+    - Clock and plane display layouts finalized (thank you RGBMatrixEmulator)
+    - Massive code rewrite: depreciated use of almost all code from 'its-a-plane' project
+        - We only retain some framework modules; we no longer use separate "scenes"
+        - Introduce new internal "display feeder" class for handling display output
+    - Fix display driver thread causing it to run again once exit signal was called, requiring program to be exited twice or terminated forcefully
+        - Restructured thread initialization timings due to above change to ensure all threads terminate when main thread is signalled to end
+
+v.0.8.0 - 2024-11-08
+    - Handle cases when we don't have required resources to drive an RGB-Matrix display
+    - Continue work on how to actually produce output to a display (the clock works at least)
+    - Repurpose initialization script from my other project "UNRAID Status Screen" for this setup
+        - Writes to rc.local on a Raspberry Pi when run for the first time so that subsequent runs will start automatically at boot
+    - Lower timeouts when we are probing possible dump1090 locations (used to be 5 seconds, now down to 0.5)
+
+v.0.7.0 - 2024-11-05
+    - Add RGBMatrixEmulator into code for display debugging and layout testing (much better than having to run this on real hardware, bless)
+    - Move settings to an external file
+    - Added brightness setting
+    - Added smaller fonts and more colors
+    - Refined plane selector algorithm based on real world testing
+        - Additional algorithm info displayed in console output
+    - Handle edge cases provided by API
+
+v.0.6.0 - 2024-10-23
+    - Determine how to utilize FlightAware API
+    - Print API results to console
+    - Add API call limiter
+    - Reorganize directory layout for this project for future modules
+    - Add caching structure for API results to minimize calls
+    - Begin work on RGB-Matrix display routines by integrating code from 'its-a-plane' by Colin Waddell
+
+v.0.5.0 - 2024-10-22
+    - MILESTONE: Cool logo
+
+v.0.4.0 - 2024-10-20
+    - Implemented rudimentary selection algorithm for planes inside range
+        - Console output also indicates how the algorithm is working
+    - Finalize necessary information to pull from dump1090 json
+
+v.0.3.0 - 2024-10-16
+    - Figure out cross-thread communication with pydispatcher
+    - Added airplane parser class to filter out stats based on desired range
+
+v.0.2.0 - 2024-10-12
+    - Add external modules to decode both registrations and country codes associated with ADS-B hex IDs
+        - Translated from original javascript sources used in tar1090
+        - Required as fallback since not all planes will have a callsign
+
+v.0.1.0 - 2024-10-08
+    - Figure out how to parse dump1090 json
+    - Add routine to handle different dump1090 locations
+    - Figure out how to combine dump978 output as well
+    - Add in scheduler for periodic routines
+    - Print to console routine
+
+v.pre-alpha - 2024-09
+    - what is ADS-B

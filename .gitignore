@@ -1,0 +1,5 @@
+**/__pycache__
+test
+/emulator_config.json
+*.7z
+*.csv
