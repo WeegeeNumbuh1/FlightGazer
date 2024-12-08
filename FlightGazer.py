@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.2.1 --- 2024-11-26'
+VERSION: str = 'v.1.2.2 BETA --- 2024-12-08'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -34,7 +34,9 @@ import asyncio
 from collections import deque
 from string import Formatter
 import random
-import getpass
+from getpass import getuser
+from importlib import import_module
+import importlib.util
 # external imports
 import requests
 from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
@@ -100,7 +102,7 @@ if __name__ != '__main__':
 CURRENT_DIR = Path(__file__).resolve().parent
 print(f"FlightGazer Version: {VERSION}")
 print(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
-print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{getpass.getuser()}\'")
+print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{getuser()}\'")
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
 DUMP1090_IS_AVAILABLE: bool = False
@@ -141,41 +143,52 @@ if NODISPLAY == False:
 if INTERACTIVE == False:
     if sys.__stdin__.isatty(): FORGOT_TO_SET_INTERACTIVE = True
 
-try: # Attempt to load config data
-    from config import (
-        FLYBY_STATS_ENABLED,
-        HEIGHT_LIMIT,
-        RANGE,
-        API_KEY,
-        API_DAILY_LIMIT,
-        CLOCK_24HR,
-        CUSTOM_DUMP1090_LOCATION,
-        CUSTOM_DUMP978_LOCATION,
-        BRIGHTNESS,
-        GPIO_SLOWDOWN,
-        HAT_PWM_ENABLED,
-        RGB_ROWS,
-        RGB_COLS,
-        LED_PWM_BITS
-    )
+# define our settings and initalize to defaults
+FLYBY_STATS_ENABLED: bool = False
+HEIGHT_LIMIT = 15000
+RANGE = 2
+API_KEY = ""
+API_DAILY_LIMIT = None
+CLOCK_24HR = True
+CUSTOM_DUMP1090_LOCATION = ""
+CUSTOM_DUMP978_LOCATION = ""
+BRIGHTNESS = 100
+GPIO_SLOWDOWN = 2
+HAT_PWM_ENABLED = False
+RGB_ROWS = 32
+RGB_COLS = 64
+LED_PWM_BITS = 8
 
-except (ModuleNotFoundError, NameError): # If there's no config data
-    FLYBY_STATS_ENABLED: bool = False
-    HEIGHT_LIMIT = 15000
-    RANGE = 2
-    API_KEY = ""
-    API_DAILY_LIMIT = None
-    CLOCK_24HR = True
-    CUSTOM_DUMP1090_LOCATION = ""
-    CUSTOM_DUMP978_LOCATION = ""
-    BRIGHTNESS = 100
-    GPIO_SLOWDOWN = 2
-    HAT_PWM_ENABLED = False
-    RGB_ROWS = 32
-    RGB_COLS = 64
-    LED_PWM_BITS = 8
-    print(f"Warning: Cannot find configuration file \'config.py\' in \'{CURRENT_DIR}\'\n\
-         or settings file is missing required entries. Using default settings.")
+# create the above as a dictionary
+settings_values: dict = {
+    "FLYBY_STATS_ENABLED": FLYBY_STATS_ENABLED,
+    "HEIGHT_LIMIT": HEIGHT_LIMIT,
+    "RANGE": RANGE,
+    "API_KEY": API_KEY,
+    "API_DAILY_LIMIT": API_DAILY_LIMIT,
+    "CLOCK_24HR": CLOCK_24HR,
+    "CUSTOM_DUMP1090_LOCATION": CUSTOM_DUMP1090_LOCATION,
+    "CUSTOM_DUMP978_LOCATION": CUSTOM_DUMP978_LOCATION,
+    "BRIGHTNESS": BRIGHTNESS,
+    "GPIO_SLOWDOWN": GPIO_SLOWDOWN,
+    "HAT_PWM_ENABLED": HAT_PWM_ENABLED,
+    "RGB_ROWS": RGB_ROWS,
+    "RGB_COLS": RGB_COLS,
+    "LED_PWM_BITS": LED_PWM_BITS,
+}
+
+settings_module_name = "config"
+if importlib.util.find_spec(settings_module_name, package=None) is None:
+    print(f"Warning: Cannot find configuration file \'config.py\' in \'{CURRENT_DIR}\'. Using Defaults.")
+
+''' We do the next block to enable backward compatibility for older config versions.
+In the future, additional settings could be defined, which older config files
+will not have, so we attempt to load what we can and handle cases when the setting value is missing. '''
+for key in settings_values:
+    try: # import the variable matching the key in the config file
+        globals()[f"{key}"] = getattr(import_module(settings_module_name), key)
+    except (ModuleNotFoundError, NameError, AttributeError):
+        globals()[f"{key}"] = settings_values[key] # ensure we can return to default values
 
 # our global variables
 general_stats: list = []
