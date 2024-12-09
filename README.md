@@ -44,6 +44,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 - Customizable features such as:
   - Range of which planes need to be in for detailed tracking
   - Height filtering
+  - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - Brightness
   - Writing to a stats file that keeps count of number of planes flying by per day (and API usage as well)
@@ -58,7 +59,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 ## 🛠️ Setup
 ### ⚠️ Prerequisites
 
-<details open><summary><b>Expand/Collapse</b></summary>
+<details open><summary><b>Show/Hide</b></summary>
 
 Using this project assumes you have the following:
 #### MINIMUM
@@ -118,10 +119,10 @@ If you don't care for running in a virtual environment, skip the `python3 -m ven
 </details>
 
 ### 🎚️ Configuration
-<details open><summary><b>Expand/Collapse</b></summary>
 
 The [`config.py`](./config.py) file is where settings are configured. It has descriptions/explanations for all configurable options. It needs to be in the same directory as the main script itself. 
->[!NOTE]
+
+> [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.
 
 <details><summary>Configuration details for a remote dump1090 installation</summary>
@@ -137,12 +138,11 @@ Example: `http://192.168.xxx.xxx:8080`
 > - [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)
 > - [Reserve a CPU core solely for the display](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#cpu-use)
 > - Lower the value for `LED_PWM_BITS` (though `8` seems good enough)
-> 
-</details>
 
 ## 🏃‍♂️ Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
->[!NOTE]
+
+> [!NOTE]
 > By default, the script is designed to run at boot (by adding an entry to `rc.local` on initial setup) and telling the python script to minimize its console output.
 
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -175,9 +175,9 @@ API results for DAL2231: ORD -> SLC, 0:36 flight time
 ### 🔡 Optional Behaviors
 
 `FlightGazer-init.sh` supports optional arguments that adjust the behavior of the main python script. Pass the `-h` argument to see all possible operating modes.
->[!TIP]
+> [!TIP]
 > An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware. <br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://ip-address-of-device-running-FlightGazer:8888`
-> 
+
 <details><summary>Advanced use</summary>
 
 There's nothing stopping you from calling the python file directly. However `FlightGazer-init.sh` was designed to make running it smoother by handling the initial setup, making sure all the dependencies are there before running the actual python script, and automatically using the full paths for both the virtual python environment binaries and for the script itself, along with handling any arguments/flags that need to be passed.
@@ -257,13 +257,13 @@ Simply delete the folder (and the virtual python environment if you set that up 
 
 ## 🐛 Known Issues and Shortcomings
 
-<details><summary><b>Expand/Collapse</b></summary>
+<details><summary><b>Show/Hide</b></summary>
 
-- Flyby stats are not 100% accurate
+- Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in `config.py`)
   - This stat relies on the number of *unique planes seen*, not each occurence of an actual flyby
     - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
-  - For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby
-  - This may be fixed in a later release
+  - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
+  
 - If using `No Filter` mode and restarting FlightGazer often, we can artifically inflate the flyby count
   - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of planes
   - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of plane IDs it keeps track of for flybys
@@ -275,7 +275,7 @@ Simply delete the folder (and the virtual python environment if you set that up 
 <br >
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
-## ✏️ Changelog
+## ✏️ Changelog & Planned Features
 Read: [`Changelog.txt`](./Changelog.txt).
 
 ## 📖 Additional Related/Similar Projects

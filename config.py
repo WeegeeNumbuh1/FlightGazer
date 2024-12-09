@@ -1,5 +1,5 @@
 ''' Configuration file for FlightGazer '''
-CONFIG_VERSION: str = "v.1.2"
+CONFIG_VERSION: str = "v.1.3"
 
 # ===== General settings =====
 # ============================
@@ -7,11 +7,20 @@ CONFIG_VERSION: str = "v.1.2"
 FLYBY_STATS_ENABLED: bool = True
 ''' Save general stats of planes and API usage to a CSV file in the directory this is stored in '''
 
-HEIGHT_LIMIT: int = 15000
-''' Filter out planes at a altitude higher than this (in feet) '''
+UNITS: int = 0
+''' Select which units to use. 
+0 = aeronautical (nmi, ft, kt)
+1 = metric (km, m, km/h)
+2 = imperial (mi, ft, mph) '''
+
+HEIGHT_LIMIT: float = 15000
+''' Filter out planes at an altitude higher than this (feet or meters)'''
 
 RANGE: float = 2
-''' Radius of which planes need to be in for detailed tracking (in nautical miles) '''
+''' Radius of which planes need to be in for detailed tracking (nautical miles, kilometers, or miles) '''
+
+FLYBY_STALENESS: int = 60
+''' If the same plane appears again before this time, do not consider it as a flyby (in minutes) '''
 
 API_KEY: str = ""
 ''' Put your FlightAware API key here. Leave as "" to not use the API '''

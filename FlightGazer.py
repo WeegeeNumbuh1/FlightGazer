@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.2.2 BETA --- 2024-12-08'
+VERSION: str = 'v.1.3.0 --- 2024-12-09'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -145,21 +145,25 @@ if INTERACTIVE == False:
 
 # define our settings and initalize to defaults
 FLYBY_STATS_ENABLED: bool = False
-HEIGHT_LIMIT = 15000
-RANGE = 2
-API_KEY = ""
-API_DAILY_LIMIT = None
-CLOCK_24HR = True
-CUSTOM_DUMP1090_LOCATION = ""
-CUSTOM_DUMP978_LOCATION = ""
-BRIGHTNESS = 100
-GPIO_SLOWDOWN = 2
-HAT_PWM_ENABLED = False
-RGB_ROWS = 32
-RGB_COLS = 64
-LED_PWM_BITS = 8
+HEIGHT_LIMIT: float = 15000
+RANGE: float = 2
+API_KEY: str = ""
+API_DAILY_LIMIT: int|None = None
+CLOCK_24HR: bool = True
+CUSTOM_DUMP1090_LOCATION: str = ""
+CUSTOM_DUMP978_LOCATION: str = ""
+BRIGHTNESS: int = 100
+GPIO_SLOWDOWN: int = 2
+HAT_PWM_ENABLED: bool = False
+RGB_ROWS: int = 32
+RGB_COLS: int = 64
+LED_PWM_BITS: int = 8
+UNITS: int = 0
+FLYBY_STALENESS: int = 60
 
 # create the above as a dictionary
+# NB: if we don't want to load certain settings,
+#     we can simply remove elements from this dictionary
 settings_values: dict = {
     "FLYBY_STATS_ENABLED": FLYBY_STATS_ENABLED,
     "HEIGHT_LIMIT": HEIGHT_LIMIT,
@@ -175,11 +179,15 @@ settings_values: dict = {
     "RGB_ROWS": RGB_ROWS,
     "RGB_COLS": RGB_COLS,
     "LED_PWM_BITS": LED_PWM_BITS,
+    "UNITS": UNITS,
+    "FLYBY_STALENESS": FLYBY_STALENESS,
 }
 
 settings_module_name = "config"
+CONFIG_MISSING: bool = False
 if importlib.util.find_spec(settings_module_name, package=None) is None:
     print(f"Warning: Cannot find configuration file \'config.py\' in \'{CURRENT_DIR}\'. Using Defaults.")
+    CONFIG_MISSING = True
 
 ''' We do the next block to enable backward compatibility for older config versions.
 In the future, additional settings could be defined, which older config files
@@ -189,9 +197,17 @@ for key in settings_values:
         globals()[f"{key}"] = getattr(import_module(settings_module_name), key)
     except (ModuleNotFoundError, NameError, AttributeError):
         globals()[f"{key}"] = settings_values[key] # ensure we can return to default values
+        if not CONFIG_MISSING:
+            print(f"Notice: Configuration file missing \'{key}\'. Using default value: \'{settings_values[key]}\'")
+else:
+    if not CONFIG_MISSING:
+        try:
+            print(f"Loaded settings from configuration file. Version: {getattr(import_module(settings_module_name), 'CONFIG_VERSION')}")
+        except:
+            print(f"Loaded settings from configuration file.")
 
 # our global variables
-general_stats: list = []
+general_stats: dict = {'Tracking':0, 'Range':0}
 """ general dump1090 stats (updated per loop) """
 relevant_planes: list = []
 """ list of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()`) """
@@ -209,8 +225,9 @@ focus_plane_ids_discard = set()
 focus_plane_api_results = deque([None] * 25, maxlen=25)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`} """
-unique_planes_seen = set()
-""" set that tracks unique hex IDs of all plane flybys in a day """
+unique_planes_seen: list = []
+""" list of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
+Keys are {`ID`, `Time`} """
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
 """ formatted dict for our Display driver.
 `idle_data` = {`Flybys`, `Track`, `Range`} """
@@ -241,12 +258,37 @@ if (sys.version_info > (3, 0)):
 else:
     def has_key(book, key):
         return book.has_key(key)
+    
+# define our units and multiplication factors (based on aeronautical units)
+distance_unit: str = "nmi"
+altitude_unit: str = "ft"
+speed_unit: str = "kt"
+distance_multiplier: float = 1
+altitude_multiplier: float = 1
+speed_multiplier: float = 1
+
+if UNITS == 1: # metric
+    distance_unit = "km"
+    altitude_unit = "m"
+    speed_unit = "km/h"
+    distance_multiplier = 1.852
+    altitude_multiplier = 0.3048
+    speed_multiplier = 1.85184
+    print("Info: Using metric units (km, m, km/h)")
+elif UNITS == 2: # imperial
+    distance_unit = "mi"
+    speed_unit = "mph"
+    distance_multiplier = 1.150779
+    speed_multiplier = 1.150783
+    print("Info: Using imperial units (mi, ft, mph)")
+else:
+    print("Info: Using default aeronautical units (nmi, ft, kt)")
 
 # make additional use for psutil
 this_process = psutil.Process()
 this_process_cpu = this_process.cpu_percent(interval=None)
 CORE_COUNT = os.cpu_count()
-if CORE_COUNT == None:
+if CORE_COUNT is None:
     CORE_COUNT = 1
 
 # =========== Program Setup I ==============
@@ -386,8 +428,10 @@ def dump1090_check() -> None:
         else:
             print(f"Could not find dump1090.json. dump1090 may not be loaded yet. Waiting 10 seconds and trying {tries} more time(s).")
             time.sleep(10)
+    else: # try it again one last time
+        DUMP1090_JSON, URL = probe1090()
 
-    if DUMP1090_JSON == None:
+    if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
         if DISPLAY_VALID == True:
             print("Error: dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
@@ -427,7 +471,7 @@ def schedule_thread() -> None:
 
 def configuration_check() -> None:
     """ Basic configuration checker """
-    global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED
+    global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS
     valid_rgb_sizes = [16, 32, 64]
     if RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes:
         print(f"Warning: selected RGB dimension ({RGB_ROWS}x{RGB_COLS}) is not a valid size.\n\
@@ -437,32 +481,37 @@ def configuration_check() -> None:
 
     if NOFILTER == False:
         # set hard limits for range
-        if RANGE > 20:
-            print(f"Warning: desired range ({RANGE}) is out of bounds. Limiting to 20.")
-            RANGE = 20
-        elif RANGE < 0.2:
-            print(f"Warning: desired range ({RANGE}) is too low. Limiting to 0.2.")
-            RANGE = 0.2
+        if RANGE > (20 * distance_multiplier):
+            print(f"Warning: desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
+            print("         If you would like to see more planes, consider \'No Filter\' mode. Use the \'-f\' flag.")
+            RANGE = (20 * distance_multiplier)
+        elif RANGE < (0.2 * distance_multiplier):
+            print(f"Warning: desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
+            RANGE = (0.2 * distance_multiplier)
 
-        height_warning = f"Warning: desired height cutoff ({HEIGHT_LIMIT}) is"
-        if HEIGHT_LIMIT >= 275000:
-            print(f"{height_warning} beyond the theoretical limit for flight. Setting to a reasonable value (60000).")
-            HEIGHT_LIMIT = 60000
-        elif HEIGHT_LIMIT > 60000 and HEIGHT_LIMIT < 275000:
-            print(f"{height_warning} beyond typical aviation flight levels. Limiting to 60000.")
-            HEIGHT_LIMIT = 60000
+        height_warning = f"Warning: desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
+        if HEIGHT_LIMIT >= (275000 * altitude_multiplier):
+            print(f"{height_warning} beyond the theoretical limit for flight. Setting to a reasonable value ({60000 * altitude_multiplier}{altitude_unit}).")
+            HEIGHT_LIMIT = (60000 * altitude_multiplier)
+        elif HEIGHT_LIMIT > (60000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
+            print(f"{height_warning} beyond typical aviation flight levels. Limiting to {60000 * altitude_multiplier}{altitude_unit}.")
+            HEIGHT_LIMIT = (60000 * altitude_multiplier)
         elif HEIGHT_LIMIT <= 0:
             print(f"{height_warning} ground level or underground.\n\
-            Planes won't be doing the thing planes do at that point (flying). Setting to a reasonable value (5000)")
-            HEIGHT_LIMIT = 5000
-        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < 100:
+            Planes won't be doing the thing planes do at that point (flying). Setting to a reasonable value ({5000 * altitude_multiplier}{altitude_unit})")
+            HEIGHT_LIMIT = (5000 * altitude_multiplier)
+        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (100 * altitude_multiplier):
             print(f"{height_warning} too low. Are planes landing on your house? \
-            Setting to a reasonable value (5000)")
+            Setting to a reasonable value ({5000 * altitude_multiplier}{altitude_unit})")
         del height_warning
 
     else:
         RANGE = 1000
         HEIGHT_LIMIT = 275000
+    
+    if FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440:
+        print(f"Warning: desired flyby staleness ({FLYBY_STALENESS}) is out of bounds. Setting to default (60)")
+        FLYBY_STALENESS = 60
 
     if API_KEY:
         print("API Key present, API will be used.")
@@ -487,6 +536,41 @@ def match_commandline(command_search: str, process_name: str) -> list:
            pass
  
     return list_of_processes
+
+def flyby_tracker(input_ID: str) -> None:
+    """ Adds given plane ID to `unique_planes_seen` list. """
+    global unique_planes_seen
+    def add_entry() -> None:
+        with threading.Lock():
+            unique_planes_seen.append(
+                {"ID": input_ID,
+                "Time": time.monotonic()
+                }
+            )
+    entry_count = len(unique_planes_seen)
+    # limit search to the following amount for speed reasons (<0.5ms);
+    # it's assumed that if a previously seen plane appears again and
+    # there have already been these many flybys, it's already stale
+    limit_count = 500
+    stale_age = FLYBY_STALENESS * 60 # seconds
+    if entry_count > limit_count: entry_count = limit_count
+    
+    # special case when there aren't any entries yet
+    if len(unique_planes_seen) == 0:
+        add_entry()
+        return
+    
+    for a in range(entry_count):
+        # search backwards through list
+        if unique_planes_seen[-a-1]['ID'] == input_ID:
+            if unique_planes_seen[-a-1]['Time'] - time.monotonic() > stale_age:
+                add_entry()
+                return
+            else: # if we recently have seen this plane
+                return
+    else: # finally, if we don't find the entry, add a new one
+        add_entry()
+        return
 
 # =========== Program Setup II =============
 # ==========================================
@@ -537,7 +621,11 @@ def flyby_stats() -> None:
                 api_hits[1] = int(last_line.split(",")[3])
                 api_hits[2] = int(last_line.split(",")[4])
                 for i in range(planes_seen): # fill the set with filler values, we don't recall the last contents of `unique_planes_seen`
-                    unique_planes_seen.add(i+1)
+                    unique_planes_seen.append(
+                        {"ID":i+1,
+                         "Time":time.monotonic(),
+                        }
+                         )
                 print(f"Successfully reloaded last written data for {date_now_str}.")
         return
     
@@ -579,10 +667,10 @@ def print_to_console() -> None:
     print(f"===== FlightGazer Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
     if DUMP1090_IS_AVAILABLE == False:
         print("********** dump1090 did not successfully load. There will be no data! **********\n")
-    if (rlat == None or rlon == None) and NOFILTER == False:
+    if (rlat is None or rlon is None) and NOFILTER == False:
         print("********** Location is not set! No airplane information will be shown! **********\n")
     if NOFILTER == False:
-        print(f"Filters enabled: <{RANGE}nmi, <{HEIGHT_LIMIT}ft\n(* indicates in focus, - indicates focused previously)")
+        print(f"Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}\n(* indicates in focus, - indicates focused previously)")
     else:
         print("******* No Filters mode enabled. All planes with locations detected by dump1090 shown. *******\n")
     if focus_plane_iter != 0:
@@ -593,7 +681,7 @@ def print_to_console() -> None:
         if focus_plane_ids_discard:
             if relevant_planes[a]['ID'] in focus_plane_ids_discard: print("- ", end='', flush=True)
         if focus_plane == relevant_planes[a]['ID']: print("* ", end='', flush=True)
-        print("[{a:03d}] {flight} ({iso}, {id}) Speed: {gs}kt Alt: {alt}ft Distance: {direc}{distance:.1f}nmi"
+        print("[{a:03d}] {flight} ({iso}, {id}) Speed: {gs:.1f}{s_u} Alt: {alt:.1f}{a_u} Distance: {direc}{distance:.1f}{d_u}"
             .format(flight=relevant_planes[a]['Flight'],
                     iso=relevant_planes[a]['Country'],
                     gs=relevant_planes[a]['Speed'],
@@ -601,7 +689,10 @@ def print_to_console() -> None:
                     distance=relevant_planes[a]['Distance'],
                     direc=relevant_planes[a]['Direction'],
                     id=relevant_planes[a]['ID'],
-                    a=a+1
+                    a=a+1,
+                    a_u=altitude_unit,
+                    s_u=speed_unit,
+                    d_u=distance_unit,
                     )
                 )
         
@@ -610,9 +701,9 @@ def print_to_console() -> None:
             if focus_plane_api_results[-i-1] is not None and focus_plane == focus_plane_api_results[-i-1]['ID']:
                 api_flight = focus_plane_api_results[-i-1]['Flight']
                 api_orig = focus_plane_api_results[-i-1]['Origin']
-                if api_orig == None: api_orig = "?"
+                if api_orig is None: api_orig = "?"
                 api_dest = focus_plane_api_results[-i-1]['Destination']
-                if api_dest == None: api_dest = "?"
+                if api_dest is None: api_dest = "?"
                 api_dpart_time = focus_plane_api_results[-i-1]['Departure']
                 if api_dpart_time is not None:
                     api_dpart_delta = (datetime.datetime.now(datetime.timezone.utc) - api_dpart_time)
@@ -626,7 +717,7 @@ def print_to_console() -> None:
 
     print(f"\n> dump1090 response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
-    print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}nmi")
+    print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}{distance_unit}")
     if API_KEY:
         print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
     print(f"> Total flybys today: {len(unique_planes_seen)}")
@@ -648,13 +739,14 @@ def main_loop_generator() -> None:
         return dirs[ix % len(dirs)]
     
     def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
-        """ Calculates distance between two points on Earth based on their latitude and longitude (in nautical miles) """
+        """ Calculates distance between two points on Earth based on their latitude and longitude (using selected units) """
         lat0 = lat0 * math.pi / 180.0
         lon0 = lon0 * math.pi / 180.0
         lat1 = lat1 * math.pi / 180.0
         lon1 = lon1 * math.pi / 180.0
-        # use Earth radius in nautical miles
-        return 3440 * math.acos(math.sin(lat0) * math.sin(lat1) + math.cos(lat0) * math.cos(lat1) * math.cos(abs(lon1 - lon0)))
+        # Earth radius in nautical miles = 3440
+        earth_radius = 3440 * distance_multiplier
+        return earth_radius * math.acos(math.sin(lat0) * math.sin(lat1) + math.cos(lat0) * math.cos(lat1) * math.cos(abs(lon1 - lon0)))
 
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
@@ -673,23 +765,23 @@ def main_loop_generator() -> None:
         """ Our dump1090 json parser. Must be fed by a valid `dump1090_heartbeat()` response. Returns a dictionary and a list.
         - dictionary: general stats to be updated per loop.
             - Tracking = total planes being tracked at current time
-            - Range = maximum range of tracked planes from your location (in nautical miles)
+            - Range = maximum range of tracked planes from your location (in selected units)
         - list: list of nested dictionaries that describes each plane found within `HEIGHT_LIMIT` and `RANGE` and updates per loop.
         If no planes are found or location is not set, this will return an empty list.
             - ID: ICAO hex of airplane
             - Flight: Callsign (falls back to registration and finally hex)
             - Country: Returns two letter ISO code based on ICAO hex
-            - Altitude: Plane's altitude in feet. Returns 0 if can't be determined or if the plane is on the ground.
-            - Speed: Plane's ground speed in knots. Returns 0 if can't be determined.
-            - Distance: Plane's distance from your location in nautical miles. Returns 0 if location is not defined.
+            - Altitude: Plane's altitude in the selected units. Returns 0 if can't be determined or if the plane is on the ground.
+            - Speed: Plane's ground speed in selected units. Returns 0 if can't be determined.
+            - Distance: Plane's distance from your location in the selected units. Returns 0 if location is not defined.
             - Direction: Cardinal direction of plane in relation to your location. Returns an empty string if location is not defined.
         """
         # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
 
         aircraft_data = dump1090_data
-        total = 0
-        max_range = 0
+        total: int = 0
+        max_range: float = 0
         ranges = []
         planes = []
         
@@ -698,7 +790,7 @@ def main_loop_generator() -> None:
                 seen_pos = a.get('seen_pos')
                 # seen_pos = a.get('seen') # use last seen versus last seen position
                 # filter planes that have valid tracking data and were seen recently
-                if seen_pos == None or seen_pos > 60:
+                if seen_pos is None or seen_pos > 60:
                     continue
                 total +=1
                 if rlat is not None and rlon is not None:
@@ -709,14 +801,17 @@ def main_loop_generator() -> None:
                 if (NOFILTER == False and (distance < RANGE and distance > 0)) or\
                     NOFILTER == True:
                     alt_baro = a.get('alt_baro')
-                    if alt_baro == "ground": alt_baro = 0
-                    if alt_baro is None or alt_baro < HEIGHT_LIMIT:
+                    if alt_baro is None or alt_baro == "ground": alt_baro = 0
+                    alt_baro = alt_baro * altitude_multiplier
+                    if alt_baro < HEIGHT_LIMIT:
                         hex = a.get('hex')
                         if hex is None: hex = "?"
                         # lat = a.get('lat')
                         # lon = a.get('lon')
                         # rssi = a.get('rssi')
                         gs = a.get('gs')
+                        if gs is None: gs = 0
+                        gs = gs * speed_multiplier
                         flight = a.get('flight')
                         if rlat is not None:
                             direc = relative_direction(rlat, rlon, a.get('lat'), a.get('lon'))
@@ -724,7 +819,6 @@ def main_loop_generator() -> None:
                             direc = ""
                         iso_code = flags.getICAO(hex).upper()
                         registration = registrations.registration_from_hexid(hex)
-                        if gs is None: gs = 0
                         if flight is None:
                             # fallback to registration, then ICAO hex
                             if registration is not None:
@@ -733,7 +827,6 @@ def main_loop_generator() -> None:
                                 flight = hex
                         else:
                             flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
-                        if alt_baro is None: alt_baro = 0
                         planes.append(
                             {
                             "ID": hex,
@@ -745,7 +838,7 @@ def main_loop_generator() -> None:
                             "Direction": direc
                             }
                         )
-                        unique_planes_seen.add(hex)
+                        flyby_tracker(hex)
 
             if not ranges:
                 max_range = 0
@@ -1109,7 +1202,7 @@ class DisplayFeeder:
                     gs_i = str(round(relevant_planes[a]['Speed'], 1))
                     if len(gs_i) <= 4: gs = gs_i
                     elif len(gs_i) > 4: gs = gs_i[:3]
-                    alt = str(relevant_planes[a]['Altitude'])
+                    alt = str(int(round(relevant_planes[a]['Altitude'], 0)))
                     # distance readout is limited to 5 characters (2 direction, 3 value);
                     # if distance >= 10, just get us the integers
                     dist_i = round(relevant_planes[a]['Distance'], 1)
