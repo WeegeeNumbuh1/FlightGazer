@@ -1,12 +1,17 @@
 FlightGazer Changelog
 
-v.1.3.1 (planned)
-    - Add more screen functionality for non-API users
-        - Selection not finalized but the framework to support these changes are present:
-            - RSSI instead of time
-            - Latitude instead of origin airport
-            - Longitude instead of destination airport
-        - Make this a toggleable option
+v.1.4.0 - 2024-12-10
+    - NEW: More screen functionality for non-API users via new mode, ENHANCED_READOUT
+        - Latitude and longitude readout instead of origin and destination
+        - RSSI instead of time
+        - Ground track
+        - Vertical speed
+        - This is a toggleable option and overrides API access; even if a key is given, it will not fetch the API
+    - Small plane readout layout tweaks due to above change
+    - Minor plane selector algorithm tweak
+    - Completely overhauled interactive display routine for more readable layout
+    - More plane details in interactive readout to reflect new ENHANCED_READOUT mode
+    - Improved screen data refresh responsiveness and switchover
 
 v.1.3.0 - 2024-12-09
     - NEW: User selectable units

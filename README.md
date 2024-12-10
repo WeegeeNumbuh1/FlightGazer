@@ -34,6 +34,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 - Visualize and figure out what planes are flying nearby your location, in a cool-looking way!
   - Shows a plane's callsign (or registration as fallback), distance *and* direction from your location, the plane's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the plane has been flying
+  - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more plane info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
 - It's a neat looking clock when there aren't any planes flying overhead
   - When `dump1090` is running, shows overall stats like how many planes you're tracking at the moment, how many planes flew by today, and the furthest plane you can detect
 - Automatically switches to other plane(s) if more than one is within the area
@@ -68,7 +69,7 @@ Using this project assumes you have the following:
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see Configuration section)
 - Python 3.8 or newer
-- Linux distros:
+- *for Linux distros:*
   - `apt` as the package manager
   - A working internet connection for setup
   - Root access (necessary for accessing the RGBMatrix hardware)
@@ -145,6 +146,7 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 > [!NOTE]
 > By default, the script is designed to run at boot (by adding an entry to `rc.local` on initial setup) and telling the python script to minimize its console output.
 
+### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
 ```
 sudo path/to/FlightGazer/FlightGazer-init.sh
@@ -154,15 +156,15 @@ The script automatically detects that you're running interactively and will disp
 
 ```
 ===== FlightGazer Console Output ===== Time now: 2024-12-01 00:00:00 | Runtime: 98 days, 23:48:05
-Filters enabled: <2nmi, <15000ft
+Filters enabled: <60nmi, <15000ft
 (* indicates in focus, - indicates focused previously)
-[Inside focus loop 5, watching: 'a382b6']
+[Inside focus loop 64, watching: 'aa3ae5']
 
-Plane scratchpad: {'a382b6'}
-* [001] DAL2231 (US, a382b6) Speed: 240.8kt Alt: 6100ft Distance: W 1.4nmi
-[002] JZA958 (CA, c00b93) Speed: 186.4kt Alt: 5600ft Distance: SW2.0nmi 
+Plane scratchpad: {'aa3ae5', 'a10d75'}
+*   [001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min | DIST: NW 22.4nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
+  - [002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min | DIST: E  53.2nmi (4x.985, -8x.078) | RSSI: -23.2dBFS
 
-API results for DAL2231: ORD -> SLC, 0:36 flight time
+API results for UAL343: ORD -> SFO, 0:24 flight time
 
 > dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
 > Detected 154 plane(s), 2 plane(s) in range, max range: 177.2nmi

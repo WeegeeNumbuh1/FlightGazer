@@ -1,5 +1,5 @@
 ''' Configuration file for FlightGazer '''
-CONFIG_VERSION: str = "v.1.3"
+CONFIG_VERSION: str = "v.1.4"
 
 # ===== General settings =====
 # ============================
@@ -21,6 +21,11 @@ RANGE: float = 2
 
 FLYBY_STALENESS: int = 60
 ''' If the same plane appears again before this time, do not consider it as a flyby (in minutes) '''
+
+ENHANCED_READOUT: bool = False
+''' If True, show more details on plane info screen and replaces origin and destination readout.
+Will not use API even if a key is provided. Useful if API is not in use.
+Additional details include plane coordinates, ground track, vertical rate, and RSSI '''
 
 API_KEY: str = ""
 ''' Put your FlightAware API key here. Leave as "" to not use the API '''

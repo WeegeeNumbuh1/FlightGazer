@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.3.0 --- 2024-12-09'
+VERSION: str = 'v.1.4.0 --- 2024-12-10'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -160,6 +160,7 @@ RGB_COLS: int = 64
 LED_PWM_BITS: int = 8
 UNITS: int = 0
 FLYBY_STALENESS: int = 60
+ENHANCED_READOUT: bool = False
 
 # create the above as a dictionary
 # NB: if we don't want to load certain settings,
@@ -181,6 +182,7 @@ settings_values: dict = {
     "LED_PWM_BITS": LED_PWM_BITS,
     "UNITS": UNITS,
     "FLYBY_STALENESS": FLYBY_STALENESS,
+    "ENHANCED_READOUT": ENHANCED_READOUT,
 }
 
 settings_module_name = "config"
@@ -233,7 +235,11 @@ idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
 `idle_data` = {`Flybys`, `Track`, `Range`} """
 active_data: dict = {}
 """ formatted dict for our Display driver.
-`active_data` = {`Callsign`, `Origin`, `Destination`, `FlightTime`, `Altitude`, `Speed`, `Distance`, `Country`, `ActivePlanes`} or {}"""
+`active_data` = {
+`Callsign`, `Origin`, `Destination`, `FlightTime`,
+`Altitude`, `Speed`, `Distance`, `Country`,
+`Latitude`, `Longitude`, `Track`, `VertSpeed`, `RSSI`
+} or {} """
 active_plane_display: bool = False
 """ which scene to put on the display. False = clock/idle, True = active plane """
 rlat: float | None = None
@@ -317,6 +323,7 @@ def probe1090() -> str | None:
         [CUSTOM_DUMP1090_LOCATION,
          "http://localhost/tar1090",
          "http://localhost/skyaware",
+         "http://localhost/dump1090-fa",
          "http://localhost:8080",]
          )
     while True:
@@ -514,9 +521,16 @@ def configuration_check() -> None:
         FLYBY_STALENESS = 60
 
     if API_KEY:
-        print("API Key present, API will be used.")
+        if ENHANCED_READOUT == False:
+            print("API Key present, API will be used.")
+        else:
+            print("API Key present, but ENHANCED_READOUT setting is enabled. API will not be used.")
     else:
-        print("No API Key present. Additional airplane info will not be available.")
+        if ENHANCED_READOUT == False:
+            print("No API Key present. Additional airplane info will not be available.")
+            print("Setting ENHANCED_READOUT to \'True\' is recommended.")
+        else:
+            print("No API Key present. Instead, additional dump1090 info will be substituted.")
 
 def match_commandline(command_search: str, process_name: str) -> list:
     """ Find all processes associated with a command line and process name that matches the given inputs.
@@ -678,24 +692,58 @@ def print_to_console() -> None:
         print(f"Plane scratchpad: {focus_plane_ids_scratch}")
 
     for a in range(plane_count):
-        if focus_plane_ids_discard:
-            if relevant_planes[a]['ID'] in focus_plane_ids_discard: print("- ", end='', flush=True)
-        if focus_plane == relevant_planes[a]['ID']: print("* ", end='', flush=True)
-        print("[{a:03d}] {flight} ({iso}, {id}) Speed: {gs:.1f}{s_u} Alt: {alt:.1f}{a_u} Distance: {direc}{distance:.1f}{d_u}"
-            .format(flight=relevant_planes[a]['Flight'],
-                    iso=relevant_planes[a]['Country'],
-                    gs=relevant_planes[a]['Speed'],
-                    alt=relevant_planes[a]['Altitude'],
-                    distance=relevant_planes[a]['Distance'],
-                    direc=relevant_planes[a]['Direction'],
-                    id=relevant_planes[a]['ID'],
-                    a=a+1,
-                    a_u=altitude_unit,
-                    s_u=speed_unit,
-                    d_u=distance_unit,
-                    )
-                )
+        print_info = []
+        # algorithm indicators
+        if NOFILTER == False:
+            if focus_plane == relevant_planes[a]['ID']:
+                print_info.append("* ")
+            else:
+                print_info.append("  ")
+            if focus_plane_ids_discard:
+                if relevant_planes[a]['ID'] in focus_plane_ids_discard:
+                    print_info.append("- ")
+                else:
+                    print_info.append("  ")
         
+        # counter, callsign, iso, id
+        print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
+            a=a+1,
+            flight=str(relevant_planes[a]['Flight']).ljust(8),
+            iso=relevant_planes[a]['Country'],
+            id=str(relevant_planes[a]['ID']).ljust(6)
+        ))
+        print_info.append(" | ")
+
+        # speed section
+        print_info.append("SPD: ")
+        print_info.append("{gs:.1f}".format(gs=relevant_planes[a]['Speed']).rjust(5))
+        print_info.append(f"{speed_unit} @ ")
+        print_info.append("{track:.1f}°".format(track=relevant_planes[a]['Track']).rjust(6))
+        print_info.append(" | ")
+        # altitude section
+        print_info.append("ALT: ")
+        print_info.append("{alt:.1f}".format(alt=relevant_planes[a]['Altitude']).rjust(7))
+        print_info.append(f"{altitude_unit}, ")
+        print_info.append("{vs:.1f}".format(vs=relevant_planes[a]['VertSpeed']).rjust(7))
+        print_info.append(f"{altitude_unit}/min")
+        print_info.append(" | ")
+        # distance section
+        print_info.append(f"DIST: {relevant_planes[a]['Direction']}")
+        print_info.append("{distance:.1f}".format(distance=relevant_planes[a]['Distance']).rjust(5))
+        print_info.append(f"{distance_unit} ")
+        print_info.append("({lat:.3f}, {lon:.3f})".format(
+            lat=relevant_planes[a]['Latitude'],
+            lon=relevant_planes[a]['Longitude'],
+        ).ljust(16))
+        print_info.append(" | ")
+        # last sectiom
+        print_info.append("RSSI: ")
+        print_info.append("{rssi}".format(rssi=relevant_planes[a]['RSSI']).rjust(5))
+        print_info.append("dBFS")
+
+        # finally, print it all
+        print("".join(print_info))
+     
     for i in range(len(focus_plane_api_results)): # only shows if API has something to show
         try:
             if focus_plane_api_results[-i-1] is not None and focus_plane == focus_plane_api_results[-i-1]['ID']:
@@ -775,6 +823,11 @@ def main_loop_generator() -> None:
             - Speed: Plane's ground speed in selected units. Returns 0 if can't be determined.
             - Distance: Plane's distance from your location in the selected units. Returns 0 if location is not defined.
             - Direction: Cardinal direction of plane in relation to your location. Returns an empty string if location is not defined.
+            - Latitude
+            - Longitude
+            - Track: Plane's track over ground in degrees
+            - VertSpeed: Plane's rate of barometric altitude in units/minute
+            - RSSI: Plane's average signal power in dbFS
         """
         # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
@@ -793,8 +846,10 @@ def main_loop_generator() -> None:
                 if seen_pos is None or seen_pos > 60:
                     continue
                 total +=1
+                lat = a.get('lat')
+                lon = a.get('lon')
                 if rlat is not None and rlon is not None:
-                    distance = greatcircle(rlat, rlon, a.get('lat'), a.get('lon'))
+                    distance = greatcircle(rlat, rlon, lat, lon)
                 else:
                     distance = 0
                 ranges.append(distance)
@@ -806,15 +861,19 @@ def main_loop_generator() -> None:
                     if alt_baro < HEIGHT_LIMIT:
                         hex = a.get('hex')
                         if hex is None: hex = "?"
-                        # lat = a.get('lat')
-                        # lon = a.get('lon')
-                        # rssi = a.get('rssi')
+                        rssi = a.get('rssi')
+                        if rssi is None: rssi = 0
+                        vs = a.get('baro_rate')
+                        if vs is None: vs = 0
+                        vs = vs * altitude_multiplier
+                        track = a.get('track')
+                        if track is None: track = 0
                         gs = a.get('gs')
                         if gs is None: gs = 0
                         gs = gs * speed_multiplier
                         flight = a.get('flight')
                         if rlat is not None:
-                            direc = relative_direction(rlat, rlon, a.get('lat'), a.get('lon'))
+                            direc = relative_direction(rlat, rlon, lat, lon)
                         else:
                             direc = ""
                         iso_code = flags.getICAO(hex).upper()
@@ -835,7 +894,12 @@ def main_loop_generator() -> None:
                             "Altitude": alt_baro,
                             "Speed": gs,
                             "Distance": distance,
-                            "Direction": direc
+                            "Direction": direc,
+                            "Latitude": lat,
+                            "Longitude": lon,
+                            "Track": track,
+                            "VertSpeed": vs,
+                            "RSSI": rssi,
                             }
                         )
                         flyby_tracker(hex)
@@ -939,6 +1003,7 @@ class AirplaneParser:
                     focus_plane = random.choice(scratch_list) # get us the next plane from all remaining planes that were not tracked previously
                 elif len(focus_plane_ids_scratch) == 0: # when we have cycled through all planes available, fall back to the first plane in list
                     focus_plane = get_plane_list[0]
+                    focus_plane_ids_discard.clear # reset this set so that we can start cycling though planes again
 
         start_time = time.perf_counter()
         focus_plane_i = focus_plane # get previously assigned focus plane into this loop's copy
@@ -1020,7 +1085,7 @@ class APIFetcher:
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
         if not API_KEY: return
-        if NOFILTER == True: return
+        if NOFILTER == True or ENHANCED_READOUT == True: return
         global process_time, focus_plane_api_results, api_hits
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
@@ -1155,7 +1220,10 @@ class DisplayFeeder:
         into a coalesed data packet for the Display. We also control scene switching here and which scene to display.
         Outputs two dicts, `idle_stats` and `active_stats`.
         `idle_stats` = {'Flybys', 'Track', 'Range'}
-        `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime', 'Altitude', 'Speed', 'Distance', 'Country', 'ActivePlanes'} or {}.
+        `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime',
+                          'Altitude', 'Speed', 'Distance', 'Country',
+                          'Latitude', 'Longitude', 'Track', 'VertSpeed', 'RSSI'}
+                       or {}.
         All values are formatted as strings. """
         global idle_data, active_data, active_plane_display
         displayfeeder_start = time.perf_counter()
@@ -1193,6 +1261,11 @@ class DisplayFeeder:
             gs = ""
             alt = ""
             distance = ""
+            lat = ""
+            lon = ""
+            track = ""
+            vs = ""
+            rssi = ""
             for a in range(relevant_plane_count):
                 if focus_plane == relevant_planes[a]['ID']:
                     flight_name = str(relevant_planes[a]['Flight'])
@@ -1211,6 +1284,28 @@ class DisplayFeeder:
                     elif dist_i > 100: dist = str(dist_i)[:3]
                     else: dist = ""
                     distance = str(relevant_planes[a]['Direction']) + dist
+                    # do our coordinate formatting
+                    lat_i = relevant_planes[a]['Latitude']
+                    lon_i = relevant_planes[a]['Longitude']
+                    if lat_i >= 0: lat_str = "N"
+                    elif lat_i <0: lat_str = "S"
+                    if lon_i >= 0: lon_str = "E"
+                    elif lon_i <0: lon_str = "W"
+                    lat = "{0:.3f}".format(abs(lat_i)) + lat_str
+                    lon = "{0:.3f}".format(abs(lon_i)) + lon_str
+                    track = "T " + str(int(round(relevant_planes[a]['Track'], 0))) + "°"
+                    # vertical speed is an interesting one; we are limited to 6 characters:
+                    # 1 for indicator, 1 for sign, and 4 for values
+                    vs_i = int(round(relevant_planes[a]['VertSpeed'], 0))
+                    vs_str = str(vs_i)
+                    if abs(vs_i) >= 10000:
+                        vs_str = str(round(vs_i / 1000, 1))
+                    if vs_i > 0:
+                        vs_str = "+" + vs_str
+                    elif vs_i == 0:
+                        vs_str = " " + vs_str
+                    vs = "V" + vs_str
+                    rssi = str(relevant_planes[a]['RSSI'])
 
             # get us our API results from focus_plane_api_results
             api_orig = filler_text
@@ -1241,7 +1336,11 @@ class DisplayFeeder:
                 'Speed': gs,
                 'Distance': distance,
                 'Country': iso,
-                'ActivePlanes': str(relevant_plane_count),
+                'Latitude': lat,
+                'Longitude': lon,
+                'Track': track,
+                'VertSpeed': vs,
+                'RSSI': rssi,
             }
         with threading.Lock():
             if NOFILTER == False:
@@ -1344,6 +1443,11 @@ class Display(
         self._last_distance = None
         self._last_country = None
         self._last_activeplanes = None
+        self._last_latitude = None
+        self._last_longitude = None
+        self._last_groundtrack = None
+        self._last_vertspeed = None
+        self._last_rssi = None
 
         # Initalize animator
         super().__init__()
@@ -1451,7 +1555,7 @@ class Display(
             )
 
     """ AM/PM Indicator """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def ampm(self, count):
         if self.active_plane_display == True or CLOCK_24HR == True:
             self._last_ampm = None
@@ -1488,7 +1592,7 @@ class Display(
             )
     
     """ Day of the week """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def day(self, count):
         if self.active_plane_display == True:
             self._last_day = None
@@ -1525,7 +1629,7 @@ class Display(
             )
 
     """ Date """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def date(self, count):
         if self.active_plane_display == True:
             self._last_date = None
@@ -1564,7 +1668,7 @@ class Display(
     # ========= Idle Stats Elements ==========
     # ========================================
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def idle_header(self, count):
         if self.active_plane_display == True: return
         HEADER_TEXT_FONT = fonts.smallest
@@ -1598,7 +1702,7 @@ class Display(
         )
     
     """ Our idle stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def stats_readout(self, count):
         if self.active_plane_display == True:
             self._last_flybys = None
@@ -1684,7 +1788,7 @@ class Display(
     # ======== Active Plane Readout ==========
     # ========================================
     """ Header information: Callsign, Distance, Country """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def top_header(self, count):
         if self.active_plane_display == False:
             self._last_callsign = None
@@ -1697,7 +1801,7 @@ class Display(
         COUNTRY_COLOR = colors.GREY
         BASELINE_Y = 6
         CALLSIGN_X_POS = 1
-        DISTANCE_X_POS = 34
+        DISTANCE_X_POS = 35
         COUNTRY_X_POS = 56
         try:
             callsign_now = active_data['Callsign']
@@ -1767,9 +1871,9 @@ class Display(
         )
 
     """ Our journey indicator (origin and destination) """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def journey(self, count):
-        if self.active_plane_display == False:
+        if self.active_plane_display == False or ENHANCED_READOUT == True:
             self._last_origin = None
             self._last_destination = None
             return
@@ -1902,8 +2006,68 @@ class Display(
                 destination_now
             )
 
+    """ Enhanced readout: replace journey with latitude and longitude """
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    def lat_lon(self, count):
+        if self.active_plane_display == False or ENHANCED_READOUT == False:
+            self._last_latitude = None
+            self._last_longitude = None
+            return
+        X_POS = 1
+        LAT_Y_POS = 12
+        LON_Y_POS = 18
+        COLOR = colors.ORANGE
+        FONT = fonts.extrasmall
+        try:
+            lat_now = active_data['Latitude']
+            lon_now = active_data['Longitude']
+        except: return
+        # Undraw sections
+        if self._last_latitude != lat_now:
+            if self._last_latitude is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    FONT,
+                    X_POS,
+                    LAT_Y_POS,
+                    colors.BLACK,
+                    self._last_latitude
+                )
+        if self._last_longitude != lon_now:
+            if self._last_longitude is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    FONT,
+                    X_POS,
+                    LON_Y_POS,
+                    colors.BLACK,
+                    self._last_longitude
+                )
+        
+        # store current data for readout in the future
+        self._last_latitude = lat_now
+        self._last_longitude = lon_now
+
+        # update values on display
+        _ = graphics.DrawText(
+            self.canvas,
+            FONT,
+            X_POS,
+            LAT_Y_POS,
+            COLOR,
+            lat_now
+        )
+        _ = graphics.DrawText(
+            self.canvas,
+            FONT,
+            X_POS,
+            LON_Y_POS,
+            COLOR,
+            lon_now
+        )
+
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def active_header(self, count):
         if self.active_plane_display == False: return
         HEADER_TEXT_FONT = fonts.extrasmall
@@ -1927,17 +2091,27 @@ class Display(
             SPEED_HEADING_COLOR,
             "SPD"
         )
-        _ = graphics.DrawText(
-            self.canvas,
-            HEADER_TEXT_FONT,
-            48,
-            ACTIVE_TEXT_Y,
-            TIME_HEADING_COLOR,
-            "TIME"
-        )
+        if ENHANCED_READOUT == False:
+            _ = graphics.DrawText(
+                self.canvas,
+                HEADER_TEXT_FONT,
+                48,
+                ACTIVE_TEXT_Y,
+                TIME_HEADING_COLOR,
+                "TIME"
+            )
+        else:
+            _ = graphics.DrawText(
+                self.canvas,
+                HEADER_TEXT_FONT,
+                47,
+                ACTIVE_TEXT_Y,
+                TIME_HEADING_COLOR,
+                "RSSI"
+            )
 
     """ Our active stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def active_readout(self, count):
         if self.active_plane_display == False:
             self._last_altitude = None
@@ -1955,7 +2129,7 @@ class Display(
         def right_align(string: str) -> int:
             """ special case to align-right the time output """
             length_s = len(string)
-            if length_s <= 4: return 50
+            if length_s <= 4: return 48
             elif length_s == 5: return 44
             elif length_s >= 6: return 40
             
@@ -1963,6 +2137,7 @@ class Display(
             altitude_now = active_data['Altitude']
             speed_now = active_data['Speed']
             flighttime_now = active_data['FlightTime']
+            rssi_now = active_data['RSSI']
         except: return
         # Undraw sections
         if self._last_altitude != altitude_now:
@@ -1985,21 +2160,34 @@ class Display(
                     colors.BLACK,
                     self._last_speed
                 )
-        if self._last_flighttime != flighttime_now:
-            if self._last_flighttime is not None:
-                _ = graphics.DrawText(
-                    self.canvas,
-                    STATS_TEXT_FONT,
-                    right_align(self._last_flighttime),
-                    READOUT_TEXT_Y,
-                    colors.BLACK,
-                    self._last_flighttime
-                )
+        if ENHANCED_READOUT == False:
+            if self._last_flighttime != flighttime_now:
+                if self._last_flighttime is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        STATS_TEXT_FONT,
+                        right_align(self._last_flighttime),
+                        READOUT_TEXT_Y,
+                        colors.BLACK,
+                        self._last_flighttime
+                    )
+        else:
+            if self._last_rssi != rssi_now:
+                if self._last_rssi is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        STATS_TEXT_FONT,
+                        right_align(self._last_rssi),
+                        READOUT_TEXT_Y,
+                        colors.BLACK,
+                        self._last_rssi
+                    )
 
         # store our current data for readout in the future
         self._last_altitude = altitude_now
         self._last_speed = speed_now
         self._last_flighttime = flighttime_now
+        self._last_rssi = rssi_now
 
         _ = graphics.DrawText(
             self.canvas,
@@ -2017,17 +2205,88 @@ class Display(
             SPEED_TEXT_COLOR,
             speed_now
         )
+        if ENHANCED_READOUT == False:
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                right_align(flighttime_now),
+                READOUT_TEXT_Y,
+                TIME_TEXT_COLOR,
+                flighttime_now
+            )
+        else:
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                right_align(rssi_now),
+                READOUT_TEXT_Y,
+                TIME_TEXT_COLOR,
+                rssi_now
+            )          
+
+    """ Enhanced readout: Ground track and Vertical Speed """
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    def enhanced(self, count):
+        if self.active_plane_display == False or ENHANCED_READOUT == False:
+            self._last_groundtrack = None
+            self._last_vertspeed = None
+            return
+        X_POS = 39
+        GT_Y_POS = 12
+        VS_Y_POS = 18
+        FONT = fonts.smallest
+        GT_COLOR = colors.PINK_DARK
+        VS_COLOR = colors.PURPLE
+        try:
+            groundtrack_now = active_data['Track']
+            vertspeed_now = active_data['VertSpeed']
+        except: return
+        # Undraw sections
+        if self._last_groundtrack != groundtrack_now:
+            if self._last_groundtrack is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    FONT,
+                    X_POS,
+                    GT_Y_POS,
+                    colors.BLACK,
+                    self._last_groundtrack
+                )
+        if self._last_vertspeed != vertspeed_now:
+            if self._last_vertspeed is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    FONT,
+                    X_POS,
+                    VS_Y_POS,
+                    colors.BLACK,
+                    self._last_vertspeed
+                )
+
+        # store current data for readout in the future
+        self._last_groundtrack = groundtrack_now
+        self._last_vertspeed = vertspeed_now
+
+        # update values on display
         _ = graphics.DrawText(
             self.canvas,
-            STATS_TEXT_FONT,
-            right_align(flighttime_now),
-            READOUT_TEXT_Y,
-            TIME_TEXT_COLOR,
-            flighttime_now
+            FONT,
+            X_POS,
+            GT_Y_POS,
+            GT_COLOR,
+            groundtrack_now
+        )
+        _ = graphics.DrawText(
+            self.canvas,
+            FONT,
+            X_POS,
+            VS_Y_POS,
+            VS_COLOR,
+            vertspeed_now
         )
 
     """ An indicator of how many planes are in the area """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
     def plane_count_indicator(self, count):
         if self.active_plane_display == False:
             self._last_activeplanes = None
