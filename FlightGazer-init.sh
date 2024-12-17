@@ -205,9 +205,9 @@ then
 
 	# for some reason RGBMatrixEmulator will write its config one directory up
 	# we make a config file first because by default it will output a ton of errors
-	if [ ! -f "../emulator_config.json" ]; then
+	if [ ! -f "${BASEDIR}/../emulator_config.json" ]; then
 	echo "  > Creating RGBMatrixEmulator settings..."
-	cat << EOF > ../emulator_config.json
+	cat << EOF > ${BASEDIR}/../emulator_config.json
 {
     "pixel_outline": 0,
     "pixel_size": 16,
