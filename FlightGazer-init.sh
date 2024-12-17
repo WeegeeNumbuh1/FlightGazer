@@ -132,6 +132,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use apt.${NC}"
 		sleep 2s
 		exit 1
+	fi
 
 	# check internet connection
 	wget -q --timeout=10 --spider http://google.com

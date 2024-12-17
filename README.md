@@ -97,7 +97,7 @@ git clone https://github.com/WeegeeNumbuh1/FlightGazer
 
 then run the following:
 ```
-sudo FlightGazer/FlightGazer-init.sh
+sudo bash FlightGazer/FlightGazer-init.sh
 ```
 which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.
 </details>
