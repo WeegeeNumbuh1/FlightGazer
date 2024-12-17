@@ -1,5 +1,13 @@
 FlightGazer Changelog
 
+v.1.5.0 - 2024-12-17
+    - Depreciate using rc.local for startup, systemd service is now the only startup method
+        - By default the script will now run in tmux
+        - Improved compatibility when running as a systemd service
+    - Even more improved signal handling for main python script
+    - RGBMatrixEmulator is now installed by default and is the fallback unless No-Display mode is enabled
+        - Restores same functionality found in v0.7.0 to v.0.9.0
+
 v.1.4.2 - 2024-12-17
     - FIXED: HTTP 403 errors due to lack of user-agent in json file requests
     - Some text output tweaks

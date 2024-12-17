@@ -52,10 +52,11 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - API limiting per day (those API calls can get expensive)
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Detailed console output when run interactively
-- Small memory footprint (about 10MB when running)
+- Small memory footprint
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
-  - Set up to automatically start on boot on a Raspberry Pi
+  - Set up to automatically start on boot via `systemd`
 - Can be configured to run automatically inside `tmux`
+- 🆕 Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
 
 ## 🛠️ Setup
 ### ⚠️ Prerequisites
@@ -71,30 +72,31 @@ Using this project assumes you have the following:
 - Python 3.8 or newer
 - A working internet connection for setup
 - *for Linux distros:*
+  - `ssh` access if running headless
   - `apt` as the package manager
   - Root access (necessary for accessing the RGBMatrix hardware)
   - `systemd` based system
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
-  - `rgbmatrix` does not need to be strictly installed to run this script (see Usage section)
+  - `rgbmatrix` does not need to be strictly installed to run this script (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - a `32x64` sized matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional plane information such as origin/destination airports
-- [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
+- [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional, installed by default when using the initalization script) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>
 
 ### 📶 Installation
-Make sure you meet the above the prerequisites. To begin:
+Make sure you meet the above prerequisites. To begin:
 ```
-git clone https://github.com/WeegeeNumbuh1/FlightGazer
+git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
 ```
 > [!NOTE]
-> It is recommended to configure your setup now before running the initalization file. See the Configuration section below, then return to this step.
+> Once the above command is completed, it is recommended to configure your setup now before running the initalization file. See the [Configuration](#️-configuration) section below, then return to this step.
 
 <details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
 
@@ -102,7 +104,7 @@ then run the following:
 ```
 sudo bash FlightGazer/FlightGazer-init.sh
 ```
-which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.
+which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards. ([Click here to view what the init.sh file does](#-misc))
 </details>
 <details><summary>if running Windows</summary>
 
@@ -125,7 +127,7 @@ If you don't care for running in a virtual environment, skip the `python3 -m ven
 
 ### 🎚️ Configuration
 
-The [`config.py`](./config.py) file is where settings are configured. It has descriptions/explanations for all configurable options. It needs to be in the same directory as the main script itself. Edit it before running FlightGazer.
+The [`config.py`](./config.py) file is where settings are configured. It has descriptions/explanations for all configurable options. It is found (and needs to be) in the same directory as the main script itself. Edit it as needed before running FlightGazer.
 
 > [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.
@@ -147,9 +149,11 @@ Example: `http://192.168.xxx.xxx:8080`
 ## 🏃‍♂️ Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
 
-> [!NOTE]
-> By default, the script is designed to run at boot (by adding an entry to `rc.local` on initial setup or via systemd with `flightgazer.service`) and telling the python script to minimize its console output.
-
+> [!IMPORTANT]
+> By default, the script is designed to run at boot (via systemd with `flightgazer.service`). You can check its status with:
+> ```
+> sudo systemctl status flightgazer.service
+> ```
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
 ```
@@ -187,8 +191,8 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 
 | Flag | Is interactive? | What it does |
 |---|---|:---:|
-| (no flag) | No | Default operating mode. Minimizes console output.
-|`-d`| Yes | Do not load any display driver. Only console output. |
+| (no flag) | No | Default operating mode. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
+|`-d`| Yes | Do not load any display driver. Only print console output. |
 |`-e`| No | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
 |`-f`| Yes | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all planes detected.<br>Useful for low traffic areas.|
 |`-t`| Yes | Run in `tmux`. Useful for long-running interactive sessions.
@@ -198,7 +202,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 <br>
 
 > [!TIP]
-> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware. <br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://ip-address-of-device-running-FlightGazer:8888`
+> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://ip-address-of-device-running-FlightGazer:8888`
 
 <details><summary>Advanced use</summary>
 
@@ -221,14 +225,14 @@ The main python file accepts the same arguments as the initialization script, bu
   - python3-dev
   - python3-venv
   - tmux
-- Writes startup entry for `FlightGazer-init.sh` in `rc.local` if not present
-- If `rc.local` doesn't exist, create a new systemd service `flightgazer.service` instead
+- Create a new systemd service `flightgazer.service`
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
   - requests
   - pydispatcher
   - schedule
   - psutil (usually provided in Raspberry Pi OS)
+  - RGBMatrixEmulator
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 
 </details>
@@ -247,9 +251,22 @@ Pass `-h` to see all operating modes.
 
 </details>
 
+<details><summary>Useful commands</summary>
+
+Terminating all FlightGazer-related processes (Linux):
+```
+kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}')
+```
+Changing `systemd` startup command
+```
+sudo nano /etc/systemd/system/flightgazer.service
+systemctl daemon-reload
+```
+</details>
+
 ## 🚮 Uninstall
 ```
-sudo /path/to/FlightGazer/uninstall.sh
+sudo bash /path/to/FlightGazer/uninstall.sh
 ```
 <details><summary>Windows</summary>
 
@@ -263,13 +280,14 @@ Simply delete the folder (and the virtual python environment if you set that up 
 **A:** Check the `HAT_PWM_ENABLED` value in `config.py` and make sure it matches your hardware setup.
 
 **Q:** Can I customize the colors?<br >
-**A:** Sure, just edit them in the script.
+**A:** Sure, just edit them in the script. (Check the functions inside the `Display` class in the main python file)
 
 **Q:** Can I customize the layout beyond what can be done in `config.py` (clock, plane info, etc)?<br >
 **A:** Sure, just like the last question, change some things in the script. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** What about showing other plane info like what airline it is or what kind of plane it is?<br >
-**A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).
+**A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
+You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.
 
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/)?<br >
 **A:** adsbdb only has reported route information for aircraft that have predetermined origins and destinations. In my experience, it cannot handle position-only flights (i.e. general aviation, military, etc) and is lacking information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
@@ -301,12 +319,17 @@ Found a bug? Want to suggest a new feature? Open an issue here on Github.
 ## ✏️ Changelog & Planned Features
 Read: [`Changelog.txt`](./Changelog.txt).
 
+Faraway ideas:
+- [ ] Docker image?
+
 ## 📖 Additional Related/Similar Projects
 
 - [Another `dump1090` x `rgbmatrix` project](https://github.com/Weslex/rpi-led-flight-tracker), but renders out a minimap instead and uses larger RGB matrix panels
   - Fun fact: I used the same font from the above project for FlightGazer
 - This [All About Circuits Article](https://www.allaboutcircuits.com/projects/track-overhead-flights-raspberry-pi-zero-w-software-defined-radio/) from 2017
   - Uses all the same core components that this project relies on at a surface-level: FlightAware's API (the older `Firehose` one), `dump1090`, `rgbmatrix`
+- [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the planes that flyby your location
+  - Inspired the functionality of the stats file FlightGazer writes out
   
 ## ✅ Acknowledgements
 Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator). This tool was invaluable for getting the layout dialed in and figuring out the logic needed to update the display correctly, all while avoiding having to program directly on the Raspberry Pi itself (VSCode Remote on a Zero 2W is literally impossible, I've tried).

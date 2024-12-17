@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.4.2 --- 2024-12-17'
+VERSION: str = 'v.1.5.0 --- 2024-12-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -142,9 +142,11 @@ if NODISPLAY == False:
         print("       If you're sure you don't want to use any display output,\n\
        use the \'-d\' flag to suppress this warning.\n")
         time.sleep(2)
+else:
+    DISPLAY_VALID = False
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
-# This affects how to handle our exit signals
+# This affects how to handle our exit signals (previously)
 if INTERACTIVE == False:
     if sys.__stdin__.isatty(): FORGOT_TO_SET_INTERACTIVE = True
 
@@ -305,8 +307,9 @@ if CORE_COUNT is None:
 # =========== Program Setup I ==============
 # ==========================================
 
-def sigterm_handler(signal, frame):
+def sigterm_handler(signum, frame):
     """ Shutdown worker threads and exit this program. """
+    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     end_time = round(time.monotonic() - START_TIME, 3)
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
     os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {datetime.datetime.now()}\n"))
@@ -2391,10 +2394,12 @@ read_1090_config()
 def main() -> None:
     """ Enters the main loop. """
     # register our loop breaker
-    if INTERACTIVE == False and FORGOT_TO_SET_INTERACTIVE == False:
-        signal.signal(signal.SIGTERM, sigterm_handler)
-    if INTERACTIVE == True or FORGOT_TO_SET_INTERACTIVE == True:
-        signal.signal(signal.SIGINT, sigterm_handler)
+    # if INTERACTIVE == False and FORGOT_TO_SET_INTERACTIVE == False:
+    #     signal.signal(signal.SIGTERM, sigterm_handler)
+    # if INTERACTIVE == True or FORGOT_TO_SET_INTERACTIVE == True:
+    #     signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
         
     periodic_stuff = threading.Thread(target=schedule_thread, name='Scheduling-Thread', daemon=True)
     periodic_stuff.start()
