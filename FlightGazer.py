@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.4.1 --- 2024-12-17'
+VERSION: str = 'v.1.4.2 --- 2024-12-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -25,7 +25,7 @@ import sys
 import math
 from pathlib import Path
 from contextlib import closing
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 import urllib.parse
 import json
 import signal
@@ -105,6 +105,8 @@ print(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
 print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{getuser()}\'")
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
+USER_AGENT: dict = {'User-Agent': "Wget/1.21.3"}
+""" Use Wget user-agent for our requests """
 DUMP1090_IS_AVAILABLE: bool = False
 """ If we fail to load dump1090, set to False and continue. We assume it isn't loaded at first. """
 LOOP_INTERVAL: float = 2
@@ -135,8 +137,11 @@ if NODISPLAY == False:
     except:
         DISPLAY_VALID = False
         print("ERROR: Cannot load display modules. There will be no display output!\n\
-    This script will still function as a basic flight parser and stat generator, if the environment allows.")
-        time.sleep(5)
+       This script will still function as a basic flight parser and stat generator,\n\
+       if the environment allows.")
+        print("       If you're sure you don't want to use any display output,\n\
+       use the \'-d\' flag to suppress this warning.\n")
+        time.sleep(2)
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals
@@ -331,7 +336,7 @@ def probe1090() -> str | None:
         if json_1090 == "nothing":
             return None, None
         try:
-            test1 = requests.get(json_1090 + '/data/aircraft.json', timeout=0.5)
+            test1 = requests.get(json_1090 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
             test1.raise_for_status()
             return json_1090 + '/data/aircraft.json', json_1090
         except:
@@ -347,7 +352,7 @@ def probe978() -> str | None:
         json_978 = next(locations, "nothing")
         if json_978 == "nothing": break
         try:
-            test1 = requests.get(json_978 + '/data/aircraft.json', timeout=0.5)
+            test1 = requests.get(json_978 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
             test1.raise_for_status()
             print(f"dump978 detected as well, at \'{json_978}\'")
             return json_978 + '/data/aircraft.json'
@@ -441,9 +446,9 @@ def dump1090_check() -> None:
     if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
         if DISPLAY_VALID == True:
-            print("Error: dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
+            print("ERROR: dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
         else:
-            print("Error: dump1090 not found. Additionally, screen resources are missing.\n\
+            print("ERROR: dump1090 not found. Additionally, screen resources are missing.\n\
        This script may not be useful until these issues are corrected.")
     DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
 
@@ -452,7 +457,8 @@ def read_1090_config() -> None:
     global rlat, rlon
     if DUMP1090_IS_AVAILABLE == False: return
     try:
-        with closing(urlopen(URL + '/data/receiver.json', None, LOOP_INTERVAL * 0.75)) as receiver_file:
+        req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
+        with closing(urlopen(req, None, LOOP_INTERVAL * 0.75)) as receiver_file:
             receiver = json.load(receiver_file)
         with threading.Lock():
             if has_key(receiver,'lat'): #if location is set
@@ -528,9 +534,13 @@ def configuration_check() -> None:
     else:
         if ENHANCED_READOUT == False:
             print("No API Key present. Additional airplane info will not be available.")
-            print("Setting ENHANCED_READOUT to \'True\' is recommended.")
+            if DISPLAY_VALID == True:
+                print("Setting ENHANCED_READOUT to \'True\' is recommended.")
         else:
-            print("No API Key present. Instead, additional dump1090 info will be substituted.")
+            if DISPLAY_VALID == True:
+                print("No API Key present. Instead, additional dump1090 info will be substituted.")
+            else:
+                print("No API Key present. Additional airplane info will not be available.")
 
 def match_commandline(command_search: str, process_name: str) -> list:
     """ Find all processes associated with a command line and process name that matches the given inputs.
@@ -799,12 +809,17 @@ def main_loop_generator() -> None:
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
         try:
-            with closing(urlopen(DUMP1090_JSON, None, LOOP_INTERVAL * 0.75)) as aircraft_file:
+            req1090 = Request(DUMP1090_JSON, data=None, headers=USER_AGENT)
+            with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.75)) as aircraft_file:
                 aircraft_data = json.load(aircraft_file)
             if DUMP978_JSON is not None:
-                with closing(urlopen(DUMP978_JSON, None, LOOP_INTERVAL * 0.75)) as aircraft_file2:
-                    aircraft_data2 = json.load(aircraft_file2)
-                    aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
+                req978 = Request(DUMP978_JSON, data=None, headers=USER_AGENT)
+                try:
+                    with closing(urlopen(req978, None, LOOP_INTERVAL * 0.75)) as aircraft_file2:
+                        aircraft_data2 = json.load(aircraft_file2)
+                        aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
+                except:
+                    pass
             return aircraft_data
         except:
             return None

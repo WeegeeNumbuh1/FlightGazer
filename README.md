@@ -93,6 +93,9 @@ Make sure you meet the above the prerequisites. To begin:
 ```
 git clone https://github.com/WeegeeNumbuh1/FlightGazer
 ```
+> [!NOTE]
+> It is recommended to configure your setup now before running the initalization file. See the Configuration section below, then return to this step.
+
 <details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
 
 then run the following:
@@ -122,7 +125,7 @@ If you don't care for running in a virtual environment, skip the `python3 -m ven
 
 ### 🎚️ Configuration
 
-The [`config.py`](./config.py) file is where settings are configured. It has descriptions/explanations for all configurable options. It needs to be in the same directory as the main script itself. 
+The [`config.py`](./config.py) file is where settings are configured. It has descriptions/explanations for all configurable options. It needs to be in the same directory as the main script itself. Edit it before running FlightGazer.
 
 > [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.

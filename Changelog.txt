@@ -1,5 +1,9 @@
 FlightGazer Changelog
 
+v.1.4.2 - 2024-12-17
+    - FIXED: HTTP 403 errors due to lack of user-agent in json file requests
+    - Some text output tweaks
+
 v.1.4.1 - 2024-12-17
     - init.sh: add ability to create a service via systemd if rc.local doesn't exist
         - Uninstall script updated to disable service as well if this method is used
