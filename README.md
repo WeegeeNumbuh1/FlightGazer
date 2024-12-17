@@ -69,10 +69,11 @@ Using this project assumes you have the following:
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see Configuration section)
 - Python 3.8 or newer
+- A working internet connection for setup
 - *for Linux distros:*
   - `apt` as the package manager
-  - A working internet connection for setup
   - Root access (necessary for accessing the RGBMatrix hardware)
+  - `systemd` based system
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
@@ -144,7 +145,7 @@ Example: `http://192.168.xxx.xxx:8080`
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
 
 > [!NOTE]
-> By default, the script is designed to run at boot (by adding an entry to `rc.local` on initial setup) and telling the python script to minimize its console output.
+> By default, the script is designed to run at boot (by adding an entry to `rc.local` on initial setup or via systemd with `flightgazer.service`) and telling the python script to minimize its console output.
 
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -176,7 +177,23 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 
 ### 🔡 Optional Behaviors
 
-`FlightGazer-init.sh` supports optional arguments that adjust the behavior of the main python script. Pass the `-h` argument to see all possible operating modes.
+`FlightGazer-init.sh` supports optional arguments that adjust the behavior of the main python script. Expand the table below to see all possible operating modes. Multiple flags can be passed as well.
+
+<details><summary>Table of operating modes</summary>
+<div align="center">
+
+| Flag | Is interactive? | What it does |
+|---|---|:---:|
+| (no flag) | No | Default operating mode. Minimizes console output.
+|`-d`| Yes | Do not load any display driver. Only console output. |
+|`-e`| No | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
+|`-f`| Yes | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all planes detected.<br>Useful for low traffic areas.|
+|`-t`| Yes | Run in `tmux`. Useful for long-running interactive sessions.
+|`-h`| Yes | Print the help message.
+
+</details>
+<br>
+
 > [!TIP]
 > An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware. <br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://ip-address-of-device-running-FlightGazer:8888`
 
@@ -202,6 +219,7 @@ The main python file accepts the same arguments as the initialization script, bu
   - python3-venv
   - tmux
 - Writes startup entry for `FlightGazer-init.sh` in `rc.local` if not present
+- If `rc.local` doesn't exist, create a new systemd service `flightgazer.service` instead
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
   - requests

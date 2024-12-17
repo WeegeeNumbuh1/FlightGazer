@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.4.0 --- 2024-12-10'
+VERSION: str = 'v.1.4.1 --- 2024-12-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -707,24 +707,24 @@ def print_to_console() -> None:
         
         # counter, callsign, iso, id
         print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
-            a=a+1,
-            flight=str(relevant_planes[a]['Flight']).ljust(8),
-            iso=relevant_planes[a]['Country'],
-            id=str(relevant_planes[a]['ID']).ljust(6)
+            a = a+1,
+            flight = str(relevant_planes[a]['Flight']).ljust(8),
+            iso = relevant_planes[a]['Country'],
+            id = str(relevant_planes[a]['ID']).ljust(6)
         ))
         print_info.append(" | ")
 
         # speed section
         print_info.append("SPD: ")
-        print_info.append("{gs:.1f}".format(gs=relevant_planes[a]['Speed']).rjust(5))
+        print_info.append("{gs:.1f}".format(gs = relevant_planes[a]['Speed']).rjust(5))
         print_info.append(f"{speed_unit} @ ")
-        print_info.append("{track:.1f}°".format(track=relevant_planes[a]['Track']).rjust(6))
+        print_info.append("{track:.1f}°".format(track = relevant_planes[a]['Track']).rjust(6))
         print_info.append(" | ")
         # altitude section
         print_info.append("ALT: ")
-        print_info.append("{alt:.1f}".format(alt=relevant_planes[a]['Altitude']).rjust(7))
+        print_info.append("{alt:.1f}".format(alt = relevant_planes[a]['Altitude']).rjust(7))
         print_info.append(f"{altitude_unit}, ")
-        print_info.append("{vs:.1f}".format(vs=relevant_planes[a]['VertSpeed']).rjust(7))
+        print_info.append("{vs:.1f}".format(vs = relevant_planes[a]['VertSpeed']).rjust(7))
         print_info.append(f"{altitude_unit}/min")
         print_info.append(" | ")
         # distance section
@@ -738,7 +738,7 @@ def print_to_console() -> None:
         print_info.append(" | ")
         # last sectiom
         print_info.append("RSSI: ")
-        print_info.append("{rssi}".format(rssi=relevant_planes[a]['RSSI']).rjust(5))
+        print_info.append("{rssi}".format(rssi = relevant_planes[a]['RSSI']).rjust(5))
         print_info.append("dBFS")
 
         # finally, print it all

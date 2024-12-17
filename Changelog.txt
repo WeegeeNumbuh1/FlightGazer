@@ -1,5 +1,9 @@
 FlightGazer Changelog
 
+v.1.4.1 - 2024-12-17
+    - init.sh: add ability to create a service via systemd if rc.local doesn't exist
+        - Uninstall script updated to disable service as well if this method is used
+
 v.1.4.0 - 2024-12-10
     - NEW: More screen functionality for non-API users via new mode, ENHANCED_READOUT
         - Latitude and longitude readout instead of origin and destination

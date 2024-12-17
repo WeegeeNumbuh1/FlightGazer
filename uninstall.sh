@@ -1,6 +1,6 @@
 #!/bin/bash
 # Uninstall script for FlightGazer.py
-# Version = v.1.2.0
+# Version = v.1.4.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -55,14 +55,19 @@ sleep 5s
 echo -n "5... "
 sleep 5s
 echo ""
-echo "Removing rc.local entry..."
 ' >> $TEMPPATH
-# sed -i -e '/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/' /etc/rc.local
-echo -e 'sed -i -e \047/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/\047 /etc/rc.local' >> $TEMPPATH
 echo 'echo "Terminating any running FlightGazer processes..."' >> $TEMPPATH
 echo -e 'kill -15 $(ps aux | grep \047[F]lightGazer.py\047 | awk \047{print $2}\047)' >> $TEMPPATH
-echo 'sleep 2s
-echo "Removing virtual Python environment..."
+echo 'echo "Removing any startup entries..."' >> $TEMPPATH
+# sed -i -e '/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/' /etc/rc.local
+echo -e 'sed -i -e \047/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/\047 /etc/rc.local 2>&1' >> $TEMPPATH
+echo 'systemctl stop flightgazer.service 2>&1
+systemctl disable flightgazer.service 2>&1
+rm -f /etc/systemd/system/flightgazer.service 2>&1
+systemctl daemon-reload 2>&1
+systemctl reset-failed 2>&1
+' >> $TEMPPATH
+echo 'echo "Removing virtual Python environment..."
 rm -rf /etc/FlightGazer-pyvenv
 echo -e "Removing FlightGazer directory ${FGDIR}..."
 rm -rf ${FGDIR}

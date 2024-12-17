@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.1.2.1
+# Version = v.1.4.1
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -125,6 +125,14 @@ fi
 
 if [ $SKIP_CHECK -eq 0 ]; then
 	echo "> Checking system image..."
+
+	# check if this system uses apt
+	command -v apt 2>&1 >/dev/null
+	if [ $? -ne 0 ]; then
+		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use apt.${NC}"
+		sleep 2s
+		exit 1
+
 	# check internet connection
 	wget -q --timeout=10 --spider http://google.com
 	if [ $? -ne 0 ]; then
@@ -159,14 +167,36 @@ then
 	echo "    > \"tmux\""
 	apt-get install -y tmux >/dev/null
 	echo ""
-	echo "  > Checking /etc/rc.local for startup entry..."
-	if grep -qw "FlightGazer-init.sh" /etc/rc.local;
-	then
-		echo "    > Start up entry is already present!"
+	if [ -f "/etc/rc.local" ]; then
+		echo "  > Checking /etc/rc.local for startup entry..."
+		if grep -qw "FlightGazer-init.sh" /etc/rc.local;
+		then
+			echo "    > Start up entry is already present!"
+		else
+			# append line telling rc.local to execute this script
+			sed -i -e "/^exit 0/i \sudo bash $THIS_FILE 2>&1 &" /etc/rc.local
+			echo -e "    > Start up entry for '$THIS_FILE' added to /etc/rc.local"
+		fi
 	else
-		# append line telling rc.local to execute this script
-		sed -i -e "/^exit 0/i \sudo bash $THIS_FILE 2>&1 &" /etc/rc.local
-		echo -e "    > Start up entry for '$THIS_FILE' added to /etc/rc.local"
+		echo "  > No rc.local file found, creating systemd service instead."
+		cat <<- EOF > /etc/systemd/system/flightgazer.service
+		[Unit]
+		Description=FlightGazer service
+		After=multi-user.target
+
+		[Service]
+		# Note: except for the -t flag, do not use interactive flags unless you want to spam the logs
+		ExecStart=bash $THIS_FILE
+		Type=simple
+
+		[Install]
+		WantedBy=multi-user.target
+		EOF
+		echo -e "${FADE}"
+		systemctl daemon-reload 2>&1
+		systemctl enable flightgazer.service 2>&1
+		systemctl status flightgazer.service
+		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
 	fi
 fi
 
@@ -269,7 +299,7 @@ then
 			sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} & child_pid=$!
 			wait "$child_pid"
 		fi
-	else # edit the entry in rc.local manually if you want to start with additional flags
+	else # edit the entry in rc.local (if present) manually if you want to start with additional flags
 		if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
 			tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG}"
 			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
