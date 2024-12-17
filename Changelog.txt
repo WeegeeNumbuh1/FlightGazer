@@ -1,5 +1,10 @@
 FlightGazer Changelog
 
+v.1.5.1 - 2024-12-17
+    - Create RGBMatrixEmulator settings upon install to suppress harmless error output
+        - Update uninstall script to remove RGBMatrixEmulator settings
+    - The war on signal handling continues (attempt another fix)
+
 v.1.5.0 - 2024-12-17
     - Depreciate using rc.local for startup, systemd service is now the only startup method
         - By default the script will now run in tmux

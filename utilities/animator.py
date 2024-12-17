@@ -5,8 +5,9 @@ import signal
 
 DELAY_DEFAULT = 0.01
 
-def sigterm_handler(signal, frame):
+def sigterm_handler(signum, frame):
     # this module will steal signals from our main thread, so we cascade our exit starting from here
+    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     os.write(sys.stdout.fileno(), b"\nDisplay Driver: Exit signal received, shutting down now.\n")
     raise ImportError # hacky
     """ We don't use SystemExit because we will need to try-except it, and the main thread
@@ -36,10 +37,12 @@ class Animator(object):
         super().__init__()
 
         # break out of this loop if the system calls for our termination
-        if sys.__stdin__.isatty():
-            signal.signal(signal.SIGINT, sigterm_handler)
-        else:
-            signal.signal(signal.SIGTERM, sigterm_handler)
+        # if sys.__stdin__.isatty():
+        #     signal.signal(signal.SIGINT, sigterm_handler)
+        # else:
+        #     signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGINT, sigterm_handler)
+        signal.signal(signal.SIGTERM, sigterm_handler)
 
     def _register_keyframes(self):
         # Some introspection to setup keyframes

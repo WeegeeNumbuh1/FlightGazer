@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.5.0 --- 2024-12-17'
+VERSION: str = 'v.1.5.1 --- 2024-12-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -113,6 +113,7 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
+sys.tracebacklimit = 0
 
 # load in all the display-related modules
 DISPLAY_VALID: bool = True

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.1.5.0
+# Version = v.1.5.1
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -201,6 +201,34 @@ then
 		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
 	else
 		echo "    > Service already exists, skipping service creation."
+	fi
+
+	# for some reason RGBMatrixEmulator will write its config one directory up
+	# we make a config file first because by default it will output a ton of errors
+	if [ ! -f "../emulator_config.json" ]; then
+	echo "  > Creating RGBMatrixEmulator settings..."
+	cat << EOF > ../emulator_config.json
+{
+    "pixel_outline": 0,
+    "pixel_size": 16,
+    "pixel_style": "circle",
+    "display_adapter": "browser",
+    "suppress_font_warnings": true,
+    "suppress_adapter_load_errors": true,
+    "browser": {
+        "_comment": "For use with the browser adapter only.",
+        "port": 8888,
+        "target_fps": 12,
+        "fps_display": false,
+        "quality": 70,
+        "image_border": true,
+        "debug_text": false,
+        "image_format": "JPEG"
+    },
+    "log_level": "info"
+}
+EOF
+	echo "    > RGBMatrixEmulator settings created."
 	fi
 fi
 
