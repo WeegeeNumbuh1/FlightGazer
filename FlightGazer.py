@@ -703,7 +703,10 @@ def print_to_console() -> None:
         print("******* No Filters mode enabled. All planes with locations detected by dump1090 shown. *******\n")
     if focus_plane_iter != 0:
         print(f"[Inside focus loop {focus_plane_iter}, watching: \'{focus_plane}\']\n", flush=True)
-        print(f"Plane scratchpad: {focus_plane_ids_scratch}")
+        if len(focus_plane_ids_discard) > 0:
+            print(f"Plane scratchpad: {focus_plane_ids_scratch}")
+        elif len(focus_plane_ids_discard) == 0:
+            print(f"Plane scratchpad: {{}}")
 
     for a in range(plane_count):
         print_info = []
@@ -1015,8 +1018,8 @@ class AirplaneParser:
             with threading.Lock():
                 focus_plane_ids_discard.add(focus_plane_i) # add previously assigned focus plane to scratchpad of planes to ignore
                 discard_list = list(focus_plane_ids_discard)
-                for i in range(len(discard_list)): # remove all previously focused planes from the global list
-                    focus_plane_ids_scratch.discard(discard_list[i])
+                for id in discard_list: # remove all previously focused planes from the global list
+                    focus_plane_ids_scratch.discard(id)
                 scratch_list = list(focus_plane_ids_scratch)
                 if len(focus_plane_ids_scratch) > 0:
                     focus_plane = random.choice(scratch_list) # get us the next plane from all remaining planes that were not tracked previously
@@ -1211,7 +1214,13 @@ class APIFetcher:
                 if destination is None:
                     destination = str(abs(round(lon, 1))) + lon_str
 
-            api_results = {'ID':focus_plane, 'Flight':flight_id, 'Origin':origin, 'Destination':destination, 'Departure':departure_time}
+            api_results = {
+                'ID':focus_plane,
+                'Flight':flight_id,
+                'Origin':origin,
+                'Destination':destination,
+                'Departure':departure_time
+                }
             with threading.Lock():
                 focus_plane_api_results.append(api_results)
 
@@ -1254,7 +1263,7 @@ class DisplayFeeder:
         total_flybys = "0"
         total_planes = "0"
         current_range = "0"
-        if general_stats:
+        if general_stats: # should always exist but just in case
             total_flybys = str(len(unique_planes_seen))
             total_planes = str(general_stats['Tracking'])
             current_range_i = general_stats['Range']
@@ -1325,6 +1334,7 @@ class DisplayFeeder:
                         vs_str = " " + vs_str
                     vs = "V" + vs_str
                     rssi = str(relevant_planes[a]['RSSI'])
+                    break
 
             # get us our API results from focus_plane_api_results
             api_orig = filler_text

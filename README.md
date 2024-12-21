@@ -68,7 +68,7 @@ Using this project assumes you have the following:
 - A working `dump1090` instance or similar where `/data/aircraft.json` can be read
   - Ex: `tar1090`, `piaware`/`skyaware`, `dump1090-fa`, `dump1090-mutability`, and `readsb`
     - Note: the script will automatically look at these locations and choose which one works
-  - This script does not need to be on the same device that `dump1090` is running from (see Configuration section)
+  - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
 - Python 3.8 or newer
 - A working internet connection for setup
 - *for Linux distros:*
@@ -151,8 +151,10 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 
 > [!IMPORTANT]
 > By default, the script is designed to run at boot (via systemd with `flightgazer.service`). You can check its status with:
-> ```
+> ```bash
 > sudo systemctl status flightgazer.service
+> # or
+> sudo tmux attach -d -t FlightGazer
 > ```
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -189,14 +191,14 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 <details><summary>Table of operating modes</summary>
 <div align="center">
 
-| Flag | Is interactive? | What it does |
-|---|---|:---:|
-| (no flag) | No | Default operating mode. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
-|`-d`| Yes | Do not load any display driver. Only print console output. |
-|`-e`| No | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
-|`-f`| Yes | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all planes detected.<br>Useful for low traffic areas.|
-|`-t`| Yes | Run in `tmux`. Useful for long-running interactive sessions.
-|`-h`| Yes | Print the help message.
+| Flag | Is<br>interactive? | What it does |
+|---|:---:|:---:|
+| (no flag) | ❌ | Default operating mode when not run as a service. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
+|`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
+|`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
+|`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all planes detected.<br>Display will never show plane details and remain as a clock.<br>Useful for low traffic areas.|
+|`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
+|`-h`| ✅ | Print the help message.
 
 </details>
 <br>
@@ -220,12 +222,16 @@ The main python file accepts the same arguments as the initialization script, bu
 <details><summary>What the initialization script does on first run</summary>
 
 - Checks if there is an internet connection
+- Checks if `first_run_complete` exists
+  - Checks last modified date: if greater than a month, runs updates for installed dependencies
+  - If file exists and is new-ish, then this isn't an initial installation and we just run the main python script
 - Updates package list
 - Installs:
   - python3-dev
   - python3-venv
   - tmux
 - Create a new systemd service `flightgazer.service`
+- Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
   - requests
@@ -254,11 +260,11 @@ Pass `-h` to see all operating modes.
 <details><summary>Useful commands</summary>
 
 Terminating all FlightGazer-related processes (Linux):
-```
+```bash
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}')
 ```
 Changing `systemd` startup command
-```
+```bash
 sudo nano /etc/systemd/system/flightgazer.service
 systemctl daemon-reload
 ```
