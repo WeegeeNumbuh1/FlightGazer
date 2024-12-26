@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.5.1 --- 2024-12-17'
+VERSION: str = 'v.1.5.2 --- 2024-12-27'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -232,6 +232,12 @@ focus_plane_ids_scratch = set()
 Elements can be removed if plane count > 1 due to selector algorithm """
 focus_plane_ids_discard = set()
 """ scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
+plane_latch_times: list = [
+    int(30 // LOOP_INTERVAL),
+    int(20 // LOOP_INTERVAL),
+    int(15 // LOOP_INTERVAL),
+]
+""" precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
 focus_plane_api_results = deque([None] * 25, maxlen=25)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`} """
@@ -690,22 +696,39 @@ def print_to_console() -> None:
     plane_count = len(relevant_planes)
     run_time = time.monotonic() - START_TIME
     time_print = str(datetime.datetime.now()).split(".")[0]
+    ver_str = VERSION.split(" --- ")[0]
 
     cls()
-    print(f"===== FlightGazer Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
+    print(f"===== FlightGazer {ver_str} Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
     if DUMP1090_IS_AVAILABLE == False:
         print("********** dump1090 did not successfully load. There will be no data! **********\n")
+
     if (rlat is None or rlon is None) and NOFILTER == False:
         print("********** Location is not set! No airplane information will be shown! **********\n")
+
     if NOFILTER == False:
         print(f"Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}\n(* indicates in focus, - indicates focused previously)")
     else:
         print("******* No Filters mode enabled. All planes with locations detected by dump1090 shown. *******\n")
+
     if focus_plane_iter != 0:
-        print(f"[Inside focus loop {focus_plane_iter}, watching: \'{focus_plane}\']\n", flush=True)
-        if len(focus_plane_ids_discard) > 0:
+        # reflects plane selection algorithm
+        select_divisor = 1
+        if plane_count == 2:
+            select_divisor = plane_latch_times[0]
+        elif plane_count == 3:
+            select_divisor = plane_latch_times[1]
+        elif plane_count >= 4:
+            select_divisor = plane_latch_times[2]
+        next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
+
+        if plane_count == 1:
+            print(f"[Inside focus loop {focus_plane_iter}]\n", flush=True)
+        else:
+            print(f"[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, watching: \'{focus_plane}\']\n", flush=True)
+        if len(focus_plane_ids_scratch) > 0:
             print(f"Plane scratchpad: {focus_plane_ids_scratch}")
-        elif len(focus_plane_ids_discard) == 0:
+        elif len(focus_plane_ids_scratch) == 0:
             print(f"Plane scratchpad: {{}}")
 
     for a in range(plane_count):
@@ -1052,12 +1075,11 @@ class AirplaneParser:
                 # control our latching time based on how many planes are present in the area;
                 # if a new plane enters the area or the number of planes changes,
                 # only switch focus plane when modulo hits zero.
-                # int(time_in_seconds // LOOP_INTERVAL)
-                if plane_count == 2 and focus_plane_iter % int(30 // LOOP_INTERVAL) == 0:
+                if plane_count == 2 and focus_plane_iter % plane_latch_times[0] == 0:
                     select()
-                if plane_count == 3 and focus_plane_iter % int(20 // LOOP_INTERVAL) == 0:
+                if plane_count == 3 and focus_plane_iter % plane_latch_times[1] == 0:
                     select()
-                if plane_count > 3 and focus_plane_iter % int(15 // LOOP_INTERVAL) == 0:
+                if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
                     select()
                 
                 # finally

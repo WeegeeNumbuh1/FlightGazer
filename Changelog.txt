@@ -1,5 +1,11 @@
 FlightGazer Changelog
 
+v.1.5.2 - 2024-12-27
+    - Additional text output tweaks for interactive mode
+        - Version number now in header
+        - When there are two or more planes shown, shows when the selector algorithm will choose another plane
+    - Small refactoring
+
 v.1.5.1 - 2024-12-17
     - Create RGBMatrixEmulator settings upon install to suppress harmless error output
         - Update uninstall script to remove RGBMatrixEmulator settings
