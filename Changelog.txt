@@ -1,4 +1,26 @@
 FlightGazer Changelog
+v.V.R.U - Release date
+  ↑ ↑ ↑
+  | | └- Update
+  | └--- Release
+  └----- Version
+
+v.1.6.0 - Planned
+    - (subject to change)
+    - NEW: Brightness settings based on time of day
+        - Switchover based on local sunrise/sunset or manual settings
+    - NEW: Brightness setting for when there is an active plane on display
+    - NEW: Optional sunrise/sunset times on clock display
+        - Requires that location is set/available
+    - NEW: Optional receiver stats on main clock display
+        - Track receiver gain (if dump1090 autogain is enabled on the device)
+        - Also display noise levels and percentage of loud signals
+    - In interactive mode, show the receiver stats from the above bullet point
+    - Updated init script
+    - Massive code restructuring
+        - Restructured config file for clarity
+    - NEW: Updater script that will upgrade FlightGazer to the latest commit on GitHub
+        - Migrates settings and stats as well
 
 v.1.5.2 - 2024-12-27
     - Additional text output tweaks for interactive mode

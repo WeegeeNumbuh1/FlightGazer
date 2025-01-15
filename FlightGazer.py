@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.5.2 --- 2024-12-27'
+VERSION: str = 'v.1.6.0 Alpha --- 2025-01-xx'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -151,6 +151,16 @@ else:
 if INTERACTIVE == False:
     if sys.__stdin__.isatty(): FORGOT_TO_SET_INTERACTIVE = True
 
+# make additional use for psutil
+this_process = psutil.Process()
+this_process_cpu = this_process.cpu_percent(interval=None)
+CORE_COUNT = os.cpu_count()
+if CORE_COUNT is None:
+    CORE_COUNT = 1
+
+# =========== Settings Load-in =============
+# ==========================================
+
 # define our settings and initalize to defaults
 FLYBY_STATS_ENABLED: bool = False
 HEIGHT_LIMIT: float = 15000
@@ -169,6 +179,18 @@ LED_PWM_BITS: int = 8
 UNITS: int = 0
 FLYBY_STALENESS: int = 60
 ENHANCED_READOUT: bool = False
+''' New settings:
+DISPLAY_SUNRISE_SUNSET: bool = False
+DISPLAY_RECEIVER_STATS: bool = False
+ENABLE_TWO_BRIGHTNESS: bool = False
+BRIGHTNESS_2: int = 50
+BRIGHTNESS_SWITCH_TIME: dict = {
+    "Sunrise": "06:00",
+    "Sunset": "18:00"
+}
+USE_SUNRISE_SUNSET: bool = False
+ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int | None = None
+'''
 
 # create the above as a dictionary
 # NB: if we don't want to load certain settings,
@@ -216,9 +238,15 @@ else:
         except:
             print(f"Loaded settings from configuration file.")
 
-# our global variables
+# =========== Global Variables =============
+# ==========================================
+
 general_stats: dict = {'Tracking':0, 'Range':0}
 """ general dump1090 stats (updated per loop) """
+receiver_stats: dict = {'Gain':0, 'Noise':0, 'Strong':0}
+""" [NEW_VARIABLE] receiver stats (if available) """
+
+# active plane stuff
 relevant_planes: list = []
 """ list of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()`) """
 focus_plane: str = ""
@@ -244,9 +272,14 @@ Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`} """
 unique_planes_seen: list = []
 """ list of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`} """
+
+# display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
 """ formatted dict for our Display driver.
 `idle_data` = {`Flybys`, `Track`, `Range`} """
+idle_data_2: dict = {'Sunrise': "00:00", 'Sunset': "00:00", 'Gain': "---", 'Noise': "---", 'Strong': "---"}
+""" [NEW_VARIABLE] additional formatted dict for our Display driver.
+`idle_data_2` = {`Sunrise`, `Sunset`, `Gain`, `Noise`, `Strong`} """
 active_data: dict = {}
 """ formatted dict for our Display driver.
 `active_data` = {
@@ -256,15 +289,21 @@ active_data: dict = {}
 } or {} """
 active_plane_display: bool = False
 """ which scene to put on the display. False = clock/idle, True = active plane """
+current_brightness: int = BRIGHTNESS
+""" [NEW_VARIABLE] active brightness level for the display; may be changed depending on settings """
+
+# location stuff
 rlat: float | None = None
 """ our location latitude """
 rlon: float | None = None
 """ our location longitude """
-# hashable objects for our cross-thread signaling
-DATA_UPDATED: str = "updated-data"
-PLANE_SELECTED: str = "plane-in-range"
-DISPLAY_SWITCH: str = "reset-scene"
-END_THREADS: str = "terminate"
+sunset_sunrise: dict = {
+    "Sunrise": None,
+    "Sunset": None
+}
+""" [NEW_VARIABLE] sunrise and sunset times for our location. Updated every day at midnight. """
+
+# runtime stuff
 process_time: list = [0,0,0,0]
 """ for debug; [json parse, filter data, API response, format data] ms """
 api_hits: list = [0,0,0,0]
@@ -272,13 +311,12 @@ api_hits: list = [0,0,0,0]
 flyby_stats_present: bool = False
 """ flag to check if we can write to `FLYBY_STATS_FILE`, initialized to False """
 
-if (sys.version_info > (3, 0)):
-    def has_key(book, key):
-        return (key in book)
-else:
-    def has_key(book, key):
-        return book.has_key(key)
-    
+# hashable objects for our cross-thread signaling
+DATA_UPDATED: str = "updated-data"
+PLANE_SELECTED: str = "plane-in-range"
+DISPLAY_SWITCH: str = "reset-scene"
+END_THREADS: str = "terminate"
+
 # define our units and multiplication factors (based on aeronautical units)
 distance_unit: str = "nmi"
 altitude_unit: str = "ft"
@@ -304,15 +342,15 @@ elif UNITS == 2: # imperial
 else:
     print("Info: Using default aeronautical units (nmi, ft, kt)")
 
-# make additional use for psutil
-this_process = psutil.Process()
-this_process_cpu = this_process.cpu_percent(interval=None)
-CORE_COUNT = os.cpu_count()
-if CORE_COUNT is None:
-    CORE_COUNT = 1
-
 # =========== Program Setup I ==============
-# ==========================================
+# =============( Utilities )================
+
+if (sys.version_info > (3, 0)):
+    def has_key(book, key):
+        return (key in book)
+else:
+    def has_key(book, key):
+        return book.has_key(key)
 
 def sigterm_handler(signum, frame):
     """ Shutdown worker threads and exit this program. """
@@ -332,43 +370,11 @@ def register_signal_handler(loop, handler, signal, sender) -> None:
         loop.call_soon_threadsafe(handler, message)
     dispatcher.connect(dispatcher_receive, signal=signal, sender=sender, weak=False)
 
-def probe1090() -> str | None:
-    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` """
-    locations = iter(
-        [CUSTOM_DUMP1090_LOCATION,
-         "http://localhost/tar1090",
-         "http://localhost/skyaware",
-         "http://localhost/dump1090-fa",
-         "http://localhost:8080",]
-         )
+def schedule_thread() -> None:
+    """ Our schedule runner """
     while True:
-        json_1090 = next(locations, "nothing")
-        if json_1090 == "nothing":
-            return None, None
-        try:
-            test1 = requests.get(json_1090 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
-            test1.raise_for_status()
-            return json_1090 + '/data/aircraft.json', json_1090
-        except:
-            pass
-
-def probe978() -> str | None:
-    """ Check if dump978 exists and returns its `URL` or None if not found. """
-    locations = iter(
-        ["http://localhost:8978",
-         CUSTOM_DUMP978_LOCATION]
-    )
-    while True:
-        json_978 = next(locations, "nothing")
-        if json_978 == "nothing": break
-        try:
-            test1 = requests.get(json_978 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
-            test1.raise_for_status()
-            print(f"dump978 detected as well, at \'{json_978}\'")
-            return json_978 + '/data/aircraft.json'
-        except:
-            pass
-    return None
+        schedule.run_pending()
+        time.sleep(1)
 
 def cls() -> None:
     """ Clear the console when using a terminal """
@@ -436,6 +442,66 @@ def reset_unique_tracks() -> None:
             api_hits[i] = 0
     return
 
+def match_commandline(command_search: str, process_name: str) -> list:
+    """ Find all processes associated with a command line and process name that matches the given inputs.
+    Returns a list of dictionaries of matching processes.
+    Perfect for making sure only a single running instance of this script is allowed. """
+    list_of_processes = []
+ 
+    # iterate over all running processes
+    for proc in psutil.process_iter():
+       try:
+           pinfo = proc.as_dict(attrs=['pid', 'name', 'create_time'])
+           cmdline = proc.cmdline()
+           # check if process name contains the given string in its command line
+           if any(command_search in position for position in cmdline) and process_name in pinfo['name']:
+               list_of_processes.append(pinfo)
+       except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+           pass
+ 
+    return list_of_processes
+
+# =========== Program Setup II =============
+# ========( Initialization Tools )==========
+
+def probe1090() -> str | None:
+    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` """
+    locations = iter(
+        [CUSTOM_DUMP1090_LOCATION,
+         "http://localhost/tar1090",
+         "http://localhost/skyaware",
+         "http://localhost/dump1090-fa",
+         "http://localhost:8080",]
+         )
+    while True:
+        json_1090 = next(locations, "nothing")
+        if json_1090 == "nothing":
+            return None, None
+        try:
+            test1 = requests.get(json_1090 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
+            test1.raise_for_status()
+            return json_1090 + '/data/aircraft.json', json_1090
+        except:
+            pass
+
+def probe978() -> str | None:
+    """ Check if dump978 exists and returns its `URL` or None if not found. """
+    locations = iter(
+        ["http://localhost:8978",
+         CUSTOM_DUMP978_LOCATION]
+    )
+    while True:
+        json_978 = next(locations, "nothing")
+        if json_978 == "nothing": break
+        try:
+            test1 = requests.get(json_978 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
+            test1.raise_for_status()
+            print(f"dump978 detected as well, at \'{json_978}\'")
+            return json_978 + '/data/aircraft.json'
+        except:
+            pass
+    return None
+
 def dump1090_check() -> None:
     """ Checks what dump1090 we have available upon startup. If we can't find it, just become a clock. """
     global DUMP1090_JSON, URL, DUMP978_JSON, DUMP1090_IS_AVAILABLE
@@ -485,12 +551,6 @@ def read_1090_config() -> None:
     except:
         print("Error: Cannot load receiver config.")
     return
-
-def schedule_thread() -> None:
-    """ Our schedule runner """
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
 
 def configuration_check() -> None:
     """ Basic configuration checker """
@@ -552,24 +612,12 @@ def configuration_check() -> None:
             else:
                 print("No API Key present. Additional airplane info will not be available.")
 
-def match_commandline(command_search: str, process_name: str) -> list:
-    """ Find all processes associated with a command line and process name that matches the given inputs.
-    Returns a list of dictionaries of matching processes.
-    Perfect for making sure only a single running instance of this script is allowed. """
-    list_of_processes = []
- 
-    # iterate over all running processes
-    for proc in psutil.process_iter():
-       try:
-           pinfo = proc.as_dict(attrs=['pid', 'name', 'create_time'])
-           cmdline = proc.cmdline()
-           # check if process name contains the given string in its command line
-           if any(command_search in position for position in cmdline) and process_name in pinfo['name']:
-               list_of_processes.append(pinfo)
-       except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-           pass
- 
-    return list_of_processes
+def read_receiver_stats() -> None:
+    """ Placeholder function for reading receiver stats. """
+    pass
+
+# =========== Program Setup III ============
+# ===========( Core Functions )=============
 
 def flyby_tracker(input_ID: str) -> None:
     """ Adds given plane ID to `unique_planes_seen` list. """
@@ -605,10 +653,7 @@ def flyby_tracker(input_ID: str) -> None:
     else: # finally, if we don't find the entry, add a new one
         add_entry()
         return
-
-# =========== Program Setup II =============
-# ==========================================
-
+    
 def flyby_stats() -> None:
     """
     If `FLYBY_STATS_ENABLED` is true, write the gathered stats from our flybys to a csv file. 

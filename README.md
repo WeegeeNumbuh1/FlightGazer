@@ -47,7 +47,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - Height filtering
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
-  - Brightness
+  - Brightness based on time of day or when there's an active plane shown
   - Writing to a stats file that keeps count of number of planes flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
@@ -90,7 +90,7 @@ Using this project assumes you have the following:
 
 </details>
 
-### 📶 Installation
+### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
 ```
 git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
@@ -168,7 +168,7 @@ The script automatically detects that you're running interactively and will disp
 ===== FlightGazer Console Output ===== Time now: 2024-12-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
 (* indicates in focus, - indicates focused previously)
-[Inside focus loop 64, watching: 'aa3ae5']
+[Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
 Plane scratchpad: {'aa3ae5', 'a10d75'}
 *   [001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min | DIST: NW 22.4nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
@@ -177,7 +177,7 @@ Plane scratchpad: {'aa3ae5', 'a10d75'}
 API results for UAL343: ORD -> SFO, 0:24 flight time
 
 > dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
-> Detected 154 plane(s), 2 plane(s) in range, max range: 177.2nmi
+> Detected 154 plane(s), 2 plane(s) in range, max range: 177.2nmi | Gain: 40.2dB, noise: -34.6dB, strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
 > Total flybys today: 13
 > CPU & memory usage: 16.925% overall CPU | 7.734MiB
