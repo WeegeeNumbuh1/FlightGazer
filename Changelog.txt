@@ -6,7 +6,6 @@ v.V.R.U - Release date
   └----- Version
 
 v.1.6.0 - Planned
-    - (subject to change)
     - NEW: Brightness settings based on time of day
         - Switchover based on local sunrise/sunset or manual settings
     - NEW: Brightness setting for when there is an active plane on display
@@ -17,6 +16,7 @@ v.1.6.0 - Planned
         - Also display noise levels and percentage of loud signals
     - In interactive mode, show the receiver stats from the above bullet point
     - Updated init script
+    - Modified 3x5.bdf font to support arrows and other useful drawing characters
     - Massive code restructuring
         - Restructured config file for clarity
     - NEW: Updater script that will upgrade FlightGazer to the latest commit on GitHub

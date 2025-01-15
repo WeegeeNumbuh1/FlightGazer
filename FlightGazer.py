@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.6.0 Alpha --- 2025-01-xx'
+VERSION: str = 'v.1.6.0 Beta --- 2025-01-xx'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -42,6 +42,7 @@ import requests
 from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
 import schedule
 import psutil
+from suntime import Sun, SunTimeException
 # utilities
 import utilities.flags as flags
 import utilities.registrations as registrations
@@ -179,18 +180,17 @@ LED_PWM_BITS: int = 8
 UNITS: int = 0
 FLYBY_STALENESS: int = 60
 ENHANCED_READOUT: bool = False
-''' New settings:
+''' New settings: '''
 DISPLAY_SUNRISE_SUNSET: bool = False
 DISPLAY_RECEIVER_STATS: bool = False
-ENABLE_TWO_BRIGHTNESS: bool = False
+ENABLE_TWO_BRIGHTNESS: bool = True
 BRIGHTNESS_2: int = 50
 BRIGHTNESS_SWITCH_TIME: dict = {
     "Sunrise": "06:00",
     "Sunset": "18:00"
 }
-USE_SUNRISE_SUNSET: bool = False
+USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int | None = None
-'''
 
 # create the above as a dictionary
 # NB: if we don't want to load certain settings,
@@ -213,6 +213,13 @@ settings_values: dict = {
     "UNITS": UNITS,
     "FLYBY_STALENESS": FLYBY_STALENESS,
     "ENHANCED_READOUT": ENHANCED_READOUT,
+    "DISPLAY_SUNRISE_SUNSET": DISPLAY_SUNRISE_SUNSET,
+    "DISPLAY_RECEIVER_STATS": DISPLAY_RECEIVER_STATS,
+    "ENABLE_TWO_BRIGHTNESS": ENABLE_TWO_BRIGHTNESS,
+    "BRIGHTNESS_2": BRIGHTNESS_2,
+    "BRIGHTNESS_SWITCH_TIME": BRIGHTNESS_SWITCH_TIME,
+    "USE_SUNRISE_SUNSET": USE_SUNRISE_SUNSET,
+    "ACTIVE_PLANE_DISPLAY_BRIGHTNESS": ACTIVE_PLANE_DISPLAY_BRIGHTNESS,
 }
 
 settings_module_name = "config"
@@ -243,8 +250,9 @@ else:
 
 general_stats: dict = {'Tracking':0, 'Range':0}
 """ general dump1090 stats (updated per loop) """
-receiver_stats: dict = {'Gain':0, 'Noise':0, 'Strong':0}
-""" [NEW_VARIABLE] receiver stats (if available) """
+receiver_stats: dict = {'Gain':None, 'Noise':None, 'Strong':None}
+""" receiver stats (if available). None values for keys if data is unavailable. 
+`receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage} """
 
 # active plane stuff
 relevant_planes: list = []
@@ -277,9 +285,9 @@ Keys are {`ID`, `Time`} """
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
 """ formatted dict for our Display driver.
 `idle_data` = {`Flybys`, `Track`, `Range`} """
-idle_data_2: dict = {'Sunrise': "00:00", 'Sunset': "00:00", 'Gain': "---", 'Noise': "---", 'Strong': "---"}
+idle_data_2: dict = {'SunriseSunset': "", 'ReceiverStats': ""}
 """ [NEW_VARIABLE] additional formatted dict for our Display driver.
-`idle_data_2` = {`Sunrise`, `Sunset`, `Gain`, `Noise`, `Strong`} """
+`idle_data_2` = {`SunriseSunset`, `ReceiverStats`} """
 active_data: dict = {}
 """ formatted dict for our Display driver.
 `active_data` = {
@@ -301,7 +309,8 @@ sunset_sunrise: dict = {
     "Sunrise": None,
     "Sunset": None
 }
-""" [NEW_VARIABLE] sunrise and sunset times for our location. Updated every day at midnight. """
+""" [NEW_VARIABLE] sunrise and sunset times for our location in datetime format.
+Updated every day at midnight via the scheduler. """
 
 # runtime stuff
 process_time: list = [0,0,0,0]
@@ -345,12 +354,8 @@ else:
 # =========== Program Setup I ==============
 # =============( Utilities )================
 
-if (sys.version_info > (3, 0)):
-    def has_key(book, key):
-        return (key in book)
-else:
-    def has_key(book, key):
-        return book.has_key(key)
+def has_key(book, key):
+    return (key in book)
 
 def sigterm_handler(signum, frame):
     """ Shutdown worker threads and exit this program. """
@@ -530,7 +535,7 @@ def dump1090_check() -> None:
 
 def read_1090_config() -> None:
     """ Gets us our location, if it is configured in dump1090. """
-    global rlat, rlon
+    global rlat, rlon, DISPLAY_SUNRISE_SUNSET
     if DUMP1090_IS_AVAILABLE == False: return
     try:
         req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
@@ -548,6 +553,9 @@ def read_1090_config() -> None:
                 rlat = rlon = None
                 print("Warning: Location has not been set! This program will not be able to determine any nearby planes or calculate range!\n\
          Please set location in dump1090 to disable this message.")
+                if DISPLAY_SUNRISE_SUNSET == True:
+                    print("Warning: Sunrise and sunset times will not be displayed.")
+                    DISPLAY_SUNRISE_SUNSET = False
     except:
         print("Error: Cannot load receiver config.")
     return
@@ -555,6 +563,7 @@ def read_1090_config() -> None:
 def configuration_check() -> None:
     """ Basic configuration checker """
     global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS
+
     valid_rgb_sizes = [16, 32, 64]
     if RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes:
         print(f"Warning: selected RGB dimension ({RGB_ROWS}x{RGB_COLS}) is not a valid size.\n\
@@ -596,6 +605,13 @@ def configuration_check() -> None:
         print(f"Warning: desired flyby staleness ({FLYBY_STALENESS}) is out of bounds. Setting to default (60)")
         FLYBY_STALENESS = 60
 
+    if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == True:
+        print("Warning: Display option for sunrise and sunset times is enabled, however, receiver stats will be displayed instead.")
+    elif DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+        print("Info: Sunrise and sunset times will be displayed.")
+    elif DISPLAY_SUNRISE_SUNSET == False and DISPLAY_RECEIVER_STATS == True:
+        print("Info: Receiver stats will be displayed.")
+
     if API_KEY:
         if ENHANCED_READOUT == False:
             print("API Key present, API will be used.")
@@ -613,8 +629,68 @@ def configuration_check() -> None:
                 print("No API Key present. Additional airplane info will not be available.")
 
 def read_receiver_stats() -> None:
-    """ Placeholder function for reading receiver stats. """
-    pass
+    """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
+    Needs to run on its own thread as its timing does not depend on `LOOP_INTERVAL`. """
+    if DUMP1090_IS_AVAILABLE == False: return
+    global receiver_stats
+
+    while True:
+        gain_now = None
+        noise_now = None
+        loud_percentage = None
+        try:
+            req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
+            with closing(urlopen(req, None, 5)) as stats_file:
+                stats = json.load(stats_file)
+
+            if has_key(stats, 'last1min'):
+                try:
+                    noise_now = stats['last1min']['local']['noise']
+                except KeyError:
+                    print("No noise in JSON")
+                    noise_now = None
+                try:
+                    messages1min = stats['last1min']['messages']
+                    loud_messages = stats['last1min']['local']['strong_signals']
+                    if messages1min == 0:
+                        loud_percentage = 0
+                    else:
+                        loud_percentage = (loud_messages / messages1min) * 100
+                except KeyError:
+                    loud_percentage = None
+            else:
+                noise_now = None
+                loud_percentage = None
+                
+            if has_key(stats, 'gain_db'):
+                gain_now = stats['gain_db']
+            else:
+                gain_now = None
+            
+            with threading.Lock():
+                receiver_stats['Gain'] = gain_now
+                receiver_stats['Noise'] = noise_now
+                receiver_stats['Strong'] = loud_percentage
+                
+        except:
+            pass
+
+        time.sleep(10) # don't need to poll too often
+
+def suntimes() -> None:
+    """ Update sunrise and sunset times """
+    global sunset_sunrise
+    if rlat is not None and rlon is not None:
+        sun = Sun(rlat, rlon)
+        try:
+            sunset_sunrise['Sunrise'] = sun.get_sunrise_time().astimezone()
+            sunset_sunrise['Sunset'] = sun.get_sunset_time().astimezone()
+        except SunTimeException:
+            sunset_sunrise['Sunrise'] = None
+            sunset_sunrise['Sunset'] = None
+    else:
+        sunset_sunrise['Sunrise'] = None
+        sunset_sunrise['Sunset'] = None
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
@@ -848,9 +924,21 @@ def print_to_console() -> None:
         except: # if we bump into None or something else
             break
 
+    # process `receiver_stats`
+    gain_str = "N/A"
+    noise_str = "N/A"
+    loud_str = "N/A"
+    if receiver_stats['Gain'] is not None:
+        gain_str = str(receiver_stats['Gain']) + 'dB'
+    if receiver_stats['Noise'] is not None:
+        noise_str = str(receiver_stats['Noise']) + 'dB'
+    if receiver_stats['Strong'] is not None:
+        loud_str = str(round(receiver_stats['Strong'], 1)) + '%'
+
     print(f"\n> dump1090 response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
-    print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}{distance_unit}")
+    print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}{distance_unit} | \
+Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     if API_KEY:
         print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
     print(f"> Total flybys today: {len(unique_planes_seen)}")
@@ -1315,17 +1403,21 @@ class DisplayFeeder:
         into a coalesed data packet for the Display. We also control scene switching here and which scene to display.
         Outputs two dicts, `idle_stats` and `active_stats`.
         `idle_stats` = {'Flybys', 'Track', 'Range'}
+        `idle_stats_2` = {'SunriseSunset', 'ReceiverStats'}
         `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime',
                           'Altitude', 'Speed', 'Distance', 'Country',
                           'Latitude', 'Longitude', 'Track', 'VertSpeed', 'RSSI'}
                        or {}.
         All values are formatted as strings. """
-        global idle_data, active_data, active_plane_display
+        global idle_data, idle_data_2, active_data, active_plane_display
         displayfeeder_start = time.perf_counter()
+        filler_text = "---"
+
         if active_data: # check if active_data exists and do a comparison after we're done
             active_data_i = True
         else:
             active_data_i = False
+
         # idle_stats
         total_flybys = "0"
         total_planes = "0"
@@ -1345,8 +1437,74 @@ class DisplayFeeder:
             'Range': current_range,
         }
 
+        # idle_stats_2
+        sunrise = ""
+        sunset = ""
+        receiver_string = ""
+        rise_set = []
+        recv_str = []
+        if sunset_sunrise['Sunrise'] is not None and sunset_sunrise['Sunset'] is not None:
+            if CLOCK_24HR == True:
+                sunrise = sunset_sunrise['Sunrise'].strftime("%H:%M")
+                sunset = sunset_sunrise['Sunset'].strftime("%H:%M")
+            else:
+                sunrise_1 = sunset_sunrise['Sunrise'].strftime("%I:%M%p")
+                sunset_1 = sunset_sunrise['Sunset'].strftime("%I:%M%p")
+                # end goal example: 06:00AM -> 6:00a
+                if sunrise_1.startswith("0"):
+                    sunrise = sunrise_1[1:-2] + sunrise_1[-2].lower()
+                else:
+                    sunrise = sunrise_1[:-2] + sunrise_1[-2].lower()
+                if sunset_1.startswith("0"):
+                    sunset = sunset_1[1:-2] + sunset_1[-2].lower()
+                else:  
+                    sunset = sunset_1[:-2] + sunset_1[-2].lower()
+        else:
+            sunrise = "--:--"
+            sunset = "--:--"
+
+        rise_set.append("▲")
+        rise_set.append(sunrise)
+        rise_set.append(" ")
+        rise_set.append("▼")
+        rise_set.append(sunset)
+        
+        # first section of receiver stats
+        # "G____"
+        recv_str.append("G")
+        if receiver_stats['Gain'] is not None:
+            recv_str.append(str(receiver_stats['Gain']).rjust(4))
+        else:
+            recv_str.append(filler_text.rjust(4))
+        recv_str.append(" ")
+        # second section of receiver stats
+        # "N____"
+        recv_str.append("N")
+        if receiver_stats['Noise'] is not None:
+            recv_str.append(str(abs(receiver_stats['Noise'])).rjust(4))
+        else:
+            recv_str.append(filler_text.rjust(4))
+        recv_str.append(" ")
+        # third section of receiver stats
+        # "L__%" or "L---"
+        recv_str.append("L")
+        if receiver_stats['Strong'] is not None:
+            strong_rounded = int(round(receiver_stats['Strong'], 0))
+            if strong_rounded >= 100:
+                recv_str.append("99%") # cap at 99%
+            else:
+                recv_str.append(str(strong_rounded).rjust(2))
+                recv_str.append("%")
+        else:
+            recv_str.append(filler_text)
+        receiver_string = "".join(recv_str)
+
+        idle_stats_2 = {
+            'SunriseSunset': "".join(rise_set),
+            'ReceiverStats': receiver_string
+            }
+
         # active_stats
-        filler_text = "---"
         active_stats = {}
         if focus_plane:
             relevant_plane_count = len(relevant_planes)
@@ -1450,6 +1608,7 @@ class DisplayFeeder:
 
             idle_data = idle_stats
             active_data = active_stats
+            idle_data_2 = idle_stats_2
             process_time[3] = round((time.perf_counter() - displayfeeder_start) * 1000, 3)
         # return idle_stats, active_stats
     
@@ -1461,6 +1620,54 @@ class DisplayFeeder:
 
     def end_thread(self, message):
         self.loop.stop()
+
+def brightness_controller():
+    """ Changes desired display brightness based on current environment
+    (ex: values of `ENABLE_TWO_BRIGHTNESS` or `sunset_sunrise`)
+    Needs to run in its own thread. """
+    global current_brightness
+    if ENABLE_TWO_BRIGHTNESS == False:
+        print(f"Info: Dynamic brightness is disabled. Display will remain at a static brightness ({BRIGHTNESS}).")
+        return
+    if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
+        print(f"Info: Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when a plane is detected.")
+
+    try:
+        test1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
+        test2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
+        del test1, test2
+        print(f"Info: Dynamic brightness is enabled. Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
+    except: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
+        current_brightness = BRIGHTNESS
+        print(f"Warning: Could not parse BRIGHTNESS_SWITCH_TIME. This is required as a fallback.\n\
+         Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
+        return
+
+    while True:
+        current_time = datetime.datetime.now().astimezone()
+
+        if (sunset_sunrise['Sunrise'] is None or sunset_sunrise['Sunset'] is None)\
+            or USE_SUNRISE_SUNSET == False:
+            # note that depending on location and time of year, sunrise and sunset times can be None
+            # thus we fall back on BRIGHNESS_SWITCH_TIME values (at this point the values have been known to work)
+            switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
+            switch_time2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
+            sunrise_time = datetime.datetime.combine(current_time.date(), switch_time1)
+            sunset_time = datetime.datetime.combine(current_time.date(), switch_time2)
+        else:
+            sunrise_time = sunset_sunrise['Sunrise']
+            sunset_time = sunset_sunrise['Sunset']
+
+        if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None and active_plane_display == True:
+            # current_brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+            pass # let the display driver handle the brightness in this scenario
+        else:
+            if current_time > sunrise_time and current_time < sunset_time:
+                current_brightness = BRIGHTNESS
+            else:
+                current_brightness = BRIGHTNESS_2
+
+        time.sleep(1)
 
 # ========== Display Superclass ============
 # ==========================================
@@ -1529,6 +1736,9 @@ class Display(
         self._last_flybys = None
         self._last_track = None
         self._last_range = None
+        # idle stats 2
+        self._last_sunrise_sunset = None
+        self._last_receiver_stats = None
         # active stats (plane info)
         self._last_callsign = None
         self._last_origin = None
@@ -1544,6 +1754,8 @@ class Display(
         self._last_groundtrack = None
         self._last_vertspeed = None
         self._last_rssi = None
+        # brightness control
+        self._last_brightness = self.matrix.brightness
 
         # Initalize animator
         super().__init__()
@@ -1880,6 +2092,83 @@ class Display(
             RANGE_TEXT_COLOR,
             range_now,
         )
+    
+    """ Idle Stats 2: Sunrise/Sunset or Receiver Stats """
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    def idle_stats_2(self, count):
+        if self.active_plane_display == True:
+            self._last_sunrise_sunset = None
+            self._last_receiver_stats = None
+            return
+        if DISPLAY_SUNRISE_SUNSET == False and DISPLAY_RECEIVER_STATS == False:
+            self._last_sunrise_sunset = None
+            self._last_receiver_stats = None
+            return
+        
+        def center_align(text_len:int) -> int:
+            """ Center aligns text based on its length across the screen """
+            if text_len >= 16:
+                return 1
+            elif text_len == 0 or text_len == 1:
+                return 31
+            else:
+                # font is monospaced and each glyph is 4 pixels wide
+                return (30 - ((text_len - 1) * 2))
+        
+        STATS_2_FONT = fonts.smallest
+        STATS_2_COLOR = graphics.Color(64, 64, 64)
+        STATS_2_Y = 18
+        try:
+            sunrise_sunset_now = idle_data_2['SunriseSunset']
+            receiver_stats_now = idle_data_2['ReceiverStats']
+        except: return
+        # Undraw sections
+        if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+            if self._last_sunrise_sunset != sunrise_sunset_now:
+                if self._last_sunrise_sunset is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        STATS_2_FONT,
+                        center_align(len(self._last_sunrise_sunset)),
+                        STATS_2_Y,
+                        colors.BLACK,
+                        self._last_sunrise_sunset,
+                    )
+        if DISPLAY_SUNRISE_SUNSET == False or DISPLAY_RECEIVER_STATS == True:
+            if self._last_receiver_stats != receiver_stats_now:
+                if self._last_receiver_stats is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        STATS_2_FONT,
+                        center_align(len(self._last_receiver_stats)),
+                        STATS_2_Y,
+                        colors.BLACK,
+                        self._last_receiver_stats,
+                    )
+        
+        # store our current data for readout in the future
+        self._last_sunrise_sunset = sunrise_sunset_now
+        self._last_receiver_stats = receiver_stats_now
+
+        # Update the values on the display
+        if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_2_FONT,
+                center_align(len(sunrise_sunset_now)),
+                STATS_2_Y,
+                STATS_2_COLOR,
+                sunrise_sunset_now,
+            )
+        if DISPLAY_SUNRISE_SUNSET == False or DISPLAY_RECEIVER_STATS == True:
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_2_FONT,
+                center_align(len(receiver_stats_now)),
+                STATS_2_Y,
+                STATS_2_COLOR,
+                receiver_stats_now,
+            )
 
     # ======== Active Plane Readout ==========
     # ========================================
@@ -2424,6 +2713,45 @@ class Display(
             self._last_activeplanes
             )
 
+    # ========== Property Controls ===========
+    # ========================================
+    """ Control the screen brightness """
+    @Animator.KeyFrame.add(frames.PER_SECOND * 0.1)
+    def brightness_switcher(self, count):
+        self._last_brightness = self.matrix.brightness
+        if active_plane_display == True and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
+            self.matrix.brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+        else:
+            self.matrix.brightness = current_brightness # read the global commanded brightness
+        if self._last_brightness != self.matrix.brightness:
+            # force a redraw of all changing elements as only static elements directly inherit the brightness change
+            # recall that if these variables are None, each respective function will attempt to redraw the element
+            self._last_time = None
+            self._last_date = None
+            self._last_day = None
+            self._last_seconds = None
+            self._last_ampm = None
+            self._last_flybys = None
+            self._last_track = None
+            self._last_range = None
+            self._last_callsign = None
+            self._last_origin = None
+            self._last_destination = None
+            self._last_flighttime = None
+            self._last_altitude = None
+            self._last_speed = None
+            self._last_distance = None
+            self._last_country = None
+            self._last_activeplanes = None
+            self._last_latitude = None
+            self._last_longitude = None
+            self._last_groundtrack = None
+            self._last_vertspeed = None
+            self._last_rssi = None
+            self._last_sunrise_sunset = None
+            self._last_receiver_stats = None
+
+    """ Actually show the display """        
     @Animator.KeyFrame.add(1)
     def sync(self, count):
         # Redraw screen every frame
@@ -2461,6 +2789,7 @@ flyby_stats() # initialize first
 
 # define our scheduled tasks
 schedule.every().day.at("00:00").do(reset_unique_tracks)
+schedule.every().day.at("00:00").do(suntimes)
 schedule.every().day.at("23:59").do(flyby_stats) # get us the day's total count before reset
 schedule.every().hour.at(":00").do(flyby_stats)
 if rlat is not None or rlon is not None:
@@ -2468,6 +2797,7 @@ if rlat is not None or rlon is not None:
 
 dump1090_check()
 read_1090_config()
+suntimes()
 
 def main() -> None:
     """ Enters the main loop. """
@@ -2485,6 +2815,8 @@ def main() -> None:
     airplane_watcher = threading.Thread(target=AirplaneParser, name='Airplane-Parser', daemon=True)
     api_getter = threading.Thread(target=APIFetcher, name='API-Fetch-Thread', daemon=True)
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
+    receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
+    brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Thread', daemon=True)
 
     if DISPLAY_VALID == True and NODISPLAY == False:
         print("\nInitializing display...")
@@ -2495,6 +2827,7 @@ def main() -> None:
         display = Display()
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
         display_stuff.start()
+        brightness_stuff.start()
 
     if INTERACTIVE == True:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
@@ -2520,6 +2853,7 @@ so you can read the above output before we enter the main loop.\n")
     airplane_watcher.start()
     api_getter.start()
     display_sender.start()
+    receiver_stuff.start()
     print("\n========== Main loop started! ===========")
     print("=========================================\n")
 

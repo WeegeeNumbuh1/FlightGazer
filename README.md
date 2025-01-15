@@ -47,7 +47,8 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - Height filtering
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
-  - Brightness based on time of day or when there's an active plane shown
+  - 🆕 Brightness based on time of day or when there's an active plane shown
+  - 🆕 Display sunrise and sunset times or detailed signal stats for your dump1090 receiver
   - Writing to a stats file that keeps count of number of planes flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
@@ -219,7 +220,7 @@ The main python file accepts the same arguments as the initialization script, bu
 
 ### 👓 Misc
 
-<details><summary>What the initialization script does on first run</summary>
+<details><summary>What the initialization script does</summary>
 
 - Checks if there is an internet connection
 - Checks if `first_run_complete` exists
@@ -238,6 +239,7 @@ The main python file accepts the same arguments as the initialization script, bu
   - pydispatcher
   - schedule
   - psutil (usually provided in Raspberry Pi OS)
+  - suntime
   - RGBMatrixEmulator
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 
@@ -326,7 +328,9 @@ Found a bug? Want to suggest a new feature? Open an issue here on Github.
 Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
+- [x] Brightness changing
 - [ ] Docker image?
+- [ ] Settings management from webpage?
 
 ## 📖 Additional Related/Similar Projects
 

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.1.5.1
+# Version = v.1.6
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -272,6 +272,8 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		${VENVPATH}/bin/pip3 install --upgrade pydispatcher >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}schedule"
 		${VENVPATH}/bin/pip3 install --upgrade schedule >/dev/null
+		echo -e "${CHECKMARK}${VERB_TEXT}suntime"
+		${VENVPATH}/bin/pip3 install --upgrade suntime >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}psutil"
 		${VENVPATH}/bin/pip3 install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"

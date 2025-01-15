@@ -50,8 +50,7 @@ DISPLAY_SUNRISE_SUNSET: bool = False
 
 DISPLAY_RECEIVER_STATS: bool = False
 ''' If True, show receiver stats (gain, noise, % loud signals) on the Clock screen.
-Overwrites sunrise/sunset display if `DISPLAY_SUNRISE_SUNSET` is enabled.
-If your setup uses a remote dump1090 instance, this likely will not show anything useful. '''
+Overwrites sunrise/sunset display if `DISPLAY_SUNRISE_SUNSET` is enabled. '''
 
 CLOCK_24HR: bool = False
 ''' If True, use 24 hour clock. If False, 12 hour clock will be used '''
@@ -62,7 +61,7 @@ CLOCK_24HR: bool = False
 BRIGHTNESS: int = 100
 ''' Set the LED brightness (0..100) '''
 
-ENABLE_TWO_BRIGHTNESS: bool = False
+ENABLE_TWO_BRIGHTNESS: bool = True
 ''' If True, enables dynamically switching brightness. If False, only `BRIGHTNESS` will be used. '''
 
 BRIGHTNESS_2: int = 50
@@ -73,15 +72,16 @@ BRIGHTNESS_SWITCH_TIME: dict = {
     "Sunrise": "06:00",
     "Sunset": "18:00"
 }
-''' Set the time of day (in 24-hr format) to switch brightness levels. '''
+''' Set the time of day (in 24-hr format as a string) to switch brightness levels. '''
 
-USE_SUNRISE_SUNSET: bool = False
+USE_SUNRISE_SUNSET: bool = True
 ''' If True, use sunrise and sunset times to adjust brightness.
 If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.'''
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int | None = None
 ''' When there is an active plane, use a different brightness level (0..100). Useful for grabbing attention.
-Overrides all other brightness settings when a plane is being tracked.
+Overrides all other brightness settings when a plane is being tracked. This value does not depend if
+`ENABLE_TWO_BRIGHTNESS` is enabled.
 If you would like to keep it the same brightness, set this to None '''
 
 # ===== RGB-Matrix settings ======
