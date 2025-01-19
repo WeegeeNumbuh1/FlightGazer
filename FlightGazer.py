@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.0.0 --- 2025-01-18'
+VERSION: str = 'v.2.0.1 --- 2025-01-19'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -672,14 +672,17 @@ def configuration_check() -> None:
         except KeyError:
             pass
 
-    if not isinstance(API_KEY, (None, str)):
+    if not isinstance(API_KEY, str):
         print("Warning: API key is not valid. API use will not occur.")
         API_KEY = ""
 
-    if not isinstance(API_DAILY_LIMIT, int) and API_KEY:
-        print("Warning: API_DAILY_LIMIT is not valid. Setting to unlimited API calls per day.")
+    if API_KEY and API_DAILY_LIMIT is None:
+        print("Info: No limit set for API calls.")
+    elif API_KEY and not isinstance(API_DAILY_LIMIT, int):
+        print("Warning: API_DAILY_LIMIT is not valid. Refusing to use API to prevent accidental overcharges.")
         API_DAILY_LIMIT = None
-    else:
+        API_KEY = ""
+    elif API_KEY and API_DAILY_LIMIT is not None:
         print(f"Info: Limiting API calls to {API_DAILY_LIMIT} per day.")
 
     if API_KEY is not None and API_KEY:

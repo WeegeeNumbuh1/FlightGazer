@@ -5,6 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.0.1 - 2025-01-19
+    - HOTFIX: Fix main script not working
+        - Caused by settings checker, ironically
+    - HOTFIX: Fix updater script
+        - Had wrong line endings
+        - Also failed to copy over temporary directory
+        - Change file ownership to nobody before copying over as we are running as root
+        - Re-archetected script to be 2 stage to avoid copying over itself
+
 v.2.0.0 - 2025-01-18
     - BREAKING CHANGE: new settings file format
         - Change from using a Python file to YAML for ease of settings migration in the future

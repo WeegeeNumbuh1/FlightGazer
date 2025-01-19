@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Version = v.2.0.0
+# Version = v.2.0.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -10,9 +10,11 @@ GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+FADE='\033[2m'
 MIGRATE_FLAG=0
 OLDER_BUILD=0
 
+set -o noclobber
 echo -ne "\033]0;FlightGazer Updater\007" # set window title
 echo -e "\n${ORANGE}>>> FlightGazer updater script started."
 if [ `id -u` -ne 0 ]; then
@@ -32,7 +34,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-rm -rf ${TEMPPATH} 2>&1 >/dev/null # make sure the temp directory doesn't exist before we start
+rm -rf ${TEMPPATH} >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
 echo -e "${GREEN}>>> Downloading latest version...${NC}${FADE}"
 git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer $TEMPPATH
 if [ $? -ne 0 ]; then
@@ -42,7 +44,7 @@ fi
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
 sleep 1s
-kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') # ensure nothing remains running
+kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
     echo "    > Old version of FlightGazer detected. You must migrate your settings manually."
@@ -56,31 +58,50 @@ else
         MIGRATE_FLAG=1
     fi
 fi
-cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv 2>&1 >/dev/null # copy flyby stats file if present
-cp -f ${BASEDIR}/config.yaml ${BASEDIR}/config_old.yaml 2>&1 >/dev/null # create backup of old config file
+cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
+cp -f ${BASEDIR}/config.yaml ${BASEDIR}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
 echo -e "${NC}${GREEN}>>> Installing latest version of FlightGazer... ${NC}${FADE}"
-rm -f ${VENVPATH}/first_run_complete 2>&1 >/dev/null # force the init script to update the venv for any changes
+rm -f ${VENVPATH}/first_run_complete >/dev/null 2>&1 # force the init script to update the venv for any changes
+# transfer execution to another script as this current script will get overwritten
+TEMP_SCRIPT='/tmp/FG_update_step2.sh'
+echo '#!/bin/bash' >| $TEMP_SCRIPT
+echo '# stage 2 updater for FlightGazer' >> $TEMP_SCRIPT
+echo "FGDIR=${BASEDIR}" >> $TEMP_SCRIPT
+echo "TEMPDIR=${TEMPPATH}" >> $TEMP_SCRIPT
+echo "FADE='\033[2m'" >> $TEMP_SCRIPT
+echo "ORANGE='\033[0;33m'" >> $TEMP_SCRIPT
+echo "GREEN='\033[0;32m'" >> $TEMP_SCRIPT
+echo "NC='\033[0m'" >> $TEMP_SCRIPT
+echo "MF=${MIGRATE_FLAG}" >> $TEMP_SCRIPT
+echo "OB=${OLDER_BUILD}" >> $TEMP_SCRIPT
+echo ''
+cat >> ${TEMP_SCRIPT} <<'EOF'
 # if there are additonal files not pulled from the latest commit, simply leave them be in the install directory
-cp -Tf ${TEMPPATH} ${BASEDIR} 2>&1 >/dev/null
-# nb: we are also likely rewriting this script with the above command. It *should* be fine as this current copy
-#     *should* be in memory at this point. See: https://unix.stackexchange.com/questions/121013/how-does-linux-deal-with-shell-scripts
+chown -Rf nobody:nogroup $TEMPDIR
+echo -e "${FADE}Copying $TEMPDIR to $FGDIR..."
+cp -TR ${TEMPDIR} ${FGDIR}
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl start flightgazer.service
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
-if [ $MIGRATE_FLAG -e 1 ]; then
+if [ $MF -eq 1 ]; then
     echo -e "${ORANGE}>>> Warning: Settings migrator failed during the update process.${NC}"
     echo "    FlightGazer is currently running with default settings."
-    echo -e "    Your previous settings are in a file named 'config_old.yaml' in ${BASEDIR}"
+    echo "    If 'config.yaml' was present, your previous settings"
+    echo -e "    are in a file named 'config_old.yaml' in ${FGDIR}"
     echo "    You must migrate your settings manually, then restart FlightGazer."
     echo "    Restart using 'sudo systemctl restart flightgazer.service'"
     sleep 5s
 fi
-if [ $OLDER_BUILD -e 1 ]; then
+if [ $OB -eq 1 ]; then
     echo -e "${ORANGE}>>> Notice: FlightGazer is currently running on default settings.${NC}"
-    echo -e "    Your previous configuration file has been renamed 'config_old.py' in ${BASEDIR}"
+    echo -e "    Your previous configuration file has been renamed 'config_old.py' in ${FGDIR}"
     echo "    Please update your settings in the new configuration file 'config.yaml',"
     echo "    then restart FlightGazer."
     echo "    Restart using 'sudo systemctl restart flightgazer.service'" 
     sleep 5s
 fi
+exit 0
+EOF
+chmod +x ${TEMP_SCRIPT}
+sudo bash ${TEMP_SCRIPT}
 exit 0

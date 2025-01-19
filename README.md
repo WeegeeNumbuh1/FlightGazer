@@ -384,6 +384,10 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
   - So far there is no fix planned for this as this does not break core functionality
     - At worst it confuses the plane selector algorithm but even then it still selects normally
     - May be mitigated in the far future
+
+- If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0
+  - Complicated to fix due to all the signal handling between the main script and the initialization script
+  - May not actually get fixed (simply just code better, smh)
   
 </details>
 <br >
