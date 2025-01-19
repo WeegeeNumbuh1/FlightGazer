@@ -45,10 +45,11 @@ echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FA
 systemctl stop flightgazer.service
 sleep 1s
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
+echo "> Done."
 echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
-    echo "    > Old version of FlightGazer detected. You must migrate your settings manually."
-    mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py 2>&1 >/dev/null
+    echo "> Old version of FlightGazer detected. You must migrate your settings manually."
+    mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
     OLDER_BUILD=1
 else
     time_now=$(date '+%Y-%m-%d %H:%M')
@@ -74,14 +75,20 @@ echo "GREEN='\033[0;32m'" >> $TEMP_SCRIPT
 echo "NC='\033[0m'" >> $TEMP_SCRIPT
 echo "MF=${MIGRATE_FLAG}" >> $TEMP_SCRIPT
 echo "OB=${OLDER_BUILD}" >> $TEMP_SCRIPT
-echo ''
+echo '' >> $TEMP_SCRIPT
 cat >> ${TEMP_SCRIPT} <<'EOF'
-# if there are additonal files not pulled from the latest commit, simply leave them be in the install directory
-chown -Rf nobody:nogroup $TEMPDIR
+# if there are additonal files in the install directory that aren't in the latest commit,
+# simply leave them be in the install directory (they could be user files)
+chown -Rf nobody:nogroup $TEMPDIR # need to do this as we are running as root
 echo -e "${FADE}Copying $TEMPDIR to $FGDIR..."
 cp -TR ${TEMPDIR} ${FGDIR}
+chown -f nobody:nogroup $FGDIR/config.yaml # ensure anyone can edit it
+chmod -f 777 $FGDIR/config.yaml
+chown -f nobody:nogroup $FGDIR/flybys.csv >/dev/null 2>&1
+chmod -f 777 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl start flightgazer.service
+echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 if [ $MF -eq 1 ]; then
     echo -e "${ORANGE}>>> Warning: Settings migrator failed during the update process.${NC}"
