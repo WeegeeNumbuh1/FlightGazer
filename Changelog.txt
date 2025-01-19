@@ -1,11 +1,16 @@
 FlightGazer Changelog
 v.V.R.U - Release date
-  ↑ ↑ ↑
-  | | └- Update
-  | └--- Release
-  └----- Version
+  | | |
+  | | `- Update
+  | `--- Release
+  `----- Version
 
-v.1.6.0 - Planned
+v.2.0.0 - 2025-01-18
+    - BREAKING CHANGE: new settings file format
+        - Change from using a Python file to YAML for ease of settings migration in the future
+        - v.2.0 and newer will not be able to read v.1.x or older settings files
+            - If upgrading from v.1.x to v.2 or newer, you must reconfigure your settings manually
+                - This affects an estimated one person as of this Version (the author)
     - NEW: Brightness settings based on time of day
         - Switchover based on local sunrise/sunset or manual settings
     - NEW: Brightness setting for when there is an active plane on display
@@ -14,13 +19,23 @@ v.1.6.0 - Planned
     - NEW: Optional receiver stats on main clock display
         - Track receiver gain (if dump1090 autogain is enabled on the device)
         - Also display noise levels and percentage of loud signals
-    - In interactive mode, show the receiver stats from the above bullet point
-    - Updated init script
-    - Modified 3x5.bdf font to support arrows and other useful drawing characters
-    - Massive code restructuring
-        - Restructured config file for clarity
     - NEW: Updater script that will upgrade FlightGazer to the latest commit on GitHub
         - Migrates settings and stats as well
+        - Forces the init script to check the FlightGazer virtual environment; startup will take slightly longer after an update
+    - NEW: Flight name (callsign/registration) blinks a few times when entering active plane display or a switchover to another plane
+        - Grabs attention better and provides clearer indicator of plane switchover
+    - Massive code restructuring. Like, a lot of changes. Almost a complete rewrite. gg anyone else using this so far
+        - Restructured config file for clarity
+        - Numerous code cleanups
+        - Refactoring to accommodate for all the added features and any future feature creep
+        - Bolstered settings checking to increase resillency against misconfiguration (not unbreakable though)
+    - In interactive mode, receiver stats are also shown
+    - Updated init script
+    - Modified 3x5.bdf font to support arrows and other useful drawing characters
+    - Fixed minor bug with plane selection algorithm where it would not loop through planes once all planes have been shown (was present since v.1.4.0)
+    - Handle cases when there is an empty callsign (this bug went unnoticed since inception)
+    - Further improve display responsiveness
+    - This update was originally slated to be v.1.6.0 but the changes snowballed enough to warrant a version bump (understandably)
 
 v.1.5.2 - 2024-12-27
     - Additional text output tweaks for interactive mode

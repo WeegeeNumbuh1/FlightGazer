@@ -1,0 +1,107 @@
+# Configuration file for FlightGazer
+
+CONFIG_VERSION: v.2.0.0 # do not modify this
+
+# ================ General settings ================
+# ==================================================
+
+FLYBY_STATS_ENABLED: false
+# Save general stats of planes and API usage to a CSV file in the directory this is stored in.
+# Note that if FlightGazer is restarted at some point in the day, it will not be able to recall
+# the amount of planes tracked for the day.
+
+UNITS: 0
+# Select which units to use. 
+# 0 = aeronautical (nmi, ft, kt)
+# 1 = metric (km, m, km/h)
+# 2 = imperial (mi, ft, mph)
+
+HEIGHT_LIMIT: 15000
+# Filter out planes at an altitude higher than this (feet or meters)
+
+RANGE: 2
+# Radius of which planes need to be in for detailed tracking (nautical miles, kilometers, or miles)
+
+FLYBY_STALENESS: 60
+# If the same plane appears again before this time, do not consider it as a flyby (in minutes)
+
+API_KEY: ''
+# Put your FlightAware API key here. Leave as '' to not use the API
+
+API_DAILY_LIMIT: 
+# Set this to null or without a value if you want to have unlimited API calls
+# or an integer value if you want to limit calls
+
+CUSTOM_DUMP1090_LOCATION: ''
+# URL of your dump1090 install if it is in a different location or on a different network device.
+# ex: `http://localhost/custom_name_here` or `http://192.168.xxx.xxx:8080` (no trailing `/`)
+
+CUSTOM_DUMP978_LOCATION: ''
+# URL of your dump978 install if it is in a different location or on a different network device.
+# If you're not using dump978, leave the value as ''.
+# ex: `http://192.168.xxx.xxx:8978`
+
+# ============= Screen Output settings =============
+# ==================================================
+
+ENHANCED_READOUT: false
+# If true, show more details on plane info screen and replaces origin and destination readout.
+# Will not use API even if a key is provided. Useful if API is not in use.
+# Additional details include plane coordinates, ground track, vertical rate, and RSSI
+
+DISPLAY_SUNRISE_SUNSET: false
+# If true, show sunrise and sunset times on the Clock screen
+
+DISPLAY_RECEIVER_STATS: false
+# If true, show receiver stats (gain, noise, % loud signals) on the Clock screen.
+# Overwrites sunrise/sunset display if `DISPLAY_SUNRISE_SUNSET` is enabled.
+
+CLOCK_24HR: false
+# If true, use 24 hour clock. If false, 12 hour clock will be used
+
+# ============== Brightness settings ===============
+# ==================================================
+
+BRIGHTNESS: 100
+# Set the LED brightness (0..100)
+
+ENABLE_TWO_BRIGHTNESS: true
+# If true, enables dynamically switching brightness. If false, only `BRIGHTNESS` will be used.
+
+BRIGHTNESS_2: 50
+# Secondary LED brightness (0..100).
+# `BRIGHTNESS_2` will be used from sunset to sunrise ("night") and `BRIGHTNESS` will be used for all other times.
+
+BRIGHTNESS_SWITCH_TIME:
+  Sunrise: 06:00
+  Sunset: 18:00
+# Set the time of day (in 24-hr format) to switch brightness levels.
+
+USE_SUNRISE_SUNSET: true
+# If True, use sunrise and sunset times to adjust brightness.
+# If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
+
+ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
+# When there is an active plane, use a different brightness level (0..100). Useful for grabbing attention.
+# Overrides all other brightness settings when a plane is being tracked. This value does not depend if
+# `ENABLE_TWO_BRIGHTNESS` is enabled.
+# If you would like to keep it the same brightness, set this to null or an empty value
+
+# ============== RGB-Matrix settings ===============
+# ==================================================
+
+GPIO_SLOWDOWN: 2
+# Set this to the specific value that works for your setup. 
+# Higher values are more suited for faster/more modern Raspberry Pi's
+
+HAT_PWM_ENABLED: true
+# If you set the quality modification for the RGB-Matrix hat, set to true. If not, set to false.
+
+RGB_ROWS: 32
+# Number of LED rows in your display
+
+RGB_COLS: 64
+# Number of LED columns in your display
+
+LED_PWM_BITS: 8
+# Lower decreases color depth but increases refresh rate. Adjust to taste

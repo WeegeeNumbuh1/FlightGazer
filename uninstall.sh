@@ -1,6 +1,6 @@
 #!/bin/bash
 # Uninstall script for FlightGazer.py
-# Version = v.1.5.1
+# Version = v.2.0.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'

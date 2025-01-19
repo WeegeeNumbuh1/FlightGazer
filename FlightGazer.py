@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.1.6.0 Beta --- 2025-01-xx'
+VERSION: str = 'v.2.0.0 --- 2025-01-18'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -35,8 +35,7 @@ from collections import deque
 from string import Formatter
 import random
 from getpass import getuser
-from importlib import import_module
-import importlib.util
+import socket
 # external imports
 import requests
 from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
@@ -77,19 +76,19 @@ if args.interactive:
 else:
     INTERACTIVE = False
 if args.emulate:
-    EMULATE: bool = True
+    EMULATE_DISPLAY: bool = True
 else:
-    EMULATE = False
+    EMULATE_DISPLAY = False
 if args.nodisplay:
-    NODISPLAY: bool = True
+    NODISPLAY_MODE: bool = True
     INTERACTIVE = True
 else:
-    NODISPLAY = False
+    NODISPLAY_MODE = False
 if args.nofilter:
-    NOFILTER: bool = True
+    NOFILTER_MODE: bool = True
     INTERACTIVE = True
 else:
-    NOFILTER = False
+    NOFILTER_MODE = False
 
 FORGOT_TO_SET_INTERACTIVE: bool = False
 
@@ -101,10 +100,12 @@ if __name__ != '__main__':
     sys.exit(1)
 
 CURRENT_DIR = Path(__file__).resolve().parent
+CURRENT_USER = getuser()
 print(f"FlightGazer Version: {VERSION}")
 print(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
-print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{getuser()}\'")
+print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{CURRENT_USER}\'")
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
+CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
 USER_AGENT: dict = {'User-Agent': "Wget/1.21.3"}
 """ Use Wget user-agent for our requests """
@@ -114,14 +115,14 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
-sys.tracebacklimit = 0
+# sys.tracebacklimit = 0
 
 # load in all the display-related modules
-DISPLAY_VALID: bool = True
-if NODISPLAY == False:
+DISPLAY_IS_VALID: bool = True
+if not NODISPLAY_MODE:
     try:
         try:
-            if EMULATE == True: raise Exception
+            if EMULATE_DISPLAY: raise Exception
             from rgbmatrix import graphics
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
         except:
@@ -135,9 +136,9 @@ if NODISPLAY == False:
 
         if 'RGBMatrixEmulator' in sys.modules:
             # INTERACTIVE = True
-            EMULATE = True
+            EMULATE_DISPLAY = True
     except:
-        DISPLAY_VALID = False
+        DISPLAY_IS_VALID = False
         print("ERROR: Cannot load display modules. There will be no display output!\n\
        This script will still function as a basic flight parser and stat generator,\n\
        if the environment allows.")
@@ -145,11 +146,11 @@ if NODISPLAY == False:
        use the \'-d\' flag to suppress this warning.\n")
         time.sleep(2)
 else:
-    DISPLAY_VALID = False
+    DISPLAY_IS_VALID = False
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals (previously)
-if INTERACTIVE == False:
+if not INTERACTIVE:
     if sys.__stdin__.isatty(): FORGOT_TO_SET_INTERACTIVE = True
 
 # make additional use for psutil
@@ -162,11 +163,11 @@ if CORE_COUNT is None:
 # =========== Settings Load-in =============
 # ==========================================
 
-# define our settings and initalize to defaults
+# Define our settings and initalize to defaults
 FLYBY_STATS_ENABLED: bool = False
 HEIGHT_LIMIT: float = 15000
 RANGE: float = 2
-API_KEY: str = ""
+API_KEY: str|None = ""
 API_DAILY_LIMIT: int|None = None
 CLOCK_24HR: bool = True
 CUSTOM_DUMP1090_LOCATION: str = ""
@@ -180,19 +181,23 @@ LED_PWM_BITS: int = 8
 UNITS: int = 0
 FLYBY_STALENESS: int = 60
 ENHANCED_READOUT: bool = False
-''' New settings: '''
 DISPLAY_SUNRISE_SUNSET: bool = False
 DISPLAY_RECEIVER_STATS: bool = False
 ENABLE_TWO_BRIGHTNESS: bool = True
 BRIGHTNESS_2: int = 50
-BRIGHTNESS_SWITCH_TIME: dict = {
-    "Sunrise": "06:00",
-    "Sunset": "18:00"
-}
+BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise":"06:00","Sunset":"18:00"}
 USE_SUNRISE_SUNSET: bool = True
-ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int | None = None
+ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 
-# create the above as a dictionary
+''' Programmer's notes for settings that are dicts:
+Don't change key names or extend the dict. You're stuck with them once baked into this script.
+Why? The settings migrator can't handle migrating dicts that have different keys.
+ex: SETTING = {'key1':val1, 'key2':val2} (user's settings)
+    SETTING = {'key1':val10, 'key2':val20, 'key3':val3} (some hypothetical extension for SETTING in new config)
+    * settings migration *
+    SETTING = {'key1':val1, 'key2':val2} (migrated settings) '''
+
+# Create our settings as a dict
 # NB: if we don't want to load certain settings,
 #     we can simply remove elements from this dictionary
 settings_values: dict = {
@@ -221,104 +226,121 @@ settings_values: dict = {
     "USE_SUNRISE_SUNSET": USE_SUNRISE_SUNSET,
     "ACTIVE_PLANE_DISPLAY_BRIGHTNESS": ACTIVE_PLANE_DISPLAY_BRIGHTNESS,
 }
+""" Dict of default settings """
 
-settings_module_name = "config"
 CONFIG_MISSING: bool = False
-if importlib.util.find_spec(settings_module_name, package=None) is None:
-    print(f"Warning: Cannot find configuration file \'config.py\' in \'{CURRENT_DIR}\'. Using Defaults.")
+print("Loading configuration...")
+try:
+    from ruamel.yaml import YAML
+    yaml = YAML()
+except:
+    print("Warning: Failed to load required module \'ruamel.yaml\'. Configuration file cannot be loaded.\n\
+         Using default settings.")
     CONFIG_MISSING = True
+if not CONFIG_MISSING:
+    try:
+        config = yaml.load(open(CONFIG_FILE, 'r'))
+    except:
+        print(f"Warning: Cannot find configuration file \'config.yaml\' in \'{CURRENT_DIR}\'.\n\
+         Using default settings.")
+        CONFIG_MISSING = True
+if not CONFIG_MISSING:
+    try:
+        config_version = config['CONFIG_VERSION']
+    except KeyError:
+        print(f"Warning: Cannot determine configuration version. This may not be a valid FlightGazer config file.\n\
+         Using default settings.")
+        CONFIG_MISSING = True
 
 ''' We do the next block to enable backward compatibility for older config versions.
 In the future, additional settings could be defined, which older config files
-will not have, so we attempt to load what we can and handle cases when the setting value is missing. '''
-for key in settings_values:
-    try: # import the variable matching the key in the config file
-        globals()[f"{key}"] = getattr(import_module(settings_module_name), key)
-    except (ModuleNotFoundError, NameError, AttributeError):
-        globals()[f"{key}"] = settings_values[key] # ensure we can return to default values
-        if not CONFIG_MISSING:
-            print(f"Notice: Configuration file missing \'{key}\'. Using default value: \'{settings_values[key]}\'")
-else:
-    if not CONFIG_MISSING:
+will not have, so we attempt to load what we can and handle cases when the setting value is missing.
+This shouldn't be an issue when FlightGazer is updated with the update script, but we still have to import the settings. '''
+if not CONFIG_MISSING:
+    for setting_key in settings_values:
         try:
-            print(f"Loaded settings from configuration file. Version: {getattr(import_module(settings_module_name), 'CONFIG_VERSION')}")
+            globals()[f"{setting_key}"] = config[setting_key] # match setting key from config file with expected keys
         except:
-            print(f"Loaded settings from configuration file.")
+            # ensure we can always revert to default values 
+            globals()[f"{setting_key}"] = settings_values[setting_key]
+            print(f"{setting_key} missing, using default value")
+    else:
+        print(f"Loaded settings from configuration file. Version: {config_version}")
 
 # =========== Global Variables =============
 # ==========================================
 
 general_stats: dict = {'Tracking':0, 'Range':0}
-""" general dump1090 stats (updated per loop) """
+""" General dump1090 stats (updated per loop).
+`general_stats` = {`Tracking`, `Range`} """
 receiver_stats: dict = {'Gain':None, 'Noise':None, 'Strong':None}
-""" receiver stats (if available). None values for keys if data is unavailable. 
+""" Receiver stats (if available). None values for keys if data is unavailable. 
 `receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage} """
 
 # active plane stuff
 relevant_planes: list = []
-""" list of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()`) """
+""" List of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()` for keys) """
 focus_plane: str = ""
-""" current plane in focus, selected by `AirplaneParser.plane_selector()` """
+""" Current plane in focus, selected by `AirplaneParser.plane_selector()`. Defaults to an empty string when no active plane is selected. """
 focus_plane_stats: dict = {}
-""" extracted stats for `focus_plane` from `relevant_planes` """
+""" Extracted stats for `focus_plane` from `relevant_planes` """
 focus_plane_iter: int = 0
-""" variable that increments per loop when `AirplaneParser` is active """
+""" Variable that increments per loop when `AirplaneParser` is active """
 focus_plane_ids_scratch = set()
-""" scratchpad of currently tracked planes (all IDs in `relevant_planes` at current loop).
+""" Scratchpad of currently tracked planes (all IDs in `relevant_planes` at current loop).
 Elements can be removed if plane count > 1 due to selector algorithm """
 focus_plane_ids_discard = set()
-""" scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
+""" Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
 plane_latch_times: list = [
     int(30 // LOOP_INTERVAL),
     int(20 // LOOP_INTERVAL),
     int(15 // LOOP_INTERVAL),
 ]
-""" precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
+""" Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
 focus_plane_api_results = deque([None] * 25, maxlen=25)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`} """
 unique_planes_seen: list = []
-""" list of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
+""" List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`} """
 
 # display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
-""" formatted dict for our Display driver.
+""" Formatted dict for our Display driver.
 `idle_data` = {`Flybys`, `Track`, `Range`} """
 idle_data_2: dict = {'SunriseSunset': "", 'ReceiverStats': ""}
-""" [NEW_VARIABLE] additional formatted dict for our Display driver.
+""" Additional formatted dict for our Display driver.
 `idle_data_2` = {`SunriseSunset`, `ReceiverStats`} """
 active_data: dict = {}
-""" formatted dict for our Display driver.
+""" Formatted dict for our Display driver.
 `active_data` = {
 `Callsign`, `Origin`, `Destination`, `FlightTime`,
 `Altitude`, `Speed`, `Distance`, `Country`,
 `Latitude`, `Longitude`, `Track`, `VertSpeed`, `RSSI`
 } or {} """
 active_plane_display: bool = False
-""" which scene to put on the display. False = clock/idle, True = active plane """
+""" Which scene to put on the display. False = clock/idle, True = active plane """
 current_brightness: int = BRIGHTNESS
-""" [NEW_VARIABLE] active brightness level for the display; may be changed depending on settings """
+""" Commanded brightness level for the display; may be changed depending on settings """
 
 # location stuff
 rlat: float | None = None
-""" our location latitude """
+""" Our location latitude """
 rlon: float | None = None
-""" our location longitude """
-sunset_sunrise: dict = {
-    "Sunrise": None,
-    "Sunset": None
-}
-""" [NEW_VARIABLE] sunrise and sunset times for our location in datetime format.
-Updated every day at midnight via the scheduler. """
+""" Our location longitude """
+sunset_sunrise: dict = {"Sunrise": None, "Sunset": None}
+""" Sunrise and sunset times for our location in datetime format.
+Updated every day at midnight via the scheduler. Defaults to None if times cannot be determined. """
+CURRENT_IP = ""
+""" IP address of device running this script """
 
 # runtime stuff
 process_time: list = [0,0,0,0]
-""" for debug; [json parse, filter data, API response, format data] ms """
+""" For debug; [json parse, filter data, API response, format data] ms """
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 flyby_stats_present: bool = False
-""" flag to check if we can write to `FLYBY_STATS_FILE`, initialized to False """
+""" Flag to check if we can write to `FLYBY_STATS_FILE`, initialized to False """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -466,6 +488,21 @@ def match_commandline(command_search: str, process_name: str) -> list:
  
     return list_of_processes
 
+def get_ip() -> str:
+    ''' Gets us our local IP. Modified from my other project `UNRAID_Status_Screen`.
+    Mofifies the global `CURRENT_IP` '''
+    global CURRENT_IP
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        s.connect(('10.254.254.254', 1)) # doesn't even need to connect
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = ""
+    finally:
+        s.close()
+    CURRENT_IP = IP
+
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
 
@@ -526,7 +563,7 @@ def dump1090_check() -> None:
 
     if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
-        if DISPLAY_VALID == True:
+        if DISPLAY_IS_VALID:
             print("ERROR: dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
         else:
             print("ERROR: dump1090 not found. Additionally, screen resources are missing.\n\
@@ -536,7 +573,7 @@ def dump1090_check() -> None:
 def read_1090_config() -> None:
     """ Gets us our location, if it is configured in dump1090. """
     global rlat, rlon, DISPLAY_SUNRISE_SUNSET
-    if DUMP1090_IS_AVAILABLE == False: return
+    if not DUMP1090_IS_AVAILABLE: return
     try:
         req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
         with closing(urlopen(req, None, LOOP_INTERVAL * 0.75)) as receiver_file:
@@ -553,7 +590,7 @@ def read_1090_config() -> None:
                 rlat = rlon = None
                 print("Warning: Location has not been set! This program will not be able to determine any nearby planes or calculate range!\n\
          Please set location in dump1090 to disable this message.")
-                if DISPLAY_SUNRISE_SUNSET == True:
+                if DISPLAY_SUNRISE_SUNSET:
                     print("Warning: Sunrise and sunset times will not be displayed.")
                     DISPLAY_SUNRISE_SUNSET = False
     except:
@@ -562,16 +599,25 @@ def read_1090_config() -> None:
 
 def configuration_check() -> None:
     """ Basic configuration checker """
-    global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS
+    global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS, API_KEY, API_DAILY_LIMIT
+    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
 
     valid_rgb_sizes = [16, 32, 64]
-    if RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes:
+    if (not isinstance(RGB_ROWS, int) or not isinstance(RGB_ROWS, int)) or\
+        (RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes):
         print(f"Warning: selected RGB dimension ({RGB_ROWS}x{RGB_COLS}) is not a valid size.\n\
-         Setting values to default (32x64).")
-        RGB_ROWS = 32
-        RGB_COLS = 64
+         Setting values to default.")
+        RGB_ROWS = settings_values['RGB_ROWS']
+        RGB_COLS = settings_values['RGB_COLS']
 
-    if NOFILTER == False:
+    if not NOFILTER_MODE:
+        if not isinstance(RANGE, int):
+            print(f"Warning: RANGE is not an integer value. Setting to default value.")
+            globals()['RANGE'] = settings_values['RANGE']
+        if not isinstance(HEIGHT_LIMIT, int):
+            print(f"Warning: HEIGHT_LIMIT is not an integer. Setting to default value.")
+            globals()['HEIGHT_LIMIT'] = settings_values['HEIGHT_LIMIT']
+
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
             print(f"Warning: desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
@@ -596,34 +642,58 @@ def configuration_check() -> None:
             print(f"{height_warning} too low. Are planes landing on your house? \
             Setting to a reasonable value ({5000 * altitude_multiplier}{altitude_unit})")
         del height_warning
-
     else:
-        RANGE = 1000
+        RANGE = 10000
         HEIGHT_LIMIT = 275000
     
-    if FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440:
-        print(f"Warning: desired flyby staleness ({FLYBY_STALENESS}) is out of bounds. Setting to default (60)")
-        FLYBY_STALENESS = 60
+    if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
+        print(f"Warning: desired flyby staleness ({FLYBY_STALENESS}) is out of bounds. Setting to default ({settings_values['FLYBY_STALENESS']})")
+        FLYBY_STALENESS = settings_values['FLYBY_STALENESS']
 
-    if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == True:
+    if not FLYBY_STATS_ENABLED:
+        print("Info: Flyby stats will not be written.")
+
+    if DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
         print("Warning: Display option for sunrise and sunset times is enabled, however, receiver stats will be displayed instead.")
-    elif DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+    elif DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
         print("Info: Sunrise and sunset times will be displayed.")
-    elif DISPLAY_SUNRISE_SUNSET == False and DISPLAY_RECEIVER_STATS == True:
+    elif not DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
         print("Info: Receiver stats will be displayed.")
 
-    if API_KEY:
-        if ENHANCED_READOUT == False:
+    brightness_list = ["BRIGHTNESS", "BRIGHTNESS_2", "ACTIVE_PLANE_DISPLAY_BRIGHTNESS"]
+    for setting_entry in brightness_list:
+        try:
+            imported_value = globals()[f"{setting_entry}"] # get current imported setting value
+            if setting_entry == "ACTIVE_PLANE_DISPLAY_BRIGHTNESS" and imported_value is None:
+                    continue
+            if not isinstance(imported_value, int) or (imported_value < 0 or imported_value > 100):
+                print(f"Warning: {setting_entry} is out of bounds or not an integer. Using default value ({settings_values[setting_entry]}).")
+                globals()[f"{setting_entry}"] = settings_values[setting_entry]
+        except KeyError:
+            pass
+
+    if not isinstance(API_KEY, (None, str)):
+        print("Warning: API key is not valid. API use will not occur.")
+        API_KEY = ""
+
+    if not isinstance(API_DAILY_LIMIT, int) and API_KEY:
+        print("Warning: API_DAILY_LIMIT is not valid. Setting to unlimited API calls per day.")
+        API_DAILY_LIMIT = None
+    else:
+        print(f"Info: Limiting API calls to {API_DAILY_LIMIT} per day.")
+
+    if API_KEY is not None and API_KEY:
+        if not ENHANCED_READOUT:
             print("API Key present, API will be used.")
         else:
             print("API Key present, but ENHANCED_READOUT setting is enabled. API will not be used.")
     else:
-        if ENHANCED_READOUT == False:
+        if not ENHANCED_READOUT:
             print("No API Key present. Additional airplane info will not be available.")
-            if DISPLAY_VALID == True:
+            if DISPLAY_IS_VALID:
                 print("Setting ENHANCED_READOUT to \'True\' is recommended.")
         else:
-            if DISPLAY_VALID == True:
+            if DISPLAY_IS_VALID:
                 print("No API Key present. Instead, additional dump1090 info will be substituted.")
             else:
                 print("No API Key present. Additional airplane info will not be available.")
@@ -631,7 +701,7 @@ def configuration_check() -> None:
 def read_receiver_stats() -> None:
     """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
     Needs to run on its own thread as its timing does not depend on `LOOP_INTERVAL`. """
-    if DUMP1090_IS_AVAILABLE == False: return
+    if not DUMP1090_IS_AVAILABLE: return
     global receiver_stats
 
     while True:
@@ -647,7 +717,6 @@ def read_receiver_stats() -> None:
                 try:
                     noise_now = stats['last1min']['local']['noise']
                 except KeyError:
-                    print("No noise in JSON")
                     noise_now = None
                 try:
                     messages1min = stats['last1min']['messages']
@@ -682,9 +751,10 @@ def suntimes() -> None:
     global sunset_sunrise
     if rlat is not None and rlon is not None:
         sun = Sun(rlat, rlon)
+        time_now = datetime.datetime.now().astimezone()
         try:
-            sunset_sunrise['Sunrise'] = sun.get_sunrise_time().astimezone()
-            sunset_sunrise['Sunset'] = sun.get_sunset_time().astimezone()
+            sunset_sunrise['Sunrise'] = sun.get_sunrise_time(time_now).astimezone()
+            sunset_sunrise['Sunset'] = sun.get_sunset_time(time_now).astimezone()
         except SunTimeException:
             sunset_sunrise['Sunrise'] = None
             sunset_sunrise['Sunset'] = None
@@ -739,10 +809,10 @@ def flyby_stats() -> None:
     Written values are accumulative and are reset at midnight.
     """
     global flyby_stats_present, FLYBY_STATS_ENABLED
-    if FLYBY_STATS_ENABLED == False:
+    if not FLYBY_STATS_ENABLED:
         return
     header = "Date,Number of flybys,API calls (successful),API calls (failed),API calls (empty)\n"
-    if FLYBY_STATS_FILE.is_file() and flyby_stats_present == False:
+    if FLYBY_STATS_FILE.is_file() and not flyby_stats_present:
         with open(FLYBY_STATS_FILE, 'r') as stats: # check if the file has a valid header
             head = next(stats)
             if head == header:
@@ -758,7 +828,7 @@ def flyby_stats() -> None:
                 FLYBY_STATS_ENABLED = False
 
         # load in last line of stats file, check if today's the current date, and re-populate our running stats
-        if flyby_stats_present == True:
+        if flyby_stats_present:
             with open(FLYBY_STATS_FILE, 'rb') as f:
                 try:  # catch OSError in case of a one line file 
                     f.seek(-2, os.SEEK_END)
@@ -799,7 +869,7 @@ def flyby_stats() -> None:
             FLYBY_STATS_ENABLED = False
             return
 
-    if flyby_stats_present == True:
+    if flyby_stats_present:
         date_now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
         try:
             with open(FLYBY_STATS_FILE, 'a') as stats:
@@ -821,13 +891,13 @@ def print_to_console() -> None:
 
     cls()
     print(f"===== FlightGazer {ver_str} Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
-    if DUMP1090_IS_AVAILABLE == False:
+    if not DUMP1090_IS_AVAILABLE:
         print("********** dump1090 did not successfully load. There will be no data! **********\n")
 
-    if (rlat is None or rlon is None) and NOFILTER == False:
+    if (rlat is None or rlon is None) and not NOFILTER_MODE:
         print("********** Location is not set! No airplane information will be shown! **********\n")
 
-    if NOFILTER == False:
+    if not NOFILTER_MODE:
         print(f"Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}\n(* indicates in focus, - indicates focused previously)")
     else:
         print("******* No Filters mode enabled. All planes with locations detected by dump1090 shown. *******\n")
@@ -855,7 +925,7 @@ def print_to_console() -> None:
     for a in range(plane_count):
         print_info = []
         # algorithm indicators
-        if NOFILTER == False:
+        if not NOFILTER_MODE:
             if focus_plane == relevant_planes[a]['ID']:
                 print_info.append("* ")
             else:
@@ -897,7 +967,7 @@ def print_to_console() -> None:
             lon=relevant_planes[a]['Longitude'],
         ).ljust(16))
         print_info.append(" | ")
-        # last sectiom
+        # last section
         print_info.append("RSSI: ")
         print_info.append("{rssi}".format(rssi = relevant_planes[a]['RSSI']).rjust(5))
         print_info.append("dBFS")
@@ -935,6 +1005,28 @@ def print_to_console() -> None:
     if receiver_stats['Strong'] is not None:
         loud_str = str(round(receiver_stats['Strong'], 1)) + '%'
 
+    # collate general info 
+    # (currently debating if this really needs to be shown; code is left here as the framework is already established)
+    gen_info = []
+    gen_info_str = ""
+    # if DUMP1090_IS_AVAILABLE:
+    #     gen_info.append("> ")
+    #     gen_info.append(f"dump1090: {URL}")
+    #     if DUMP978_JSON is not None:
+    #         gen_info.append(f", dump978: {DUMP978_JSON[:-19]}")
+    #     if HOSTNAME:
+    #         gen_info.append(f" | Running on {HOSTNAME}")
+    #         if CURRENT_IP:
+    #             gen_info.append(f" as {CURRENT_IP}")
+    #     gen_info_str = "".join(gen_info)
+    # else:
+        # if HOSTNAME:
+        #     gen_info.append(f"> Running on {HOSTNAME}")
+        #     if CURRENT_IP:
+        #         gen_info.append(f" as {CURRENT_IP}")
+        # gen_info_str = "".join(gen_info)
+
+    # print footer section
     print(f"\n> dump1090 response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
     print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}{distance_unit} | \
@@ -945,6 +1037,8 @@ Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     current_memory_usage = psutil.Process().memory_info().rss
     this_process_cpu = this_process.cpu_percent(interval=None)
     print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
+    if gen_info_str:
+        print(gen_info_str)
 
 def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
@@ -1031,8 +1125,8 @@ def main_loop_generator() -> None:
                 else:
                     distance = 0
                 ranges.append(distance)
-                if (NOFILTER == False and (distance < RANGE and distance > 0)) or\
-                    NOFILTER == True:
+                if (not NOFILTER_MODE and (distance < RANGE and distance > 0)) or\
+                    NOFILTER_MODE:
                     alt_baro = a.get('alt_baro')
                     if alt_baro is None or alt_baro == "ground": alt_baro = 0
                     alt_baro = alt_baro * altitude_multiplier
@@ -1056,7 +1150,7 @@ def main_loop_generator() -> None:
                             direc = ""
                         iso_code = flags.getICAO(hex).upper()
                         registration = registrations.registration_from_hexid(hex)
-                        if flight is None:
+                        if flight is None or flight == "        ": # when dump1090 reports an empty callsign, it will show 8 spaces
                             # fallback to registration, then ICAO hex
                             if registration is not None:
                                 flight = registration
@@ -1104,10 +1198,10 @@ def main_loop_generator() -> None:
                 dump1090_data = dump1090_heartbeat()
                 if dump1090_data is None:
                     general_stats = {'Tracking': 0, 'Range': 0}
-                    if DUMP1090_IS_AVAILABLE == True: raise TimeoutError
+                    if DUMP1090_IS_AVAILABLE: raise TimeoutError
                 process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3)
                 start_time = time.perf_counter()
-                if DUMP1090_IS_AVAILABLE == True:
+                if DUMP1090_IS_AVAILABLE:
                     with threading.Lock():
                         general_stats, relevant_planes = dump1090_loop(dump1090_data)
                 process_time[1] = round((time.perf_counter() - start_time)*1000, 3)
@@ -1181,12 +1275,12 @@ class AirplaneParser:
                     focus_plane = random.choice(scratch_list) # get us the next plane from all remaining planes that were not tracked previously
                 elif len(focus_plane_ids_scratch) == 0: # when we have cycled through all planes available, fall back to the first plane in list
                     focus_plane = get_plane_list[0]
-                    focus_plane_ids_discard.clear # reset this set so that we can start cycling though planes again
+                    focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
         start_time = time.perf_counter()
         focus_plane_i = focus_plane # get previously assigned focus plane into this loop's copy
 
-        if NOFILTER == False:
+        if not NOFILTER_MODE:
             if plane_count > 0:
                 with threading.Lock():
                     focus_plane_ids_scratch.clear()
@@ -1215,7 +1309,7 @@ class AirplaneParser:
                 if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
                     select()
                 
-                # finally
+                # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
                     for i in range(len(relevant_planes)): # find our focus plane in `relevant_planes`
                         if focus_plane == relevant_planes[i]['ID']:
@@ -1261,8 +1355,8 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
-        if not API_KEY: return
-        if NOFILTER == True or ENHANCED_READOUT == True: return
+        if API_KEY is None or not API_KEY: return
+        if NOFILTER_MODE or ENHANCED_READOUT: return
         global process_time, focus_plane_api_results, api_hits
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
@@ -1274,11 +1368,10 @@ class APIFetcher:
         destination = None
         departure_time = None
 
-        flight_id = ""
-        for i in range(len(relevant_planes)): # find our focus plane in `relevant_planes`
-            if focus_plane == relevant_planes[i]['ID']:
-                flight_id = relevant_planes[i]['Flight']
-                break
+        try:
+            flight_id = focus_plane_stats['Flight']
+        except KeyError:
+            flight_id = ""
 
         # if for some reason there is no flight ID, don't bother trying to query the API
         if not flight_id or flight_id == '?': return
@@ -1444,7 +1537,7 @@ class DisplayFeeder:
         rise_set = []
         recv_str = []
         if sunset_sunrise['Sunrise'] is not None and sunset_sunrise['Sunset'] is not None:
-            if CLOCK_24HR == True:
+            if CLOCK_24HR:
                 sunrise = sunset_sunrise['Sunrise'].strftime("%H:%M")
                 sunset = sunset_sunrise['Sunset'].strftime("%H:%M")
             else:
@@ -1507,59 +1600,46 @@ class DisplayFeeder:
         # active_stats
         active_stats = {}
         if focus_plane:
-            relevant_plane_count = len(relevant_planes)
-            # find our focus plane in relevant_planes
-            flight_name = ""
-            iso = ""
-            gs = ""
-            alt = ""
-            distance = ""
-            lat = ""
-            lon = ""
-            track = ""
-            vs = ""
-            rssi = ""
-            for a in range(relevant_plane_count):
-                if focus_plane == relevant_planes[a]['ID']:
-                    flight_name = str(relevant_planes[a]['Flight'])
-                    iso = str(relevant_planes[a]['Country'])
-                    # speed readout is limited to 4 characters;
-                    # if speed >= 100, truncate to just the integers
-                    gs_i = str(round(relevant_planes[a]['Speed'], 1))
-                    if len(gs_i) <= 4: gs = gs_i
-                    elif len(gs_i) > 4: gs = gs_i[:3]
-                    alt = str(int(round(relevant_planes[a]['Altitude'], 0)))
-                    # distance readout is limited to 5 characters (2 direction, 3 value);
-                    # if distance >= 10, just get us the integers
-                    dist_i = round(relevant_planes[a]['Distance'], 1)
-                    if dist_i >= 0 and dist_i < 10: dist = str(dist_i)
-                    elif dist_i >= 10 and dist_i < 100: dist = str(dist_i)[:2]
-                    elif dist_i > 100: dist = str(dist_i)[:3]
-                    else: dist = ""
-                    distance = str(relevant_planes[a]['Direction']) + dist
-                    # do our coordinate formatting
-                    lat_i = relevant_planes[a]['Latitude']
-                    lon_i = relevant_planes[a]['Longitude']
-                    if lat_i >= 0: lat_str = "N"
-                    elif lat_i <0: lat_str = "S"
-                    if lon_i >= 0: lon_str = "E"
-                    elif lon_i <0: lon_str = "W"
-                    lat = "{0:.3f}".format(abs(lat_i)) + lat_str
-                    lon = "{0:.3f}".format(abs(lon_i)) + lon_str
-                    track = "T " + str(int(round(relevant_planes[a]['Track'], 0))) + "°"
-                    # vertical speed is an interesting one; we are limited to 6 characters:
-                    # 1 for indicator, 1 for sign, and 4 for values
-                    vs_i = int(round(relevant_planes[a]['VertSpeed'], 0))
-                    vs_str = str(vs_i)
-                    if abs(vs_i) >= 10000:
-                        vs_str = str(round(vs_i / 1000, 1))
-                    if vs_i > 0:
-                        vs_str = "+" + vs_str
-                    elif vs_i == 0:
-                        vs_str = " " + vs_str
-                    vs = "V" + vs_str
-                    rssi = str(relevant_planes[a]['RSSI'])
-                    break
+            flight_name = str(focus_plane_stats['Flight'])
+            # flight name readout is limited to 8 characters
+            if len(flight_name) > 8: flight_name = flight_name[:8]
+            iso = str(focus_plane_stats['Country'])
+            # speed readout is limited to 4 characters;
+            # if speed >= 100, truncate to just the integers
+            gs_i = str(round(focus_plane_stats['Speed'], 1))
+            if len(gs_i) <= 4: gs = gs_i
+            elif len(gs_i) > 4: gs = gs_i[:3]
+            alt = str(int(round(focus_plane_stats['Altitude'], 0)))
+            # distance readout is limited to 5 characters (2 direction, 3 value);
+            # if distance >= 10, just get us the integers
+            dist_i = round(focus_plane_stats['Distance'], 1)
+            if dist_i >= 0 and dist_i < 10: dist = str(dist_i)
+            elif dist_i >= 10 and dist_i < 100: dist = str(dist_i)[:2]
+            elif dist_i > 100: dist = str(dist_i)[:3]
+            else: dist = ""
+            distance = str(focus_plane_stats['Direction']) + dist
+            # do our coordinate formatting
+            lat_i = focus_plane_stats['Latitude']
+            lon_i = focus_plane_stats['Longitude']
+            if lat_i >= 0: lat_str = "N"
+            elif lat_i <0: lat_str = "S"
+            if lon_i >= 0: lon_str = "E"
+            elif lon_i <0: lon_str = "W"
+            lat = "{0:.3f}".format(abs(lat_i)) + lat_str
+            lon = "{0:.3f}".format(abs(lon_i)) + lon_str
+            track = "T " + str(int(round(focus_plane_stats['Track'], 0))) + "°"
+            # vertical speed is an interesting one; we are limited to 6 characters:
+            # 1 for indicator, 1 for sign, and 4 for values
+            vs_i = int(round(focus_plane_stats['VertSpeed'], 0))
+            vs_str = str(vs_i)
+            if abs(vs_i) >= 10000:
+                vs_str = str(round(vs_i / 1000, 1))
+            if vs_i > 0:
+                vs_str = "+" + vs_str
+            elif vs_i == 0:
+                vs_str = " " + vs_str
+            vs = "V" + vs_str
+            rssi = str(focus_plane_stats['RSSI'])
 
             # get us our API results from focus_plane_api_results
             api_orig = filler_text
@@ -1597,7 +1677,7 @@ class DisplayFeeder:
                 'RSSI': rssi,
             }
         with threading.Lock():
-            if NOFILTER == False:
+            if not NOFILTER_MODE:
                 if active_stats: active_plane_display = True
                 else: active_plane_display = False
             else:
@@ -1610,7 +1690,6 @@ class DisplayFeeder:
             active_data = active_stats
             idle_data_2 = idle_stats_2
             process_time[3] = round((time.perf_counter() - displayfeeder_start) * 1000, 3)
-        # return idle_stats, active_stats
     
     def run_loop(self):
         def keep_alive():
@@ -1626,7 +1705,7 @@ def brightness_controller():
     (ex: values of `ENABLE_TWO_BRIGHTNESS` or `sunset_sunrise`)
     Needs to run in its own thread. """
     global current_brightness
-    if ENABLE_TWO_BRIGHTNESS == False:
+    if not ENABLE_TWO_BRIGHTNESS:
         print(f"Info: Dynamic brightness is disabled. Display will remain at a static brightness ({BRIGHTNESS}).")
         return
     if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
@@ -1647,7 +1726,7 @@ def brightness_controller():
         current_time = datetime.datetime.now().astimezone()
 
         if (sunset_sunrise['Sunrise'] is None or sunset_sunrise['Sunset'] is None)\
-            or USE_SUNRISE_SUNSET == False:
+            or not USE_SUNRISE_SUNSET:
             # note that depending on location and time of year, sunrise and sunset times can be None
             # thus we fall back on BRIGHNESS_SWITCH_TIME values (at this point the values have been known to work)
             switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
@@ -1658,7 +1737,7 @@ def brightness_controller():
             sunrise_time = sunset_sunrise['Sunrise']
             sunset_time = sunset_sunrise['Sunset']
 
-        if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None and active_plane_display == True:
+        if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None and active_plane_display:
             # current_brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
             pass # let the display driver handle the brightness in this scenario
         else:
@@ -1668,6 +1747,117 @@ def brightness_controller():
                 current_brightness = BRIGHTNESS_2
 
         time.sleep(1)
+
+class BlinkTheText:
+    """ This is designed to blink the the flight name on the active plane display.
+    This should run in its own thread because it needs to modify the `active_data` global asynchronously.
+    """
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        register_signal_handler(self.loop, self.blinkyblinky, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
+        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self._lastplane = "" # hex ID
+        self._last_callsign = "" # what is shown on the display
+        self._is_blinking = False # pseudo-semaphore
+        self.run_loop()
+
+    def blinkyblinky(self, message):
+        """ Recall that the Display is constantly reading `active_data` to get its display info.
+        We are not tied to whenever `DisplayFeeder` updates `active_data` and this function is designed
+        to exploit this functionality; we can modify `active_data` and the Display will show it.
+        However, `DisplayFeeder` still updates `active_data` so whatever this function does to `active_data` is temporary.
+        It's also rather complicated... but have you seen the rest of this program? """
+
+        global active_data
+        if not focus_plane: return
+        if self._is_blinking: return # prevent starting multiple instances of this function if we switch planes while this is running
+        self._is_blinking = True # acquire a "lock" on our pseudo-semaphore
+        cycles = 4 # times to blink
+        cycle_current = cycles # cycle counter; decrements
+        half_cycle_time = 0.5 # seconds
+        clock_tick = 0.00001 # 0.01 ms, tighter watch time
+        clock_tick_slower = 0.01 # 10 ms
+        wait_for_data = int(1 / clock_tick_slower) # iterations; decrements
+
+        def reset_blink_buffer() -> None:
+            self._lastplane = ""
+            self._last_callsign = ""
+            
+        def resync() -> None:
+            """ Wait to resync with `DisplayFeeder`.
+            When `blinkyblinky()` gets the signal from `AirplaneParser.plane_selector()` we must wait for
+            `DisplayFeeder` to write out `active_data`, which from real-world analysis
+            (watch the `Display formatting` result in Interactive mode) completes on the order 0.1 - 1 milliseconds. """
+            match_flightname = focus_plane_stats['Flight'] # get a local copy
+            timeout = int(0.025 / clock_tick) # wait no longer than this to resync
+            # if it turns out `DisplayFeeder` already wrote out the data, the loop will never run and we can skip the wait
+            while match_flightname != active_data['Callsign']:
+                time.sleep(clock_tick)
+                timeout -= 1
+                if timeout == 0: break
+            return
+
+        while not active_data: # if `DisplayFeeder` hasn't finished writing out data upon switching to active plane display
+            time.sleep(clock_tick_slower) # 10 ms
+            wait_for_data -= 1
+            if wait_for_data == 0: # timeout; don't do anything
+                self._is_blinking = False
+                return
+        
+        resync()
+        # initialize data before entering loop
+        self._lastplane = focus_plane
+        self._last_callsign = active_data['Callsign']
+        while focus_plane: # if there's a focus plane
+            while self._lastplane == focus_plane:
+                if cycle_current == 0:
+                    # exit this function (no more blinking)
+                    with threading.Lock():
+                        active_data['Callsign'] = self._last_callsign
+                    reset_blink_buffer()
+                    self._is_blinking = False
+                    return
+                with threading.Lock():
+                    # restore callsign
+                    active_data['Callsign'] = self._last_callsign
+                time.sleep(half_cycle_time)
+                if self._lastplane != focus_plane: # check if focus plane changed mid-cycle
+                    break 
+                with threading.Lock():
+                    # the "blink"
+                    active_data['Callsign'] = ""
+                cycle_current -= 1
+                time.sleep(half_cycle_time)
+
+            if cycle_current == 0: # always have an escape path
+                with threading.Lock():
+                    active_data['Callsign'] = self._last_callsign
+                reset_blink_buffer()
+                self._is_blinking = False
+                return
+            
+            # below block will run if we break out of the loop or if the while loop evaluates False
+            # update to latest change then re-enter the loop
+            cycle_current = cycles
+            resync()
+            reset_blink_buffer()
+            self._lastplane = focus_plane
+            self._last_callsign = active_data['Callsign'] 
+
+        else:
+            reset_blink_buffer()
+            self._is_blinking = False
+            return
+
+    def run_loop(self):
+        def keep_alive():
+            self.loop.call_later(1, keep_alive)
+        keep_alive()
+        self.loop.run_forever()
+
+    def end_thread(self, message):
+        self.loop.stop()
 
 # ========== Display Superclass ============
 # ==========================================
@@ -1763,7 +1953,10 @@ class Display(
         # Overwrite any default settings from Animator
         self.delay = frames.PERIOD
 
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.1)
+    # Control display "responsiveness" (the animator redraw, in seconds)
+    refresh_speed = 0.1
+
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def scene_switch(self, count):
         if self._last_active_state != active_plane_display:
             self.active_plane_display = active_plane_display
@@ -1783,9 +1976,9 @@ class Display(
     # ========================================
 
     """ Hour and minute """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def clock(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_time = None
             return
         CLOCK_FONT = fonts.large_bold
@@ -1793,7 +1986,7 @@ class Display(
         CLOCK_COLOR = colors.WARM_WHITE
 
         now = datetime.datetime.now()
-        if CLOCK_24HR == False:
+        if not CLOCK_24HR:
             current_time = now.strftime("%I:%M")
             current_time = current_time[0].replace("0", " ", 1) + current_time[1:] # replace leading zero
         else:
@@ -1825,9 +2018,9 @@ class Display(
             )
     
     """ Seconds """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def second(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_seconds = None
             return
         SECONDS_FONT = fonts.smallest
@@ -1863,9 +2056,9 @@ class Display(
             )
 
     """ AM/PM Indicator """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def ampm(self, count):
-        if self.active_plane_display == True or CLOCK_24HR == True:
+        if self.active_plane_display or CLOCK_24HR:
             self._last_ampm = None
             return
         AMPM_COLOR = colors.ORANGE_DARK
@@ -1900,9 +2093,9 @@ class Display(
             )
     
     """ Day of the week """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def day(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_day = None
             return
         DAY_COLOR = colors.PINK_DARK
@@ -1937,9 +2130,9 @@ class Display(
             )
 
     """ Date """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def date(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_date = None
             return
         DATE_COLOR = colors.PURPLE
@@ -1976,9 +2169,9 @@ class Display(
     # ========= Idle Stats Elements ==========
     # ========================================
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_header(self, count):
-        if self.active_plane_display == True: return
+        if self.active_plane_display: return
         HEADER_TEXT_FONT = fonts.smallest
         FLYBY_HEADING_COLOR = colors.BLUE_DARK
         TRACK_HEADING_COLOR = colors.GREEN_DARK
@@ -2010,9 +2203,9 @@ class Display(
         )
     
     """ Our idle stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def stats_readout(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_flybys = None
             self._last_track = None
             self._last_range = None
@@ -2094,13 +2287,13 @@ class Display(
         )
     
     """ Idle Stats 2: Sunrise/Sunset or Receiver Stats """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_stats_2(self, count):
-        if self.active_plane_display == True:
+        if self.active_plane_display:
             self._last_sunrise_sunset = None
             self._last_receiver_stats = None
             return
-        if DISPLAY_SUNRISE_SUNSET == False and DISPLAY_RECEIVER_STATS == False:
+        if not DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
             self._last_sunrise_sunset = None
             self._last_receiver_stats = None
             return
@@ -2116,14 +2309,14 @@ class Display(
                 return (30 - ((text_len - 1) * 2))
         
         STATS_2_FONT = fonts.smallest
-        STATS_2_COLOR = graphics.Color(64, 64, 64)
+        STATS_2_COLOR = colors.DARK_GREY
         STATS_2_Y = 18
         try:
             sunrise_sunset_now = idle_data_2['SunriseSunset']
             receiver_stats_now = idle_data_2['ReceiverStats']
         except: return
         # Undraw sections
-        if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+        if DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
             if self._last_sunrise_sunset != sunrise_sunset_now:
                 if self._last_sunrise_sunset is not None:
                     _ = graphics.DrawText(
@@ -2134,7 +2327,7 @@ class Display(
                         colors.BLACK,
                         self._last_sunrise_sunset,
                     )
-        if DISPLAY_SUNRISE_SUNSET == False or DISPLAY_RECEIVER_STATS == True:
+        if not DISPLAY_SUNRISE_SUNSET or DISPLAY_RECEIVER_STATS:
             if self._last_receiver_stats != receiver_stats_now:
                 if self._last_receiver_stats is not None:
                     _ = graphics.DrawText(
@@ -2151,7 +2344,7 @@ class Display(
         self._last_receiver_stats = receiver_stats_now
 
         # Update the values on the display
-        if DISPLAY_SUNRISE_SUNSET == True and DISPLAY_RECEIVER_STATS == False:
+        if DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
             _ = graphics.DrawText(
                 self.canvas,
                 STATS_2_FONT,
@@ -2160,7 +2353,7 @@ class Display(
                 STATS_2_COLOR,
                 sunrise_sunset_now,
             )
-        if DISPLAY_SUNRISE_SUNSET == False or DISPLAY_RECEIVER_STATS == True:
+        if not DISPLAY_SUNRISE_SUNSET or DISPLAY_RECEIVER_STATS:
             _ = graphics.DrawText(
                 self.canvas,
                 STATS_2_FONT,
@@ -2173,9 +2366,9 @@ class Display(
     # ======== Active Plane Readout ==========
     # ========================================
     """ Header information: Callsign, Distance, Country """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def top_header(self, count):
-        if self.active_plane_display == False:
+        if not self.active_plane_display:
             self._last_callsign = None
             self._last_distance = None
             self._last_country = None
@@ -2256,9 +2449,9 @@ class Display(
         )
 
     """ Our journey indicator (origin and destination) """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def journey(self, count):
-        if self.active_plane_display == False or ENHANCED_READOUT == True:
+        if not self.active_plane_display or ENHANCED_READOUT:
             self._last_origin = None
             self._last_destination = None
             return
@@ -2392,9 +2585,9 @@ class Display(
             )
 
     """ Enhanced readout: replace journey with latitude and longitude """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def lat_lon(self, count):
-        if self.active_plane_display == False or ENHANCED_READOUT == False:
+        if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_latitude = None
             self._last_longitude = None
             return
@@ -2452,9 +2645,9 @@ class Display(
         )
 
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def active_header(self, count):
-        if self.active_plane_display == False: return
+        if not self.active_plane_display: return
         HEADER_TEXT_FONT = fonts.extrasmall
         ALTITUDE_HEADING_COLOR = colors.BLUE_DARK
         SPEED_HEADING_COLOR = colors.GREEN_DARK
@@ -2476,7 +2669,7 @@ class Display(
             SPEED_HEADING_COLOR,
             "SPD"
         )
-        if ENHANCED_READOUT == False:
+        if not ENHANCED_READOUT:
             _ = graphics.DrawText(
                 self.canvas,
                 HEADER_TEXT_FONT,
@@ -2496,9 +2689,9 @@ class Display(
             )
 
     """ Our active stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def active_readout(self, count):
-        if self.active_plane_display == False:
+        if not self.active_plane_display:
             self._last_altitude = None
             self._last_speed = None
             self._last_flighttime = None
@@ -2545,7 +2738,7 @@ class Display(
                     colors.BLACK,
                     self._last_speed
                 )
-        if ENHANCED_READOUT == False:
+        if not ENHANCED_READOUT:
             if self._last_flighttime != flighttime_now:
                 if self._last_flighttime is not None:
                     _ = graphics.DrawText(
@@ -2590,7 +2783,7 @@ class Display(
             SPEED_TEXT_COLOR,
             speed_now
         )
-        if ENHANCED_READOUT == False:
+        if not ENHANCED_READOUT:
             _ = graphics.DrawText(
                 self.canvas,
                 STATS_TEXT_FONT,
@@ -2610,9 +2803,9 @@ class Display(
             )          
 
     """ Enhanced readout: Ground track and Vertical Speed """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def enhanced(self, count):
-        if self.active_plane_display == False or ENHANCED_READOUT == False:
+        if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_groundtrack = None
             self._last_vertspeed = None
             return
@@ -2671,9 +2864,9 @@ class Display(
         )
 
     """ An indicator of how many planes are in the area """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.5)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def plane_count_indicator(self, count):
-        if self.active_plane_display == False:
+        if not self.active_plane_display:
             self._last_activeplanes = None
             return
         
@@ -2716,13 +2909,16 @@ class Display(
     # ========== Property Controls ===========
     # ========================================
     """ Control the screen brightness """
-    @Animator.KeyFrame.add(frames.PER_SECOND * 0.1)
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def brightness_switcher(self, count):
         self._last_brightness = self.matrix.brightness
-        if active_plane_display == True and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
+        if active_plane_display and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
             self.matrix.brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
         else:
-            self.matrix.brightness = current_brightness # read the global commanded brightness
+            try:
+                self.matrix.brightness = current_brightness # read the global commanded brightness
+            except:
+                self.matrix.brightness = BRIGHTNESS
         if self._last_brightness != self.matrix.brightness:
             # force a redraw of all changing elements as only static elements directly inherit the brightness change
             # recall that if these variables are None, each respective function will attempt to redraw the element
@@ -2784,6 +2980,9 @@ if len(matching_processes) > 1: # when we scan for all processes, it will includ
 else:
     del matching_processes
 
+get_ip()
+HOSTNAME = socket.gethostname()
+print(f"Info: Running from {CURRENT_IP} ({HOSTNAME})")
 configuration_check()
 flyby_stats() # initialize first
 
@@ -2792,6 +2991,7 @@ schedule.every().day.at("00:00").do(reset_unique_tracks)
 schedule.every().day.at("00:00").do(suntimes)
 schedule.every().day.at("23:59").do(flyby_stats) # get us the day's total count before reset
 schedule.every().hour.at(":00").do(flyby_stats)
+schedule.every().hour.at(":00").do(get_ip) # in case the IP changes
 if rlat is not None or rlon is not None:
     schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 
@@ -2802,9 +3002,9 @@ suntimes()
 def main() -> None:
     """ Enters the main loop. """
     # register our loop breaker
-    # if INTERACTIVE == False and FORGOT_TO_SET_INTERACTIVE == False:
+    # if not INTERACTIVE and not FORGOT_TO_SET_INTERACTIVE:
     #     signal.signal(signal.SIGTERM, sigterm_handler)
-    # if INTERACTIVE == True or FORGOT_TO_SET_INTERACTIVE == True:
+    # if INTERACTIVE or FORGOT_TO_SET_INTERACTIVE:
     #     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
@@ -2817,8 +3017,9 @@ def main() -> None:
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
     brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Thread', daemon=True)
+    flightname_blinker = threading.Thread(target=BlinkTheText, name='Text-Blinker', daemon=True)
 
-    if DISPLAY_VALID == True and NODISPLAY == False:
+    if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         print("\nInitializing display...")
         if 'RGBMatrixEmulator' in sys.modules:
             print("We are using \'RGBMatrixEmulator\'")
@@ -2829,22 +3030,25 @@ def main() -> None:
         display_stuff.start()
         brightness_stuff.start()
 
-    if INTERACTIVE == True:
+    if INTERACTIVE:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
 so you can read the above output before we enter the main loop.\n")
         interactive_wait_time = 15
-        if random.randint(0,1) == 1 and (DISPLAY_VALID == True and EMULATE == False): # randomly show this tip
+        # silly random distractions while you wait 
+        if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
             interactive_wait_time -= 5
             time.sleep(5)
             print("Protip: If you're not using a physical RBG-Matrix display,\n\
         use RGBMatrixEmulator to see the display on a webpage instead!")
-            if 'RGBMatrixEmulator' not in sys.modules:
-                print("        It doesn't seem to be installed, so use \'pip install RGBMatrixEmulator\' to get it.")
+        if random.randint(0,1) == 1:
+            interactive_wait_time -= 5
+            time.sleep(5)
+            print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
             
         time.sleep(interactive_wait_time)
         del interactive_wait_time
     
-    if INTERACTIVE == False and FORGOT_TO_SET_INTERACTIVE == True:
+    if not INTERACTIVE and FORGOT_TO_SET_INTERACTIVE:
         print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n\
         Normally, outputs shown here are not usually seen. If you want to see data, use Ctrl+C to quit\n\
         and use the interactive flag (-i) instead.")
@@ -2854,6 +3058,7 @@ so you can read the above output before we enter the main loop.\n")
     api_getter.start()
     display_sender.start()
     receiver_stuff.start()
+    flightname_blinker.start()
     print("\n========== Main loop started! ===========")
     print("=========================================\n")
 
