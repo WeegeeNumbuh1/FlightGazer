@@ -2,14 +2,14 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Version = v.2.0.0
+# Last updated: v.2.1.0
 # By WeegeeNumbuh1
+
+import sys
 if __name__ != '__main__':
     print("This file cannot be loaded as a module.")
     sys.exit(1)
-
 import argparse
-import sys
 import os
 from pathlib import Path
 os.environ["PYTHONUNBUFFERED"] = "1"
@@ -25,14 +25,9 @@ parser.add_argument("current_settings_file")
 parser.add_argument("new_settings_file")
 args = parser.parse_args()
 
-try:
-    PATH1 = Path(args.current_settings_file)
-    PATH2 = Path(args.new_settings_file)
-except:
-    print("Error: Could not parse working directories. These values were given:")
-    print(f"      {args.current_settings_file}")
-    print(f"      {args.new_settings_file}")
-    sys.exit(1)
+PATH1 = Path(args.current_settings_file)
+PATH2 = Path(args.new_settings_file)
+
 print(f"Current configuration file: {PATH1}\nNew configuration file:     {PATH2}")
 
 yaml=YAML()

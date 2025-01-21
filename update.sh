@@ -1,11 +1,11 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Version = v.2.0.1
+# Last updated: v.2.1.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
 VENVPATH=/etc/FlightGazer-pyvenv
-MIGRATE_LOG=${BASEDIR}/settings_migrate.log
+MIGRATE_LOG=${TEMPPATH}/settings_migrate.log
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 RED='\033[0;31m'
@@ -50,6 +50,8 @@ echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
     echo "> Old version of FlightGazer detected. You must migrate your settings manually."
     mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
+    chown -f nobody:nogroup ${BASEDIR}/config_old.py >/dev/null 2>&1
+    chmod -f 777 ${BASEDIR}/config_old.py >/dev/null 2>&1
     OLDER_BUILD=1
 else
     time_now=$(date '+%Y-%m-%d %H:%M')
@@ -60,7 +62,7 @@ else
     fi
 fi
 cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
-cp -f ${BASEDIR}/config.yaml ${BASEDIR}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
+cp -f ${BASEDIR}/config.yaml ${TEMPPATH}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
 echo -e "${NC}${GREEN}>>> Installing latest version of FlightGazer... ${NC}${FADE}"
 rm -f ${VENVPATH}/first_run_complete >/dev/null 2>&1 # force the init script to update the venv for any changes
 # transfer execution to another script as this current script will get overwritten

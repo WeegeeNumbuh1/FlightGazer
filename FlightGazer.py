@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.0.1 --- 2025-01-19'
+VERSION: str = 'v.2.1.0 --- 2025-01-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1751,117 +1751,6 @@ def brightness_controller():
 
         time.sleep(1)
 
-class BlinkTheText:
-    """ This is designed to blink the the flight name on the active plane display.
-    This should run in its own thread because it needs to modify the `active_data` global asynchronously.
-    """
-    def __init__(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        register_signal_handler(self.loop, self.blinkyblinky, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
-        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
-        self._lastplane = "" # hex ID
-        self._last_callsign = "" # what is shown on the display
-        self._is_blinking = False # pseudo-semaphore
-        self.run_loop()
-
-    def blinkyblinky(self, message):
-        """ Recall that the Display is constantly reading `active_data` to get its display info.
-        We are not tied to whenever `DisplayFeeder` updates `active_data` and this function is designed
-        to exploit this functionality; we can modify `active_data` and the Display will show it.
-        However, `DisplayFeeder` still updates `active_data` so whatever this function does to `active_data` is temporary.
-        It's also rather complicated... but have you seen the rest of this program? """
-
-        global active_data
-        if not focus_plane: return
-        if self._is_blinking: return # prevent starting multiple instances of this function if we switch planes while this is running
-        self._is_blinking = True # acquire a "lock" on our pseudo-semaphore
-        cycles = 4 # times to blink
-        cycle_current = cycles # cycle counter; decrements
-        half_cycle_time = 0.5 # seconds
-        clock_tick = 0.00001 # 0.01 ms, tighter watch time
-        clock_tick_slower = 0.01 # 10 ms
-        wait_for_data = int(1 / clock_tick_slower) # iterations; decrements
-
-        def reset_blink_buffer() -> None:
-            self._lastplane = ""
-            self._last_callsign = ""
-            
-        def resync() -> None:
-            """ Wait to resync with `DisplayFeeder`.
-            When `blinkyblinky()` gets the signal from `AirplaneParser.plane_selector()` we must wait for
-            `DisplayFeeder` to write out `active_data`, which from real-world analysis
-            (watch the `Display formatting` result in Interactive mode) completes on the order 0.1 - 1 milliseconds. """
-            match_flightname = focus_plane_stats['Flight'] # get a local copy
-            timeout = int(0.025 / clock_tick) # wait no longer than this to resync
-            # if it turns out `DisplayFeeder` already wrote out the data, the loop will never run and we can skip the wait
-            while match_flightname != active_data['Callsign']:
-                time.sleep(clock_tick)
-                timeout -= 1
-                if timeout == 0: break
-            return
-
-        while not active_data: # if `DisplayFeeder` hasn't finished writing out data upon switching to active plane display
-            time.sleep(clock_tick_slower) # 10 ms
-            wait_for_data -= 1
-            if wait_for_data == 0: # timeout; don't do anything
-                self._is_blinking = False
-                return
-        
-        resync()
-        # initialize data before entering loop
-        self._lastplane = focus_plane
-        self._last_callsign = active_data['Callsign']
-        while focus_plane: # if there's a focus plane
-            while self._lastplane == focus_plane:
-                if cycle_current == 0:
-                    # exit this function (no more blinking)
-                    with threading.Lock():
-                        active_data['Callsign'] = self._last_callsign
-                    reset_blink_buffer()
-                    self._is_blinking = False
-                    return
-                with threading.Lock():
-                    # restore callsign
-                    active_data['Callsign'] = self._last_callsign
-                time.sleep(half_cycle_time)
-                if self._lastplane != focus_plane: # check if focus plane changed mid-cycle
-                    break 
-                with threading.Lock():
-                    # the "blink"
-                    active_data['Callsign'] = ""
-                cycle_current -= 1
-                time.sleep(half_cycle_time)
-
-            if cycle_current == 0: # always have an escape path
-                with threading.Lock():
-                    active_data['Callsign'] = self._last_callsign
-                reset_blink_buffer()
-                self._is_blinking = False
-                return
-            
-            # below block will run if we break out of the loop or if the while loop evaluates False
-            # update to latest change then re-enter the loop
-            cycle_current = cycles
-            resync()
-            reset_blink_buffer()
-            self._lastplane = focus_plane
-            self._last_callsign = active_data['Callsign'] 
-
-        else:
-            reset_blink_buffer()
-            self._is_blinking = False
-            return
-
-    def run_loop(self):
-        def keep_alive():
-            self.loop.call_later(1, keep_alive)
-        keep_alive()
-        self.loop.run_forever()
-
-    def end_thread(self, message):
-        self.loop.stop()
-
 # ========== Display Superclass ============
 # ==========================================
 
@@ -1949,6 +1838,11 @@ class Display(
         self._last_rssi = None
         # brightness control
         self._last_brightness = self.matrix.brightness
+        # blinker variables for callsign (see `callsign_blinker() below`)
+        self._callsign_is_blanked = False
+        self._callsign_blinker_cache = None
+        self._callsign_blinker_cache_last = None
+        self._callsign_frame_decrement = None
 
         # Initalize animator
         super().__init__()
@@ -1974,6 +1868,39 @@ class Display(
     def clear_screen(self):
         # First operation after a screen reset
         self.canvas.Clear()
+
+    """ Blink the callsign upon plane change or if active plane display starts """
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
+    def callsign_blinker(self, count):
+        half_cycle_time: float = 0.5 # in seconds
+        frame_count_per_sec = frames.PER_SECOND
+        switch_after_these_many_frames = int(round(frame_count_per_sec * half_cycle_time, 0))
+        times_to_blink: int = 5
+        # (times_to_blink * 2) gives us a full cycle in regards to frames
+        frame_decrement_init = int(switch_after_these_many_frames * (times_to_blink * 2))
+
+        def reinit():
+            self._callsign_frame_decrement = frame_decrement_init
+            self._callsign_is_blanked = False
+
+        if self._callsign_frame_decrement is None or\
+            (not self.active_plane_display or not focus_plane):
+            # reset the decrementer if we haven't initalized it yet or plane display is off 
+            reinit()
+            self._callsign_blinker_cache_last = None
+            return
+        self._callsign_blinker_cache = focus_plane_stats['ID'] # get current hex ID at this loop
+        # if the callsign changed after we're done blinking (decrement == 0) and active plane display is still true
+        if self._callsign_blinker_cache_last is not None and\
+            self._callsign_blinker_cache_last != self._callsign_blinker_cache:
+            reinit()
+        if self._callsign_frame_decrement == 0: # stop the blinking
+            self._callsign_is_blanked = False
+            return
+        if self._callsign_frame_decrement % switch_after_these_many_frames == 0:
+            self._callsign_is_blanked = not self._callsign_is_blanked # the actual "blink"
+        self._callsign_frame_decrement -= 1
+        self._callsign_blinker_cache_last = self._callsign_blinker_cache # move this loop's cache to another cache to check at a later time
 
     # =========== Clock Elements =============
     # ========================================
@@ -2385,7 +2312,11 @@ class Display(
         DISTANCE_X_POS = 35
         COUNTRY_X_POS = 56
         try:
-            callsign_now = active_data['Callsign']
+            # we want to blink this text
+            if not self._callsign_is_blanked:
+                callsign_now = active_data['Callsign']
+            else:
+                callsign_now = ""
             distance_now = active_data['Distance']
             country_now = active_data['Country']
         except: return
@@ -3020,7 +2951,6 @@ def main() -> None:
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
     brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Thread', daemon=True)
-    flightname_blinker = threading.Thread(target=BlinkTheText, name='Text-Blinker', daemon=True)
 
     if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         print("\nInitializing display...")
@@ -3047,6 +2977,11 @@ so you can read the above output before we enter the main loop.\n")
             interactive_wait_time -= 5
             time.sleep(5)
             print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
+        if random.randint(0,1) == 1:
+            interactive_wait_time -= 5
+            time.sleep(5)
+            print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n\
+              color scale used on the dump1090 map that corresponds to plane altitude.")
             
         time.sleep(interactive_wait_time)
         del interactive_wait_time
@@ -3061,7 +2996,6 @@ so you can read the above output before we enter the main loop.\n")
     api_getter.start()
     display_sender.start()
     receiver_stuff.start()
-    flightname_blinker.start()
     print("\n========== Main loop started! ===========")
     print("=========================================\n")
 

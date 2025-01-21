@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.0.1
+# Version = v.2.1.0
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -152,6 +152,9 @@ if [ $SKIP_CHECK -eq 0 ]; then
 	fi
 fi
 
+# start the splash screen
+nohup python $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+
 if [ ! -f "$CHECK_FILE" ];
 then 
     echo "  > Updating package lists..."
@@ -291,7 +294,13 @@ ENDTIME=$(date '+%s')
 echo "Setup/Initialization took $((ENDTIME - STARTTIME)) seconds."
 echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
+if [ $SKIP_CHECK -eq 1 ]; then
+	echo -e "${NC}${FADE}> Playing splash screen for 5 seconds..."
+	sleep 5s
+	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
+fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"
+kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
 if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	echo -e "\n${NC}${RED}>>> ERROR: Cannot find ${BASEDIR}/FlightGazer.py."
 	sleep 2s

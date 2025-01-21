@@ -22,10 +22,14 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 <details open>
 <summary><b>Show/Hide images</b></summary>
 
-| <div align="center"><img src="media/FG_NewPlane.gif" alt=""><br ><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt=""><br ><i>...and once it leaves.</i></div> |
+| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br ><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br ><i>...and once it leaves.</i></div> |
 |---|---|
-| <div align="center"><img src="media/FG_Switch.gif" alt=""><br ><i>Handles multiple planes in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt=""><br ><i>...and moments when the API takes its time.</i></div> |
-| <div align="center"><img src="media/FG_EdgeCase.gif" alt=""><br ><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
+| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br ><i>Handles multiple planes in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br ><i>...and moments when the API takes its time.</i></div> |
+| <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br ><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
+
+|   |
+|---|
+| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br>- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Plane display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active plane display (shown) or plane switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active plane (shown) |
 
 </details>
 
@@ -75,7 +79,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 Using this project assumes you have the following:
 #### MINIMUM
 - A working `dump1090` instance or similar where `/data/aircraft.json` can be read
-  - Ex: `tar1090`, `piaware`/`skyaware`, `dump1090-fa`, `dump1090-mutability`, and `readsb`
+  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090), `piaware`/`skyaware`, `dump1090-fa`, `dump1090-mutability`, and [`readsb`](https://github.com/wiedehopf/readsb)
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
 - Python 3.8 or newer
@@ -90,7 +94,8 @@ Using this project assumes you have the following:
   - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
   - `rgbmatrix` does not need to be strictly installed to run this script (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
-  - a `32x64` sized matrix display (this is the only layout this script was designed for)
+  - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
+  - Using `32x64` sized matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional plane information such as origin/destination airports
@@ -333,14 +338,15 @@ Simply delete the folder (and the virtual python environment if you set that up 
 <details><summary><b>FAQ's (Open these before raising an issue)</b></summary>
 
 **Q:** My RGB display is blank when running this, what broke?<br>
-**A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.
+**A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
+Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 rgb panel. Other setups are not supported.
 
 **Q:** I restarted my system but it took longer for my display to start. What's going on?<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
 If it has been over a month since it last checked, then the next time it restarts, it will run these checks. It usually only adds another 30 seconds to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
 **Q:** I see a red dot on the right of the plane readout display. What is it?<br>
-**A:** That is an indicator of how many planes are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6.
+**A:** That is an indicator of how many planes are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between planes to show you what else is flying in your area.
 
 **Q:** Can I customize the colors?<br >
 **A:** Sure, just edit them in the script. (Check the functions inside the `Display` class in the main python file).<br>
@@ -410,8 +416,11 @@ Faraway ideas:
 - [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the planes that flyby your location
   - Inspired the functionality of the stats file FlightGazer writes out
 
-## 🎖️ Highlights Across The Internet
+## 🎖️ Highlights Across Media
 \* (dust) \* 
+
+## ⚖️ Licence
+\* (to be chosen eventually) \*
 
 ## ✅ Acknowledgements
 Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator). This tool was invaluable for getting the layout dialed in and figuring out the logic needed to update the display correctly, all while avoiding having to program directly on the Raspberry Pi itself (VSCode Remote on a Zero 2W is literally impossible, I've tried).

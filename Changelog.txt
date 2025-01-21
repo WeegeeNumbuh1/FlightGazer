@@ -5,14 +5,23 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.1.0 - 2025-01-20
+    - NEW: New logo
+    - NEW: Splash screen (to show off the new logo)
+        - Only works if using the init script
+        - Now there's something to show when the init script needs to update the working environment
+    - Overhauled method to blink callsign
+        - The design is now much less janky and much more robust
+    - Small tweaks to updater scripts
+
 v.2.0.1 - 2025-01-19
-    - HOTFIX: Fix main script not working
+    - HOTFIX: Fix main script not working (failed to start)
         - Caused by settings checker, ironically
     - HOTFIX: Fix updater script
         - Had wrong line endings
         - Also failed to copy over temporary directory
         - Change file ownership to nobody before copying over as we are running as root
-        - Re-archetected script to be 2 stage to avoid copying over itself
+        - Re-architected script to be 2 stage to avoid copying over itself
 
 v.2.0.0 - 2025-01-18
     - BREAKING CHANGE: new settings file format
