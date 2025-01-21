@@ -7,8 +7,8 @@ CONFIG_VERSION: v.2.1.1 # do not modify this
 
 FLYBY_STATS_ENABLED: false
 # Save general stats of planes and API usage to a CSV file in the directory this is stored in.
-# Note that if FlightGazer is restarted at some point in the day, it will not be able to recall
-# the amount of planes tracked for the day.
+# Note that if FlightGazer is restarted at some point in the day and this setting is false,
+# FlightGazer will not be able to recall the amount of planes tracked so far for that day before it was restarted.
 
 UNITS: 0
 # Select which units to use. 
@@ -26,11 +26,11 @@ FLYBY_STALENESS: 60
 # If the same plane appears again before this time, do not consider it as a flyby (in minutes)
 
 API_KEY: ''
-# Put your FlightAware API key here. Leave as '' to not use the API
+# Put your FlightAware API key here. Leave as '' to not use the API.
 
 API_DAILY_LIMIT: 
-# Set this to null or without a value if you want to have unlimited API calls
-# or an integer value if you want to limit calls
+# Set this to an integer value if you want to limit calls.
+# If you want to have unlimited API calls, set this to null or an empty value.
 
 CUSTOM_DUMP1090_LOCATION: ''
 # URL of your dump1090 install if it is in a different location or on a different network device.
@@ -78,14 +78,14 @@ BRIGHTNESS_SWITCH_TIME:
 # Set the time of day (in 24-hr format) to switch brightness levels.
 
 USE_SUNRISE_SUNSET: true
-# If True, use sunrise and sunset times to adjust brightness.
+# If true, use sunrise and sunset times to adjust brightness.
 # If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
 # When there is an active plane, use a different brightness level (0..100). Useful for grabbing attention.
 # Overrides all other brightness settings when a plane is being tracked. This value does not depend if
 # `ENABLE_TWO_BRIGHTNESS` is enabled.
-# If you would like to keep it the same brightness, set this to null or an empty value
+# If you do not want the brightness to change, set this to null or an empty value.
 
 # ============== RGB-Matrix settings ===============
 # ==================================================
