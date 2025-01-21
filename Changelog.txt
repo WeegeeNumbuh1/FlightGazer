@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.1.1 - 2025-01-21
+    - Fix permissions of files to owner of FlightGazer install directory when running updater
+    
 v.2.1.0 - 2025-01-20
     - NEW: New logo
     - NEW: Splash screen (to show off the new logo)

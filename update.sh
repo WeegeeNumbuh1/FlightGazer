@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.1.0
+# Last updated: v.2.1.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -13,6 +13,8 @@ NC='\033[0m' # No Color
 FADE='\033[2m'
 MIGRATE_FLAG=0
 OLDER_BUILD=0
+OWNER_OF_FGDIR='nobody'
+GROUP_OF_FGDIR='nogroup'
 
 set -o noclobber
 echo -ne "\033]0;FlightGazer Updater\007" # set window title
@@ -47,10 +49,13 @@ sleep 1s
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo "> Done."
 echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
+# get current owner of the install directory
+read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
+echo -e "> ${BASEDIR} | Owner: ${OWNER_OF_FGDIR}, Group: ${GROUP_OF_FGDIR}"
 if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
     echo "> Old version of FlightGazer detected. You must migrate your settings manually."
     mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
-    chown -f nobody:nogroup ${BASEDIR}/config_old.py >/dev/null 2>&1
+    chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/config_old.py >/dev/null 2>&1
     chmod -f 777 ${BASEDIR}/config_old.py >/dev/null 2>&1
     OLDER_BUILD=1
 else
@@ -77,16 +82,18 @@ echo "GREEN='\033[0;32m'" >> $TEMP_SCRIPT
 echo "NC='\033[0m'" >> $TEMP_SCRIPT
 echo "MF=${MIGRATE_FLAG}" >> $TEMP_SCRIPT
 echo "OB=${OLDER_BUILD}" >> $TEMP_SCRIPT
+echo "FG_O=${OWNER_OF_FGDIR}" >> $TEMP_SCRIPT
+echo "FG_G=${GROUP_OF_FGDIR}" >> $TEMP_SCRIPT
 echo '' >> $TEMP_SCRIPT
 cat >> ${TEMP_SCRIPT} <<'EOF'
 # if there are additonal files in the install directory that aren't in the latest commit,
 # simply leave them be in the install directory (they could be user files)
-chown -Rf nobody:nogroup $TEMPDIR # need to do this as we are running as root
+chown -Rf ${FG_O}:${FG_G} $TEMPDIR # need to do this as we are running as root
 echo -e "${FADE}Copying $TEMPDIR to $FGDIR..."
 cp -TR ${TEMPDIR} ${FGDIR}
-chown -f nobody:nogroup $FGDIR/config.yaml # ensure anyone can edit it
+chown -f ${FG_O}:${FG_G} $FGDIR/config.yaml # ensure anyone can edit it
 chmod -f 777 $FGDIR/config.yaml
-chown -f nobody:nogroup $FGDIR/flybys.csv >/dev/null 2>&1
+chown -f ${FG_O}:${FG_G} $FGDIR/flybys.csv >/dev/null 2>&1
 chmod -f 777 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl start flightgazer.service
