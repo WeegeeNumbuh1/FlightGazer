@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.1.2 - 2025-01-22
+    - NEW: Added API checking to check both API key validity and to get usage status
+        - According to FlightAware, his incurs 0 charges against your API usage (current as of this update)
+    - The war with settings validation continues (more fixes)
+    - Small code fixes and tweaks
+    - Text output tweaks
+
 v.2.1.1 - 2025-01-21
     - Fix permissions of files to owner of FlightGazer install directory when running updater
     

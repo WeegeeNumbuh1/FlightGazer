@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.1.0
+# Version = v.2.1.2
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -153,7 +153,9 @@ if [ $SKIP_CHECK -eq 0 ]; then
 fi
 
 # start the splash screen
-nohup python $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+if [ "$DFLAG" != "-d" ]; then
+	nohup python $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+fi
 
 if [ ! -f "$CHECK_FILE" ];
 then 

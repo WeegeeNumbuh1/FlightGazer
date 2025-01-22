@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.1.1 --- 2025-01-21'
+VERSION: str = 'v.2.1.2 --- 2025-01-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -115,7 +115,7 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
-# sys.tracebacklimit = 0
+sys.tracebacklimit = 0 # this may change from time to time across commits
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
@@ -266,6 +266,7 @@ if not CONFIG_MISSING:
             print(f"{setting_key} missing, using default value")
     else:
         print(f"Loaded settings from configuration file. Version: {config_version}")
+print("Checking settings configuration...")
 
 # =========== Global Variables =============
 # ==========================================
@@ -490,7 +491,7 @@ def match_commandline(command_search: str, process_name: str) -> list:
 
 def get_ip() -> str:
     ''' Gets us our local IP. Modified from my other project `UNRAID_Status_Screen`.
-    Mofifies the global `CURRENT_IP` '''
+    Modifies the global `CURRENT_IP` '''
     global CURRENT_IP
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0)
@@ -506,7 +507,7 @@ def get_ip() -> str:
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
 
-def probe1090() -> str | None:
+def probe1090() -> tuple[str, str] | None:
     """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` """
     locations = iter(
         [CUSTOM_DUMP1090_LOCATION,
@@ -597,6 +598,35 @@ def read_1090_config() -> None:
         print("Error: Cannot load receiver config.")
     return
 
+def probe_API() -> tuple[int, float] | None:
+    """ Checks if the provided API Key is valid, and if it is, pulls stats from the last 30 days.
+    This specific query doesn't use API credits according to the API reference. If the call fails, returns None. """
+    if API_KEY is None or not API_KEY: return None, None
+    if NOFILTER_MODE or ENHANCED_READOUT: return None, None
+    api_calls = 0
+    api_cost = 0
+    date_now = datetime.datetime.now()
+    time_delta_last_month = date_now - datetime.timedelta(days=30)
+    date_month_iso = time_delta_last_month.astimezone().replace(microsecond=0).isoformat()
+    auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
+    query_string = (API_URL
+                    + "account/usage"
+                    + "?start=" + urllib.parse.quote(date_month_iso)
+                    + "&max_pages=1"
+                    )
+    try:
+        response = requests.get(query_string, headers=auth_header, timeout=10)
+        response.raise_for_status()
+        if response.status_code == 200:
+            response_json = response.json()
+            api_calls = response_json['total_calls']
+            api_cost = response_json['total_cost']
+            return api_calls, api_cost
+        else:
+            return None, None
+    except:
+        return None, None
+    
 def configuration_check() -> None:
     """ Basic configuration checker """
     global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS, API_KEY, API_DAILY_LIMIT
@@ -611,43 +641,46 @@ def configuration_check() -> None:
         RGB_COLS = settings_values['RGB_COLS']
 
     if not NOFILTER_MODE:
-        if not isinstance(RANGE, int):
-            print(f"Warning: RANGE is not an integer value. Setting to default value.")
+        if not isinstance(RANGE, (int, float)):
+            print(f"Warning: RANGE is not a number. Setting to default value ({settings_values['RANGE']}).")
             globals()['RANGE'] = settings_values['RANGE']
         if not isinstance(HEIGHT_LIMIT, int):
-            print(f"Warning: HEIGHT_LIMIT is not an integer. Setting to default value.")
+            print(f"Warning: HEIGHT_LIMIT is not an integer. Setting to default value ({settings_values['HEIGHT_LIMIT']}).")
             globals()['HEIGHT_LIMIT'] = settings_values['HEIGHT_LIMIT']
 
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
-            print(f"Warning: desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
+            print(f"Warning: Desired range ({RANGE}{distance_unit}) is out of bounds. \
+Limiting to {20 * distance_multiplier}{distance_unit}.")
             print("         If you would like to see more planes, consider \'No Filter\' mode. Use the \'-f\' flag.")
             RANGE = (20 * distance_multiplier)
         elif RANGE < (0.2 * distance_multiplier):
-            print(f"Warning: desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
+            print(f"Warning: Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
             RANGE = (0.2 * distance_multiplier)
 
-        height_warning = f"Warning: desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
+        height_warning = f"Warning: Desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
         if HEIGHT_LIMIT >= (275000 * altitude_multiplier):
-            print(f"{height_warning} beyond the theoretical limit for flight. Setting to a reasonable value ({60000 * altitude_multiplier}{altitude_unit}).")
-            HEIGHT_LIMIT = (60000 * altitude_multiplier)
-        elif HEIGHT_LIMIT > (60000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
-            print(f"{height_warning} beyond typical aviation flight levels. Limiting to {60000 * altitude_multiplier}{altitude_unit}.")
-            HEIGHT_LIMIT = (60000 * altitude_multiplier)
+            print(f"{height_warning} beyond the theoretical limit for flight. Setting to a reasonable value: \
+{75000 * altitude_multiplier}{altitude_unit}.")
+            HEIGHT_LIMIT = (75000 * altitude_multiplier)
+        elif HEIGHT_LIMIT > (75000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
+            print(f"{height_warning} beyond typical aviation flight levels. Limiting to {75000 * altitude_multiplier}{altitude_unit}.")
+            HEIGHT_LIMIT = (75000 * altitude_multiplier)
         elif HEIGHT_LIMIT <= 0:
             print(f"{height_warning} ground level or underground.\n\
-            Planes won't be doing the thing planes do at that point (flying). Setting to a reasonable value ({5000 * altitude_multiplier}{altitude_unit})")
+         Planes won't be doing the thing planes do at that point (flying). Setting to a reasonable value: \
+{5000 * altitude_multiplier}{altitude_unit}.")
             HEIGHT_LIMIT = (5000 * altitude_multiplier)
-        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (100 * altitude_multiplier):
+        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (200 * altitude_multiplier):
             print(f"{height_warning} too low. Are planes landing on your house? \
-            Setting to a reasonable value ({5000 * altitude_multiplier}{altitude_unit})")
+Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         del height_warning
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
     
     if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
-        print(f"Warning: desired flyby staleness ({FLYBY_STALENESS}) is out of bounds. Setting to default ({settings_values['FLYBY_STALENESS']})")
+        print(f"Warning: Desired flyby staleness is out of bounds. Setting to default ({settings_values['FLYBY_STALENESS']})")
         FLYBY_STALENESS = settings_values['FLYBY_STALENESS']
 
     if not FLYBY_STATS_ENABLED:
@@ -672,34 +705,53 @@ def configuration_check() -> None:
         except KeyError:
             pass
 
+    print("Settings check complete.")
+
+    # check the API config
+    print("Checking API settings...")
     if not isinstance(API_KEY, str):
-        print("Warning: API key is not valid. API use will not occur.")
+        print("Warning: API key is invalid.")
         API_KEY = ""
 
-    if API_KEY and API_DAILY_LIMIT is None:
-        print("Info: No limit set for API calls.")
-    elif API_KEY and not isinstance(API_DAILY_LIMIT, int):
-        print("Warning: API_DAILY_LIMIT is not valid. Refusing to use API to prevent accidental overcharges.")
-        API_DAILY_LIMIT = None
-        API_KEY = ""
-    elif API_KEY and API_DAILY_LIMIT is not None:
-        print(f"Info: Limiting API calls to {API_DAILY_LIMIT} per day.")
+    if (API_KEY and (
+        API_DAILY_LIMIT is not None 
+        and not isinstance(API_DAILY_LIMIT, int)
+        )) or (
+        isinstance(API_DAILY_LIMIT, int) 
+        and API_DAILY_LIMIT < 0):
+            print("Warning: API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
+            API_DAILY_LIMIT = None
+            API_KEY = ""
 
     if API_KEY is not None and API_KEY:
-        if not ENHANCED_READOUT:
-            print("API Key present, API will be used.")
+        api_use = None
+        api_cost = None
+        api_use, api_cost = probe_API()
+
+        if api_use is None:
+            print("Warning: Provided API Key failed to return a valid response.")
+            API_KEY = ""
         else:
-            print("API Key present, but ENHANCED_READOUT setting is enabled. API will not be used.")
+            print(f"API Key \'***{API_KEY[-5:]}\' is valid.")
+            print(f"Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+
+    if API_KEY is not None and API_KEY: # test again
+        if ENHANCED_READOUT:
+            print("Info: ENHANCED_READOUT setting is enabled. API will not be used.")
+        else:
+            if API_DAILY_LIMIT is None:
+                print("Info: No limit set for API calls.")
+            else:
+                print(f"Info: Limiting API calls to {API_DAILY_LIMIT} per day.")
     else:
         if not ENHANCED_READOUT:
-            print("No API Key present. Additional airplane info will not be available.")
+            print("Info: API will not be used. Additional airplane info will not be available.")
             if DISPLAY_IS_VALID:
-                print("Setting ENHANCED_READOUT to \'True\' is recommended.")
-        else:
-            if DISPLAY_IS_VALID:
-                print("No API Key present. Instead, additional dump1090 info will be substituted.")
-            else:
-                print("No API Key present. Additional airplane info will not be available.")
+                print("      Setting ENHANCED_READOUT to \'true\' is recommended.")
+        elif ENHANCED_READOUT and DISPLAY_IS_VALID:
+            print("Info: API will not be used. Instead, additional dump1090 info will be substituted.")
+
+    print("API check complete.")
 
 def read_receiver_stats() -> None:
     """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
@@ -1389,7 +1441,7 @@ class APIFetcher:
             except: # if we bump into None or something else
                 break
 
-        # this is for limiting API calls per day for testing; just bumps up the "no data" count
+        # this is for limiting API calls per day; just bumps up the "no data" count
         if API_DAILY_LIMIT is not None and api_hits[0] == API_DAILY_LIMIT:
             api_hits[2] += 1
             return
@@ -1406,7 +1458,7 @@ class APIFetcher:
             start_time = time.perf_counter()
             response = requests.get(query_string, headers=auth_header, timeout=5)
             process_time[2] = round((time.perf_counter() - start_time)*1000, 3)
-            response.raise_for_status
+            response.raise_for_status()
             if response.status_code == 200: # check if service to the API call was valid
                 response_json = response.json()
                 # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
@@ -1725,7 +1777,7 @@ def brightness_controller():
          Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
         return
 
-    while True:
+    while True: # if the above tests pass, this thread can go to work
         current_time = datetime.datetime.now().astimezone()
 
         if (sunset_sunrise['Sunrise'] is None or sunset_sunrise['Sunset'] is None)\
@@ -1734,8 +1786,8 @@ def brightness_controller():
             # thus we fall back on BRIGHNESS_SWITCH_TIME values (at this point the values have been known to work)
             switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
             switch_time2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
-            sunrise_time = datetime.datetime.combine(current_time.date(), switch_time1)
-            sunset_time = datetime.datetime.combine(current_time.date(), switch_time2)
+            sunrise_time = datetime.datetime.combine(current_time.date(), switch_time1).astimezone()
+            sunset_time = datetime.datetime.combine(current_time.date(), switch_time2).astimezone()
         else:
             sunrise_time = sunset_sunrise['Sunrise']
             sunset_time = sunset_sunrise['Sunset']
@@ -2950,7 +3002,7 @@ def main() -> None:
     api_getter = threading.Thread(target=APIFetcher, name='API-Fetch-Thread', daemon=True)
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
-    brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Thread', daemon=True)
+    brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
 
     if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         print("\nInitializing display...")

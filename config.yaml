@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.1.1 # do not modify this
+CONFIG_VERSION: v.2.1.2 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -23,7 +23,7 @@ RANGE: 2
 # Radius of which planes need to be in for detailed tracking (nautical miles, kilometers, or miles)
 
 FLYBY_STALENESS: 60
-# If the same plane appears again before this time, do not consider it as a flyby (in minutes)
+# If the same plane appears again before this time, do not consider it as a flyby (in minutes, as an integer)
 
 API_KEY: ''
 # Put your FlightAware API key here. Leave as '' to not use the API.
