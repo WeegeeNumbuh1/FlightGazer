@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.2.0 - 2025-01-23
+    - NEW: Colors are no longer hard-coded and can be configured
+        - Slight tweaks to blue color preset to improve legibility
+        - Additional color presets
+    - Updated updater script to migrate color configuration file
+
 v.2.1.2 - 2025-01-22
     - NEW: Added API checking to check both API key validity and to get usage status
         - According to FlightAware, his incurs 0 charges against your API usage (current as of this update)

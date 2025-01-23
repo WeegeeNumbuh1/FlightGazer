@@ -61,6 +61,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - 🆕 Display sunrise and sunset times or detailed signal stats for your dump1090 receiver
   - Writing to a stats file that keeps count of number of planes flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
+  - 🆕 Colors 🌈
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Detailed console output when run interactively
 - Small memory footprint
@@ -109,7 +110,7 @@ Make sure you meet the above prerequisites. To begin:
 ```
 git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
 ```
-> [!NOTE]
+> [!IMPORTANT]
 > Once the above command is completed, it is recommended to configure your setup now before running the initalization file. See the [Configuration](#️-configuration) section below, then return to this step.
 
 <details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
@@ -143,12 +144,14 @@ If you don't care for running in a virtual environment, skip the `python3 -m ven
 
 ### 🎚️ Configuration
 
-The [`config.yaml`](./config.yaml) file is where settings are configured. It has descriptions/explanations for all configurable options. It is found (and needs to be) in the same directory as the main script itself. Edit it as needed before running FlightGazer.
+The [`config.yaml`](./config.yaml) file is where settings are configured. It has descriptions/explanations for all configurable options. It is found (and needs to be) in the same directory as the main script itself. Edit it as needed before running FlightGazer. If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.
 
 > [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.<br>
 > (Just don't try to purposely break the script!)
 
+#### Adjusting Colors
+There is [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer that controls the color for each element shown on the display. You can configure the colors in that file.
 #### Tricks & Tips
 <details><summary>Configuration details for a remote dump1090 installation</summary>
 
@@ -189,9 +192,11 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 > [!IMPORTANT]
 > By default, the script is designed to run at boot (via systemd with `flightgazer.service`). You can check its status with:
 > ```bash
-> sudo systemctl status flightgazer.service
+> systemctl status flightgazer # press 'q' to exit
 > # or
-> sudo tmux attach -d -t FlightGazer
+> sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
+> # or
+> journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -254,6 +259,32 @@ sudo /etc/FlightGazer-pyvenv/bin/python3 /path/to/FlightGazer/FlightGazer.py
 The main python file accepts the same arguments as the initialization script, but you can always pass `-h` to see all possible operating modes.
 </details>
 
+### 🔕 Shutting Down & Restarting
+To shutdown FlightGazer, do any one of the following:
+<details><summary>Show/Hide</summary>
+
+```bash
+sudo systemctl stop flightgazer
+```
+```bash
+sudo tmux attach -d -t FlightGazer
+# then, press 'Ctrl+C' to stop
+```
+```bash
+# if you started FlightGazer interactively and manually
+Ctrl+C
+```
+</details>
+
+To restart, simply do the following:
+<details><summary>Show/Hide</summary>
+
+```bash
+sudo systemctl start flightgazer
+```
+or, you may [start it manually](#️-interactive-mode).
+</details>
+
 ### 👓 Misc
 
 <details><summary>What the initialization script does</summary>
@@ -307,6 +338,10 @@ Changing `systemd` startup command
 sudo nano /etc/systemd/system/flightgazer.service
 systemctl daemon-reload
 ```
+Disabling startup at boot
+```bash
+sudo systemctl disable flightgazer.service
+```
 </details>
 
 ## ⬆️ How to Update
@@ -345,15 +380,14 @@ Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and 
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
 If it has been over a month since it last checked, then the next time it restarts, it will run these checks. It usually only adds another 30 seconds to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
-**Q:** I see a red dot on the right of the plane readout display. What is it?<br>
+**Q:** I see a dot on the right of the plane readout display. What is it?<br>
 **A:** That is an indicator of how many planes are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between planes to show you what else is flying in your area.
 
 **Q:** Can I customize the colors?<br >
-**A:** Sure, just edit them in the script. (Check the functions inside the `Display` class in the main python file).<br>
-However, if you run the update script, you will lose all these customizations as it will overwrite `FlightGazer.py` with the one present in this repo.
+**A:** [Click here](#adjusting-colors)
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, plane info, etc)?<br >
-**A:** Sure, just like the last question, change some things in the script. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
+**A:** Sure, just change some things in the script. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** What about showing other plane info like what airline it is or what kind of plane it is?<br >
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>

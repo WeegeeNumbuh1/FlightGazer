@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.1.2 --- 2025-01-22'
+VERSION: str = 'v.2.2.0 --- 2025-01-23'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1965,7 +1965,7 @@ class Display(
             return
         CLOCK_FONT = fonts.large_bold
         CLOCK_POSITION = (1, 12)
-        CLOCK_COLOR = colors.WARM_WHITE
+        CLOCK_COLOR = colors.clock_color
 
         now = datetime.datetime.now()
         if not CLOCK_24HR:
@@ -2007,7 +2007,7 @@ class Display(
             return
         SECONDS_FONT = fonts.smallest
         SECONDS_POSITION = (41, 12)
-        SECONDS_COLOR = colors.WARM_WHITE
+        SECONDS_COLOR = colors.seconds_color
 
         now = datetime.datetime.now()
         current_timesec = now.strftime("%S")
@@ -2043,7 +2043,7 @@ class Display(
         if self.active_plane_display or CLOCK_24HR:
             self._last_ampm = None
             return
-        AMPM_COLOR = colors.ORANGE_DARK
+        AMPM_COLOR = colors.am_pm_color
         AMPM_FONT = fonts.smallest
         AMPM_POSITION = (41, 6)
         now = datetime.datetime.now()
@@ -2080,7 +2080,7 @@ class Display(
         if self.active_plane_display:
             self._last_day = None
             return
-        DAY_COLOR = colors.PINK_DARK
+        DAY_COLOR = colors.day_of_week_color
         DAY_FONT = fonts.smallest
         DAY_POSITION = (51, 6)
         now = datetime.datetime.now()
@@ -2117,7 +2117,7 @@ class Display(
         if self.active_plane_display:
             self._last_date = None
             return
-        DATE_COLOR = colors.PURPLE
+        DATE_COLOR = colors.date_color
         DATE_FONT = fonts.smallest
         DATE_POSITION = (55, 12)
         now = datetime.datetime.now()
@@ -2155,9 +2155,9 @@ class Display(
     def idle_header(self, count):
         if self.active_plane_display: return
         HEADER_TEXT_FONT = fonts.smallest
-        FLYBY_HEADING_COLOR = colors.BLUE_DARK
-        TRACK_HEADING_COLOR = colors.GREEN_DARK
-        RANGE_HEADING_COLOR = colors.YELLOW_DARK
+        FLYBY_HEADING_COLOR = colors.flyby_header_color
+        TRACK_HEADING_COLOR = colors.track_header_color
+        RANGE_HEADING_COLOR = colors.range_header_color
         IDLE_TEXT_Y = 25
         _ = graphics.DrawText(
             self.canvas,
@@ -2193,9 +2193,9 @@ class Display(
             self._last_range = None
             return
         STATS_TEXT_FONT = fonts.extrasmall
-        FLYBY_TEXT_COLOR = colors.BLUE
-        TRACK_TEXT_COLOR = colors.GREEN
-        RANGE_TEXT_COLOR = colors.YELLOW
+        FLYBY_TEXT_COLOR = colors.flyby_color
+        TRACK_TEXT_COLOR = colors.track_color
+        RANGE_TEXT_COLOR = colors.range_color
         READOUT_TEXT_Y = 31
         FLYBY_X_POS = 1
         TRACK_X_POS = 24
@@ -2291,7 +2291,7 @@ class Display(
                 return (30 - ((text_len - 1) * 2))
         
         STATS_2_FONT = fonts.smallest
-        STATS_2_COLOR = colors.DARK_GREY
+        STATS_2_COLOR = colors.stats_color
         STATS_2_Y = 18
         try:
             sunrise_sunset_now = idle_data_2['SunriseSunset']
@@ -2356,9 +2356,9 @@ class Display(
             self._last_country = None
             return
         TOP_HEADER_FONT = fonts.smallest
-        CALLSIGN_COLOR = colors.WHITE
-        DISTANCE_COLOR = colors.WARM_WHITE
-        COUNTRY_COLOR = colors.GREY
+        CALLSIGN_COLOR = colors.callsign_color
+        DISTANCE_COLOR = colors.distance_color
+        COUNTRY_COLOR = colors.country_color
         BASELINE_Y = 6
         CALLSIGN_X_POS = 1
         DISTANCE_X_POS = 35
@@ -2489,7 +2489,10 @@ class Display(
         JOURNEY_Y_BASELINE = 18
         ORIGIN_X_POS = 3
         DESTINATION_X_POS = 37
-        JOURNEY_COLOR = colors.ORANGE
+        ORIGIN_COLOR = colors.origin_color
+        DESTINATION_COLOR = colors.destination_color
+        ARROW_COLOR = colors.arrow_color
+
         try:
             origin_now = active_data['Origin']
             destination_now = active_data['Destination']
@@ -2510,7 +2513,7 @@ class Display(
         self._last_destination = destination_now
 
         # Draw our arrow
-        journey_arrow(self.canvas, 33, 13, 4, 8, JOURNEY_COLOR)
+        journey_arrow(self.canvas, 33, 13, 4, 8, ARROW_COLOR)
         
         # Draw origin; adjust font for all anticipated string lengths
         if len(origin_now) <= 3:
@@ -2519,7 +2522,7 @@ class Display(
                 fonts.large_bold,
                 ORIGIN_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                ORIGIN_COLOR,
                 origin_now
             )
         elif len(origin_now) == 4:
@@ -2528,7 +2531,7 @@ class Display(
                 fonts.regularplus,
                 ORIGIN_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                ORIGIN_COLOR,
                 origin_now
             )
         elif len(origin_now) > 4:
@@ -2537,7 +2540,7 @@ class Display(
                 fonts.extrasmall,
                 ORIGIN_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                ORIGIN_COLOR,
                 origin_now
             )
 
@@ -2548,7 +2551,7 @@ class Display(
                 fonts.large_bold,
                 DESTINATION_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                DESTINATION_COLOR,
                 destination_now
             )
         elif len(destination_now) == 4:
@@ -2557,7 +2560,7 @@ class Display(
                 fonts.regularplus,
                 DESTINATION_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                DESTINATION_COLOR,
                 destination_now
             )
         elif len(destination_now) > 4:
@@ -2566,7 +2569,7 @@ class Display(
                 fonts.extrasmall,
                 DESTINATION_X_POS,
                 JOURNEY_Y_BASELINE,
-                JOURNEY_COLOR,
+                DESTINATION_COLOR,
                 destination_now
             )
 
@@ -2580,7 +2583,8 @@ class Display(
         X_POS = 1
         LAT_Y_POS = 12
         LON_Y_POS = 18
-        COLOR = colors.ORANGE
+        LATITUDE_COLOR = colors.latitude_color
+        LONGITUDE_COLOR = colors.longitude_color
         FONT = fonts.extrasmall
         try:
             lat_now = active_data['Latitude']
@@ -2618,7 +2622,7 @@ class Display(
             FONT,
             X_POS,
             LAT_Y_POS,
-            COLOR,
+            LATITUDE_COLOR,
             lat_now
         )
         _ = graphics.DrawText(
@@ -2626,7 +2630,7 @@ class Display(
             FONT,
             X_POS,
             LON_Y_POS,
-            COLOR,
+            LONGITUDE_COLOR,
             lon_now
         )
 
@@ -2635,9 +2639,9 @@ class Display(
     def active_header(self, count):
         if not self.active_plane_display: return
         HEADER_TEXT_FONT = fonts.extrasmall
-        ALTITUDE_HEADING_COLOR = colors.BLUE_DARK
-        SPEED_HEADING_COLOR = colors.GREEN_DARK
-        TIME_HEADING_COLOR = colors.YELLOW_DARK
+        ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
+        SPEED_HEADING_COLOR = colors.speed_heading_color
+        TIME_HEADING_COLOR = colors.time_rssi_heading_color
         ACTIVE_TEXT_Y = 25
         _ = graphics.DrawText(
             self.canvas,
@@ -2683,9 +2687,9 @@ class Display(
             self._last_flighttime = None
             return
         STATS_TEXT_FONT = fonts.smallest
-        ALTITUDE_TEXT_COLOR = colors.BLUE
-        SPEED_TEXT_COLOR = colors.GREEN
-        TIME_TEXT_COLOR = colors.YELLOW
+        ALTITUDE_TEXT_COLOR = colors.altitude_color
+        SPEED_TEXT_COLOR = colors.speed_color
+        TIME_TEXT_COLOR = colors.time_rssi_color
         READOUT_TEXT_Y = 31
         ALTITUDE_X_POS = 1
         SPEED_X_POS = 23
@@ -2799,8 +2803,8 @@ class Display(
         GT_Y_POS = 12
         VS_Y_POS = 18
         FONT = fonts.smallest
-        GT_COLOR = colors.PINK_DARK
-        VS_COLOR = colors.PURPLE
+        GT_COLOR = colors.groundtrack_color
+        VS_COLOR = colors.verticalspeed_color
         try:
             groundtrack_now = active_data['Track']
             vertspeed_now = active_data['VertSpeed']
@@ -2888,7 +2892,7 @@ class Display(
             self.canvas,
             INDICATORS_X,
             INDICATORS_Y,
-            colors.RED,
+            colors.plane_count_color,
             self._last_activeplanes
             )
 
@@ -3028,12 +3032,12 @@ so you can read the above output before we enter the main loop.\n")
         if random.randint(0,1) == 1:
             interactive_wait_time -= 5
             time.sleep(5)
-            print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
+            print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n\
+              color scale used on the dump1090 map that corresponds to plane altitude.")
         if random.randint(0,1) == 1:
             interactive_wait_time -= 5
             time.sleep(5)
-            print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n\
-              color scale used on the dump1090 map that corresponds to plane altitude.")
+            print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
             
         time.sleep(interactive_wait_time)
         del interactive_wait_time

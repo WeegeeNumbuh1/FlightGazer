@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.1.1
+# Last updated: v.2.2.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -48,6 +48,19 @@ systemctl stop flightgazer.service
 sleep 1s
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo "> Done."
+color_migrator () {
+    file=$1 # new file
+    file2=$2 # current file
+    # read colors.py from latest pull up to "# CONFIG_START" line
+    while read -r line; do
+        if grep -q "# CONFIG_START" <<< "$line"; then
+            break
+        fi
+        echo "$line"
+        done < "$file"
+    # read colors.py from current install from and including "# CONFIG_START" line to end of file
+    sed -n '/# CONFIG_START/,$p' $file2
+}
 echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 # get current owner of the install directory
 read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
@@ -65,6 +78,15 @@ else
     if [ $? -ne 0 ]; then
         MIGRATE_FLAG=1
     fi
+fi
+echo "> Migrating color configuration..."
+grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
+if [ $? -eq 0 ]; then
+    color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
+    mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
+    echo "  > Done."
+else
+    echo "  > Older version of colors.py detected. Updating to newer version in this update."
 fi
 cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
 cp -f ${BASEDIR}/config.yaml ${TEMPPATH}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
