@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.3.0 - 2025-01-24
+    - NEW: Logging
+        - Solves issue of not being able to read script output when started as a service
+        - Provides method of getting log output for troubleshooting
+        - Overhauled text output due to this addition (console printout of data is unaffected by this change)
+    _ NEW: Option to control airplane location staleness via new setting, LOCATION_TIMEOUT
+        - dump1090's default is to remove planes from its tracking list after not receiving a location for more than 60 seconds
+        - This is now a customizable metric that affects displayed total plane count to make it more "real-time"
+    - Improved handling of situations when we cannot read dump1090 once FlightGazer is running (eg: internet failing, dump1090 service fails, etc.)
+        - Console output will also show a stat only if this occurs while running
+        - Additional logic rearrangement as part of this change
+
 v.2.2.0 - 2025-01-23
     - NEW: Colors are no longer hard-coded and can be configured
         - Slight tweaks to blue color preset to improve legibility

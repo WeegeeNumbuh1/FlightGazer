@@ -2,13 +2,16 @@
 from time import sleep
 import sys, os
 import signal
+import logging
 
 DELAY_DEFAULT = 0.01
+animator_logger = logging.getLogger("DisplayDriver")
 
 def sigterm_handler(signum, frame):
     # this module will steal signals from our main thread, so we cascade our exit starting from here
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     os.write(sys.stdout.fileno(), b"\nDisplay Driver: Exit signal received, shutting down now.\n")
+    animator_logger.info("Exit signal received, shutting down now.")
     raise ImportError # hacky
     """ We don't use SystemExit because we will need to try-except it, and the main thread
     will catch the same signal from the main system when we call for external termination or a KeyboardInterrupt,
@@ -37,10 +40,6 @@ class Animator(object):
         super().__init__()
 
         # break out of this loop if the system calls for our termination
-        # if sys.__stdin__.isatty():
-        #     signal.signal(signal.SIGINT, sigterm_handler)
-        # else:
-        #     signal.signal(signal.SIGTERM, sigterm_handler)
         signal.signal(signal.SIGINT, sigterm_handler)
         signal.signal(signal.SIGTERM, sigterm_handler)
 
@@ -57,6 +56,7 @@ class Animator(object):
                 keyframe()
 
     def play(self):
+        animator_logger.info("Display started!")
         print("Display Driver: Display started!\n", flush=True)
         try:
             while True:

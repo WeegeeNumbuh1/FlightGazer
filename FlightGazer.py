@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.2.0 --- 2025-01-23'
+VERSION: str = 'v.2.3.0 --- 2025-01-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -36,6 +36,7 @@ from string import Formatter
 import random
 from getpass import getuser
 import socket
+import logging
 # external imports
 import requests
 from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
@@ -99,11 +100,45 @@ if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
     sys.exit(1)
 
+# setup logging
+main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
 CURRENT_USER = getuser()
-print(f"FlightGazer Version: {VERSION}")
-print(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
-print(f"We are running in \'{CURRENT_DIR}\'\nUsing: \'{sys.executable}\' as \'{CURRENT_USER}\'")
+LOGFILE = Path(f"{CURRENT_DIR}/FlightGazer-log.log")
+LOGFILE.touch(mode=0o777, exist_ok=True)
+with open(LOGFILE, 'a') as f:
+    f.write("\n") # append a newline at the start of logging
+
+logging_format = logging.Formatter(
+    fmt='%(asctime)s.%(msecs)03d - %(threadName)s | %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    )
+
+# set root logger to write out to file but not stdout
+logging.basicConfig(
+    filename=LOGFILE,
+    format='%(asctime)s.%(msecs)03d - %(name)s %(threadName)s | %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    encoding='utf-8',
+    level=logging.INFO,
+)
+
+# add a stdout stream for the logger that we can disable when `sigterm_handler()` is called
+# NB: in `main_logger.handlers` this handler will be in index 0 (the default one we set above does not add a handler),
+# so to stop the stdout stream, use main_logger.removeHandler()
+stdout_stream = logging.StreamHandler(sys.stdout)
+stdout_stream.setLevel(logging.NOTSET)
+stdout_stream.setFormatter(logging_format)
+main_logger.addHandler(stdout_stream)
+
+main_logger.info("==============================================================")
+main_logger.info("===                 Welcome to FlightGazer!                ===")
+main_logger.info("==============================================================")
+main_logger.info(f"FlightGazer Version: {VERSION}")
+main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
+main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
+main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
@@ -139,11 +174,11 @@ if not NODISPLAY_MODE:
             EMULATE_DISPLAY = True
     except:
         DISPLAY_IS_VALID = False
-        print("ERROR: Cannot load display modules. There will be no display output!\n\
-       This script will still function as a basic flight parser and stat generator,\n\
-       if the environment allows.")
-        print("       If you're sure you don't want to use any display output,\n\
-       use the \'-d\' flag to suppress this warning.\n")
+        main_logger.error("Cannot load display modules. There will be no display output!")
+        main_logger.warning(">>> This script will still function as a basic flight parser and stat generator,")
+        main_logger.warning(">>> if the environment allows.")
+        main_logger.warning(">>> If you're sure you don't want to use any display output,")
+        main_logger.warning(">>> use the \'-d\' flag to suppress this warning.")
         time.sleep(2)
 else:
     DISPLAY_IS_VALID = False
@@ -188,6 +223,7 @@ BRIGHTNESS_2: int = 50
 BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise":"06:00","Sunset":"18:00"}
 USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
+LOCATION_TIMEOUT: int = 60
 
 ''' Programmer's notes for settings that are dicts:
 Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -200,6 +236,7 @@ ex: SETTING = {'key1':val1, 'key2':val2} (user's settings)
 # Create our settings as a dict
 # NB: if we don't want to load certain settings,
 #     we can simply remove elements from this dictionary
+#     but be cautious of leaving out keys that are used elsewhere
 settings_values: dict = {
     "FLYBY_STATS_ENABLED": FLYBY_STATS_ENABLED,
     "HEIGHT_LIMIT": HEIGHT_LIMIT,
@@ -225,31 +262,32 @@ settings_values: dict = {
     "BRIGHTNESS_SWITCH_TIME": BRIGHTNESS_SWITCH_TIME,
     "USE_SUNRISE_SUNSET": USE_SUNRISE_SUNSET,
     "ACTIVE_PLANE_DISPLAY_BRIGHTNESS": ACTIVE_PLANE_DISPLAY_BRIGHTNESS,
+    "LOCATION_TIMEOUT": LOCATION_TIMEOUT,
 }
 """ Dict of default settings """
 
 CONFIG_MISSING: bool = False
-print("Loading configuration...")
+main_logger.info("Loading configuration...")
 try:
     from ruamel.yaml import YAML
     yaml = YAML()
 except:
-    print("Warning: Failed to load required module \'ruamel.yaml\'. Configuration file cannot be loaded.\n\
-         Using default settings.")
+    main_logger.warning("Failed to load required module \'ruamel.yaml\'. Configuration file cannot be loaded.")
+    main_logger.info(">>> Using default settings.")
     CONFIG_MISSING = True
 if not CONFIG_MISSING:
     try:
         config = yaml.load(open(CONFIG_FILE, 'r'))
     except:
-        print(f"Warning: Cannot find configuration file \'config.yaml\' in \'{CURRENT_DIR}\'.\n\
-         Using default settings.")
+        main_logger.warning(f"Cannot find configuration file \'config.yaml\' in \'{CURRENT_DIR}\'")
+        main_logger.info(">>> Using default settings.")
         CONFIG_MISSING = True
 if not CONFIG_MISSING:
     try:
         config_version = config['CONFIG_VERSION']
     except KeyError:
-        print(f"Warning: Cannot determine configuration version. This may not be a valid FlightGazer config file.\n\
-         Using default settings.")
+        main_logger.warning("Warning: Cannot determine configuration version. This may not be a valid FlightGazer config file.")
+        main_logger.info(">>> Using default settings.")
         CONFIG_MISSING = True
 
 ''' We do the next block to enable backward compatibility for older config versions.
@@ -263,10 +301,11 @@ if not CONFIG_MISSING:
         except:
             # ensure we can always revert to default values 
             globals()[f"{setting_key}"] = settings_values[setting_key]
-            print(f"{setting_key} missing, using default value")
+            main_logger.warning(f"{setting_key} missing, using default value")
     else:
-        print(f"Loaded settings from configuration file. Version: {config_version}")
-print("Checking settings configuration...")
+        main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
+
+main_logger.info("Checking settings configuration...")
 
 # =========== Global Variables =============
 # ==========================================
@@ -342,12 +381,18 @@ api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 flyby_stats_present: bool = False
 """ Flag to check if we can write to `FLYBY_STATS_FILE`, initialized to False """
+dump1090_failures: int = 0
+""" Track amount of times we fail to read dump1090 data. """
+watchdog_triggers: int = 0
+""" Track amount of times the watchdog is triggered. If this amount exceeds
+a certain threshold, permanently disable watching dump1090 for this session. """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
 PLANE_SELECTED: str = "plane-in-range"
 DISPLAY_SWITCH: str = "reset-scene"
 END_THREADS: str = "terminate"
+KICK_DUMP1090_WATCHDOG: str = "kick-watchdog"
 
 # define our units and multiplication factors (based on aeronautical units)
 distance_unit: str = "nmi"
@@ -364,15 +409,15 @@ if UNITS == 1: # metric
     distance_multiplier = 1.852
     altitude_multiplier = 0.3048
     speed_multiplier = 1.85184
-    print("Info: Using metric units (km, m, km/h)")
+    main_logger.info("Using metric units (km, m, km/h)")
 elif UNITS == 2: # imperial
     distance_unit = "mi"
     speed_unit = "mph"
     distance_multiplier = 1.150779
     speed_multiplier = 1.150783
-    print("Info: Using imperial units (mi, ft, mph)")
+    main_logger.info("Using imperial units (mi, ft, mph)")
 else:
-    print("Info: Using default aeronautical units (nmi, ft, kt)")
+    main_logger.info("Using default aeronautical units (nmi, ft, kt)")
 
 # =========== Program Setup I ==============
 # =============( Utilities )================
@@ -383,13 +428,19 @@ def has_key(book, key):
 def sigterm_handler(signum, frame):
     """ Shutdown worker threads and exit this program. """
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
+    exit_time = datetime.datetime.now()
     end_time = round(time.monotonic() - START_TIME, 3)
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
-    os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {datetime.datetime.now()}\n"))
+    main_logger.removeHandler(main_logger.handlers[0]) # remove the stdout stream for the logger
+    os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"Shutting down... "))
+    # write the above message to the log file
+    main_logger.info(f"- Exit signal commanded at {exit_time}")
+    main_logger.info(f"  Script ran for {timedelta_clean(end_time)}")
     flyby_stats()
     os.write(sys.stdout.fileno(), b"Done.\n")
+    main_logger.info("FlightGazer is shutdown.")
     sys.exit(0)
 
 def register_signal_handler(loop, handler, signal, sender) -> None:
@@ -539,7 +590,7 @@ def probe978() -> str | None:
         try:
             test1 = requests.get(json_978 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
             test1.raise_for_status()
-            print(f"dump978 detected as well, at \'{json_978}\'")
+            main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
             return json_978 + '/data/aircraft.json'
         except:
             pass
@@ -548,16 +599,16 @@ def probe978() -> str | None:
 def dump1090_check() -> None:
     """ Checks what dump1090 we have available upon startup. If we can't find it, just become a clock. """
     global DUMP1090_JSON, URL, DUMP978_JSON, DUMP1090_IS_AVAILABLE
-    print("Searching for dump1090...")
+    main_logger.info("Searching for dump1090...")
     for wait in range(3):
         tries = 3 - wait
         DUMP1090_JSON, URL = probe1090()
         if DUMP1090_JSON is not None:
-            print(f"Found dump1090 at \'{DUMP1090_JSON}\'")
+            main_logger.info(f"Found dump1090 at \'{DUMP1090_JSON}\'")
             DUMP1090_IS_AVAILABLE = True
             break
         else:
-            print(f"Could not find dump1090.json. dump1090 may not be loaded yet. Waiting 10 seconds and trying {tries} more time(s).")
+            main_logger.info(f"Could not find dump1090.json. dump1090 may not be loaded yet. Waiting 10 seconds and trying {tries} more time(s).")
             time.sleep(10)
     else: # try it again one last time
         DUMP1090_JSON, URL = probe1090()
@@ -565,10 +616,10 @@ def dump1090_check() -> None:
     if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
         if DISPLAY_IS_VALID:
-            print("ERROR: dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
+            main_logger.error("dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
         else:
-            print("ERROR: dump1090 not found. Additionally, screen resources are missing.\n\
-       This script may not be useful until these issues are corrected.")
+            main_logger.error("dump1090 not found. Additionally, screen resources are missing.")
+            main_logger.error(">>> This script may not be useful until these issues are corrected.")
     DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
 
 def read_1090_config() -> None:
@@ -586,16 +637,17 @@ def read_1090_config() -> None:
                 if receiver['lat'] != rlat_last or receiver['lon'] != rlon_last:
                     rlat = float(receiver['lat'])
                     rlon = float(receiver['lon'])
-                    print(f"Info: Location updated. ({rlat}, {rlon})")
+                    main_logger.info(f"Location updated.")
+                    main_logger.debug(f">>> ({rlat}, {rlon})") # do not write to file
             else:
                 rlat = rlon = None
-                print("Warning: Location has not been set! This program will not be able to determine any nearby planes or calculate range!\n\
-         Please set location in dump1090 to disable this message.")
+                main_logger.warning("Location has not been set! This program will not be able to determine any nearby planes or calculate range!")
+                main_logger.warning(">>> Please set location in dump1090 to disable this message.")
                 if DISPLAY_SUNRISE_SUNSET:
-                    print("Warning: Sunrise and sunset times will not be displayed.")
+                    main_logger.warning("Sunrise and sunset times will not be displayed.")
                     DISPLAY_SUNRISE_SUNSET = False
     except:
-        print("Error: Cannot load receiver config.")
+        main_logger.error("Cannot load receiver config.")
     return
 
 def probe_API() -> tuple[int, float] | None:
@@ -629,69 +681,78 @@ def probe_API() -> tuple[int, float] | None:
     
 def configuration_check() -> None:
     """ Basic configuration checker """
-    global RANGE, HEIGHT_LIMIT, RGB_COLS, RGB_ROWS, FLYBY_STATS_ENABLED, FLYBY_STALENESS, API_KEY, API_DAILY_LIMIT
+    global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT
+    global API_KEY, API_DAILY_LIMIT
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+    global RGB_COLS, RGB_ROWS
 
     valid_rgb_sizes = [16, 32, 64]
     if (not isinstance(RGB_ROWS, int) or not isinstance(RGB_ROWS, int)) or\
         (RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes):
-        print(f"Warning: selected RGB dimension ({RGB_ROWS}x{RGB_COLS}) is not a valid size.\n\
-         Setting values to default.")
+        main_logger.warning(f"Selected RGB dimensions is not a valid size.")
+        main_logger.info(f">>> Setting values to default. ({settings_values['RGB_ROWS']}x{settings_values['RGB_COLS']})")
         RGB_ROWS = settings_values['RGB_ROWS']
         RGB_COLS = settings_values['RGB_COLS']
 
+    if not isinstance(LOCATION_TIMEOUT, int) or\
+    (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
+        main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
+        main_logger.info(f">>> Setting to default ({settings_values['LOCATION_TIMEOUT']})")
+        LOCATION_TIMEOUT = settings_values['LOCATION_TIMEOUT']
+
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
-            print(f"Warning: RANGE is not a number. Setting to default value ({settings_values['RANGE']}).")
+            main_logger.warning(f"RANGE is not a number. Setting to default value ({settings_values['RANGE']}).")
             globals()['RANGE'] = settings_values['RANGE']
         if not isinstance(HEIGHT_LIMIT, int):
-            print(f"Warning: HEIGHT_LIMIT is not an integer. Setting to default value ({settings_values['HEIGHT_LIMIT']}).")
+            main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({settings_values['HEIGHT_LIMIT']}).")
             globals()['HEIGHT_LIMIT'] = settings_values['HEIGHT_LIMIT']
 
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
-            print(f"Warning: Desired range ({RANGE}{distance_unit}) is out of bounds. \
-Limiting to {20 * distance_multiplier}{distance_unit}.")
-            print("         If you would like to see more planes, consider \'No Filter\' mode. Use the \'-f\' flag.")
+            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
+            main_logger.info(">>> If you would like to see more planes, consider \'No Filter\' mode. Use the \'-f\' flag.")
             RANGE = (20 * distance_multiplier)
         elif RANGE < (0.2 * distance_multiplier):
-            print(f"Warning: Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
+            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
             RANGE = (0.2 * distance_multiplier)
 
         height_warning = f"Warning: Desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
         if HEIGHT_LIMIT >= (275000 * altitude_multiplier):
-            print(f"{height_warning} beyond the theoretical limit for flight. Setting to a reasonable value: \
-{75000 * altitude_multiplier}{altitude_unit}.")
+            main_logger.warning(f"{height_warning} beyond the theoretical limit for flight.")
+            main_logger.info(f">>> Setting to a reasonable value:{75000 * altitude_multiplier}{altitude_unit}")
             HEIGHT_LIMIT = (75000 * altitude_multiplier)
         elif HEIGHT_LIMIT > (75000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
-            print(f"{height_warning} beyond typical aviation flight levels. Limiting to {75000 * altitude_multiplier}{altitude_unit}.")
+            main_logger.warning(f"{height_warning} beyond typical aviation flight levels.")
+            main_logger.info(f">>> Limiting to {75000 * altitude_multiplier}{altitude_unit}.")
             HEIGHT_LIMIT = (75000 * altitude_multiplier)
         elif HEIGHT_LIMIT <= 0:
-            print(f"{height_warning} ground level or underground.\n\
-         Planes won't be doing the thing planes do at that point (flying). Setting to a reasonable value: \
-{5000 * altitude_multiplier}{altitude_unit}.")
+            main_logger.warning(f"{height_warning} ground level or underground.")
+            main_logger.warning("Planes won't be doing the thing planes do at that point (flying).")
+            main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
             HEIGHT_LIMIT = (5000 * altitude_multiplier)
         elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (200 * altitude_multiplier):
-            print(f"{height_warning} too low. Are planes landing on your house? \
-Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
+            main_logger.warning(f"{height_warning} too low. Are planes landing on your house?")
+            main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         del height_warning
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
     
     if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
-        print(f"Warning: Desired flyby staleness is out of bounds. Setting to default ({settings_values['FLYBY_STALENESS']})")
+        main_logger.warning(f"Desired flyby staleness is out of bounds.")
+        main_logger.info(f">>> Setting to default ({settings_values['FLYBY_STALENESS']})")
         FLYBY_STALENESS = settings_values['FLYBY_STALENESS']
 
     if not FLYBY_STATS_ENABLED:
-        print("Info: Flyby stats will not be written.")
+        main_logger.info("Flyby stats will not be written.")
 
     if DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
-        print("Warning: Display option for sunrise and sunset times is enabled, however, receiver stats will be displayed instead.")
+        main_logger.warning("Display option for sunrise and sunset times is enabled, however, receiver stats will be displayed instead.")
     elif DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
-        print("Info: Sunrise and sunset times will be displayed.")
+        main_logger.info("Sunrise and sunset times will be displayed.")
     elif not DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
-        print("Info: Receiver stats will be displayed.")
+        main_logger.info("Receiver stats will be displayed.")
 
     brightness_list = ["BRIGHTNESS", "BRIGHTNESS_2", "ACTIVE_PLANE_DISPLAY_BRIGHTNESS"]
     for setting_entry in brightness_list:
@@ -700,17 +761,18 @@ Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
             if setting_entry == "ACTIVE_PLANE_DISPLAY_BRIGHTNESS" and imported_value is None:
                     continue
             if not isinstance(imported_value, int) or (imported_value < 0 or imported_value > 100):
-                print(f"Warning: {setting_entry} is out of bounds or not an integer. Using default value ({settings_values[setting_entry]}).")
+                main_logger.warning(f"{setting_entry} is out of bounds or not an integer.")
+                main_logger.info(f">>> Using default value ({settings_values[setting_entry]}).")
                 globals()[f"{setting_entry}"] = settings_values[setting_entry]
         except KeyError:
             pass
 
-    print("Settings check complete.")
+    main_logger.info("Settings check complete.")
 
     # check the API config
-    print("Checking API settings...")
+    main_logger.info("Checking API settings...")
     if not isinstance(API_KEY, str):
-        print("Warning: API key is invalid.")
+        main_logger.warning("API key is invalid.")
         API_KEY = ""
 
     if (API_KEY and (
@@ -719,7 +781,7 @@ Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         )) or (
         isinstance(API_DAILY_LIMIT, int) 
         and API_DAILY_LIMIT < 0):
-            print("Warning: API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
+            main_logger.warning("API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
             API_DAILY_LIMIT = None
             API_KEY = ""
 
@@ -729,29 +791,29 @@ Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         api_use, api_cost = probe_API()
 
         if api_use is None:
-            print("Warning: Provided API Key failed to return a valid response.")
+            main_logger.warning("Provided API Key failed to return a valid response.")
             API_KEY = ""
         else:
-            print(f"API Key \'***{API_KEY[-5:]}\' is valid.")
-            print(f"Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+            main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")
+            main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
 
     if API_KEY is not None and API_KEY: # test again
         if ENHANCED_READOUT:
-            print("Info: ENHANCED_READOUT setting is enabled. API will not be used.")
+            main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
         else:
             if API_DAILY_LIMIT is None:
-                print("Info: No limit set for API calls.")
+                main_logger.info("No limit set for API calls.")
             else:
-                print(f"Info: Limiting API calls to {API_DAILY_LIMIT} per day.")
+                main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
     else:
         if not ENHANCED_READOUT:
-            print("Info: API will not be used. Additional airplane info will not be available.")
+            main_logger.info("API will not be used. Additional airplane info will not be available.")
             if DISPLAY_IS_VALID:
-                print("      Setting ENHANCED_READOUT to \'true\' is recommended.")
+                main_logger.info(">>> Setting ENHANCED_READOUT to \'true\' is recommended.")
         elif ENHANCED_READOUT and DISPLAY_IS_VALID:
-            print("Info: API will not be used. Instead, additional dump1090 info will be substituted.")
+            main_logger.info("API will not be used. Instead, additional dump1090 info will be substituted.")
 
-    print("API check complete.")
+    main_logger.info("API check complete.")
 
 def read_receiver_stats() -> None:
     """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
@@ -791,14 +853,13 @@ def read_receiver_stats() -> None:
             else:
                 gain_now = None
             
-            with threading.Lock():
-                receiver_stats['Gain'] = gain_now
-                receiver_stats['Noise'] = noise_now
-                receiver_stats['Strong'] = loud_percentage
-                
         except:
             pass
 
+        with threading.Lock():
+            receiver_stats['Gain'] = gain_now
+            receiver_stats['Noise'] = noise_now
+            receiver_stats['Strong'] = loud_percentage
         time.sleep(10) # don't need to poll too often
 
 def suntimes() -> None:
@@ -872,14 +933,14 @@ def flyby_stats() -> None:
             head = next(stats)
             if head == header:
                 flyby_stats_present = True
-                print(f"Flyby stats file \'{FLYBY_STATS_FILE}\' is present.")
+                main_logger.info(f"Flyby stats file \'{FLYBY_STATS_FILE}\' is present.")
             # elif head == "":
             #     with open(FLYBY_STATS_FILE, 'w') as stats:
             #         stats.write(header)
             #     print(f"A new flyby stats file \'{FLYBY_STATS_FILE}\' was created.")
             #     flyby_stats_present = True
             else:
-                print(f"Error: header in \'{FLYBY_STATS_FILE}\' is incorrect or has been modifed. Stats will not be saved.")
+                main_logger.warning(f"Header in \'{FLYBY_STATS_FILE}\' is incorrect or has been modifed. Stats will not be saved.")
                 FLYBY_STATS_ENABLED = False
 
         # load in last line of stats file, check if today's the current date, and re-populate our running stats
@@ -906,7 +967,7 @@ def flyby_stats() -> None:
                          "Time":time.monotonic(),
                         }
                          )
-                print(f"Successfully reloaded last written data for {date_now_str}.")
+                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}.")
         return
     
     elif not FLYBY_STATS_FILE.is_file():
@@ -916,11 +977,11 @@ def flyby_stats() -> None:
                 os.chmod(FLYBY_STATS_FILE, 0o777)
             with open(FLYBY_STATS_FILE, 'w') as stats:
                 stats.write(header)
-            print(f"No Flyby stats file was found. A new flyby stats file \'{FLYBY_STATS_FILE}\' was created.")
+            main_logger.info(f"No Flyby stats file was found. A new flyby stats file \'{FLYBY_STATS_FILE}\' was created.")
             flyby_stats_present = True
             return
         except:
-            print(f"Error: Cannot write to \'{FLYBY_STATS_FILE}\'. Stats will not be saved.")
+            main_logger.error(f"Cannot write to \'{FLYBY_STATS_FILE}\'. Stats will not be saved.")
             FLYBY_STATS_ENABLED = False
             return
 
@@ -932,7 +993,7 @@ def flyby_stats() -> None:
 #             print(f"({date_now_str}) - {len(unique_planes_seen)} flybys so far today. \
 # {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
         except:
-            print(f"Error: Cannot write to \'{FLYBY_STATS_FILE}\'. Data for {date_now_str} has been lost.")
+            main_logger.error(f"Cannot write to \'{FLYBY_STATS_FILE}\'. Data for {date_now_str} has been lost.")
     return
 
 def print_to_console() -> None:
@@ -1094,6 +1155,8 @@ Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
     if gen_info_str:
         print(gen_info_str)
+    if dump1090_failures > 0:
+        print(f"> dump1090 communication failures: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
 
 def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
@@ -1120,6 +1183,7 @@ def main_loop_generator() -> None:
 
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
+        if not DUMP1090_IS_AVAILABLE: return None
         try:
             req1090 = Request(DUMP1090_JSON, data=None, headers=USER_AGENT)
             with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.75)) as aircraft_file:
@@ -1154,7 +1218,7 @@ def main_loop_generator() -> None:
             - Longitude
             - Track: Plane's track over ground in degrees
             - VertSpeed: Plane's rate of barometric altitude in units/minute
-            - RSSI: Plane's average signal power in dbFS
+            - RSSI: Plane's average signal power in dBFS
         """
         # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
@@ -1170,7 +1234,7 @@ def main_loop_generator() -> None:
                 seen_pos = a.get('seen_pos')
                 # seen_pos = a.get('seen') # use last seen versus last seen position
                 # filter planes that have valid tracking data and were seen recently
-                if seen_pos is None or seen_pos > 60:
+                if seen_pos is None or seen_pos > LOCATION_TIMEOUT:
                     continue
                 total +=1
                 lat = a.get('lat')
@@ -1246,15 +1310,17 @@ def main_loop_generator() -> None:
     
     def loop():
         """ Do the loop """
-        global general_stats, relevant_planes, unique_planes_seen, process_time
+        global general_stats, relevant_planes, unique_planes_seen, process_time, dump1090_failures
         while True:
             try:
                 loadingtime = time.perf_counter()
                 dump1090_data = dump1090_heartbeat()
+                process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3)
+                if not DUMP1090_IS_AVAILABLE:
+                    process_time[0] = 0 # doesn't make sense for there to be a process time in this case
                 if dump1090_data is None:
                     general_stats = {'Tracking': 0, 'Range': 0}
                     if DUMP1090_IS_AVAILABLE: raise TimeoutError
-                process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3)
                 start_time = time.perf_counter()
                 if DUMP1090_IS_AVAILABLE:
                     with threading.Lock():
@@ -1266,17 +1332,21 @@ def main_loop_generator() -> None:
 
             except TimeoutError:
                 cls()
-                print("Dump1090 service timed out, retrying...")
+                main_logger.warning("dump1090 service timed out. Retrying...")
+                dump1090_failures += 1
+                if dump1090_failures % 20 == 0:
+                    main_logger.error("dump1090 service has failed too many times (20).")
+                    dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
+                    time.sleep(5)
                 time.sleep(LOOP_INTERVAL)
                 continue
 
             except (SystemExit, KeyboardInterrupt):
-                print("\nLoop ended by external control.")
                 return
 
             except:
                 cls()
-                print("Error: LOOP thread caught an exception. Trying again...")
+                main_logger.error("LOOP thread caught an exception. Trying again...")
                 time.sleep(LOOP_INTERVAL)
                 continue
 
@@ -1755,26 +1825,67 @@ class DisplayFeeder:
     def end_thread(self, message):
         self.loop.stop()
 
+class dump1090Watchdog:
+    """ Monitors if dump1090 data is available while the main loop of FlightGazer is running.
+    If the amount of `dump1090_failures` exceeds the amount set within `main_loop_generator()`
+    this 'watchdog' will get kicked and will suspend reading dump1090 for a set amount of time.
+    """
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        register_signal_handler(self.loop, self.watchdog, signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
+        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self.run_loop()
+
+    def watchdog(self, message):
+        global DUMP1090_IS_AVAILABLE, relevant_planes, watchdog_triggers
+        DUMP1090_IS_AVAILABLE = False
+        with threading.Lock(): # indirectly let the other threads know that dump1090 is not available
+            relevant_planes.clear()
+        watchdog_triggers += 1
+        if watchdog_triggers > 2:
+            main_logger.error("dump1090 watchdog has been triggered too many times (3).")
+            main_logger.error(">>> Permanently disabling dump1090 readout for this session.")
+            main_logger.error("If this is a remote dump1090 connection, please check your internet connectivity.")
+            main_logger.error("If dump1090 is running on this machine, please check the dump1090 service.")
+            return
+        main_logger.error(">>> Suspending checking dump1090 for 10 minutes.")
+        time.sleep(600)
+        main_logger.info("Re-enabling dump1090 readout.")
+        DUMP1090_IS_AVAILABLE = True
+
+    def run_loop(self):
+        def keep_alive():
+            self.loop.call_later(1, keep_alive)
+        keep_alive()
+        self.loop.run_forever()
+
+    def end_thread(self, message):
+        self.loop.stop()
+
 def brightness_controller():
     """ Changes desired display brightness based on current environment
     (ex: values of `ENABLE_TWO_BRIGHTNESS` or `sunset_sunrise`)
     Needs to run in its own thread. """
     global current_brightness
     if not ENABLE_TWO_BRIGHTNESS:
-        print(f"Info: Dynamic brightness is disabled. Display will remain at a static brightness ({BRIGHTNESS}).")
+        main_logger.info("Dynamic brightness is disabled.")
+        main_logger.info(f"Display will remain at a static brightness ({BRIGHTNESS}).")
         return
+    
     if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
-        print(f"Info: Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when a plane is detected.")
+        main_logger.info(f"Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when a plane is detected.")
 
     try:
         test1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
         test2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
         del test1, test2
-        print(f"Info: Dynamic brightness is enabled. Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
+        main_logger.info("Dynamic brightness is enabled.")
+        main_logger.info(f"Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
     except: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
         current_brightness = BRIGHTNESS
-        print(f"Warning: Could not parse BRIGHTNESS_SWITCH_TIME. This is required as a fallback.\n\
-         Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
+        main_logger.warning("Cound not parse BRIGHTNESS_SWITCH_TIME. This is required as a fallback.")
+        main_logger.info(f">>> Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
         return
 
     while True: # if the above tests pass, this thread can go to work
@@ -1825,7 +1936,7 @@ class Display(
     Hence, we're basically going to shove all of the scenes inspired by Waddell, including our added stuff, as part of this single class
     and let `DisplayFeeder` control what we do.
 
-    n.b.: Use the @Animator decorator to control both how often elements update and our logic evaluations. """
+    NB: Use the @Animator decorator to control both how often elements update and our logic evaluations. """
     def __init__(self):
 
         # Setup Display
@@ -2954,26 +3065,29 @@ class Display(
 # =========== Initialization II ============
 # ==========================================
 
+configuration_check()
+
+main_logger.info("Checking for running instances of FlightGazer before continuing to the next stage...")
 matching_processes = match_commandline(Path(__file__).name, 'python')
 if len(matching_processes) > 1: # when we scan for all processes, it will include this process as well
-    print("\nERROR: FlightGazer is already running! Only one instance can be running.")
-    print("Matching processes:")
+    main_logger.critical("FlightGazer is already running! Only one instance can be running!")
+    main_logger.warning("Matching processes:")
     for elem in matching_processes:
         process_ID = elem['pid']
         process_name = elem['name']
         process_started =  time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(elem['create_time']))
         if process_ID != this_process.pid:
-            print(f"PID {process_ID} -- [ {process_name} ] started: {process_started}")
-    print("")
+            main_logger.warning(f"   PID {process_ID} -- [ {process_name} ] started: {process_started}")
+    main_logger.warning(f"This current instance (PID {this_process.pid}) of FlightGazer will now exit.")
     time.sleep(1)
     exit(1)
 else:
     del matching_processes
+    main_logger.info("Cleared for takeoff.")
 
 get_ip()
 HOSTNAME = socket.gethostname()
-print(f"Info: Running from {CURRENT_IP} ({HOSTNAME})")
-configuration_check()
+main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
 flyby_stats() # initialize first
 
 # define our scheduled tasks
@@ -2992,10 +3106,6 @@ suntimes()
 def main() -> None:
     """ Enters the main loop. """
     # register our loop breaker
-    # if not INTERACTIVE and not FORGOT_TO_SET_INTERACTIVE:
-    #     signal.signal(signal.SIGTERM, sigterm_handler)
-    # if INTERACTIVE or FORGOT_TO_SET_INTERACTIVE:
-    #     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
         
@@ -3007,13 +3117,14 @@ def main() -> None:
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
     brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
+    watchdog_stuff = threading.Thread(target=dump1090Watchdog, name='Dump1090-Watchdog', daemon=True)
 
     if DISPLAY_IS_VALID and not NODISPLAY_MODE:
-        print("\nInitializing display...")
+        main_logger.info("Initializing display...")
         if 'RGBMatrixEmulator' in sys.modules:
-            print("We are using \'RGBMatrixEmulator\'")
+            main_logger.info("We are using 'RGBMatrixEmulator'")
         else:
-            print("We are using \'rgbmatrix\'")
+            main_logger.info("We are using 'rgbmatrix'")
         display = Display()
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
         display_stuff.start()
@@ -3044,16 +3155,18 @@ so you can read the above output before we enter the main loop.\n")
     
     if not INTERACTIVE and FORGOT_TO_SET_INTERACTIVE:
         print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n\
-        Normally, outputs shown here are not usually seen. If you want to see data, use Ctrl+C to quit\n\
-        and use the interactive flag (-i) instead.")
+        Normally, outputs shown here are not usually seen and are written to the log.\n\
+        If you want to see data, use Ctrl+C to quit and use the interactive flag (-i) instead.")
 
     main_stuff.start()
     airplane_watcher.start()
     api_getter.start()
     display_sender.start()
     receiver_stuff.start()
-    print("\n========== Main loop started! ===========")
-    print("=========================================\n")
+    watchdog_stuff.start()
+    print()
+    main_logger.info("========== Main loop started! ===========")
+    main_logger.info("=========================================")
 
     try:
         while True: #keep-alive

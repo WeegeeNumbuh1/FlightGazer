@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.2.0
+# Last updated: v.2.3.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -45,7 +45,7 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
-sleep 1s
+sleep 3s
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo "> Done."
 color_migrator () {

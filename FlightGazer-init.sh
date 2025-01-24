@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.2.0
+# Version = v.2.3.0
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -17,6 +17,7 @@ FADE='\033[2m'
 CHECK_FILE=${VENVPATH}/first_run_complete
 PROFILING_FLAG=${BASEDIR}/profile
 THIS_FILE=${BASEDIR}/FlightGazer-init.sh
+LOGFILE=${BASEDIR}/FlightGazer-log.log
 INTERNET_STAT=0 # think return codes
 SKIP_CHECK=0 # 0 = do not skip dependency checks, 1 = skip
 
@@ -149,6 +150,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo "  > Internet connectivity available, initial setup can continue."
+		read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
 	fi
 fi
 
@@ -233,6 +235,7 @@ then
     "log_level": "info"
 }
 EOF
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/../emulator_config.json >/dev/null 2>&1
 	echo "    > RGBMatrixEmulator settings created."
 	fi
 fi
@@ -290,6 +293,9 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		echo "  Skipping due to no internet."
 	fi
 	touch $CHECK_FILE
+	touch $LOGFILE
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
+	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
 fi
 
 ENDTIME=$(date '+%s')

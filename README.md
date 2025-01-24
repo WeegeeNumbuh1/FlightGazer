@@ -401,7 +401,7 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 
 </details>
 
-## 🐛 Known Issues and Shortcomings
+## 🐛 Known Issues, Shortcomings, and Reporting Issues
 
 <details><summary><b>Show/Hide</b></summary>
 
@@ -432,6 +432,8 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 </details>
 <br >
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
+
+If you do encounter an issue, provide a copy of `FlightGazer-log.log` which is present in the FlightGazer directory.
 
 ## ✏️ Changelog & Planned Features
 Read: [`Changelog.txt`](./Changelog.txt).

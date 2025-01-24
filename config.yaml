@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.2.0 # do not modify this
+CONFIG_VERSION: v.2.3.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -24,6 +24,12 @@ RANGE: 2
 
 FLYBY_STALENESS: 60
 # If the same plane appears again before this time, do not consider it as a flyby (in minutes, as an integer)
+
+LOCATION_TIMEOUT: 60
+# How much time must pass before a plane's last location is considered stale and removed from tracking (in seconds).
+# Valid range: (15..60) as an integer. If less than 60, affects total plane count.
+# This setting, if low enough, will cause planes that are present in the area to "drop out" more readily
+# if they don't report a timely location update.
 
 API_KEY: ''
 # Put your FlightAware API key here. Leave as '' to not use the API.
