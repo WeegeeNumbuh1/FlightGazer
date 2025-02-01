@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.3.0 --- 2025-01-24'
+VERSION: str = 'v.2.4.0 --- 2025-02-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -71,6 +71,10 @@ argflags.add_argument('-f', '--nofilter',
                       Disables API fetching and Display remains as a clock.\n\
                       Implies Interactive mode."
                       )
+argflags.add_argument('-v', '--verbose',
+                      action='store_true',
+                      help="Log/display more detailed messages.\n\
+                      This flag is useful for debugging.")
 args = argflags.parse_args()
 if args.interactive:
     INTERACTIVE: bool = True
@@ -90,6 +94,10 @@ if args.nofilter:
     INTERACTIVE = True
 else:
     NOFILTER_MODE = False
+if args.verbose:
+    VERBOSE_MODE: bool = True
+else:
+    VERBOSE_MODE = False
 
 FORGOT_TO_SET_INTERACTIVE: bool = False
 
@@ -120,10 +128,10 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d - %(name)s %(threadName)s | %(levelname)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     encoding='utf-8',
-    level=logging.INFO,
+    level=logging.DEBUG if VERBOSE_MODE else logging.INFO,
 )
 
-# add a stdout stream for the logger that we can disable when `sigterm_handler()` is called
+# add a stdout stream for the logger that we can disable if we run interactively
 # NB: in `main_logger.handlers` this handler will be in index 0 (the default one we set above does not add a handler),
 # so to stop the stdout stream, use main_logger.removeHandler()
 stdout_stream = logging.StreamHandler(sys.stdout)
@@ -150,7 +158,10 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
-sys.tracebacklimit = 0 # this may change from time to time across commits
+if not VERBOSE_MODE:
+    sys.tracebacklimit = 0
+else:
+    main_logger.debug("Verbose mode enabled.")
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
@@ -182,6 +193,7 @@ if not NODISPLAY_MODE:
         time.sleep(2)
 else:
     DISPLAY_IS_VALID = False
+    main_logger.info("Display output disabled. Running in console-only mode.")
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals (previously)
@@ -331,6 +343,8 @@ focus_plane_ids_scratch = set()
 Elements can be removed if plane count > 1 due to selector algorithm """
 focus_plane_ids_discard = set()
 """ Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
+last_plane_count: int = 0
+""" Count of planes in `relevant_planes` from the previous loop """
 plane_latch_times: list = [
     int(30 // LOOP_INTERVAL),
     int(20 // LOOP_INTERVAL),
@@ -386,6 +400,8 @@ dump1090_failures: int = 0
 watchdog_triggers: int = 0
 """ Track amount of times the watchdog is triggered. If this amount exceeds
 a certain threshold, permanently disable watching dump1090 for this session. """
+selection_events: int = 0
+""" Track amount of times the plane selector is triggered. (this is just a verbose stat) """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -431,7 +447,6 @@ def sigterm_handler(signum, frame):
     exit_time = datetime.datetime.now()
     end_time = round(time.monotonic() - START_TIME, 3)
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
-    main_logger.removeHandler(main_logger.handlers[0]) # remove the stdout stream for the logger
     os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"Shutting down... "))
@@ -512,13 +527,16 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     return f.format(fmt, **values)
 
 def reset_unique_tracks() -> None:
-    """ Resets the tracked planes set (schedule this) """
-    time.sleep(5) # wait for hourly events to complete
-    global unique_planes_seen, api_hits
+    """ Resets the tracked planes set and daily accumulators (schedule this) """
+    time.sleep(2) # wait for hourly events to complete
+    global unique_planes_seen, api_hits, selection_events
+    main_logger.info(f"DAILY STATS: {len(unique_planes_seen)} flybys. {selection_events} selection events. \
+{api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
     with threading.Lock():
         unique_planes_seen.clear()
         for i in range(len(api_hits)):
             api_hits[i] = 0
+        selection_events = 0
     return
 
 def match_commandline(command_search: str, process_name: str) -> list:
@@ -638,7 +656,7 @@ def read_1090_config() -> None:
                     rlat = float(receiver['lat'])
                     rlon = float(receiver['lon'])
                     main_logger.info(f"Location updated.")
-                    main_logger.debug(f">>> ({rlat}, {rlon})") # do not write to file
+                    main_logger.debug(f">>> ({rlat}, {rlon})") # do not write to file unless verbose mode
             else:
                 rlat = rlon = None
                 main_logger.warning("Location has not been set! This program will not be able to determine any nearby planes or calculate range!")
@@ -664,7 +682,6 @@ def probe_API() -> tuple[int, float] | None:
     query_string = (API_URL
                     + "account/usage"
                     + "?start=" + urllib.parse.quote(date_month_iso)
-                    + "&max_pages=1"
                     )
     try:
         response = requests.get(query_string, headers=auth_header, timeout=10)
@@ -699,6 +716,11 @@ def configuration_check() -> None:
         main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
         main_logger.info(f">>> Setting to default ({settings_values['LOCATION_TIMEOUT']})")
         LOCATION_TIMEOUT = settings_values['LOCATION_TIMEOUT']
+    else:
+        if LOCATION_TIMEOUT == 60:
+            main_logger.info("Location timeout set to 60 seconds. This will match to dump1090's behavior.")
+        else:
+            main_logger.info(f"Location timeout set to {LOCATION_TIMEOUT} seconds.")
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
@@ -860,7 +882,7 @@ def read_receiver_stats() -> None:
             receiver_stats['Gain'] = gain_now
             receiver_stats['Noise'] = noise_now
             receiver_stats['Strong'] = loud_percentage
-        time.sleep(10) # don't need to poll too often
+        time.sleep(5) # don't need to poll too often
 
 def suntimes() -> None:
     """ Update sunrise and sunset times """
@@ -877,6 +899,7 @@ def suntimes() -> None:
     else:
         sunset_sunrise['Sunrise'] = None
         sunset_sunrise['Sunset'] = None
+    main_logger.debug(f"Sunrise: {sunset_sunrise['Sunrise']}, Sunset: {sunset_sunrise['Sunset']}")
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
@@ -934,11 +957,6 @@ def flyby_stats() -> None:
             if head == header:
                 flyby_stats_present = True
                 main_logger.info(f"Flyby stats file \'{FLYBY_STATS_FILE}\' is present.")
-            # elif head == "":
-            #     with open(FLYBY_STATS_FILE, 'w') as stats:
-            #         stats.write(header)
-            #     print(f"A new flyby stats file \'{FLYBY_STATS_FILE}\' was created.")
-            #     flyby_stats_present = True
             else:
                 main_logger.warning(f"Header in \'{FLYBY_STATS_FILE}\' is incorrect or has been modifed. Stats will not be saved.")
                 FLYBY_STATS_ENABLED = False
@@ -990,8 +1008,6 @@ def flyby_stats() -> None:
         try:
             with open(FLYBY_STATS_FILE, 'a') as stats:
                 stats.write(f"{date_now_str},{len(unique_planes_seen)},{api_hits[0]},{api_hits[1]},{api_hits[2]}\n")
-#             print(f"({date_now_str}) - {len(unique_planes_seen)} flybys so far today. \
-# {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
         except:
             main_logger.error(f"Cannot write to \'{FLYBY_STATS_FILE}\'. Data for {date_now_str} has been lost.")
     return
@@ -1149,14 +1165,14 @@ Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     if API_KEY:
         print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
-    print(f"> Total flybys today: {len(unique_planes_seen)}")
+    print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
     current_memory_usage = psutil.Process().memory_info().rss
     this_process_cpu = this_process.cpu_percent(interval=None)
     print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
     if gen_info_str:
         print(gen_info_str)
     if dump1090_failures > 0:
-        print(f"> dump1090 communication failures: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
+        print(f"> dump1090 communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
 
 def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
@@ -1232,9 +1248,9 @@ def main_loop_generator() -> None:
         try:
             for a in aircraft_data['aircraft']:
                 seen_pos = a.get('seen_pos')
-                # seen_pos = a.get('seen') # use last seen versus last seen position
+                broadcast_type = a.get('type')
                 # filter planes that have valid tracking data and were seen recently
-                if seen_pos is None or seen_pos > LOCATION_TIMEOUT:
+                if seen_pos is None or seen_pos > LOCATION_TIMEOUT or broadcast_type == 'tisb_other':
                     continue
                 total +=1
                 lat = a.get('lat')
@@ -1332,8 +1348,10 @@ def main_loop_generator() -> None:
 
             except TimeoutError:
                 cls()
-                main_logger.warning("dump1090 service timed out. Retrying...")
                 dump1090_failures += 1
+                if INTERACTIVE:
+                    print(f"dump1090 service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                main_logger.warning(f"dump1090 service timed out. This is occurrence {dump1090_failures}. Retrying...")
                 if dump1090_failures % 20 == 0:
                     main_logger.error("dump1090 service has failed too many times (20).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
@@ -1365,10 +1383,20 @@ class AirplaneParser:
    
     def plane_selector(self, message):
         """ Select a plane! """
-        global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, process_time
+        global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, last_plane_count
+        global process_time, selection_events
         plane_count = len(relevant_planes)
         get_plane_list: list = []
         focus_plane_i: str = ""
+        # algorithm stuff; note how these are initalized before `focus_plane_iter` is incremented
+        next_select_table = [0,0,0]
+        loops_to_next_select = [0,0,0]
+        for i, value in enumerate(plane_latch_times):
+            next_select_table[i] = ((focus_plane_iter // value) + 1) * value
+            loops_to_next_select[i] = value - (focus_plane_iter % value)
+        def rare_message():
+            main_logger.info(f"Rare event! Plane count changed from {last_plane_count} to {plane_count} as we were about to select another plane.")
+            main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event: {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
 
         def select():
             """ 
@@ -1426,13 +1454,29 @@ class AirplaneParser:
 
                 # control our latching time based on how many planes are present in the area;
                 # if a new plane enters the area or the number of planes changes,
-                # only switch focus plane when modulo hits zero.
-                if plane_count == 2 and focus_plane_iter % plane_latch_times[0] == 0:
-                    select()
-                if plane_count == 3 and focus_plane_iter % plane_latch_times[1] == 0:
-                    select()
-                if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
-                    select()
+                # switch focus plane only when modulo hits zero OR
+                # if we were about to switch to another plane, but at this very loop
+                # the plane count changes, which would throw off the modulo
+
+                if ((plane_count > 1 and plane_count <= 4) and
+                    last_plane_count > 1)\
+                    and last_plane_count != plane_count:
+                    if last_plane_count == 2 and loops_to_next_select[0] == 1:
+                        select()
+                        rare_message()
+                    if last_plane_count == 3 and loops_to_next_select[1] == 1:
+                        select()
+                        rare_message()
+                    if last_plane_count > 3 and loops_to_next_select[2] == 1:
+                        select()
+                        rare_message()
+                else:
+                    if plane_count == 2 and focus_plane_iter % plane_latch_times[0] == 0:
+                        select()
+                    if plane_count == 3 and focus_plane_iter % plane_latch_times[1] == 0:
+                        select()
+                    if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
+                        select()
                 
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
@@ -1440,9 +1484,11 @@ class AirplaneParser:
                         if focus_plane == relevant_planes[i]['ID']:
                             focus_plane_stats = relevant_planes[i]
                             break
+                last_plane_count = plane_count
 
                 # if this thread changed the focus plane, fire up the API fetcher
                 if focus_plane_i != focus_plane:
+                    selection_events += 1
                     dispatcher.send(message=focus_plane, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
 
             else: # when there are no planes
@@ -1453,6 +1499,7 @@ class AirplaneParser:
                         focus_plane_stats.clear()
                         focus_plane_ids_scratch.clear()
                         focus_plane_ids_discard.clear()
+                        last_plane_count = 0
         
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
@@ -1534,6 +1581,7 @@ class APIFetcher:
                 # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
                 if response_json['flights']: # if no results (ex: invalid flight_id or plane is blocked from tracking) this key will not exist
                     api_hits[0] += 1
+                    main_logger.debug(f"API call for \'{flight_id}\' successful.")
                     for a in range(len(response_json['flights'])):
                         if "En Route" in response_json['flights'][a]['status']: # check we're reading current flight information
                             # check if these subkeys exist, if not, just return None
@@ -1566,14 +1614,17 @@ class APIFetcher:
                             break
                 else:
                     api_hits[2] += 1
+                    main_logger.debug(f"API call for \'{flight_id}\' returned no useful data.")
             else:
                 raise Exception
         except:
             api_hits[1] += 1
+            main_logger.debug(f"API call for \'{flight_id}\' failed. Status code: {response.status_code}")
         finally:
             # special case when the API returns a coordinate instead of an airport
             # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
             if origin is not None and origin.startswith("L "):
+                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}) for \'{flight_id}\'.")
                 orig_coord = origin[2:].split(" ")
                 lat = float(orig_coord[0])
                 lon = float(orig_coord[1])
@@ -1584,8 +1635,7 @@ class APIFetcher:
                 origin = str(abs(round(lat, 1))) + lat_str
                 # Exploit the fact that since we are looking at a position-only flight there will be no known destination beforehand.
                 # We replace the destination with the longitude instead for space reasons (worst case string length: 5 lat, 6 lon)
-                if destination is None:
-                    destination = str(abs(round(lon, 1))) + lon_str
+                destination = str(abs(round(lon, 1))) + lon_str
 
             api_results = {
                 'ID':focus_plane,
@@ -1849,7 +1899,7 @@ class dump1090Watchdog:
             main_logger.error("If this is a remote dump1090 connection, please check your internet connectivity.")
             main_logger.error("If dump1090 is running on this machine, please check the dump1090 service.")
             return
-        main_logger.error(">>> Suspending checking dump1090 for 10 minutes.")
+        main_logger.error(f">>> Suspending checking dump1090 for 10 minutes. This is occurrence: {watchdog_triggers}")
         time.sleep(600)
         main_logger.info("Re-enabling dump1090 readout.")
         DUMP1090_IS_AVAILABLE = True
@@ -3065,9 +3115,7 @@ class Display(
 # =========== Initialization II ============
 # ==========================================
 
-configuration_check()
-
-main_logger.info("Checking for running instances of FlightGazer before continuing to the next stage...")
+main_logger.info("Checking for running instances of FlightGazer before continuing...")
 matching_processes = match_commandline(Path(__file__).name, 'python')
 if len(matching_processes) > 1: # when we scan for all processes, it will include this process as well
     main_logger.critical("FlightGazer is already running! Only one instance can be running!")
@@ -3075,7 +3123,7 @@ if len(matching_processes) > 1: # when we scan for all processes, it will includ
     for elem in matching_processes:
         process_ID = elem['pid']
         process_name = elem['name']
-        process_started =  time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(elem['create_time']))
+        process_started = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(elem['create_time']))
         if process_ID != this_process.pid:
             main_logger.warning(f"   PID {process_ID} -- [ {process_name} ] started: {process_started}")
     main_logger.warning(f"This current instance (PID {this_process.pid}) of FlightGazer will now exit.")
@@ -3085,6 +3133,7 @@ else:
     del matching_processes
     main_logger.info("Cleared for takeoff.")
 
+configuration_check()
 get_ip()
 HOSTNAME = socket.gethostname()
 main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
@@ -3132,7 +3181,8 @@ def main() -> None:
 
     if INTERACTIVE:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
-so you can read the above output before we enter the main loop.\n")
+so you can read the above output before we enter the main loop.")
+        print(f"If you need to review the output again, review the log file at \'{LOGFILE}\'\n")
         interactive_wait_time = 15
         # silly random distractions while you wait 
         if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
@@ -3167,6 +3217,8 @@ so you can read the above output before we enter the main loop.\n")
     print()
     main_logger.info("========== Main loop started! ===========")
     main_logger.info("=========================================")
+    if INTERACTIVE: 
+        main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
 
     try:
         while True: #keep-alive

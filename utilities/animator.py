@@ -95,21 +95,3 @@ class Animator(object):
     @delay.setter
     def delay(self, value):
         self._delay = value
-
-
-if __name__ == "__main__":
-
-    class Test(Animator):
-        @Animator.KeyFrame.add(5, 1)
-        def method1(self, frame):
-            print(f"method1 {frame}")
-
-        @Animator.KeyFrame.add(1, 1)
-        def method2(self, frame):
-            print(f"method2 {frame}")
-
-    myclass = Test(1)
-    myclass.run()
-
-    while 1:
-        sleep(5)

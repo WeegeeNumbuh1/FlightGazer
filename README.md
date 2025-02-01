@@ -22,10 +22,10 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 <details open>
 <summary><b>Show/Hide images</b></summary>
 
-| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br ><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br ><i>...and once it leaves.</i></div> |
+| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
 |---|---|
-| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br ><i>Handles multiple planes in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br ><i>...and moments when the API takes its time.</i></div> |
-| <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br ><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
+| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple planes in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
+| <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
 
 |   |
 |---|
@@ -41,6 +41,8 @@ If you want one, I can also build one for you. (also Coming Soon™)
 </div>
 
 ## 💪 Features
+<details open><summary><b>Show/Hide</b></summary>
+
 - Visualize and figure out what planes are flying nearby your location, in a cool-looking way!
   - Shows a plane's callsign (or registration as fallback), distance *and* direction from your location, the plane's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the plane has been flying
@@ -70,7 +72,9 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Can be configured to run automatically inside `tmux`
 - 🆕 Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
 - 🆕 Easily update to latest builds here on Github
-  - Automagically migrate settings, even if new options appear or are removed in the future 
+  - Automagically migrate settings, even if new options appear or are removed in the future
+
+</details>
 
 ## 🛠️ Setup
 ### ⚠️ Prerequisites (Important)
@@ -86,6 +90,7 @@ Using this project assumes you have the following:
 - Python 3.8 or newer
 - A working internet connection for setup
 - *for Linux distros:*
+  - Basic knowledge of how to use `bash` or similar terminal
   - `ssh` access if running headless
   - `apt` as the package manager
   - Root access (necessary for accessing the RGBMatrix hardware)
@@ -155,7 +160,7 @@ There is [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer t
 #### Tricks & Tips
 <details><summary>Configuration details for a remote dump1090 installation</summary>
 
-Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br >
+Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
 Example: `http://192.168.xxx.xxx:8080`
 
 </details>
@@ -197,6 +202,8 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
 > # or
 > journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
+> # or
+> tail -n 50 /path/to/FlightGazer/FlightGazer-log.log # read the log output
 > ```
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -207,7 +214,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer Console Output ===== Time now: 2025-01-15 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.2.4.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
 (* indicates in focus, - indicates focused previously)
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
@@ -221,7 +228,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 > dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
 > Detected 154 plane(s), 2 plane(s) in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
-> Total flybys today: 13
+> Total flybys today: 13 | Aircraft selections: 13
 > CPU & memory usage: 16.925% overall CPU | 7.734MiB
 ```
 </details>
@@ -264,6 +271,7 @@ To shutdown FlightGazer, do any one of the following:
 <details><summary>Show/Hide</summary>
 
 ```bash
+# preferred method
 sudo systemctl stop flightgazer
 ```
 ```bash
@@ -280,6 +288,8 @@ To restart, simply do the following:
 <details><summary>Show/Hide</summary>
 
 ```bash
+sudo systemctl restart flightgazer
+# or, if it's currently not running:
 sudo systemctl start flightgazer
 ```
 or, you may [start it manually](#️-interactive-mode).
@@ -383,17 +393,17 @@ If it has been over a month since it last checked, then the next time it restart
 **Q:** I see a dot on the right of the plane readout display. What is it?<br>
 **A:** That is an indicator of how many planes are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between planes to show you what else is flying in your area.
 
-**Q:** Can I customize the colors?<br >
+**Q:** Can I customize the colors?<br>
 **A:** [Click here](#adjusting-colors)
 
-**Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, plane info, etc)?<br >
-**A:** Sure, just change some things in the script. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
+**Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, plane info, etc)?<br>
+**A:** Sure, just change some things in the script. (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
-**Q:** What about showing other plane info like what airline it is or what kind of plane it is?<br >
+**Q:** What about showing other plane info like what airline it is or what kind of plane it is?<br>
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
 You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.
 
-**Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/)?<br >
+**Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/)?<br>
 **A:** adsbdb only has reported route information for aircraft that have predetermined origins and destinations. In my experience, it cannot handle position-only flights (i.e. general aviation, military, etc) and is lacking information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
 
 **Q:** Some of your code is not pythonic!!!1!!111 ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
@@ -405,7 +415,7 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 
 <details><summary><b>Show/Hide</b></summary>
 
-- Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in `config.py`)
+- Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in your config)
   - This stat relies on the number of *unique planes seen*, not each occurence of an actual flyby
     - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
   - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
@@ -426,11 +436,11 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
     - May be mitigated in the far future
 
 - If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0
-  - Complicated to fix due to all the signal handling between the main script and the initialization script
+  - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd
   - May not actually get fixed (simply just code better, smh)
   
 </details>
-<br >
+<br>
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` which is present in the FlightGazer directory.
@@ -455,7 +465,7 @@ Faraway ideas:
 ## 🎖️ Highlights Across Media
 \* (dust) \* 
 
-## ⚖️ Licence
+## ⚖️ Licence & Warranty
 \* (to be chosen eventually) \*
 
 ## ✅ Acknowledgements

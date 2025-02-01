@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.3.0
+# Version = v.2.4.0
 # by: WeegeeNumbuh1
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -175,17 +175,6 @@ then
 	echo "    > \"tmux\""
 	apt-get install -y tmux >/dev/null
 	echo ""
-	# if [ -f "/etc/rc.local" ]; then
-	# 	echo "  > Checking /etc/rc.local for startup entry..."
-	# 	if grep -qw "FlightGazer-init.sh" /etc/rc.local;
-	# 	then
-	# 		echo "    > Start up entry is already present!"
-	# 	else
-	# 		# append line telling rc.local to execute this script
-	# 		sed -i -e "/^exit 0/i \sudo bash $THIS_FILE 2>&1 &" /etc/rc.local
-	# 		echo -e "    > Start up entry for '$THIS_FILE' added to /etc/rc.local"
-	# 	fi
-	# else
 	echo "  > Creating systemd service..."
 	if [ ! -f "/etc/systemd/system/flightgazer.service" ]; then
 		cat <<- EOF > /etc/systemd/system/flightgazer.service
@@ -194,10 +183,14 @@ then
 		After=multi-user.target
 
 		[Service]
+		User=root
 		# Note: unless the -t flag is used, DO NOT use interactive flags unless you want to spam the logs
 		ExecStart=bash $THIS_FILE -t
-		Type=simple
-
+		ExecStop=-tmux send-keys -t FlightGazer C-c || true
+		ExecStop=sleep 1s
+		Type=forking
+		TimeoutStopSec=5
+		
 		[Install]
 		WantedBy=multi-user.target
 		EOF
@@ -362,15 +355,14 @@ then
 			tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG}"
 			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
 			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
-			# wait -n $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | tr '\n' ' ')
-			# keep-alive, assuming this is a service
+			# keep-alive, assuming this is a simple systemd service
 			# we watch the amount of processes running that match the script name
 			# and if we terminate it internally we break out and tell systemd we shutdown gracefully
-			while [ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | wc -l) -ne 0 ];
-			do
-				sleep 2
-			done
-			echo -e "${GREEN}>>> Shutdown commanded internally.${NC}"
+			# while [ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | wc -l) -ne 0 ];
+			# do
+			# 	sleep 2
+			# done
+			# echo -e "${GREEN}>>> Shutdown commanded internally.${NC}"
 			exit 0
 		else
 			TRADITIONAL_START=true

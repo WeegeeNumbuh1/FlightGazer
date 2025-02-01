@@ -1,15 +1,16 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.2.2.0
+VERSION: v.2.4.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
-    Example:
+The name is also case-sensitive.
+->  Example:
     setting = BLACK
 If you are using your own custom color, you must use 'graphics.Color(red, green, blue)'
 where the red, green, blue values are integers from 0 to 255.
-    Example:
+->  Example:
     setting = graphics.Color(123, 123, 123)
 
 Your edits must between the # CONFIG_START and # CONFIG_END
