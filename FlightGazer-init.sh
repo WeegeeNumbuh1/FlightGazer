@@ -2,8 +2,9 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.4.0
+# Version = v.2.4.1
 # by: WeegeeNumbuh1
+export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
 BASEDIR=$(cd `dirname -- $0` && pwd)
 export PYTHONUNBUFFERED=1
@@ -189,6 +190,7 @@ then
 		ExecStop=-tmux send-keys -t FlightGazer C-c || true
 		ExecStop=sleep 1s
 		Type=forking
+		TimeoutStartSec=600
 		TimeoutStopSec=5
 		
 		[Install]

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.3.0
+# Last updated: v.2.4.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -69,7 +69,7 @@ if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
     echo "> Old version of FlightGazer detected. You must migrate your settings manually."
     mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
     chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/config_old.py >/dev/null 2>&1
-    chmod -f 777 ${BASEDIR}/config_old.py >/dev/null 2>&1
+    chmod -f 644 ${BASEDIR}/config_old.py >/dev/null 2>&1
     OLDER_BUILD=1
 else
     time_now=$(date '+%Y-%m-%d %H:%M')
@@ -113,12 +113,12 @@ cat >> ${TEMP_SCRIPT} <<'EOF'
 chown -Rf ${FG_O}:${FG_G} $TEMPDIR # need to do this as we are running as root
 echo -e "${FADE}Copying $TEMPDIR to $FGDIR..."
 cp -TR ${TEMPDIR} ${FGDIR}
-chown -f ${FG_O}:${FG_G} $FGDIR/config.yaml # ensure anyone can edit it
-chmod -f 777 $FGDIR/config.yaml
+chown -f ${FG_O}:${FG_G} $FGDIR/config.yaml
+chmod -f 644 $FGDIR/config.yaml
 chown -f ${FG_O}:${FG_G} $FGDIR/flybys.csv >/dev/null 2>&1
-chmod -f 777 $FGDIR/flybys.csv >/dev/null 2>&1
+chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
-systemctl start flightgazer.service
+systemctl start flightgazer.service &
 echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 if [ $MF -eq 1 ]; then

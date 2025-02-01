@@ -356,8 +356,13 @@ sudo systemctl disable flightgazer.service
 
 ## ⬆️ How to Update
 Version v2.x and newer:
-```
+```bash
 sudo bash /path/to/FlightGazer/update.sh
+```
+or, to ensure the most up-to-date version:
+```bash
+cd /path/to/FlightGazer
+sudo bash -c "$(wget -nv -O- https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh)"
 ```
 <details><summary>Windows</summary>
 

@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.4.0 --- 2025-02-01'
+VERSION: str = 'v.2.4.1 --- 2025-02-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse

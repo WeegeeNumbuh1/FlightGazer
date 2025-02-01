@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.4.1 - 2025-02-01
+    - HOTFIX: Adjusted systemd start timeout for initial setup after update
+        - This would cause FlightGazer to never complete its setup and never start
+    - Adjusted update script to restart FlightGazer in the background
+        - Changed permissions to 644 from 777 as well
+
 v.2.4.0 - 2025-02-01
     - Refactored systemd service and init script to handle system shutdowns more gracefully
         - Important: If you already have FlightGazer (v.1.5.0 - v.2.3.0) installed as a service, 
