@@ -5,6 +5,25 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.5.0 - 2025-02-06
+    - NEW: ENHANCED_READOUT_AS_FALLBACK setting
+        - If the provided API key fails at startup or if the set API_LIMIT value is reached, switch to using ENHANCED_READOUT
+    - NEW: Calculate aircraft elevation from horizon and slant range (aka line-of-sight distance)
+        - Available only in Interactive mode
+        - As of this update and to the scope of the author's research, no other ADS-B processor offers these calculations
+        - NB: angle of elevation assumes the site elevation is 0 (the ground at the local horizon) and not the actual elevation of the site/antenna.
+          For distances near the site, using this geometric datum has negligible effect on the accuracy of the calculation.
+          At distances closer to the actual radio horizon (using the range outline provided by heywhatsthat), the accuracy
+          can be off by a few degrees due to compounding factors such as actual elevation differences (terrain)
+    - FLYBY_STATS_ENABLED is now defaulted to "True"
+    - Changed readable references of "plane" or "planes" to "aircraft" and using the word "aircraft" in documentation henceforth
+    - Minor tweaks to dump1090 processing
+        - Use the best available altitude (geometric) if available instead of just barometric altitude
+        - Take advantage of readsb features if present
+    - Further aircraft selection algorithm tweaks
+    - Various underlying code tweaks
+    - Logging output tweaks
+
 v.2.4.1 - 2025-02-01
     - HOTFIX: Adjusted systemd start timeout for initial setup after update
         - This would cause FlightGazer to never complete its setup and never start

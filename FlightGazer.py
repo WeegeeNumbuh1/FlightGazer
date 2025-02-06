@@ -8,7 +8,7 @@
                                      
 """ 
 A program heavily inspired by https://github.com/ColinWaddell/its-a-plane-python, but supplements flight information of
-nearby planes with real-time ADS-B and UAT data from dump1090 and dump978. Uses the FlightAware API instead of FlightRadar24.
+nearby aircraft with real-time ADS-B and UAT data from dump1090 and dump978. Uses the FlightAware API instead of FlightRadar24.
 """
     
 # =============== Imports ==================
@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.4.1 --- 2025-02-01'
+VERSION: str = 'v.2.5.0 --- 2025-02-06'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -67,7 +67,7 @@ argflags.add_argument('-d', '--nodisplay',
                       )
 argflags.add_argument('-f', '--nofilter',
                       action='store_true',
-                      help="Disable filtering and show all planes detected by dump1090.\n\
+                      help="Disable filtering and show all aircraft detected by dump1090.\n\
                       Disables API fetching and Display remains as a clock.\n\
                       Implies Interactive mode."
                       )
@@ -236,14 +236,15 @@ BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise":"06:00","Sunset":"18:00"}
 USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 LOCATION_TIMEOUT: int = 60
+ENHANCED_READOUT_AS_FALLBACK: bool = False
 
-''' Programmer's notes for settings that are dicts:
-Don't change key names or extend the dict. You're stuck with them once baked into this script.
-Why? The settings migrator can't handle migrating dicts that have different keys.
-ex: SETTING = {'key1':val1, 'key2':val2} (user's settings)
-    SETTING = {'key1':val10, 'key2':val20, 'key3':val3} (some hypothetical extension for SETTING in new config)
-    * settings migration *
-    SETTING = {'key1':val1, 'key2':val2} (migrated settings) '''
+# Programmer's notes for settings that are dicts:
+# Don't change key names or extend the dict. You're stuck with them once baked into this script.
+# Why? The settings migrator can't handle migrating dicts that have different keys.
+# ex: SETTING = {'key1':val1, 'key2':val2} (user's settings)
+#     SETTING = {'key1':val10, 'key2':val20, 'key3':val3} (some hypothetical extension for SETTING in new config)
+#     * settings migration *
+#     SETTING = {'key1':val1, 'key2':val2} (migrated settings)
 
 # Create our settings as a dict
 # NB: if we don't want to load certain settings,
@@ -275,6 +276,7 @@ settings_values: dict = {
     "USE_SUNRISE_SUNSET": USE_SUNRISE_SUNSET,
     "ACTIVE_PLANE_DISPLAY_BRIGHTNESS": ACTIVE_PLANE_DISPLAY_BRIGHTNESS,
     "LOCATION_TIMEOUT": LOCATION_TIMEOUT,
+    "ENHANCED_READOUT_AS_FALLBACK": ENHANCED_READOUT_AS_FALLBACK,
 }
 """ Dict of default settings """
 
@@ -397,11 +399,24 @@ flyby_stats_present: bool = False
 """ Flag to check if we can write to `FLYBY_STATS_FILE`, initialized to False """
 dump1090_failures: int = 0
 """ Track amount of times we fail to read dump1090 data. """
+dump1090_failures_to_watchdog_trigger: int = 20
+""" Number of times that we fail to read dump1090 data before triggering the watchdog. """
 watchdog_triggers: int = 0
 """ Track amount of times the watchdog is triggered. If this amount exceeds
-a certain threshold, permanently disable watching dump1090 for this session. """
+`watchdog_setpoint`, permanently disable watching dump1090 for this session. """
+watchdog_setpoint: int = 3
+""" How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 selection_events: int = 0
 """ Track amount of times the plane selector is triggered. (this is just a verbose stat) """
+API_limit_reached: bool = False
+""" This flag will be set to True if we reach the API limit.
+Currently controls the fallback for ENHANCED_READOUT. """
+dump1090_receiver_version: str = ''
+""" What version of dump1090 we're connected to as read from the `receiver.json` file. """
+is_readsb: bool = False
+""" Tweak text output if we're connected to wiedehopf's readsb instead of dump1090 """
+dump1090: str = "readsb" if is_readsb else "dump1090"
+""" dump1090 or readsb """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -526,16 +541,20 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
             values[field], remainder = divmod(remainder, constants[field])
     return f.format(fmt, **values)
 
-def reset_unique_tracks() -> None:
-    """ Resets the tracked planes set and daily accumulators (schedule this) """
+def runtime_accumulators_reset() -> None:
+    """ Resets the tracked planes set and other daily accumulators (schedule this) """
     time.sleep(2) # wait for hourly events to complete
-    global unique_planes_seen, api_hits, selection_events
+    global unique_planes_seen, api_hits, selection_events, ENHANCED_READOUT, API_limit_reached
     main_logger.info(f"DAILY STATS: {len(unique_planes_seen)} flybys. {selection_events} selection events. \
 {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
     with threading.Lock():
         unique_planes_seen.clear()
         for i in range(len(api_hits)):
             api_hits[i] = 0
+        if ENHANCED_READOUT_AS_FALLBACK and API_limit_reached:
+            ENHANCED_READOUT = False
+            API_limit_reached = False
+            main_logger.info("API calls have been reset. Restoring to previous display mode (ENHANCED_READOUT = False).")
         selection_events = 0
     return
 
@@ -636,22 +655,32 @@ def dump1090_check() -> None:
         if DISPLAY_IS_VALID:
             main_logger.error("dump1090 not found. This will just be a cool-looking clock until this program is restarted.")
         else:
-            main_logger.error("dump1090 not found. Additionally, screen resources are missing.")
-            main_logger.error(">>> This script may not be useful until these issues are corrected.")
+            main_logger.error("dump1090 not found. Additionally, screen resources are missing!")
+            main_logger.error(">>> This script may not be useful until these issues are corrected!")
     DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
 
 def read_1090_config() -> None:
     """ Gets us our location, if it is configured in dump1090. """
-    global rlat, rlon, DISPLAY_SUNRISE_SUNSET
+    global rlat, rlon, DISPLAY_SUNRISE_SUNSET, dump1090_receiver_version, is_readsb
     if not DUMP1090_IS_AVAILABLE: return
     try:
         req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
         with closing(urlopen(req, None, LOOP_INTERVAL * 0.75)) as receiver_file:
             receiver = json.load(receiver_file)
         with threading.Lock():
+            rlat_last = rlat
+            rlon_last = rlon
+            version_last = dump1090_receiver_version
+
+            # avoid printing this every time we run this function
+            if has_key(receiver, 'version') and receiver['version'] != version_last:
+                dump1090_receiver_version = receiver['version']
+                main_logger.info(f"ADS-B receiver version: \'{dump1090_receiver_version}\'")
+                if 'wiedehopf' in dump1090_receiver_version:
+                    is_readsb = True
+                    main_logger.debug("Connected to readsb!")
+
             if has_key(receiver,'lat'): #if location is set
-                rlat_last = rlat
-                rlon_last = rlon
                 if receiver['lat'] != rlat_last or receiver['lon'] != rlon_last:
                     rlat = float(receiver['lat'])
                     rlon = float(receiver['lon'])
@@ -659,7 +688,7 @@ def read_1090_config() -> None:
                     main_logger.debug(f">>> ({rlat}, {rlon})") # do not write to file unless verbose mode
             else:
                 rlat = rlon = None
-                main_logger.warning("Location has not been set! This program will not be able to determine any nearby planes or calculate range!")
+                main_logger.warning("Location has not been set! This program will not be able to determine any nearby aircraft or calculate range!")
                 main_logger.warning(">>> Please set location in dump1090 to disable this message.")
                 if DISPLAY_SUNRISE_SUNSET:
                     main_logger.warning("Sunrise and sunset times will not be displayed.")
@@ -668,7 +697,7 @@ def read_1090_config() -> None:
         main_logger.error("Cannot load receiver config.")
     return
 
-def probe_API() -> tuple[int, float] | None:
+def probe_API() -> tuple[int | None, float | None]:
     """ Checks if the provided API Key is valid, and if it is, pulls stats from the last 30 days.
     This specific query doesn't use API credits according to the API reference. If the call fails, returns None. """
     if API_KEY is None or not API_KEY: return None, None
@@ -697,10 +726,10 @@ def probe_API() -> tuple[int, float] | None:
         return None, None
     
 def configuration_check() -> None:
-    """ Basic configuration checker """
+    """ Configuration checker and runtime adjustments. """
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT
     global API_KEY, API_DAILY_LIMIT
-    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS, ENHANCED_READOUT
     global RGB_COLS, RGB_ROWS
 
     valid_rgb_sizes = [16, 32, 64]
@@ -711,11 +740,6 @@ def configuration_check() -> None:
         RGB_ROWS = settings_values['RGB_ROWS']
         RGB_COLS = settings_values['RGB_COLS']
 
-    if not isinstance(LOCATION_TIMEOUT, int) or\
-    (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
-        main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
-        main_logger.info(f">>> Setting to default ({settings_values['LOCATION_TIMEOUT']})")
-        LOCATION_TIMEOUT = settings_values['LOCATION_TIMEOUT']
     else:
         if LOCATION_TIMEOUT == 60:
             main_logger.info("Location timeout set to 60 seconds. This will match to dump1090's behavior.")
@@ -730,10 +754,16 @@ def configuration_check() -> None:
             main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({settings_values['HEIGHT_LIMIT']}).")
             globals()['HEIGHT_LIMIT'] = settings_values['HEIGHT_LIMIT']
 
+        if not isinstance(LOCATION_TIMEOUT, int) or\
+        (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
+            main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
+            main_logger.info(f">>> Setting to default ({settings_values['LOCATION_TIMEOUT']})")
+            LOCATION_TIMEOUT = settings_values['LOCATION_TIMEOUT']
+
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
             main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
-            main_logger.info(">>> If you would like to see more planes, consider \'No Filter\' mode. Use the \'-f\' flag.")
+            main_logger.info(">>> If you would like to see more aircraft, consider \'No Filter\' mode. Use the \'-f\' flag.")
             RANGE = (20 * distance_multiplier)
         elif RANGE < (0.2 * distance_multiplier):
             main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
@@ -750,16 +780,17 @@ def configuration_check() -> None:
             HEIGHT_LIMIT = (75000 * altitude_multiplier)
         elif HEIGHT_LIMIT <= 0:
             main_logger.warning(f"{height_warning} ground level or underground.")
-            main_logger.warning("Planes won't be doing the thing planes do at that point (flying).")
+            main_logger.warning("aircraft won't be doing the thing aircraft do at that point (flying).")
             main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
             HEIGHT_LIMIT = (5000 * altitude_multiplier)
         elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (200 * altitude_multiplier):
-            main_logger.warning(f"{height_warning} too low. Are planes landing on your house?")
+            main_logger.warning(f"{height_warning} too low. Are aircraft landing on your house?")
             main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         del height_warning
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
+        LOCATION_TIMEOUT = 60
     
     if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
         main_logger.warning(f"Desired flyby staleness is out of bounds.")
@@ -793,57 +824,68 @@ def configuration_check() -> None:
 
     # check the API config
     main_logger.info("Checking API settings...")
-    if not isinstance(API_KEY, str):
-        main_logger.warning("API key is invalid.")
-        API_KEY = ""
-
-    if (API_KEY and (
-        API_DAILY_LIMIT is not None 
-        and not isinstance(API_DAILY_LIMIT, int)
-        )) or (
-        isinstance(API_DAILY_LIMIT, int) 
-        and API_DAILY_LIMIT < 0):
-            main_logger.warning("API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
-            API_DAILY_LIMIT = None
+    if not NOFILTER_MODE:
+        if not isinstance(API_KEY, str):
+            main_logger.warning("API key is invalid.")
             API_KEY = ""
 
-    if API_KEY is not None and API_KEY:
-        api_use = None
-        api_cost = None
-        api_use, api_cost = probe_API()
+        if (API_KEY and (
+            API_DAILY_LIMIT is not None 
+            and not isinstance(API_DAILY_LIMIT, int)
+            )) or (
+            isinstance(API_DAILY_LIMIT, int) 
+            and API_DAILY_LIMIT <= 0):
+                main_logger.warning("API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
+                API_DAILY_LIMIT = None
+                API_KEY = ""
 
-        if api_use is None:
-            main_logger.warning("Provided API Key failed to return a valid response.")
-            API_KEY = ""
-        else:
-            main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")
-            main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+        if API_KEY:
+            api_use = None
+            api_cost = None
+            api_use, api_cost = probe_API()
 
-    if API_KEY is not None and API_KEY: # test again
-        if ENHANCED_READOUT:
-            main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
-        else:
-            if API_DAILY_LIMIT is None:
-                main_logger.info("No limit set for API calls.")
+            if api_use is None:
+                main_logger.warning("Provided API Key failed to return a valid response.")
+                API_KEY = ""
             else:
-                main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
-    else:
-        if not ENHANCED_READOUT:
-            main_logger.info("API will not be used. Additional airplane info will not be available.")
+                main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")
+                main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+
+        if API_KEY: # test again
+            if ENHANCED_READOUT:
+                main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
+            else:
+                if API_DAILY_LIMIT is None:
+                    main_logger.info("No limit set for API calls.")
+                else:
+                    main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
+                    if ENHANCED_READOUT_AS_FALLBACK and DISPLAY_IS_VALID:
+                        main_logger.info("ENHANCED_READOUT_AS_FALLBACK is enabled. When API limit is reached, ENHANCED_READOUT will be used.")
+        else:
+            main_logger.info("API is unavailable. Additional API-derived info will not be available.")
             if DISPLAY_IS_VALID:
-                main_logger.info(">>> Setting ENHANCED_READOUT to \'true\' is recommended.")
-        elif ENHANCED_READOUT and DISPLAY_IS_VALID:
-            main_logger.info("API will not be used. Instead, additional dump1090 info will be substituted.")
+                if ENHANCED_READOUT:
+                    main_logger.info("Additional info provided by dump1090 will be substituted on display instead.")
+                elif not ENHANCED_READOUT and not ENHANCED_READOUT_AS_FALLBACK:
+                    main_logger.info("Setting ENHANCED_READOUT or ENHANCED_READOUT_AS_FALLBACK to \'true\' is highly recommended.")
+                elif not ENHANCED_READOUT and ENHANCED_READOUT_AS_FALLBACK:
+                    ENHANCED_READOUT = True
+                    main_logger.info("ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
+    else:
+        main_logger.info("No Filter mode is enabled. API will not be used.")
 
     main_logger.info("API check complete.")
 
 def read_receiver_stats() -> None:
     """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
     Needs to run on its own thread as its timing does not depend on `LOOP_INTERVAL`. """
-    if not DUMP1090_IS_AVAILABLE: return
+    if not DUMP1090_IS_AVAILABLE: return # don't start this thread if, only at startup, dump1090 is unavailable
     global receiver_stats
 
     while True:
+        if watchdog_triggers > (watchdog_setpoint - 1):
+            main_logger.debug("Watchdog has been triggered too many times. Terminating thread and disabling receiver stats.")
+            break
         gain_now = None
         noise_now = None
         loud_percentage = None
@@ -851,7 +893,7 @@ def read_receiver_stats() -> None:
             req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
             with closing(urlopen(req, None, 5)) as stats_file:
                 stats = json.load(stats_file)
-
+                
             if has_key(stats, 'last1min'):
                 try:
                     noise_now = stats['last1min']['local']['noise']
@@ -985,7 +1027,7 @@ def flyby_stats() -> None:
                          "Time":time.monotonic(),
                         }
                          )
-                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}.")
+                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}. API calls: {api_hits[0]}")
         return
     
     elif not FLYBY_STATS_FILE.is_file():
@@ -1024,15 +1066,21 @@ def print_to_console() -> None:
     cls()
     print(f"===== FlightGazer {ver_str} Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
     if not DUMP1090_IS_AVAILABLE:
-        print("********** dump1090 did not successfully load. There will be no data! **********\n")
+        if watchdog_triggers == 0:
+            print(f"********** {dump1090} did not successfully load. There will be no data! **********\n")
+        elif watchdog_triggers > 0:
+            print(f"***** Watchdog triggered. There is currently a pause on {dump1090} processing. *****\n")
+        elif watchdog_triggers >= watchdog_setpoint:
+            print(f"***** {dump1090} connection is too unstable! No more data will be processed! *****")
+            print("*****    Please correct the underlying issue then restart FlightGazer.     *****\n")
 
-    if (rlat is None or rlon is None) and not NOFILTER_MODE:
-        print("********** Location is not set! No airplane information will be shown! **********\n")
+    if DUMP1090_IS_AVAILABLE and (rlat is None or rlon is None) and not NOFILTER_MODE:
+        print("********** Location is not set! No aircraft information will be shown! **********\n")
 
     if not NOFILTER_MODE:
         print(f"Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}\n(* indicates in focus, - indicates focused previously)")
     else:
-        print("******* No Filters mode enabled. All planes with locations detected by dump1090 shown. *******\n")
+        print(f"******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******\n")
 
     if focus_plane_iter != 0:
         # reflects plane selection algorithm
@@ -1050,9 +1098,9 @@ def print_to_console() -> None:
         else:
             print(f"[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, watching: \'{focus_plane}\']\n", flush=True)
         if len(focus_plane_ids_scratch) > 0:
-            print(f"Plane scratchpad: {focus_plane_ids_scratch}")
+            print(f"Aircraft scratchpad: {focus_plane_ids_scratch}")
         elif len(focus_plane_ids_scratch) == 0:
-            print(f"Plane scratchpad: {{}}")
+            print(f"Aircraft scratchpad: {{}}")
 
     for a in range(plane_count):
         print_info = []
@@ -1088,11 +1136,15 @@ def print_to_console() -> None:
         print_info.append("{alt:.1f}".format(alt = relevant_planes[a]['Altitude']).rjust(7))
         print_info.append(f"{altitude_unit}, ")
         print_info.append("{vs:.1f}".format(vs = relevant_planes[a]['VertSpeed']).rjust(7))
-        print_info.append(f"{altitude_unit}/min")
+        print_info.append(f"{altitude_unit}/min, ")
+        print_info.append("{elevation:.2f}°".format(elevation = relevant_planes[a]['Elevation']).rjust(6))
         print_info.append(" | ")
         # distance section
         print_info.append(f"DIST: {relevant_planes[a]['Direction']}")
-        print_info.append("{distance:.1f}".format(distance=relevant_planes[a]['Distance']).rjust(5))
+        print_info.append("{distance:.2f}".format(distance=relevant_planes[a]['Distance']).rjust(6))
+        print_info.append(f"{distance_unit} ")
+        print_info.append("LOS")
+        print_info.append("{slant_range:.2f}".format(slant_range=relevant_planes[a]['SlantRange']).rjust(6))
         print_info.append(f"{distance_unit} ")
         print_info.append("({lat:.3f}, {lon:.3f})".format(
             lat=relevant_planes[a]['Latitude'],
@@ -1159,9 +1211,9 @@ def print_to_console() -> None:
         # gen_info_str = "".join(gen_info)
 
     # print footer section
-    print(f"\n> dump1090 response {process_time[0]} ms | \
+    print(f"\n> {dump1090} response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
-    print(f"> Detected {general_stats['Tracking']} plane(s), {plane_count} plane(s) in range, max range: {general_stats['Range']}{distance_unit} | \
+    print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     if API_KEY:
         print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
@@ -1172,7 +1224,7 @@ Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     if gen_info_str:
         print(gen_info_str)
     if dump1090_failures > 0:
-        print(f"> dump1090 communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
+        print(f"> {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
 
 def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
@@ -1188,14 +1240,32 @@ def main_loop_generator() -> None:
         return dirs[ix % len(dirs)]
     
     def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
-        """ Calculates distance between two points on Earth based on their latitude and longitude (using selected units) """
+        """ Calculates distance between two points on Earth based on their latitude and longitude.
+        (returns value based on selected units) """
         lat0 = lat0 * math.pi / 180.0
         lon0 = lon0 * math.pi / 180.0
         lat1 = lat1 * math.pi / 180.0
         lon1 = lon1 * math.pi / 180.0
-        # Earth radius in nautical miles = 3440
+        # Earth arithmetic mean radius defined by the IUGG in nautical miles = 3440
         earth_radius = 3440 * distance_multiplier
         return earth_radius * math.acos(math.sin(lat0) * math.sin(lat1) + math.cos(lat0) * math.cos(lat1) * math.cos(abs(lon1 - lon0)))
+    
+    def elevation_and_slant(greatcircle_dist: float, altitude: float) -> tuple[float, float]:
+        """ Calculates elevation angle and slant range based on given distance and altitude.
+        NB: this function assumes the site elevation is 0 relative to the target, eg,
+        we are looking at the local horizon. Additionally, this returns the 'real'
+        elevation angle and line-of-sight distance unaffected by atmospheric conditions 
+        as we already have a generally accurate location of the target. """
+        if greatcircle_dist <= 0:
+            return 0., 0.
+        # calculate apparent drop in height to account for Earth's curvature, with radius in nautical miles
+        drop_in_height = 3440 * (1 - math.cos(greatcircle_dist / (3440 * distance_multiplier)))
+        # normalize all measurements to nautical miles; 6076.115 = feet per nautical mile
+        dist_nm = (greatcircle_dist / distance_multiplier)
+        alt_nm = altitude / (altitude_multiplier * 6076.115)
+        alt_apparent = alt_nm - drop_in_height
+        slant_range = math.sqrt(dist_nm**2 + alt_nm**2)
+        return math.degrees(math.atan2(alt_apparent, dist_nm)), slant_range * distance_multiplier
 
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
@@ -1216,7 +1286,7 @@ def main_loop_generator() -> None:
         except:
             return None
 
-    def dump1090_loop(dump1090_data: list) -> dict | list:
+    def dump1090_loop(dump1090_data: list) -> tuple[dict, list]:
         """ Our dump1090 json parser. Must be fed by a valid `dump1090_heartbeat()` response. Returns a dictionary and a list.
         - dictionary: general stats to be updated per loop.
             - Tracking = total planes being tracked at current time
@@ -1235,6 +1305,8 @@ def main_loop_generator() -> None:
             - Track: Plane's track over ground in degrees
             - VertSpeed: Plane's rate of barometric altitude in units/minute
             - RSSI: Plane's average signal power in dBFS
+            - Elevation: Plane's elevation angle in degrees
+            - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
         """
         # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
@@ -1262,15 +1334,17 @@ def main_loop_generator() -> None:
                 ranges.append(distance)
                 if (not NOFILTER_MODE and (distance < RANGE and distance > 0)) or\
                     NOFILTER_MODE:
-                    alt_baro = a.get('alt_baro')
-                    if alt_baro is None or alt_baro == "ground": alt_baro = 0
-                    alt_baro = alt_baro * altitude_multiplier
-                    if alt_baro < HEIGHT_LIMIT:
+                    alt = a.get('alt_geom')
+                    if alt is None: alt = a.get('alt_baro')
+                    if alt is None or alt == "ground": alt = 0
+                    alt = alt * altitude_multiplier
+                    if alt < HEIGHT_LIMIT:
                         hex = a.get('hex')
                         if hex is None: hex = "?"
                         rssi = a.get('rssi')
                         if rssi is None: rssi = 0
-                        vs = a.get('baro_rate')
+                        vs = a.get('geom_rate')
+                        if vs is None: vs = a.get('baro_rate')
                         if vs is None: vs = 0
                         vs = vs * altitude_multiplier
                         track = a.get('track')
@@ -1283,8 +1357,13 @@ def main_loop_generator() -> None:
                             direc = relative_direction(rlat, rlon, lat, lon)
                         else:
                             direc = ""
+                        elevation, slant_range_dist = elevation_and_slant(distance, alt)
                         iso_code = flags.getICAO(hex).upper()
-                        registration = registrations.registration_from_hexid(hex)
+                        # This key is sometimes present in some readsb setups (eg: adsb.im images).
+                        # Because it reads from a much more updated database, we try to use it first
+                        registration = a.get('r')
+                        if registration is None:
+                            registration = registrations.registration_from_hexid(hex)
                         if flight is None or flight == "        ": # when dump1090 reports an empty callsign, it will show 8 spaces
                             # fallback to registration, then ICAO hex
                             if registration is not None:
@@ -1298,7 +1377,7 @@ def main_loop_generator() -> None:
                             "ID": hex,
                             "Flight": flight,
                             "Country": iso_code,
-                            "Altitude": alt_baro,
+                            "Altitude": alt,
                             "Speed": gs,
                             "Distance": distance,
                             "Direction": direc,
@@ -1307,6 +1386,8 @@ def main_loop_generator() -> None:
                             "Track": track,
                             "VertSpeed": vs,
                             "RSSI": rssi,
+                            "Elevation": elevation,
+                            "SlantRange": slant_range_dist,
                             }
                         )
                         flyby_tracker(hex)
@@ -1336,6 +1417,7 @@ def main_loop_generator() -> None:
                     process_time[0] = 0 # doesn't make sense for there to be a process time in this case
                 if dump1090_data is None:
                     general_stats = {'Tracking': 0, 'Range': 0}
+                    relevant_planes.clear()
                     if DUMP1090_IS_AVAILABLE: raise TimeoutError
                 start_time = time.perf_counter()
                 if DUMP1090_IS_AVAILABLE:
@@ -1350,10 +1432,10 @@ def main_loop_generator() -> None:
                 cls()
                 dump1090_failures += 1
                 if INTERACTIVE:
-                    print(f"dump1090 service timed out. This is occurrence {dump1090_failures}. Retrying...")
-                main_logger.warning(f"dump1090 service timed out. This is occurrence {dump1090_failures}. Retrying...")
-                if dump1090_failures % 20 == 0:
-                    main_logger.error("dump1090 service has failed too many times (20).")
+                    print(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
+                    main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
                     time.sleep(5)
                 time.sleep(LOOP_INTERVAL)
@@ -1426,8 +1508,8 @@ class AirplaneParser:
                 scratch_list = list(focus_plane_ids_scratch)
                 if len(focus_plane_ids_scratch) > 0:
                     focus_plane = random.choice(scratch_list) # get us the next plane from all remaining planes that were not tracked previously
-                elif len(focus_plane_ids_scratch) == 0: # when we have cycled through all planes available, fall back to the first plane in list
-                    focus_plane = get_plane_list[0]
+                elif len(focus_plane_ids_scratch) == 0: # when we have cycled through all planes available, select another plane at random
+                    focus_plane = random.choice(get_plane_list)
                     focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
         start_time = time.perf_counter()
@@ -1461,15 +1543,24 @@ class AirplaneParser:
                 if ((plane_count > 1 and plane_count <= 4) and
                     last_plane_count > 1)\
                     and last_plane_count != plane_count:
-                    if last_plane_count == 2 and loops_to_next_select[0] == 1:
-                        select()
-                        rare_message()
-                    if last_plane_count == 3 and loops_to_next_select[1] == 1:
-                        select()
-                        rare_message()
-                    if last_plane_count > 3 and loops_to_next_select[2] == 1:
-                        select()
-                        rare_message()
+                    # avoid times when the next select loop associated with the last plane count
+                    # matches the next select loop associated with the current plane count
+                    # due to the values being common multiples of each other
+                    # eg: next_select_table = [150, 150, 156]
+                    #                          ^    ^
+                    #                          |    |
+                    #                          |    +-- last plane count    | 3 planes
+                    #                          +------- current plane count | 2 planes
+                    if (next_select_table[plane_count - 2] != next_select_table[last_plane_count - 2]):
+                        if last_plane_count == 2 and loops_to_next_select[0] == 1:
+                            select()
+                            rare_message()
+                        if last_plane_count == 3 and loops_to_next_select[1] == 1:
+                            select()
+                            rare_message()
+                        if last_plane_count > 3 and loops_to_next_select[2] == 1:
+                            select()
+                            rare_message()
                 else:
                     if plane_count == 2 and focus_plane_iter % plane_latch_times[0] == 0:
                         select()
@@ -1527,9 +1618,9 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
+        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_limit_reached, active_plane_display
         if API_KEY is None or not API_KEY: return
         if NOFILTER_MODE or ENHANCED_READOUT: return
-        global process_time, focus_plane_api_results, api_hits
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
         time_delta_yesterday = date_now - datetime.timedelta(days=1)
@@ -1559,8 +1650,19 @@ class APIFetcher:
                 break
 
         # this is for limiting API calls per day; just bumps up the "no data" count
-        if API_DAILY_LIMIT is not None and api_hits[0] == API_DAILY_LIMIT:
+        if API_DAILY_LIMIT is not None and api_hits[0] >= API_DAILY_LIMIT:
             api_hits[2] += 1
+            if not API_limit_reached:
+                # send this message only once until the limit is reset
+                main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. No more API calls will occur until the next day.")
+                API_limit_reached = True
+                if ENHANCED_READOUT_AS_FALLBACK:
+                    main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
+                    ENHANCED_READOUT = True # recall that once this is enabled, any call to this function will immediately return
+                    with threading.Lock():
+                        time.sleep(1)
+                        active_plane_display = False # force the screen to redraw if it's currently showing an active plane
+                        main_logger.debug("Forcing display redraw to use ENHANCED_READOUT mode.")
             return
 
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
@@ -1893,15 +1995,15 @@ class dump1090Watchdog:
         with threading.Lock(): # indirectly let the other threads know that dump1090 is not available
             relevant_planes.clear()
         watchdog_triggers += 1
-        if watchdog_triggers > 2:
-            main_logger.error("dump1090 watchdog has been triggered too many times (3).")
+        if watchdog_triggers > (watchdog_setpoint - 1):
+            main_logger.error(f"{dump1090} watchdog has been triggered too many times ({watchdog_setpoint}).")
             main_logger.error(">>> Permanently disabling dump1090 readout for this session.")
-            main_logger.error("If this is a remote dump1090 connection, please check your internet connectivity.")
-            main_logger.error("If dump1090 is running on this machine, please check the dump1090 service.")
+            main_logger.error(f"If this is a remote {dump1090} connection, please check your internet connectivity.")
+            main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
             return
-        main_logger.error(f">>> Suspending checking dump1090 for 10 minutes. This is occurrence: {watchdog_triggers}")
+        main_logger.error(f">>> Suspending checking {dump1090} for 10 minutes. This is occurrence: {watchdog_triggers}")
         time.sleep(600)
-        main_logger.info("Re-enabling dump1090 readout.")
+        main_logger.info(f"Re-enabling {dump1090} readout.")
         DUMP1090_IS_AVAILABLE = True
 
     def run_loop(self):
@@ -1913,7 +2015,7 @@ class dump1090Watchdog:
     def end_thread(self, message):
         self.loop.stop()
 
-def brightness_controller():
+def brightness_controller() -> None:
     """ Changes desired display brightness based on current environment
     (ex: values of `ENABLE_TWO_BRIGHTNESS` or `sunset_sunrise`)
     Needs to run in its own thread. """
@@ -3140,11 +3242,11 @@ main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
 flyby_stats() # initialize first
 
 # define our scheduled tasks
-schedule.every().day.at("00:00").do(reset_unique_tracks)
+schedule.every().day.at("00:00").do(runtime_accumulators_reset)
 schedule.every().day.at("00:00").do(suntimes)
 schedule.every().day.at("23:59").do(flyby_stats) # get us the day's total count before reset
 schedule.every().hour.at(":00").do(flyby_stats)
-schedule.every().hour.at(":00").do(get_ip) # in case the IP changes
+schedule.every().hour.do(get_ip) # in case the IP changes
 if rlat is not None or rlon is not None:
     schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 
@@ -3208,6 +3310,9 @@ so you can read the above output before we enter the main loop.")
         Normally, outputs shown here are not usually seen and are written to the log.\n\
         If you want to see data, use Ctrl+C to quit and use the interactive flag (-i) instead.")
 
+    global dump1090
+    dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary
+    main_logger.debug("Firing up threads...")
     main_stuff.start()
     airplane_watcher.start()
     api_getter.start()

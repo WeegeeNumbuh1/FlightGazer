@@ -1,14 +1,14 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.4.1 # do not modify this
+CONFIG_VERSION: v.2.5.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
 FLYBY_STATS_ENABLED: false
-# Save general stats of planes and API usage to a CSV file in the directory this is stored in.
+# Save general stats of aircraft and API usage to a CSV file in the directory this is stored in.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
-# FlightGazer will not be able to recall the amount of planes tracked so far for that day before it was restarted.
+# FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
 
 UNITS: 0
 # Select which units to use. 
@@ -17,10 +17,10 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# Filter out planes at an altitude higher than this (feet or meters)
+# Filter out aircraft at an altitude higher than this (feet or meters)
 
 RANGE: 2
-# Radius of which planes need to be in for detailed tracking (nautical miles, kilometers, or miles)
+# Radius of which aircraft need to be in for detailed tracking (nautical miles, kilometers, or miles)
 
 FLYBY_STALENESS: 60
 # If the same plane appears again before this time, do not consider it as a flyby (in minutes, as an integer)
@@ -28,7 +28,7 @@ FLYBY_STALENESS: 60
 LOCATION_TIMEOUT: 60
 # How much time must pass before a plane's last location is considered stale and removed from tracking (in seconds).
 # Valid range: (15..60) as an integer. If less than 60, affects total plane count.
-# This setting, if low enough, will cause planes that are present in the area to "drop out" more readily
+# This setting, if low enough, will cause aircraft that are present in the area to "drop out" more readily
 # if they don't report a timely location update.
 
 API_KEY: ''
@@ -54,6 +54,11 @@ ENHANCED_READOUT: false
 # If true, show more details on plane info screen and replaces origin and destination readout.
 # Will not use API even if a key is provided. Useful if API is not in use.
 # Additional details include plane coordinates, ground track, vertical rate, and RSSI
+
+ENHANCED_READOUT_AS_FALLBACK: true
+# When true, switch to using `ENHANCED_READOUT` if the API Key fails at startup
+# or when `API_DAILY_LIMIT` is reached.
+# This setting only works if `ENHANCED_READOUT` is false.
 
 DISPLAY_SUNRISE_SUNSET: false
 # If true, show sunrise and sunset times on the Clock screen

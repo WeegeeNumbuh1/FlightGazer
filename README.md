@@ -10,7 +10,7 @@
 
 ## 🚩 About
 This is a personal project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby planes with real-time ADS-B and UAT data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API instead of FlightRadar24 to get a plane's departure and destination airports.
+nearby aircraft with real-time ADS-B and UAT data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API instead of FlightRadar24 to get a plane's departure and destination airports.
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
@@ -24,7 +24,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 
 | <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
 |---|---|
-| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple planes in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
+| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple aircraft in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
 | <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
 
 |   |
@@ -43,29 +43,29 @@ If you want one, I can also build one for you. (also Coming Soon™)
 ## 💪 Features
 <details open><summary><b>Show/Hide</b></summary>
 
-- Visualize and figure out what planes are flying nearby your location, in a cool-looking way!
+- Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
   - Shows a plane's callsign (or registration as fallback), distance *and* direction from your location, the plane's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the plane has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more plane info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
-- It's a neat looking clock when there aren't any planes flying overhead
-  - When `dump1090` is running, shows overall stats like how many planes you're tracking at the moment, how many planes flew by today, and the furthest plane you can detect
+- It's a neat looking clock when there aren't any aircraft flying overhead
+  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest plane you can detect
 - Automatically switches to other plane(s) if more than one is within the area
 - Fully Python based
   - The python script has been verified to run in both Linux (Debian) and Windows
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
 - Customizable features such as:
-  - Range of which planes need to be in for detailed tracking
+  - Range of which aircraft need to be in for detailed tracking
   - Height filtering
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - 🆕 Brightness based on time of day or when there's an active plane shown
   - 🆕 Display sunrise and sunset times or detailed signal stats for your dump1090 receiver
-  - Writing to a stats file that keeps count of number of planes flying by per day (and API usage as well)
+  - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
   - 🆕 Colors 🌈
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
-- Detailed console output when run interactively
+- Useful and detailed console output
 - Small memory footprint
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
@@ -214,19 +214,19 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.2.4.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.2.5.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
 (* indicates in focus, - indicates focused previously)
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
-Plane scratchpad: {'aa3ae5', 'a10d75'}
-*   [001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min | DIST: NW 22.4nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
-  - [002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min | DIST: E  53.2nmi (4x.985, -8x.078) | RSSI: -23.2dBFS
+Aircraft scratchpad: {'aa3ae5', 'a10d75'}
+*   [001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
+  - [002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS
 
 API results for UAL343: ORD -> SFO, 0:24 flight time
 
 > dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
-> Detected 154 plane(s), 2 plane(s) in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
+> Detected 154 aircraft, 2 aircraft in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
 > Total flybys today: 13 | Aircraft selections: 13
 > CPU & memory usage: 16.925% overall CPU | 7.734MiB
@@ -245,7 +245,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 | (no flag) | ❌ | Default operating mode when not run as a service. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
 |`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
-|`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all planes detected.<br>Display will never show plane details and remain as a clock.<br>Useful for low traffic areas.|
+|`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show plane details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
 |`-h`| ✅ | Print the help message.
 
@@ -357,10 +357,12 @@ sudo systemctl disable flightgazer.service
 ## ⬆️ How to Update
 Version v2.x and newer:
 ```bash
+# recommended
 sudo bash /path/to/FlightGazer/update.sh
 ```
 or, to ensure the most up-to-date version:
 ```bash
+# alternative approach
 cd /path/to/FlightGazer
 sudo bash -c "$(wget -nv -O- https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh)"
 ```
@@ -371,7 +373,7 @@ You can run `git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer \a
 
 <details><summary>Upgrading from v.1.x to v.2.x and newer</summary>
 
-Download [`update.sh`](./update.sh) and place it inside the FlightGazer directory. Change the permissions to executable with `chmod +x update.sh`. Then run the update script.<br>
+Use the alternative approach above.<br>
 The migrator cannot migrate v.1.x configuration files to the newer format so you must manually migrate your settings.
 </details>
 
@@ -389,14 +391,15 @@ Simply delete the folder (and the virtual python environment if you set that up 
 
 **Q:** My RGB display is blank when running this, what broke?<br>
 **A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
-Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 rgb panel. Other setups are not supported.
+Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 rgb panel. Other setups are not supported.<br>
+Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
 
 **Q:** I restarted my system but it took longer for my display to start. What's going on?<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
 If it has been over a month since it last checked, then the next time it restarts, it will run these checks. It usually only adds another 30 seconds to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
 **Q:** I see a dot on the right of the plane readout display. What is it?<br>
-**A:** That is an indicator of how many planes are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between planes to show you what else is flying in your area.
+**A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
 
 **Q:** Can I customize the colors?<br>
 **A:** [Click here](#adjusting-colors)
@@ -421,12 +424,12 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 <details><summary><b>Show/Hide</b></summary>
 
 - Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in your config)
-  - This stat relies on the number of *unique planes seen*, not each occurence of an actual flyby
+  - This stat relies on the number of *unique aircraft seen*, not each occurence of an actual flyby
     - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
   - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
   
 - If using `No Filter` mode and restarting FlightGazer often, we can artifically inflate the flyby count
-  - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of planes
+  - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of aircraft
   - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of plane IDs it keeps track of for flybys
   - The flyby count runs under the assumption that the flyby area itself is small, but since `No Filter` removes that restriction, it's a free-for-all
   - This is not usually a problem, as long as we don't restart often in the same day
@@ -448,7 +451,7 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 <br>
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
-If you do encounter an issue, provide a copy of `FlightGazer-log.log` which is present in the FlightGazer directory.
+If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `settings_migrate.log` if present) which can be found in the FlightGazer directory.
 
 ## ✏️ Changelog & Planned Features
 Read: [`Changelog.txt`](./Changelog.txt).
@@ -464,7 +467,7 @@ Faraway ideas:
   - Fun fact: I used the same font from the above project for FlightGazer
 - This [All About Circuits Article](https://www.allaboutcircuits.com/projects/track-overhead-flights-raspberry-pi-zero-w-software-defined-radio/) from 2017
   - Uses all the same core components that this project relies on at a surface-level: FlightAware's API (the older `Firehose` one), `dump1090`, `rgbmatrix`
-- [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the planes that flyby your location
+- [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the aircraft that flyby your location
   - Inspired the functionality of the stats file FlightGazer writes out
 
 ## 🎖️ Highlights Across Media

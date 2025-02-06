@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.4.1
+# Version = v.2.5.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -54,7 +54,7 @@ help_str(){
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
 	echo "[-d]     No Display mode - Only console output."
 	echo "[-e]     Emulate - Run display via RGBMatrixEmulator instead of real hardware."
-	echo "[-f]     No Filter mode - Disable filtering and show all plane positions. No API fetching."
+	echo "[-f]     No Filter mode - Disable filtering and show all aircraft positions. No API fetching."
 	echo "[-t]     Run in tmux, if available."
 	echo "[-h]     Print this help message."
 	echo ""
