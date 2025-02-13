@@ -1,11 +1,11 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.5.0 # do not modify this
+CONFIG_VERSION: v.2.6.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
-FLYBY_STATS_ENABLED: false
+FLYBY_STATS_ENABLED: true
 # Save general stats of aircraft and API usage to a CSV file in the directory this is stored in.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
 # FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
@@ -23,11 +23,11 @@ RANGE: 2
 # Radius of which aircraft need to be in for detailed tracking (nautical miles, kilometers, or miles)
 
 FLYBY_STALENESS: 60
-# If the same plane appears again before this time, do not consider it as a flyby (in minutes, as an integer)
+# If the same aircraft appears again before this time, do not consider it as a flyby (in minutes, as an integer)
 
 LOCATION_TIMEOUT: 60
-# How much time must pass before a plane's last location is considered stale and removed from tracking (in seconds).
-# Valid range: (15..60) as an integer. If less than 60, affects total plane count.
+# How much time must pass before an aircraft's last location is considered stale and removed from tracking (in seconds).
+# Valid range: (15..60) as an integer. If less than 60, affects total aircraft count.
 # This setting, if low enough, will cause aircraft that are present in the area to "drop out" more readily
 # if they don't report a timely location update.
 
@@ -51,9 +51,9 @@ CUSTOM_DUMP978_LOCATION: ''
 # ==================================================
 
 ENHANCED_READOUT: false
-# If true, show more details on plane info screen and replaces origin and destination readout.
+# If true, show more details on aircraft info screen and replaces origin and destination readout.
 # Will not use API even if a key is provided. Useful if API is not in use.
-# Additional details include plane coordinates, ground track, vertical rate, and RSSI
+# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI
 
 ENHANCED_READOUT_AS_FALLBACK: true
 # When true, switch to using `ENHANCED_READOUT` if the API Key fails at startup
@@ -93,8 +93,8 @@ USE_SUNRISE_SUNSET: true
 # If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
-# When there is an active plane, use a different brightness level (0..100). Useful for grabbing attention.
-# Overrides all other brightness settings when a plane is being tracked. This value does not depend if
+# When there is an active aircraft, use a different brightness level (0..100). Useful for grabbing attention.
+# Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
 # `ENABLE_TWO_BRIGHTNESS` is enabled.
 # If you do not want the brightness to change, set this to null or an empty value.
 

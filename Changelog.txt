@@ -5,6 +5,16 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.6.0 - 2025-02-13
+    - FIX: Edge case in aircraft selector routine that may have existed before v.1.0.0, causing it to fail to select an aircraft
+        - Includes aircraft selector algorithm refactoring for better resillence
+        - Also affected fetching and displaying API results as this relies on the aircraft selector to work
+    - Minor text tweaks
+    - Change more "plane" references to "aircraft" for further consistency
+    - Refactored dump1090 and API processing slightly
+    - For certain site environments, limit amount of specific logging messages to prevent spamming the log
+    - Actually make the default config have FLYBY_STATS_ENABLED set to 'True' (it was not in v.2.5.0, oops)
+
 v.2.5.0 - 2025-02-06
     - NEW: ENHANCED_READOUT_AS_FALLBACK setting
         - If the provided API key fails at startup or if the set API_LIMIT value is reached, switch to using ENHANCED_READOUT
@@ -14,7 +24,8 @@ v.2.5.0 - 2025-02-06
         - NB: angle of elevation assumes the site elevation is 0 (the ground at the local horizon) and not the actual elevation of the site/antenna.
           For distances near the site, using this geometric datum has negligible effect on the accuracy of the calculation.
           At distances closer to the actual radio horizon (using the range outline provided by heywhatsthat), the accuracy
-          can be off by a few degrees due to compounding factors such as actual elevation differences (terrain)
+          can be off by a few degrees due to compounding factors such as actual elevation differences (terrain) and the fact that
+          the Earth is not a perfect sphere
     - FLYBY_STATS_ENABLED is now defaulted to "True"
     - Changed readable references of "plane" or "planes" to "aircraft" and using the word "aircraft" in documentation henceforth
     - Minor tweaks to dump1090 processing

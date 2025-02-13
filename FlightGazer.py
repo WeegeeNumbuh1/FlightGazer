@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.5.0 --- 2025-02-06'
+VERSION: str = 'v.2.6.0 --- 2025-02-13'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -345,8 +345,6 @@ focus_plane_ids_scratch = set()
 Elements can be removed if plane count > 1 due to selector algorithm """
 focus_plane_ids_discard = set()
 """ Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
-last_plane_count: int = 0
-""" Count of planes in `relevant_planes` from the previous loop """
 plane_latch_times: list = [
     int(30 // LOOP_INTERVAL),
     int(20 // LOOP_INTERVAL),
@@ -544,8 +542,9 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
 def runtime_accumulators_reset() -> None:
     """ Resets the tracked planes set and other daily accumulators (schedule this) """
     time.sleep(2) # wait for hourly events to complete
+    date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     global unique_planes_seen, api_hits, selection_events, ENHANCED_READOUT, API_limit_reached
-    main_logger.info(f"DAILY STATS: {len(unique_planes_seen)} flybys. {selection_events} selection events. \
+    main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events. \
 {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
     with threading.Lock():
         unique_planes_seen.clear()
@@ -787,6 +786,7 @@ def configuration_check() -> None:
             main_logger.warning(f"{height_warning} too low. Are aircraft landing on your house?")
             main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
         del height_warning
+        main_logger.info(f"Filtering summary: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}.")
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
@@ -1068,11 +1068,11 @@ def print_to_console() -> None:
     if not DUMP1090_IS_AVAILABLE:
         if watchdog_triggers == 0:
             print(f"********** {dump1090} did not successfully load. There will be no data! **********\n")
-        elif watchdog_triggers > 0:
+        elif watchdog_triggers > 0 and watchdog_triggers < watchdog_setpoint:
             print(f"***** Watchdog triggered. There is currently a pause on {dump1090} processing. *****\n")
         elif watchdog_triggers >= watchdog_setpoint:
             print(f"***** {dump1090} connection is too unstable! No more data will be processed! *****")
-            print("*****    Please correct the underlying issue then restart FlightGazer.     *****\n")
+            print("         Please correct the underlying issue then restart FlightGazer.\n")
 
     if DUMP1090_IS_AVAILABLE and (rlat is None or rlon is None) and not NOFILTER_MODE:
         print("********** Location is not set! No aircraft information will be shown! **********\n")
@@ -1255,7 +1255,8 @@ def main_loop_generator() -> None:
         NB: this function assumes the site elevation is 0 relative to the target, eg,
         we are looking at the local horizon. Additionally, this returns the 'real'
         elevation angle and line-of-sight distance unaffected by atmospheric conditions 
-        as we already have a generally accurate location of the target. """
+        as we already have a generally accurate location of the target.
+        Excellent reference: https://www.ngs.noaa.gov/CORS/Articles/SolerEisemannJSE.pdf """
         if greatcircle_dist <= 0:
             return 0., 0.
         # calculate apparent drop in height to account for Earth's curvature, with radius in nautical miles
@@ -1334,23 +1335,16 @@ def main_loop_generator() -> None:
                 ranges.append(distance)
                 if (not NOFILTER_MODE and (distance < RANGE and distance > 0)) or\
                     NOFILTER_MODE:
-                    alt = a.get('alt_geom')
-                    if alt is None: alt = a.get('alt_baro')
+                    alt = a.get('alt_geom', a.get('alt_baro'))
                     if alt is None or alt == "ground": alt = 0
                     alt = alt * altitude_multiplier
                     if alt < HEIGHT_LIMIT:
-                        hex = a.get('hex')
-                        if hex is None: hex = "?"
-                        rssi = a.get('rssi')
-                        if rssi is None: rssi = 0
-                        vs = a.get('geom_rate')
-                        if vs is None: vs = a.get('baro_rate')
-                        if vs is None: vs = 0
+                        hex = a.get('hex', "?")
+                        rssi = a.get('rssi', 0)
+                        vs = a.get('geom_rate', a.get('baro_rate', 0))
                         vs = vs * altitude_multiplier
-                        track = a.get('track')
-                        if track is None: track = 0
-                        gs = a.get('gs')
-                        if gs is None: gs = 0
+                        track = a.get('track', 0)
+                        gs = a.get('gs', 0)
                         gs = gs * speed_multiplier
                         flight = a.get('flight')
                         if rlat is not None:
@@ -1361,9 +1355,7 @@ def main_loop_generator() -> None:
                         iso_code = flags.getICAO(hex).upper()
                         # This key is sometimes present in some readsb setups (eg: adsb.im images).
                         # Because it reads from a much more updated database, we try to use it first
-                        registration = a.get('r')
-                        if registration is None:
-                            registration = registrations.registration_from_hexid(hex)
+                        registration = a.get('r', registrations.registration_from_hexid(hex))
                         if flight is None or flight == "        ": # when dump1090 reports an empty callsign, it will show 8 spaces
                             # fallback to registration, then ICAO hex
                             if registration is not None:
@@ -1395,7 +1387,7 @@ def main_loop_generator() -> None:
             if not ranges:
                 max_range = 0
             else:
-                max_range = round(max(ranges), 1)
+                max_range = round(max(ranges), 2)
 
             current_stats = {"Tracking": total, "Range": max_range}
 
@@ -1461,13 +1453,19 @@ class AirplaneParser:
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.plane_selector, signal=DATA_UPDATED, sender=main_loop_generator)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self._last_plane_count: int = 0
+        """ Count of planes in `relevant_planes` from the previous loop """
+        self._rare_occurences: int = 0
+        self._current_date: str = ""
         self.run_loop()
    
     def plane_selector(self, message):
         """ Select a plane! """
-        global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, last_plane_count
+        global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard
         global process_time, selection_events
-        plane_count = len(relevant_planes)
+        start_time = time.perf_counter()
+        relevant_planes_local_copy = relevant_planes
+        plane_count = len(relevant_planes_local_copy)
         get_plane_list: list = []
         focus_plane_i: str = ""
         # algorithm stuff; note how these are initalized before `focus_plane_iter` is incremented
@@ -1476,28 +1474,38 @@ class AirplaneParser:
         for i, value in enumerate(plane_latch_times):
             next_select_table[i] = ((focus_plane_iter // value) + 1) * value
             loops_to_next_select[i] = value - (focus_plane_iter % value)
+
         def rare_message():
-            main_logger.info(f"Rare event! Plane count changed from {last_plane_count} to {plane_count} as we were about to select another plane.")
-            main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event: {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
+            """ Print a 'rare message' in the log. Under certain conditions in real-world testing, this occurs up to 5% of the time. """
+            date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
+            if date_now_str != self._current_date: # reset count if it is a different date when this function is triggered
+                if self._rare_occurences >= 5:
+                    main_logger.info(f"Re-enabling \'rare message\' printout. There were {self._rare_occurences} rare occurences for {self._current_date}.")
+                self._rare_occurences = 0
+            if self._rare_occurences == 5 and date_now_str == self._current_date:
+                main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
+                main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day. (Aircraft selection is still working normally.)")
+            elif self._rare_occurences < 5:
+                main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
+                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event: {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
+            self._rare_occurences += 1
+            self._current_date = date_now_str
 
         def select():
+            """ Our main plane selection algorithm. """
             """ 
-            The following selector algorithm is rather naive, but it works for occurences when there is more than one plane in the area
-            and we want to put some effort into trying to go through all of them without having to flip back and forth constantly.
-            It is designed this way to minimize API calls (it can get real expensive real quick if you're nearby a major international airport).
+            Programmer's Notes: The following selector algorithm is rather naive, but it works for occurences when there is more than one plane in the area
+            and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
+            It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
             Additionally, it avoids the complications associated with trying to use a queue to handle `relevant_planes` per data update.
-            The algorithm keeps track of already tracked planes and (tries to) switch the focus to planes that haven't been tracked yet.
+            The algorithm keeps track of already tracked planes and switches the focus to planes that haven't been tracked yet.
             `RANGE` should be relatively small giving us less possible concurrent planes to handle at a time, as the more planes are in the area,
             the higher the chance some planes will not be tracked whatsoever due to the latching time.
-            """
-            """
-            Programmer's notes: A truly smarter way would be reading the current range and altitude of each plane,
-            calculating the magnitude of its change (eg. is it getting closer or farther), and translating this into a priority.
-            ex: if plane1 is 0.5nmi away and getting closer, keep focus on this plane as plane2 enters `RANGE`. Once plane1 starts
-            moving away, then we can focus on plane2. This approach can get much more complicated as the amount of planes increases
-            while keeping us from constantly switching (for the case of multiple planes flying in parallel).
-            There is likely some kind of method or algorithm out there that could solve this. If you're not me and you're reading this comment block,
-            reach out, I want to see your take. - WeegeeNumbuh1 (Nov. 2024)
+            
+            A built-in metric on tracking the overall selection "efficiency" is by watching the value of 'Aircraft selections' in Interactive Mode introduced in v.2.4.0.
+            The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
+            were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitalized to the last saved flyby count (more likely).
+            A much higher value (1.5x-3x) is reflective of a very active area being monitored as the rate of switching increases to accommodate for increased traffic.
             """
             global focus_plane, focus_plane_ids_discard, focus_plane_ids_scratch
             with threading.Lock():
@@ -1512,7 +1520,6 @@ class AirplaneParser:
                     focus_plane = random.choice(get_plane_list)
                     focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
-        start_time = time.perf_counter()
         focus_plane_i = focus_plane # get previously assigned focus plane into this loop's copy
 
         if not NOFILTER_MODE:
@@ -1520,8 +1527,8 @@ class AirplaneParser:
                 with threading.Lock():
                     focus_plane_ids_scratch.clear()
                     for a in range(plane_count):
-                        get_plane_list.append(relevant_planes[a]['ID']) # current planes in this loop 
-                        focus_plane_ids_scratch.add(relevant_planes[a]['ID']) # add the above to the global list (rebuilds each loop)
+                        get_plane_list.append(relevant_planes_local_copy[a]['ID']) # current planes in this loop 
+                        focus_plane_ids_scratch.add(relevant_planes_local_copy[a]['ID']) # add the above to the global list (rebuilds each loop)
                             
                 focus_plane_iter += 1
 
@@ -1541,8 +1548,8 @@ class AirplaneParser:
                 # the plane count changes, which would throw off the modulo
 
                 if ((plane_count > 1 and plane_count <= 4) and
-                    last_plane_count > 1)\
-                    and last_plane_count != plane_count:
+                    self._last_plane_count > 1)\
+                    and self._last_plane_count != plane_count:
                     # avoid times when the next select loop associated with the last plane count
                     # matches the next select loop associated with the current plane count
                     # due to the values being common multiples of each other
@@ -1551,14 +1558,15 @@ class AirplaneParser:
                     #                          |    |
                     #                          |    +-- last plane count    | 3 planes
                     #                          +------- current plane count | 2 planes
-                    if (next_select_table[plane_count - 2] != next_select_table[last_plane_count - 2]):
-                        if last_plane_count == 2 and loops_to_next_select[0] == 1:
+                    last_plane_count_i = 4 if self._last_plane_count > 4 else self._last_plane_count # avoid IndexError
+                    if (next_select_table[plane_count - 2] != next_select_table[last_plane_count_i - 2]):
+                        if self._last_plane_count == 2 and loops_to_next_select[0] == 1:
                             select()
                             rare_message()
-                        if last_plane_count == 3 and loops_to_next_select[1] == 1:
+                        if self._last_plane_count == 3 and loops_to_next_select[1] == 1:
                             select()
                             rare_message()
-                        if last_plane_count > 3 and loops_to_next_select[2] == 1:
+                        if self._last_plane_count > 3 and loops_to_next_select[2] == 1:
                             select()
                             rare_message()
                 else:
@@ -1571,11 +1579,19 @@ class AirplaneParser:
                 
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
-                    for i in range(len(relevant_planes)): # find our focus plane in `relevant_planes`
-                        if focus_plane == relevant_planes[i]['ID']:
-                            focus_plane_stats = relevant_planes[i]
+                    for i in range(plane_count): # find our focus plane in `relevant_planes`
+                        try:
+                            if focus_plane == relevant_planes_local_copy[i]['ID']:
+                                focus_plane_stats = relevant_planes_local_copy[i]
+                                break
+                        except IndexError:
+                            main_logger.error(f"Plane selector failed to extract plane info.")
+                            main_logger.error(f"Selection index: {i} | Relevant planes size: {len(relevant_planes)} | Selected plane: {focus_plane}")
+                            main_logger.error(f"Relevant planes: {relevant_planes}")
+                            focus_plane = ""
+                            focus_plane_stats = dict()
                             break
-                last_plane_count = plane_count
+                self._last_plane_count = plane_count
 
                 # if this thread changed the focus plane, fire up the API fetcher
                 if focus_plane_i != focus_plane:
@@ -1590,7 +1606,7 @@ class AirplaneParser:
                         focus_plane_stats.clear()
                         focus_plane_ids_scratch.clear()
                         focus_plane_ids_discard.clear()
-                        last_plane_count = 0
+                        self._last_plane_count = 0
         
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
@@ -1631,10 +1647,7 @@ class APIFetcher:
         destination = None
         departure_time = None
 
-        try:
-            flight_id = focus_plane_stats['Flight']
-        except KeyError:
-            flight_id = ""
+        flight_id = focus_plane_stats.get('Flight', "")
 
         # if for some reason there is no flight ID, don't bother trying to query the API
         if not flight_id or flight_id == '?': return
@@ -1683,7 +1696,7 @@ class APIFetcher:
                 # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
                 if response_json['flights']: # if no results (ex: invalid flight_id or plane is blocked from tracking) this key will not exist
                     api_hits[0] += 1
-                    main_logger.debug(f"API call for \'{flight_id}\' successful.")
+                    main_logger.debug(f"API call for \'{flight_id}\' successful. Took {process_time[2]}ms")
                     for a in range(len(response_json['flights'])):
                         if "En Route" in response_json['flights'][a]['status']: # check we're reading current flight information
                             # check if these subkeys exist, if not, just return None
@@ -1691,23 +1704,21 @@ class APIFetcher:
                                 # we optimally want the 3 letter airport codes
                                 # cascade through these keys until we have something
                                 origin: str | None = response_json['flights'][a]['origin']['code_lid']
-                                if origin is None or origin == 'null':
+                                if origin is None:
                                     origin = response_json['flights'][a]['origin']['code_iata']
-                                if origin is None or origin == 'null':
+                                if origin is None:
                                     origin = response_json['flights'][a]['origin']['code']
-                                if origin is None or origin == 'null': origin = None
                             except: origin = None
                             try:
                                 destination: str | None = response_json['flights'][a]['destination']['code_lid']
-                                if destination is None or destination == 'null':
+                                if destination is None:
                                     destination = response_json['flights'][a]['destination']['code_iata']
-                                if destination is None or destination == 'null':
+                                if destination is None:
                                     destination = response_json['flights'][a]['destination']['code']
-                                if destination is None or destination == 'null': destination = None
                             except: destination = None
                             try:
                                 depart_iso: str | None = response_json['flights'][a]['actual_off']
-                                if depart_iso is None or depart_iso == 'null':
+                                if depart_iso is None:
                                     departure_time = None
                                 else:
                                     departure_time = depart_iso[:-1] + "+00:00" # API returns UTC time; need to format for .fromisoformat()
@@ -1798,8 +1809,10 @@ class DisplayFeeder:
             current_range_i = general_stats['Range']
             if current_range_i >= 100: # just get us the integer values
                 current_range = str(round(current_range_i, 0))[:3]
-            elif current_range_i >= 0 or current_range_i < 100:
-                current_range = str(current_range_i)
+            elif current_range_i >=10 and current_range_i < 100:
+                current_range = str(round(current_range_i, 1))
+            elif current_range_i >= 0 and current_range_i < 10:
+                current_range = str(round(current_range_i, 2))
 
         idle_stats = {
             'Flybys': total_flybys,
@@ -1876,24 +1889,27 @@ class DisplayFeeder:
 
         # active_stats
         active_stats = {}
-        if focus_plane:
+        if focus_plane and focus_plane_stats:
             flight_name = str(focus_plane_stats['Flight'])
             # flight name readout is limited to 8 characters
             if len(flight_name) > 8: flight_name = flight_name[:8]
             iso = str(focus_plane_stats['Country'])
             # speed readout is limited to 4 characters;
             # if speed >= 100, truncate to just the integers
-            gs_i = str(round(focus_plane_stats['Speed'], 1))
-            if len(gs_i) <= 4: gs = gs_i
-            elif len(gs_i) > 4: gs = gs_i[:3]
+            if focus_plane_stats['Speed'] >= 100 or focus_plane_stats['Speed'] == 0:
+                gs = str(int(round(focus_plane_stats['Speed'], 0)))
+            elif focus_plane_stats['Speed'] > 0 and focus_plane_stats['Speed'] < 100:
+                gs = str(round(focus_plane_stats['Speed'], 1))
+            else:
+                gs = "0"
             alt = str(int(round(focus_plane_stats['Altitude'], 0)))
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
             dist_i = round(focus_plane_stats['Distance'], 1)
             if dist_i >= 0 and dist_i < 10: dist = str(dist_i)
             elif dist_i >= 10 and dist_i < 100: dist = str(dist_i)[:2]
-            elif dist_i > 100: dist = str(dist_i)[:3]
-            else: dist = ""
+            elif dist_i >= 100: dist = str(dist_i)[:3]
+            else: dist = "0"
             distance = str(focus_plane_stats['Direction']) + dist
             # do our coordinate formatting
             lat_i = focus_plane_stats['Latitude']
@@ -2026,7 +2042,7 @@ def brightness_controller() -> None:
         return
     
     if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
-        main_logger.info(f"Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when a plane is detected.")
+        main_logger.info(f"Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when an aircraft is detected.")
 
     try:
         test1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
