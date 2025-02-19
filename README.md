@@ -10,7 +10,7 @@
 
 ## 🚩 About
 This is a personal project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby aircraft with real-time ADS-B and UAT data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API instead of FlightRadar24 to get a plane's departure and destination airports.
+nearby aircraft with real-time ADS-B and UAT data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API instead of FlightRadar24 to get an aircraft's departure and destination airports.
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
@@ -22,14 +22,14 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 <details open>
 <summary><b>Show/Hide images</b></summary>
 
-| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When a plane enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
+| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When an aircraft enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
 |---|---|
 | <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple aircraft in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
 | <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
 
 |   |
 |---|
-| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br>- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Plane display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active plane display (shown) or plane switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active plane (shown) |
+| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br>- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown) |
 
 </details>
 
@@ -44,12 +44,12 @@ If you want one, I can also build one for you. (also Coming Soon™)
 <details open><summary><b>Show/Hide</b></summary>
 
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
-  - Shows a plane's callsign (or registration as fallback), distance *and* direction from your location, the plane's country of registration, current altitude, and speed, all provided from `dump1090`
-  - With API access you also can see the origin and destination airport, as well as how long the plane has been flying
-  - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more plane info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
+  - Shows an aircraft's callsign (or registration as fallback), distance *and* direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
+  - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
+  - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
 - It's a neat looking clock when there aren't any aircraft flying overhead
-  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest plane you can detect
-- Automatically switches to other plane(s) if more than one is within the area
+  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
+- Automatically switches to other aircraft if more than one is within the area
 - Fully Python based
   - The python script has been verified to run in both Linux (Debian) and Windows
 - Does not need to run on the same hardware that `dump1090` is running from
@@ -59,7 +59,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Height filtering
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
-  - 🆕 Brightness based on time of day or when there's an active plane shown
+  - 🆕 Brightness based on time of day or when there's an active aircraft shown
   - 🆕 Display sunrise and sunset times or detailed signal stats for your dump1090 receiver
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
@@ -104,7 +104,7 @@ Using this project assumes you have the following:
   - Using `32x64` sized matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
 #### For Enhanced Functionality
-- A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional plane information such as origin/destination airports
+- A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
 - [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional, installed by default when using the initalization script) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
@@ -176,7 +176,7 @@ then set `BRIGHTNESS_SWITCH_TIME` to whatever time you want.
 Note that FlightGazer will still be running *and* driving the screen even with a brightness of `0` so CPU usage will remain the same.
 
 </details>
-<details><summary>Only turn on the screen when there's a plane nearby (no clock)</summary>
+<details><summary>Only turn on the screen when there's an aircraft nearby (no clock)</summary>
 
 `BRIGHTNESS: 0`<br>
 `ENABLE_TWO_BRIGHTNESS: false`<br>
@@ -214,7 +214,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.2.5.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.2.6.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
 (* indicates in focus, - indicates focused previously)
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
@@ -245,7 +245,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 | (no flag) | ❌ | Default operating mode when not run as a service. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
 |`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
-|`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show plane details and remain as a clock.<br>Useful for low traffic areas.|
+|`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
 |`-h`| ✅ | Print the help message.
 
@@ -253,7 +253,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 <br>
 
 > [!TIP]
-> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://ip-address-of-device-running-FlightGazer:8888`
+> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://localhost:8888` (on the device running FlightGazer)
 
 <details><summary>Advanced use</summary>
 
@@ -360,10 +360,10 @@ Version v2.x and newer:
 # recommended
 sudo bash /path/to/FlightGazer/update.sh
 ```
-or, to ensure the most up-to-date version:
+or, to use the most up-to-date version of the update script:
 ```bash
 # alternative approach
-cd /path/to/FlightGazer
+cd /path/to/FlightGazer 
 sudo bash -c "$(wget -nv -O- https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh)"
 ```
 <details><summary>Windows</summary>
@@ -398,16 +398,16 @@ Getting the RGB display to work is beyond the scope of this project if it wasn't
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
 If it has been over a month since it last checked, then the next time it restarts, it will run these checks. It usually only adds another 30 seconds to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
-**Q:** I see a dot on the right of the plane readout display. What is it?<br>
+**Q:** I see a dot on the right of the aircraft readout display. What is it?<br>
 **A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
 
 **Q:** Can I customize the colors?<br>
 **A:** [Click here](#adjusting-colors)
 
-**Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, plane info, etc)?<br>
+**Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
 **A:** Sure, just change some things in the script. (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
-**Q:** What about showing other plane info like what airline it is or what kind of plane it is?<br>
+**Q:** What about showing other aircraft info like what airline or what kind of aircraft it is?<br>
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
 You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.
 
@@ -430,17 +430,17 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
   
 - If using `No Filter` mode and restarting FlightGazer often, we can artifically inflate the flyby count
   - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of aircraft
-  - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of plane IDs it keeps track of for flybys
+  - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of aircraft IDs it keeps track of for flybys
   - The flyby count runs under the assumption that the flyby area itself is small, but since `No Filter` removes that restriction, it's a free-for-all
   - This is not usually a problem, as long as we don't restart often in the same day
   - May not ever get fixed
   
-- On rare occasions are times when there will be two entries of the same plane
-  - This is an edge case that's been noted since the v.0.x days due to dump1090 listing the same plane twice
-  - This is further complicated if dump978 is also active and the plane uses a dual mode transponder
+- On rare occasions are times when there will be two entries of the same aircraft
+  - This is an edge case that's been noted since the v.0.x days due to dump1090 listing the same aircraft twice
+  - This is further complicated if dump978 is also active and the aircraft uses a dual mode transponder
   - Having MLAT enabled also increases the chances of this bug occurring
   - So far there is no fix planned for this as this does not break core functionality
-    - At worst it confuses the plane selector algorithm but even then it still selects normally
+    - At worst it confuses the aircraft selector algorithm but even then it still selects normally
     - May be mitigated in the far future
 
 - If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0

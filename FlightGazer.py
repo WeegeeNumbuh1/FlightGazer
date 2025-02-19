@@ -1995,7 +1995,7 @@ class DisplayFeeder:
 
 class dump1090Watchdog:
     """ Monitors if dump1090 data is available while the main loop of FlightGazer is running.
-    If the amount of `dump1090_failures` exceeds the amount set within `main_loop_generator()`
+    If the amount of `dump1090_failures` exceeds `dump1090_failures_to_watchdog_trigger`
     this 'watchdog' will get kicked and will suspend reading dump1090 for a set amount of time.
     """
     def __init__(self):
@@ -2175,7 +2175,7 @@ class Display(
         self._callsign_blinker_cache_last = None
         self._callsign_frame_decrement = None
 
-        # Initalize animator
+        # Initialize animator
         super().__init__()
 
         # Overwrite any default settings from Animator
