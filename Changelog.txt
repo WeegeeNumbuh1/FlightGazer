@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.6.1 - 2025-02-20
+    - Don't play splash screen when "no display" option passed to init script
+    - Add banner to updater script
+    - Typo fixes
+
 v.2.6.0 - 2025-02-13
     - FIX: Edge case in aircraft selector routine that may have existed before v.1.0.0, causing it to fail to select an aircraft
         - Includes aircraft selector algorithm refactoring for better resillence

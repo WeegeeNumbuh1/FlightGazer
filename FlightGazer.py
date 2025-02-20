@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.6.0 --- 2025-02-13'
+VERSION: str = 'v.2.6.1 --- 2025-02-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -210,7 +210,7 @@ if CORE_COUNT is None:
 # =========== Settings Load-in =============
 # ==========================================
 
-# Define our settings and initalize to defaults
+# Define our settings and initialize to defaults
 FLYBY_STATS_ENABLED: bool = False
 HEIGHT_LIMIT: float = 15000
 RANGE: float = 2
@@ -1468,7 +1468,7 @@ class AirplaneParser:
         plane_count = len(relevant_planes_local_copy)
         get_plane_list: list = []
         focus_plane_i: str = ""
-        # algorithm stuff; note how these are initalized before `focus_plane_iter` is incremented
+        # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
         next_select_table = [0,0,0]
         loops_to_next_select = [0,0,0]
         for i, value in enumerate(plane_latch_times):
@@ -1476,7 +1476,7 @@ class AirplaneParser:
             loops_to_next_select[i] = value - (focus_plane_iter % value)
 
         def rare_message():
-            """ Print a 'rare message' in the log. Under certain conditions in real-world testing, this occurs up to 5% of the time. """
+            """ Print a 'rare message' in the log. Under very specific conditions in real-world testing, this occurs up to 5% of the time. """
             date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
             if date_now_str != self._current_date: # reset count if it is a different date when this function is triggered
                 if self._rare_occurences >= 5:
@@ -1504,7 +1504,7 @@ class AirplaneParser:
             
             A built-in metric on tracking the overall selection "efficiency" is by watching the value of 'Aircraft selections' in Interactive Mode introduced in v.2.4.0.
             The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
-            were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitalized to the last saved flyby count (more likely).
+            were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitialized to the last saved flyby count (more likely).
             A much higher value (1.5x-3x) is reflective of a very active area being monitored as the rate of switching increases to accommodate for increased traffic.
             """
             global focus_plane, focus_plane_ids_discard, focus_plane_ids_scratch
@@ -2216,7 +2216,7 @@ class Display(
 
         if self._callsign_frame_decrement is None or\
             (not self.active_plane_display or not focus_plane):
-            # reset the decrementer if we haven't initalized it yet or plane display is off 
+            # reset the decrementer if we haven't initialized it yet or plane display is off 
             reinit()
             self._callsign_blinker_cache_last = None
             return

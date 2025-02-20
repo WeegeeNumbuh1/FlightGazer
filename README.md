@@ -288,9 +288,9 @@ To restart, simply do the following:
 <details><summary>Show/Hide</summary>
 
 ```bash
-sudo systemctl restart flightgazer
+sudo systemctl restart flightgazer &
 # or, if it's currently not running:
-sudo systemctl start flightgazer
+sudo systemctl start flightgazer &
 ```
 or, you may [start it manually](#️-interactive-mode).
 </details>

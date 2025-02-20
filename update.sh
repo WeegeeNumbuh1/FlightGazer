@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.4.1
+# Last updated: v.2.6.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -18,6 +18,20 @@ GROUP_OF_FGDIR='nogroup'
 
 set -o noclobber
 echo -ne "\033]0;FlightGazer Updater\007" # set window title
+echo -e "${FADE}"
+echo ""
+echo "     _/_/_/_/ _/_/    _/            _/        _/                          ";
+echo "    _/         _/         _/_/_/   _/_/_/  _/_/_/_/                       ";
+echo "   _/_/_/     _/    _/   _/    _/ _/    _/  _/                            ";
+echo "  _/         _/    _/   _/    _/ _/    _/  _/                             ";
+echo " _/         _/_/    _/   _/_/_/ _/    _/    _/_/                          ";
+echo "                            _/                     by: WeegeeNumbuh1      ";
+echo "                       _/_/     _/_/_/                                    ";
+echo "                             _/         _/_/_/ _/_/_/_/   _/_/   _/  _/_/ ";
+echo "                            _/  _/_/ _/    _/     _/   _/_/_/_/ _/_/      ";
+echo "                           _/    _/ _/    _/   _/     _/       _/         ";
+echo "                            _/_/_/   _/_/_/ _/_/_/_/   _/_/_/ _/          ";
+echo -e "${NC}"
 echo -e "\n${ORANGE}>>> FlightGazer updater script started."
 if [ `id -u` -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"

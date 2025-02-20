@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.5.0
+# Version = v.2.6.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -297,7 +297,7 @@ ENDTIME=$(date '+%s')
 echo "Setup/Initialization took $((ENDTIME - STARTTIME)) seconds."
 echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
-if [ $SKIP_CHECK -eq 1 ]; then
+if [ $SKIP_CHECK -eq 1 -a "$DFLAG" = "" ]; then
 	echo -e "${NC}${FADE}> Playing splash screen for 5 seconds..."
 	sleep 5s
 	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
