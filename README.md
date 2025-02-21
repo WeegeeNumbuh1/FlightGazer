@@ -364,7 +364,8 @@ or, to use the most up-to-date version of the update script:
 ```bash
 # alternative approach
 cd /path/to/FlightGazer 
-sudo bash -c "$(wget -nv -O- https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh)"
+wget -O update.sh https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh
+sudo bash update.sh
 ```
 <details><summary>Windows</summary>
 

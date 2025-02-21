@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.6.1 --- 2025-02-20'
+VERSION: str = 'v.2.6.2 --- 2025-02-21'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -158,42 +158,56 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
-if not VERBOSE_MODE:
-    sys.tracebacklimit = 0
-else:
-    main_logger.debug("Verbose mode enabled.")
+if VERBOSE_MODE: main_logger.debug("Verbose mode enabled.")
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
 if not NODISPLAY_MODE:
     try:
-        try:
-            if EMULATE_DISPLAY: raise Exception
-            from rgbmatrix import graphics
-            from rgbmatrix import RGBMatrix, RGBMatrixOptions
-        except:
-            # this is for debugging display output outside of physical hardware
-            from RGBMatrixEmulator import graphics
-            from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+        if not EMULATE_DISPLAY:
+            try:
+                from rgbmatrix import graphics
+                from rgbmatrix import RGBMatrix, RGBMatrixOptions
+            except (ModuleNotFoundError, ImportError):
+                main_logger.warning("rgbmatrix software framework not found. Switching to display emulation mode.")
+                EMULATE_DISPLAY = True
+
+        if EMULATE_DISPLAY:
+            try:
+                # this is for debugging display output outside of physical hardware
+                from RGBMatrixEmulator import graphics
+                from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+            except (ModuleNotFoundError, ImportError):
+                DISPLAY_IS_VALID = False
+                main_logger.error("Display module \'RGBMatrixEmulator\' not found or failed to load. There will be no display output!")
+                main_logger.warning(">>> Please check the working environment, reboot the system, and do a reinstallation if necessary.")
+                main_logger.warning("    If this error continues to occur, submit a bug report to the developer.")
+                main_logger.warning(">>> This script will still function as a basic flight parser and stat generator,")
+                main_logger.warning("    if the environment allows.")
+                main_logger.warning(">>> If you're sure you don't want to use any display output,")
+                main_logger.warning("    use the \'-d\' flag to suppress this warning.")
+                time.sleep(2)
         
         # these modules depend on the above, so they should load successfully at this point,
         # but if they break somehow, we can still catch it
         from setup import colors, fonts
 
-        if 'RGBMatrixEmulator' in sys.modules:
-            # INTERACTIVE = True
-            EMULATE_DISPLAY = True
-    except:
+    except Exception as e:
         DISPLAY_IS_VALID = False
-        main_logger.error("Cannot load display modules. There will be no display output!")
-        main_logger.warning(">>> This script will still function as a basic flight parser and stat generator,")
-        main_logger.warning(">>> if the environment allows.")
+        main_logger.error("Display modules failed to load. There will be no display output!")
+        main_logger.error(f"Error details regarding \'{e}\':", exc_info=True)
+        main_logger.warning(">>> Please check the working environment, reboot the system, and do a reinstallation if necessary.")
+        main_logger.warning("    If this error continues to occur, submit a bug report to the developer.")
+        main_logger.warning(">>> This script will still function as a basic flight parser and stat generator")
+        main_logger.warning("    if the environment allows.")
         main_logger.warning(">>> If you're sure you don't want to use any display output,")
-        main_logger.warning(">>> use the \'-d\' flag to suppress this warning.")
+        main_logger.warning("    use the \'-d\' flag to suppress this warning.")
         time.sleep(2)
 else:
     DISPLAY_IS_VALID = False
     main_logger.info("Display output disabled. Running in console-only mode.")
+
+if not VERBOSE_MODE: sys.tracebacklimit = 0 # supress tracebacks; it should be handled from here on out
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals (previously)
@@ -1436,10 +1450,11 @@ def main_loop_generator() -> None:
             except (SystemExit, KeyboardInterrupt):
                 return
 
-            except:
+            except Exception as e:
                 cls()
-                main_logger.error("LOOP thread caught an exception. Trying again...")
-                time.sleep(LOOP_INTERVAL)
+                dump1090_failures += 1
+                main_logger.error(f"LOOP thread caught an exception. ({e}) Trying again...")
+                time.sleep(LOOP_INTERVAL * 5)
                 continue
 
     # Enter here
@@ -1484,10 +1499,11 @@ class AirplaneParser:
                 self._rare_occurences = 0
             if self._rare_occurences == 5 and date_now_str == self._current_date:
                 main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
-                main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day. (Aircraft selection is still working normally.)")
+                main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day and until it is re-triggered afterwards.")
+                main_logger.info("    (Aircraft selection is still working normally)")
             elif self._rare_occurences < 5:
                 main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
-                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event: {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
+                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
             self._rare_occurences += 1
             self._current_date = date_now_str
 

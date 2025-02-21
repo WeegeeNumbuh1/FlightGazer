@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.6.2 - 2025-02-21
+    - Improved display module import handling and better logging messages
+
 v.2.6.1 - 2025-02-20
     - Don't play splash screen when "no display" option passed to init script
     - Add banner to updater script
