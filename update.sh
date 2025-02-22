@@ -1,6 +1,6 @@
 #!/bin/bash
 # Updater script for FlightGazer.py
-# Last updated: v.2.6.1
+# Last updated: v.2.6.2
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
@@ -155,5 +155,5 @@ fi
 exit 0
 EOF
 chmod +x ${TEMP_SCRIPT}
-sudo bash ${TEMP_SCRIPT}
+sudo bash ${TEMP_SCRIPT} &
 exit 0
