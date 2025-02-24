@@ -425,7 +425,7 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 <details><summary><b>Show/Hide</b></summary>
 
 - Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in your config)
-  - This stat relies on the number of *unique aircraft seen*, not each occurence of an actual flyby
+  - This stat relies on the number of *unique aircraft seen*, not each occurrence of an actual flyby
     - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
   - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
   
@@ -436,13 +436,14 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
   - This is not usually a problem, as long as we don't restart often in the same day
   - May not ever get fixed
   
-- On rare occasions are times when there will be two entries of the same aircraft
+- On rare occasions are times when there will be two entries of the same aircraft (only when using `No Filter` mode)
   - This is an edge case that's been noted since the v.0.x days due to dump1090 listing the same aircraft twice
   - This is further complicated if dump978 is also active and the aircraft uses a dual mode transponder
-  - Having MLAT enabled also increases the chances of this bug occurring
-  - So far there is no fix planned for this as this does not break core functionality
+  - Having MLAT enabled also increases the chances of this bug occurring as you can also get ATC broadcasts of the same aircraft
+  - ~~So far there is no fix planned for this as this does not break core functionality~~
     - At worst it confuses the aircraft selector algorithm but even then it still selects normally
-    - May be mitigated in the far future
+    - ~~May be mitigated in the far future~~
+  - **This has been mitigated in v.2.6.3 and newer; FlightGazer will pick the first entry it encounters when not using `No Filter` mode**
 
 - If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0
   - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd

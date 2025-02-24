@@ -5,6 +5,16 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.6.3 - 2025-02-24
+    - Mitigate occurrence when duplicate entires for the same aircraft are present
+        - This edge case has been present since v.0.1.0 but did not cause any issues
+        - When an aircraft is using both ADS-B and UAT, ADS-B will prevail
+        - FlightGazer will always pick the first entry of the same aircraft it encounters, even if another entry has better information
+        - This does not affect No-Filter mode
+    - Aircraft selection algorithm tweak: once all aircraft in the area are cycled through, pick an aircraft not the last selected one
+    - Minor code fixes
+    - More typo fixes (it appears I cannot English)
+
 v.2.6.2 - 2025-02-21
     - Improved display module import handling and better logging messages
 

@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.6.2 # do not modify this
+CONFIG_VERSION: v.2.6.3 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -40,12 +40,12 @@ API_DAILY_LIMIT:
 
 CUSTOM_DUMP1090_LOCATION: ''
 # URL of your dump1090 install if it is in a different location or on a different network device.
-# ex: `http://localhost/custom_name_here` or `http://192.168.xxx.xxx:8080` (no trailing `/`)
+# ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing `/`)
 
 CUSTOM_DUMP978_LOCATION: ''
 # URL of your dump978 install if it is in a different location or on a different network device.
 # If you're not using dump978, leave the value as ''.
-# ex: `http://192.168.xxx.xxx:8978`
+# ex: http://192.168.xxx.xxx:8978
 
 # ============= Screen Output settings =============
 # ==================================================

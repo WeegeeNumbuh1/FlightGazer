@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.6.2 --- 2025-02-21'
+VERSION: str = 'v.2.6.3 --- 2025-02-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -218,8 +218,7 @@ if not INTERACTIVE:
 this_process = psutil.Process()
 this_process_cpu = this_process.cpu_percent(interval=None)
 CORE_COUNT = os.cpu_count()
-if CORE_COUNT is None:
-    CORE_COUNT = 1
+if CORE_COUNT is None: CORE_COUNT = 1
 
 # =========== Settings Load-in =============
 # ==========================================
@@ -959,41 +958,6 @@ def suntimes() -> None:
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
-
-def flyby_tracker(input_ID: str) -> None:
-    """ Adds given plane ID to `unique_planes_seen` list. """
-    global unique_planes_seen
-    def add_entry() -> None:
-        with threading.Lock():
-            unique_planes_seen.append(
-                {"ID": input_ID,
-                "Time": time.monotonic()
-                }
-            )
-    entry_count = len(unique_planes_seen)
-    # limit search to the following amount for speed reasons (<0.5ms);
-    # it's assumed that if a previously seen plane appears again and
-    # there have already been these many flybys, it's already stale
-    limit_count = 500
-    stale_age = FLYBY_STALENESS * 60 # seconds
-    if entry_count > limit_count: entry_count = limit_count
-    
-    # special case when there aren't any entries yet
-    if len(unique_planes_seen) == 0:
-        add_entry()
-        return
-    
-    for a in range(entry_count):
-        # search backwards through list
-        if unique_planes_seen[-a-1]['ID'] == input_ID:
-            if unique_planes_seen[-a-1]['Time'] - time.monotonic() > stale_age:
-                add_entry()
-                return
-            else: # if we recently have seen this plane
-                return
-    else: # finally, if we don't find the entry, add a new one
-        add_entry()
-        return
     
 def flyby_stats() -> None:
     """
@@ -1244,6 +1208,41 @@ def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
     (an homage to Davis Instruments `LOOP` packets for their weather stations) """
 
+    def flyby_tracker(input_ID: str) -> None:
+        """ Adds given plane ID to `unique_planes_seen` list. """
+        global unique_planes_seen
+        def add_entry() -> None:
+            with threading.Lock():
+                unique_planes_seen.append(
+                    {"ID": input_ID,
+                    "Time": time.monotonic()
+                    }
+                )
+        entry_count = len(unique_planes_seen)
+        # limit search to the following amount for speed reasons (<~0.5ms);
+        # it's assumed that if a previously seen plane appears again and
+        # there have already been these many flybys, it's already stale
+        limit_count = 500
+        stale_age = FLYBY_STALENESS * 60 # seconds
+        if entry_count > limit_count: entry_count = limit_count
+        
+        # special case when there aren't any entries yet
+        if len(unique_planes_seen) == 0:
+            add_entry()
+            return
+        
+        for a in range(entry_count):
+            # search backwards through list
+            if unique_planes_seen[-a-1]['ID'] == input_ID:
+                if unique_planes_seen[-a-1]['Time'] - time.monotonic() > stale_age:
+                    add_entry()
+                    return
+                else: # if we recently have seen this plane
+                    return
+        else: # finally, if we don't find the entry, add a new one
+            add_entry()
+            return
+    
     def relative_direction(lat0: float, lon0: float, lat1: float, lon1: float) -> str:
         """ Gets us the plane's relative location in respect to our location. 
         Sourced from here: https://gist.github.com/RobertSudwarts/acf8df23a16afdb5837f?permalink_comment_id=3070256#gistcomment-3070256 """
@@ -1326,16 +1325,23 @@ def main_loop_generator() -> None:
         # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
 
-        aircraft_data = dump1090_data
+        if dump1090_data is None: return {'Tracking': 0, 'Range': 0}, []
         total: int = 0
         max_range: float = 0
         ranges = []
         planes = []
+        unique_ids = set()
         
         try:
-            for a in aircraft_data['aircraft']:
+            for a in dump1090_data['aircraft']:
                 seen_pos = a.get('seen_pos')
                 broadcast_type = a.get('type')
+                hex = a.get('hex', "?")
+                # skip duplicate entries:
+                # only accept the the first entry found of each unique ICAO hex, even if a better one is found
+                # thus, with a combined ADS-B and UAT feed, ADS-B will prevail as UAT entries are appended at the end of `dump1090_data`
+                if hex in unique_ids and not NOFILTER_MODE: continue
+                unique_ids.add(hex)
                 # filter planes that have valid tracking data and were seen recently
                 if seen_pos is None or seen_pos > LOCATION_TIMEOUT or broadcast_type == 'tisb_other':
                     continue
@@ -1353,14 +1359,13 @@ def main_loop_generator() -> None:
                     if alt is None or alt == "ground": alt = 0
                     alt = alt * altitude_multiplier
                     if alt < HEIGHT_LIMIT:
-                        hex = a.get('hex', "?")
+                        flight = a.get('flight')
                         rssi = a.get('rssi', 0)
                         vs = a.get('geom_rate', a.get('baro_rate', 0))
                         vs = vs * altitude_multiplier
                         track = a.get('track', 0)
                         gs = a.get('gs', 0)
                         gs = gs * speed_multiplier
-                        flight = a.get('flight')
                         if rlat is not None:
                             direc = relative_direction(rlat, rlon, lat, lon)
                         else:
@@ -1470,7 +1475,7 @@ class AirplaneParser:
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self._last_plane_count: int = 0
         """ Count of planes in `relevant_planes` from the previous loop """
-        self._rare_occurences: int = 0
+        self._rare_occurrences: int = 0
         self._current_date: str = ""
         self.run_loop()
    
@@ -1479,7 +1484,7 @@ class AirplaneParser:
         global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard
         global process_time, selection_events
         start_time = time.perf_counter()
-        relevant_planes_local_copy = relevant_planes
+        relevant_planes_local_copy = relevant_planes.copy()
         plane_count = len(relevant_planes_local_copy)
         get_plane_list: list = []
         focus_plane_i: str = ""
@@ -1494,23 +1499,23 @@ class AirplaneParser:
             """ Print a 'rare message' in the log. Under very specific conditions in real-world testing, this occurs up to 5% of the time. """
             date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
             if date_now_str != self._current_date: # reset count if it is a different date when this function is triggered
-                if self._rare_occurences >= 5:
-                    main_logger.info(f"Re-enabling \'rare message\' printout. There were {self._rare_occurences} rare occurences for {self._current_date}.")
-                self._rare_occurences = 0
-            if self._rare_occurences == 5 and date_now_str == self._current_date:
+                if self._rare_occurrences >= 5:
+                    main_logger.info(f"Re-enabling \'rare message\' printout. There were {self._rare_occurrences} rare occurrences for {self._current_date}.")
+                self._rare_occurrences = 0
+            if self._rare_occurrences == 5 and date_now_str == self._current_date:
                 main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
                 main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day and until it is re-triggered afterwards.")
                 main_logger.info("    (Aircraft selection is still working normally)")
-            elif self._rare_occurences < 5:
+            elif self._rare_occurrences < 5:
                 main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
                 main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
-            self._rare_occurences += 1
+            self._rare_occurrences += 1
             self._current_date = date_now_str
 
         def select():
             """ Our main plane selection algorithm. """
             """ 
-            Programmer's Notes: The following selector algorithm is rather naive, but it works for occurences when there is more than one plane in the area
+            Programmer's Notes: The following selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
             and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
             It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
             Additionally, it avoids the complications associated with trying to use a queue to handle `relevant_planes` per data update.
@@ -1533,7 +1538,12 @@ class AirplaneParser:
                 if len(focus_plane_ids_scratch) > 0:
                     focus_plane = random.choice(scratch_list) # get us the next plane from all remaining planes that were not tracked previously
                 elif len(focus_plane_ids_scratch) == 0: # when we have cycled through all planes available, select another plane at random
-                    focus_plane = random.choice(get_plane_list)
+                    whatever_else = get_plane_list.copy()
+                    try:
+                        whatever_else.remove(focus_plane_i) # remove the current focus plane from the list of planes to choose from
+                    except ValueError:
+                        pass
+                    focus_plane = random.choice(whatever_else)
                     focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
         focus_plane_i = focus_plane # get previously assigned focus plane into this loop's copy
@@ -3340,7 +3350,8 @@ so you can read the above output before we enter the main loop.")
     if not INTERACTIVE and FORGOT_TO_SET_INTERACTIVE:
         print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n\
         Normally, outputs shown here are not usually seen and are written to the log.\n\
-        If you want to see data, use Ctrl+C to quit and use the interactive flag (-i) instead.")
+        If you want to see data, use Ctrl+C to quit and use the interactive flag (-i) instead.\n\
+        If you close this window now, FlightGazer will exit uncleanly.\a")
 
     global dump1090
     dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary
@@ -3351,6 +3362,7 @@ so you can read the above output before we enter the main loop.")
     display_sender.start()
     receiver_stuff.start()
     watchdog_stuff.start()
+    main_logger.debug(f"Running with {this_process.num_threads()} threads.")
     print()
     main_logger.info("========== Main loop started! ===========")
     main_logger.info("=========================================")
