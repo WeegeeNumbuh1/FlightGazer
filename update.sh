@@ -1,7 +1,13 @@
 #!/bin/bash
+{
 # Updater script for FlightGazer.py
-# Last updated: v.2.7.0
+# Last updated: v.2.7.1
 # by: WeegeeNumbuh1
+
+# Notice the '{' in the second line:
+# We need bash to load this whole file into memory so that when we replace this file
+# during the second-stage of the updater, we won't run into any odd behaviors.
+# See here: https://stackoverflow.com/a/2358432
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
 VENVPATH=/etc/FlightGazer-pyvenv
@@ -155,4 +161,6 @@ fi
 exit 0
 EOF
 chmod +x ${TEMP_SCRIPT}
-exec sudo bash ${TEMP_SCRIPT}
+sudo bash ${TEMP_SCRIPT}
+exit 0
+}

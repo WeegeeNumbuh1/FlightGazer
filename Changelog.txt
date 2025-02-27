@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.7.1 - 2025-02-26
+    - Apply tweaks to both updater and uninstaller scripts that should make them more robust to changes in the future
+    - Fix tmux checking in main python script
+
 v.2.7.0 - 2025-02-26
     - NEW: Interactive mode now uses colors for better clarity
     - Speed readout moved 1 pixel to the right for better spacing

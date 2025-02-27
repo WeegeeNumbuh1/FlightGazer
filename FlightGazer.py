@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.7.0 --- 2025-02-26'
+VERSION: str = 'v.2.7.1 --- 2025-02-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -100,10 +100,10 @@ else:
     VERBOSE_MODE = False
 
 FORGOT_TO_SET_INTERACTIVE: bool = False
-if os.environ.get('TMUX') is None:
-    INSIDE_TMUX: bool = False
+if os.environ.get('TMUX') is not None or 'tmux' in os.environ.get('TERM', ''):
+    INSIDE_TMUX: bool = True
 else:
-    INSIDE_TMUX = True
+    INSIDE_TMUX = False
 
 # =========== Initialization I =============
 # ==========================================
