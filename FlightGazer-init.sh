@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.6.1
+# Version = v.2.7.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -49,13 +49,15 @@ fi
 
 help_str(){
 	echo ""
-	echo "Usage: sudo $(basename $0) [-d] [-e] [-f] [-t] [-h]"
+	echo "Usage: sudo $(basename $0) [-d] [-e] [-f] [-t] [-c] [-v] [-h]"
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
 	echo "[-d]     No Display mode - Only console output."
 	echo "[-e]     Emulate - Run display via RGBMatrixEmulator instead of real hardware."
 	echo "[-f]     No Filter mode - Disable filtering and show all aircraft positions. No API fetching."
 	echo "[-t]     Run in tmux, if available."
+	echo "[-c]     Install/check dependencies only. Do not start main script."
+	echo "[-v]     Enable verbose/debug messages for the main script."
 	echo "[-h]     Print this help message."
 	echo ""
 }
@@ -64,7 +66,9 @@ DFLAG=""
 EFLAG=""
 FFLAG=""
 TFLAG=""
-while getopts ':defht' opt; do
+CFLAG=false
+VFLAG=""
+while getopts ':cdefhtv' opt; do
 	case "$opt" in
 		d)
 		DFLAG="-d"
@@ -77,6 +81,12 @@ while getopts ':defht' opt; do
 		;;
 		t)
 		TFLAG=true
+		;;
+		c)
+		CFLAG=true
+		;;
+		v)
+		VFLAG="-v"
 		;;
 		h)
 		echo "This is the FlightGazer initialization script."
@@ -325,61 +335,67 @@ echo "                           _/    _/ _/    _/   _/     _/       _/         
 echo "                            _/_/_/   _/_/_/ _/_/_/_/   _/_/_/ _/          ";
 
 echo ""
-# fire up the script and watch over it
-echo -e "> Running main script with additional options: [ ${DFLAG} ${EFLAG} ${FFLAG} ]"
-if [ ! -f "$PROFILING_FLAG" ];
-then
-	if [ -t 1 ]; then
-		# always have the -i interactive flag in use if no other options are given
-		echo -e "${GREEN}> We're running in an interactive shell. Program output will be shown.${NC}${FADE}"
-		if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG}"
-			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
-			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
-			sleep 1s
-			exit 0
-		else
-			trap interrupt SIGINT SIGTERM SIGHUP
-			echo -e "${GREEN}  Running in tmux is recommended for extended runs!\n${NC}${FADE}"
-			echo -e "\n${NC}${RED}>>> Use Ctrl+C to quit.${NC}${FADE}"
-			if [ "$TMUX_AVAIL" = false -a "$TFLAG" = true ]; then
-				echo "> Notice: Program will be running in this console window as tmux is not available!"
-			fi
-			TRADITIONAL_START=true
-			sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} & child_pid=$!
-			wait "$child_pid"
-		fi
-	else 
-		# edit the entry in /etc/systemd/system/flightgazer.service manually if you want to start with additional flags
-		# then use `systemctl daemon-reload` to use the updated settings
-		trap terminate SIGTERM
-		if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG}"
-			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
-			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
-			# keep-alive, assuming this is a simple systemd service
-			# we watch the amount of processes running that match the script name
-			# and if we terminate it internally we break out and tell systemd we shutdown gracefully
-			# while [ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | wc -l) -ne 0 ];
-			# do
-			# 	sleep 2
-			# done
-			# echo -e "${GREEN}>>> Shutdown commanded internally.${NC}"
-			exit 0
-		else
-			TRADITIONAL_START=true
-			# don't parse arguments that enable interactive modes
-			sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py ${EFLAG} & child_pid=$!
-			wait "$child_pid"
-		fi
-	fi
+if [ "$CFLAG" = true ]; then
+	echo -e "${NC}${ORANGE}>>> Install-only/dependency check was requested. Not starting main script."
+	sleep 2s
+	exit 0
 else
-	echo -e "${ORANGE}>>> ⚠️ Profiling enabled. You MUST run the below command in a new console window!"
-	echo -e "${VENVPATH}/bin/python3 -m scalene --cli --reduced-profile --profile-interval 60 ${BASEDIR}/FlightGazer.py \n"
-	echo "Note: this can only be run once. This terminal must be restarted to profile again."
-	echo "--- To disable profiling on the next run, rename or delete the \"profile\" file."
-	python3 -c "exec(\"import time\nwhile True: time.sleep(1)\")" & child_pid=$! # to keep the session alive
-	wait "$child_pid"
+	# fire up the script and watch over it
+	echo -e "> Running main script with additional options: [ ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} ]"
+	if [ ! -f "$PROFILING_FLAG" ];
+	then
+		if [ -t 1 ]; then
+			# always have the -i interactive flag in use if no other options are given
+			echo -e "${GREEN}> We're running in an interactive shell. Program output will be shown.${NC}${FADE}"
+			if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
+				tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
+				echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
+				echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
+				sleep 1s
+				exit 0
+			else
+				trap interrupt SIGINT SIGTERM SIGHUP
+				echo -e "${GREEN}  Running in tmux is recommended for extended runs!\n${NC}${FADE}"
+				echo -e "\n${NC}${RED}>>> Use Ctrl+C to quit.${NC}${FADE}"
+				if [ "$TMUX_AVAIL" = false -a "$TFLAG" = true ]; then
+					echo "> Notice: Program will be running in this console window as tmux is not available!"
+				fi
+				TRADITIONAL_START=true
+				sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} & child_pid=$!
+				wait "$child_pid"
+			fi
+		else 
+			# edit the entry in /etc/systemd/system/flightgazer.service manually if you want to start with additional flags
+			# then use `systemctl daemon-reload` to use the updated settings
+			if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
+				tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
+				echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
+				echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
+				# keep-alive, assuming this is a simple systemd service
+				# we watch the amount of processes running that match the script name
+				# and if we terminate it internally we break out and tell systemd we shutdown gracefully
+				# while [ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | wc -l) -ne 0 ];
+				# do
+				# 	sleep 2
+				# done
+				# echo -e "${GREEN}>>> Shutdown commanded internally.${NC}"
+				exit 0
+			else
+				trap terminate SIGTERM
+				TRADITIONAL_START=true
+				# don't parse arguments that enable interactive modes
+				sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py ${EFLAG} ${VFLAG} & child_pid=$!
+				wait "$child_pid"
+			fi
+		fi
+	else
+		echo -e "${ORANGE}>>> ⚠️ Profiling enabled. You MUST run the below command in a new console window!"
+		echo -e "${VENVPATH}/bin/python3 -m scalene --cli --reduced-profile --profile-interval 60 ${BASEDIR}/FlightGazer.py \n"
+		echo "Note: this can only be run once. This terminal must be restarted to profile again."
+		echo "--- To disable profiling on the next run, rename or delete the \"profile\" file."
+		python3 -c "exec(\"import time\nwhile True: time.sleep(1)\")" & child_pid=$! # to keep the session alive
+		wait "$child_pid"
+	fi
 fi
 # the following will only run if the python script exits with an error
 if [ "$TRADITIONAL_START" = true ]; then

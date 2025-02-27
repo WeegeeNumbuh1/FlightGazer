@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer.py
-# Last updated: v.2.7.1
+# Last updated: v.2.7.2
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -99,14 +99,14 @@ else
         MIGRATE_FLAG=1
     fi
 fi
-echo "> Migrating color configuration..."
+echo -n "> Migrating color configuration... "
 grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
 if [ $? -eq 0 ]; then
     color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
     mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
-    echo "  > Done."
+    echo "Done."
 else
-    echo "  > Older version of colors.py detected. Updating to newer version in this update."
+    echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 fi
 cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
 cp -f ${BASEDIR}/config.yaml ${TEMPPATH}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
@@ -138,8 +138,13 @@ chmod -f 644 $FGDIR/config.yaml
 chown -f ${FG_O}:${FG_G} $FGDIR/flybys.csv >/dev/null 2>&1
 chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
-systemctl start flightgazer.service &
-echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
+if [ "$(systemctl is-enabled flightgazer.service)" = "disabled" ]; then
+    echo "> Service is disabled!"
+    echo "${ORANGE}> You must restart FlightGazer manually."
+else
+    systemctl start flightgazer.service &
+    echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
+fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 if [ $MF -eq 1 ]; then
     echo -e "${ORANGE}>>> Warning: Settings migrator failed during the update process.${NC}"

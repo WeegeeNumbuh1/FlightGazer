@@ -248,6 +248,8 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
+|`-c`| ❌ | Only install/check dependencies and don't start the main script.
+|`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.
 |`-h`| ✅ | Print the help message.
 
 </details>
@@ -264,7 +266,7 @@ You can run it like so:
 ```
 sudo /etc/FlightGazer-pyvenv/bin/python3 /path/to/FlightGazer/FlightGazer.py
 ```
-The main python file accepts the same arguments as the initialization script, but you can always pass `-h` to see all possible operating modes.
+The main python file accepts almost all the same arguments as the initialization script, but you can always pass `-h` to see all possible operating modes.
 </details>
 
 ### 🔕 Shutting Down & Restarting
