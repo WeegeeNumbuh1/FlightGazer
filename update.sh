@@ -140,7 +140,7 @@ chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 if [ "$(systemctl is-enabled flightgazer.service)" = "disabled" ]; then
     echo "> Service is disabled!"
-    echo "${ORANGE}> You must restart FlightGazer manually."
+    echo -e "${ORANGE}> You must restart FlightGazer manually."
 else
     systemctl start flightgazer.service &
     echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
