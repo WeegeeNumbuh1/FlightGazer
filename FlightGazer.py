@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.6.3 --- 2025-02-24'
+VERSION: str = 'v.2.7.0 --- 2025-02-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -100,6 +100,12 @@ else:
     VERBOSE_MODE = False
 
 FORGOT_TO_SET_INTERACTIVE: bool = False
+if os.environ.get('TMUX') is None:
+    INSIDE_TMUX: bool = False
+elif 'tmux' in os.environ.get('TMUX'):
+    INSIDE_TMUX = True
+else:
+    INSIDE_TMUX = False
 
 # =========== Initialization I =============
 # ==========================================
@@ -146,6 +152,7 @@ main_logger.info(f"FlightGazer Version: {VERSION}")
 main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
 main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
@@ -735,6 +742,7 @@ def probe_API() -> tuple[int | None, float | None]:
         else:
             return None, None
     except:
+        main_logger.debug(f"API call failed. Returned: {response.status_code}")
         return None, None
     
 def configuration_check() -> None:
@@ -1041,24 +1049,35 @@ def print_to_console() -> None:
     time_print = str(datetime.datetime.now()).split(".")[0]
     ver_str = VERSION.split(" --- ")[0]
 
+    rst = "\x1b[0m"
+    fade = "\x1b[2m"
+    italic = "\x1b[3m"
+    white_highlight = "\x1b[0;30;47m"
+    red_warning = "\x1b[0;30;41m"
+    yellow_warning = "\x1b[0;30;43m"
+    green_highlight = "\x1b[0;30;42m"
+    blue_highlight = "\x1b[0;37;44m"
+    yellow_text = "\x1b[0;33m"
+
     cls()
-    print(f"===== FlightGazer {ver_str} Console Output ===== Time now: {time_print} | Runtime: {timedelta_clean(run_time)}")
+    print(f"{rst}{green_highlight}===== FlightGazer {ver_str} Console Output ====={rst} {fade}Time now: {time_print} | Runtime: {timedelta_clean(run_time)}{rst}")
     if not DUMP1090_IS_AVAILABLE:
         if watchdog_triggers == 0:
-            print(f"********** {dump1090} did not successfully load. There will be no data! **********\n")
+            print(f"{red_warning}********** {dump1090} did not successfully load. There will be no data! **********{rst}\n")
         elif watchdog_triggers > 0 and watchdog_triggers < watchdog_setpoint:
-            print(f"***** Watchdog triggered. There is currently a pause on {dump1090} processing. *****\n")
+            print(f"{yellow_warning}***** Watchdog triggered. There is currently a pause on {dump1090} processing. *****{rst}\n")
         elif watchdog_triggers >= watchdog_setpoint:
-            print(f"***** {dump1090} connection is too unstable! No more data will be processed! *****")
-            print("         Please correct the underlying issue then restart FlightGazer.\n")
+            print(f"{red_warning}***** {dump1090} connection is too unstable! No more data will be processed! *****{rst}")
+            print(f"         {white_highlight}Please correct the underlying issue then restart FlightGazer.{rst}\n")
 
     if DUMP1090_IS_AVAILABLE and (rlat is None or rlon is None) and not NOFILTER_MODE:
-        print("********** Location is not set! No aircraft information will be shown! **********\n")
+        print(f"{yellow_warning}********** Location is not set! No aircraft information will be shown! **********{rst}\n")
 
-    if not NOFILTER_MODE:
-        print(f"Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}\n(* indicates in focus, - indicates focused previously)")
-    else:
-        print(f"******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******\n")
+    if DUMP1090_IS_AVAILABLE:
+        if not NOFILTER_MODE:
+                print(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}{rst}")
+        else:
+            print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******{rst}\n")
 
     if focus_plane_iter != 0:
         # reflects plane selection algorithm
@@ -1072,27 +1091,28 @@ def print_to_console() -> None:
         next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
 
         if plane_count == 1:
-            print(f"[Inside focus loop {focus_plane_iter}]\n", flush=True)
+            print(f"{fade}[Inside focus loop {focus_plane_iter}]{rst}\n")
         else:
-            print(f"[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, watching: \'{focus_plane}\']\n", flush=True)
+            print(f"{fade}[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, watching: {white_highlight}\'{focus_plane}\'{rst}\n")
         if len(focus_plane_ids_scratch) > 0:
-            print(f"Aircraft scratchpad: {focus_plane_ids_scratch}")
+            print(f"{fade}Aircraft scratchpad: {focus_plane_ids_scratch}{rst}")
         elif len(focus_plane_ids_scratch) == 0:
-            print(f"Aircraft scratchpad: {{}}")
+            print(f"{fade}Aircraft scratchpad: {{}}{rst}")
 
     for a in range(plane_count):
         print_info = []
+        print_info.append(f"{rst}")
         # algorithm indicators
         if not NOFILTER_MODE:
             if focus_plane == relevant_planes[a]['ID']:
-                print_info.append("* ")
-            else:
-                print_info.append("  ")
+                print_info.append(white_highlight)
+            # else:
+            #     print_info.append("  ")
             if focus_plane_ids_discard:
                 if relevant_planes[a]['ID'] in focus_plane_ids_discard:
-                    print_info.append("- ")
-                else:
-                    print_info.append("  ")
+                    print_info.append(italic)
+                # else:
+                #     print_info.append("  ")
         
         # counter, callsign, iso, id
         print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
@@ -1135,6 +1155,7 @@ def print_to_console() -> None:
         print_info.append("dBFS")
 
         # finally, print it all
+        print_info.append(rst)
         print("".join(print_info))
      
     for i in range(len(focus_plane_api_results)): # only shows if API has something to show
@@ -1151,7 +1172,8 @@ def print_to_console() -> None:
                     api_dpart_delta = str(api_dpart_delta).split(".")[0]
                 else:
                     api_dpart_delta = "?"
-                print(f"\nAPI results for {api_flight}: {api_orig} -> {api_dest}, {api_dpart_delta} flight time")
+                print(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: \
+    {api_orig} -> {api_dest}, {api_dpart_delta} flight time{rst}")
                 break
         except: # if we bump into None or something else
             break
@@ -1189,7 +1211,7 @@ def print_to_console() -> None:
         # gen_info_str = "".join(gen_info)
 
     # print footer section
-    print(f"\n> {dump1090} response {process_time[0]} ms | \
+    print(f"\n{rst}{fade}> {dump1090} response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
     print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
@@ -1202,7 +1224,11 @@ Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     if gen_info_str:
         print(gen_info_str)
     if dump1090_failures > 0:
-        print(f"> {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}")
+        print(f">{rst}{yellow_text} {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}{rst}{fade}")
+    if INSIDE_TMUX:
+        print(f">{italic} Use \'Ctrl+B D\' to detach from this session. Ctrl+C to exit -and- quit FlightGazer.{rst}")
+    else:
+        print(f">{italic} Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.{rst}")
 
 def main_loop_generator() -> None:
     """ Our main `LOOP` generator. Only generates/publishes data for subscribers to interpret.
@@ -1440,23 +1466,22 @@ def main_loop_generator() -> None:
                 time.sleep(LOOP_INTERVAL) # our main loop polling time
 
             except TimeoutError:
-                cls()
                 dump1090_failures += 1
                 if INTERACTIVE:
-                    print(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
-                main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                    cls()
+                    print(f"FlightGazer: {dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
                 if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
                     main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
                     time.sleep(5)
-                time.sleep(LOOP_INTERVAL)
+                main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                time.sleep(5)
                 continue
 
             except (SystemExit, KeyboardInterrupt):
                 return
 
             except Exception as e:
-                cls()
                 dump1090_failures += 1
                 main_logger.error(f"LOOP thread caught an exception. ({e}) Trying again...")
                 time.sleep(LOOP_INTERVAL * 5)
@@ -1830,10 +1855,18 @@ class DisplayFeeder:
         total_planes = "0"
         current_range = "0"
         if general_stats: # should always exist but just in case
-            total_flybys = str(len(unique_planes_seen))
-            total_planes = str(general_stats['Tracking'])
+            if len(unique_planes_seen) > 9999:
+                total_flybys = "9999"
+            else:
+                total_flybys = str(len(unique_planes_seen))
+            if general_stats['Tracking'] > 999:
+                total_planes = ">999"
+            else:
+                total_planes = str(general_stats['Tracking'])
             current_range_i = general_stats['Range']
-            if current_range_i >= 100: # just get us the integer values
+            if current_range_i > 999:
+                current_range = ">999"
+            elif current_range_i >= 100: # just get us the integer values
                 current_range = str(round(current_range_i, 0))[:3]
             elif current_range_i >=10 and current_range_i < 100:
                 current_range = str(round(current_range_i, 1))
@@ -2959,7 +2992,7 @@ class Display(
         _ = graphics.DrawText(
             self.canvas,
             HEADER_TEXT_FONT,
-            23,
+            24,
             ACTIVE_TEXT_Y,
             SPEED_HEADING_COLOR,
             "SPD"
@@ -2997,7 +3030,7 @@ class Display(
         TIME_TEXT_COLOR = colors.time_rssi_color
         READOUT_TEXT_Y = 31
         ALTITUDE_X_POS = 1
-        SPEED_X_POS = 23
+        SPEED_X_POS = 24
         # TIME_X_POS = 40
         def right_align(string: str) -> int:
             """ special case to align-right the time output """
@@ -3326,7 +3359,8 @@ def main() -> None:
     if INTERACTIVE:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
 so you can read the above output before we enter the main loop.")
-        print(f"If you need to review the output again, review the log file at \'{LOGFILE}\'\n")
+        print(f"If you need to review the output again, review the log file at:\n\
+\'{LOGFILE}\'\n")
         interactive_wait_time = 15
         # silly random distractions while you wait 
         if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
@@ -3349,9 +3383,9 @@ so you can read the above output before we enter the main loop.")
     
     if not INTERACTIVE and FORGOT_TO_SET_INTERACTIVE:
         print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n\
-        Normally, outputs shown here are not usually seen and are written to the log.\n\
-        If you want to see data, use Ctrl+C to quit and use the interactive flag (-i) instead.\n\
-        If you close this window now, FlightGazer will exit uncleanly.\a")
+Normally, outputs shown here are not usually seen and are written to the log.\n\
+\x1b[0;30;43mIf you want to see data, use Ctrl+C to quit and pass the interactive flag (-i) instead.\x1b[0m\n\
+If you close this window now, FlightGazer will exit uncleanly.\a\n")
 
     global dump1090
     dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary
@@ -3365,9 +3399,8 @@ so you can read the above output before we enter the main loop.")
     main_logger.debug(f"Running with {this_process.num_threads()} threads.")
     print()
     main_logger.info("========== Main loop started! ===========")
-    main_logger.info("=========================================")
-    if INTERACTIVE: 
-        main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
+    main_logger.info("=========================================") 
+    main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
 
     try:
         while True: #keep-alive

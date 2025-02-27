@@ -2,7 +2,7 @@
 # Shows a splash screen while we wait for the main script to load
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
-# Last updated: v.2.1.0
+# Last updated: v.2.7.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -73,7 +73,7 @@ class ImageScroller():
         xpos = 0
         while True:
             xpos += 1
-            if (xpos > img_width):
+            if (xpos >= img_width):
                 xpos = 0
             
             # scrolls to the right

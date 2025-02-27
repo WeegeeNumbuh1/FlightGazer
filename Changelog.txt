@@ -5,6 +5,16 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.7.0 - 2025-02-26
+    - NEW: Interactive mode now uses colors for better clarity
+    - Speed readout moved 1 pixel to the right for better spacing
+    - Limit Flyby, Tracking, and Range readout on display if the values exceed what can fit in their sections
+        - These limits will almost always never be hit, but they're there now
+    - Increased pause length when FlightGazer encounters a dump1090 timeout 
+    - Main python script now detects if it's running inside tmux
+    - Interactive mode now has a reminder in the footer on how to exit
+    - Smoothed splash screen scroll
+
 v.2.6.3 - 2025-02-24
     - Mitigate occurrence when duplicate entires for the same aircraft are present
         - This edge case has been present since v.0.1.0 but did not cause any issues

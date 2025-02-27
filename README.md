@@ -143,7 +143,8 @@ pip install RGBMatrixEmulator
 pip install suntime
 pip install ruamel.yaml
 ```
-If you don't care for running in a virtual environment, skip the `python3 -m venv` and `cd "path\to..."` lines and install the packages globally.
+If you don't care for running in a virtual environment, skip the `python3 -m venv` and `cd "path\to..."` lines and install the packages globally.<br>
+Then, [read here](#-misc).
 
 </details>
 
@@ -214,14 +215,13 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.2.6.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.2.7.0 Console Output ===== Time now: 2025-02-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
-(* indicates in focus, - indicates focused previously)
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
 Aircraft scratchpad: {'aa3ae5', 'a10d75'}
-*   [001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
-  - [002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS
+[001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS
+[002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS
 
 API results for UAL343: ORD -> SFO, 0:24 flight time
 
@@ -230,6 +230,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
 > Total flybys today: 13 | Aircraft selections: 13
 > CPU & memory usage: 16.925% overall CPU | 7.734MiB
+> Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.
 ```
 </details>
 
