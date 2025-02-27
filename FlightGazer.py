@@ -102,10 +102,8 @@ else:
 FORGOT_TO_SET_INTERACTIVE: bool = False
 if os.environ.get('TMUX') is None:
     INSIDE_TMUX: bool = False
-elif 'tmux' in os.environ.get('TMUX'):
-    INSIDE_TMUX = True
 else:
-    INSIDE_TMUX = False
+    INSIDE_TMUX = True
 
 # =========== Initialization I =============
 # ==========================================

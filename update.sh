@@ -155,4 +155,4 @@ fi
 exit 0
 EOF
 chmod +x ${TEMP_SCRIPT}
-sudo bash ${TEMP_SCRIPT} &
+exec sudo bash ${TEMP_SCRIPT}
