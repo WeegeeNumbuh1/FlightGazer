@@ -124,7 +124,8 @@ then run the following:
 ```
 sudo bash FlightGazer/FlightGazer-init.sh
 ```
-which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards. ([Click here to view what the init.sh file does](#-misc))
+which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.<br>
+If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).<br>([Click here to view what the init.sh file does](#-misc))
 </details>
 <details><summary>if running Windows</summary>
 
@@ -236,12 +237,12 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 
 ### 🔡 Optional Behaviors
 
-`FlightGazer-init.sh` supports optional arguments that adjust the behavior of the main python script. Expand the table below to see all possible operating modes. Multiple flags can be passed as well.
+`FlightGazer-init.sh` supports optional arguments that adjust the behaviors of the FlightGazer installation and main python script. Expand the table below to see all possible operating modes. Multiple flags can be passed as well.
 
 <details><summary>Table of operating modes</summary>
 <div align="center">
 
-| Flag | Is<br>interactive? | What it does |
+| Flag | Enables<br>interactive<br>mode in<br>FlightGazer? | What it does |
 |---|:---:|:---:|
 | (no flag) | ❌ | Default operating mode when not run as a service. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
 |`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
@@ -250,6 +251,7 @@ API results for UAL343: ORD -> SFO, 0:24 flight time
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
 |`-c`| ❌ | Only install/check dependencies and don't start the main script.
 |`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.
+|`-l`| ❌ | Live/Demo mode.<br>Does not install service and runs FlightGazer from dependencies in `/tmp`.
 |`-h`| ✅ | Print the help message.
 
 </details>

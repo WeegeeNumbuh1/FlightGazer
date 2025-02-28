@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer.py
-# Last updated: v.2.7.2
+# Last updated: v.2.7.3
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -138,12 +138,18 @@ chmod -f 644 $FGDIR/config.yaml
 chown -f ${FG_O}:${FG_G} $FGDIR/flybys.csv >/dev/null 2>&1
 chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
-if [ "$(systemctl is-enabled flightgazer.service)" = "disabled" ]; then
-    echo "> Service is disabled!"
+systemctl is-enabled flightgazer.service >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "> Service does not exist!"
     echo -e "${ORANGE}> You must restart FlightGazer manually."
 else
-    systemctl start flightgazer.service &
-    echo -e "> FlightGazer started. ${ORANGE}It may take a few minutes for the display to start as the system prepares itself!"
+    if [ "$(systemctl is-enabled flightgazer.service)" = "disabled" ]; then
+        echo "> Service is disabled!"
+        echo -e "${ORANGE}> You must restart FlightGazer manually."
+    else
+        systemctl start flightgazer.service &
+        echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
+    fi
 fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 if [ $MF -eq 1 ]; then

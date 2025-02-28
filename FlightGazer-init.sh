@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.7.2
+# Version = v.2.7.3
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -39,26 +39,22 @@ interrupt() {
 	exit 0
 	}
 
-echo -ne "\033]0;FlightGazer\007" # set window title
-echo -e "\n${ORANGE}>>> Welcome to FlightGazer!${NC}"
-if [ `id -u` -ne 0 ]; then
-	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
-	sleep 1s
-	exit 1
-fi
-
 help_str(){
 	echo ""
-	echo "Usage: sudo $(basename $0) [-d] [-e] [-f] [-t] [-c] [-v] [-h]"
+	echo "Usage: sudo $(basename $0) [-d] [-e] [-f] [-t] [-c] [-v] [-l] [-h]"
+	echo "[-h]     Print this help message."
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
+	echo " ***** Main script options *****"
 	echo "[-d]     No Display mode - Only console output."
 	echo "[-e]     Emulate - Run display via RGBMatrixEmulator instead of real hardware."
 	echo "[-f]     No Filter mode - Disable filtering and show all aircraft positions. No API fetching."
+	echo "[-v]     Enable verbose/debug messages for the main script."
+	echo ""
+	echo " *****    Setup options    *****"
 	echo "[-t]     Run in tmux, if available."
 	echo "[-c]     Install/check dependencies only. Do not start main script."
-	echo "[-v]     Enable verbose/debug messages for the main script."
-	echo "[-h]     Print this help message."
+	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
 	echo ""
 }
 
@@ -68,7 +64,8 @@ FFLAG=""
 TFLAG=""
 CFLAG=false
 VFLAG=""
-while getopts ':cdefhtv' opt; do
+LFLAG=false
+while getopts ':cdefhltv' opt; do
 	case "$opt" in
 		d)
 		DFLAG="-d"
@@ -88,6 +85,11 @@ while getopts ':cdefhtv' opt; do
 		v)
 		VFLAG="-v"
 		;;
+		l)
+		LFLAG=true
+		VENVPATH=/tmp/FlightGazer-pyvenv
+		CHECK_FILE=${VENVPATH}/first_run_complete
+		;;
 		h)
 		echo "This is the FlightGazer initialization script."
 		help_str
@@ -103,6 +105,14 @@ done
 # if this variable exists, let it loop, then print the help string and exit
 if [ "$INVALID_FLAG" = true ]; then
 	help_str
+	exit 1
+fi
+
+echo -ne "\033]0;FlightGazer\007" # set window title
+echo -e "\n${ORANGE}>>> Welcome to FlightGazer!${NC}"
+if [ `id -u` -ne 0 ]; then
+	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
+	sleep 1s
 	exit 1
 fi
 
@@ -122,6 +132,10 @@ if [ ! -f "$CHECK_FILE" ];
 then 
 	echo "> First run detected, installing needed dependencies.
   This may take some time depending on your internet connection."
+	if [ "$LFLAG" = true ]; then
+		echo "> We are currently running in Live/Demo mode; no permanent changes to"
+		echo "  the system will occur. FlightGazer will run using dependencies in '/tmp'."
+	fi
 	VERB_TEXT='Installing: '
 else
 	echo -n "> Last dependencies check: "
@@ -187,7 +201,7 @@ then
 	apt-get install -y tmux >/dev/null
 	echo ""
 	echo "  > Creating systemd service..."
-	if [ ! -f "/etc/systemd/system/flightgazer.service" ]; then
+	if [ ! -f "/etc/systemd/system/flightgazer.service" -a "$LFLAG" = false ]; then
 		cat <<- EOF > /etc/systemd/system/flightgazer.service
 		[Unit]
 		Description=FlightGazer service
@@ -212,7 +226,7 @@ then
 		systemctl status flightgazer.service
 		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
 	else
-		echo "    > Service already exists, skipping service creation."
+		echo "    > Service already exists or we are running in Live/Demo mode, skipping service creation."
 	fi
 
 	# for some reason RGBMatrixEmulator will write its config one directory up

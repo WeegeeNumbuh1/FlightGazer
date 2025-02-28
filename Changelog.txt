@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.7.3 - 2025-02-28
+    - Initialization script now has a live/demo mode where it will only setup the environment in /tmp
+        - This also does not install the service in systemd
+    - Updater script now checks if the service is installed before restarting FlightGazer
+
 v.2.7.2 - 2025-02-27
     - Updater script checks if service is disabled and does not automatically restart the service
     - Initialization script accepts new flags: an install-only/check dependencies mode and enabling verbose mode
