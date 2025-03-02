@@ -2,7 +2,7 @@ STARTFONT 2.1
 COMMENT 
 COMMENT Converted from OpenType font "3x5.ttf" by "otf2bdf 3.0".
 COMMENT 
-COMMENT Edited by WeegeeNumbuh1 to add arrows and other useful drawing elements
+COMMENT Edited by WeegeeNumbuh1 to add arrows and other useful drawing elements; 'Q' also has been modified for clarity
 COMMENT nb: the added glyphs can be seen by the name "char[decimal]"; convert to hex to map it to Unicode
 COMMENT 
 FONT -FreeType-Teeny Tiny Pixls-Medium-R-Normal--5-50-72-72-P-32-ISO10646-1
@@ -599,7 +599,7 @@ E0
 A0
 A0
 C0
-A0
+20
 ENDCHAR
 STARTCHAR 0052
 ENCODING 82

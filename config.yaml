@@ -1,12 +1,12 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.7.3 # do not modify this
+CONFIG_VERSION: v.2.8.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
 FLYBY_STATS_ENABLED: true
-# Save general stats of aircraft and API usage to a CSV file in the directory this is stored in.
+# Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
 # FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
 
@@ -37,6 +37,17 @@ API_KEY: ''
 API_DAILY_LIMIT: 
 # Set this to an integer value if you want to limit calls.
 # If you want to have unlimited API calls, set this to null or an empty value.
+
+FOLLOW_THIS_AIRCRAFT: ''
+# If there is a specific aircraft you would like to follow, put its ICAO ID here. Leave this as '' to not use this feature.
+# This is not the Callsign nor Registration for the aircraft. It is a string of 6 hexidecimal values unique to the aircraft.
+# Only one (1) aircraft is allowed for this setting.
+# If this aircraft enters the reception area for your ADS-B receiver (not the values set by `HEIGHT_LIMIT` or `RANGE`)
+# then FlightGazer will start tracking it as if it were inside your designated RANGE.
+# When tracking this aircraft, FlightGazer will use its ENHANCED_READOUT mode regardless of the setting for that option.
+# If this aircraft does enter your defined area, FlightGazer will follow the same settings
+# that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
+# FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
 
 CUSTOM_DUMP1090_LOCATION: ''
 # URL of your dump1090 install if it is in a different location or on a different network device.

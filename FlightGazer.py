@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.7.3 --- 2025-02-28'
+VERSION: str = 'v.2.8.0 --- 2025-03-02'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -255,6 +255,7 @@ USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
+FOLLOW_THIS_AIRCRAFT: str = "" # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -295,6 +296,7 @@ settings_values: dict = {
     "ACTIVE_PLANE_DISPLAY_BRIGHTNESS": ACTIVE_PLANE_DISPLAY_BRIGHTNESS,
     "LOCATION_TIMEOUT": LOCATION_TIMEOUT,
     "ENHANCED_READOUT_AS_FALLBACK": ENHANCED_READOUT_AS_FALLBACK,
+    "FOLLOW_THIS_AIRCRAFT": FOLLOW_THIS_AIRCRAFT,
 }
 """ Dict of default settings """
 
@@ -433,6 +435,8 @@ is_readsb: bool = False
 """ Tweak text output if we're connected to wiedehopf's readsb instead of dump1090 """
 dump1090: str = "readsb" if is_readsb else "dump1090"
 """ dump1090 or readsb """
+ENHANCED_READOUT_INIT: bool = False
+""" State of ENHANCED_READOUT after successfully parsing settings file """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -658,7 +662,7 @@ def dump1090_check() -> None:
         tries = 3 - wait
         DUMP1090_JSON, URL = probe1090()
         if DUMP1090_JSON is not None:
-            main_logger.info(f"Found dump1090 at \'{DUMP1090_JSON}\'")
+            main_logger.info(f"Found dump1090 at \'{URL}\'")
             DUMP1090_IS_AVAILABLE = True
             break
         else:
@@ -745,9 +749,9 @@ def probe_API() -> tuple[int | None, float | None]:
     
 def configuration_check() -> None:
     """ Configuration checker and runtime adjustments. """
-    global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT
+    global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
     global API_KEY, API_DAILY_LIMIT
-    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS, ENHANCED_READOUT
+    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS, ENHANCED_READOUT, ENHANCED_READOUT_INIT
     global RGB_COLS, RGB_ROWS
 
     valid_rgb_sizes = [16, 32, 64]
@@ -815,6 +819,21 @@ def configuration_check() -> None:
         main_logger.warning(f"Desired flyby staleness is out of bounds.")
         main_logger.info(f">>> Setting to default ({settings_values['FLYBY_STALENESS']})")
         FLYBY_STALENESS = settings_values['FLYBY_STALENESS']
+
+    if FOLLOW_THIS_AIRCRAFT:
+        try:
+            test1 = int(FOLLOW_THIS_AIRCRAFT, 16) # check if this produces a valid number
+            if len(FOLLOW_THIS_AIRCRAFT) != 6 or test1 < 0:
+                raise ValueError
+            del test1
+            FOLLOW_THIS_AIRCRAFT = FOLLOW_THIS_AIRCRAFT.lower() # json file has the hex IDs in lowercase
+            main_logger.info(f"FOLLOW_MODE enabled: Aircraft with hex ID \'{FOLLOW_THIS_AIRCRAFT}\' will be shown when detected by the ADS-B receiver.")
+        except (ValueError, TypeError):
+            main_logger.warning("FOLLOW_THIS_AIRCRAFT is not a valid hex ID.")
+            main_logger.info(">>> Disabling FOLLOW_MODE.")
+            FOLLOW_THIS_AIRCRAFT = ""
+    else:
+        FOLLOW_THIS_AIRCRAFT = ""
 
     if not FLYBY_STATS_ENABLED:
         main_logger.info("Flyby stats will not be written.")
@@ -892,6 +911,7 @@ def configuration_check() -> None:
                     main_logger.info("ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
     else:
         main_logger.info("No Filter mode is enabled. API will not be used.")
+    ENHANCED_READOUT_INIT = ENHANCED_READOUT
 
     main_logger.info("API check complete.")
 
@@ -904,13 +924,17 @@ def read_receiver_stats() -> None:
     while True:
         if watchdog_triggers > (watchdog_setpoint - 1):
             main_logger.debug("Watchdog has been triggered too many times. Terminating thread and disabling receiver stats.")
+            with threading.Lock():
+                receiver_stats['Gain'] = None
+                receiver_stats['Noise'] = None
+                receiver_stats['Strong'] = None
             break
         gain_now = None
         noise_now = None
         loud_percentage = None
         try:
             req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
-            with closing(urlopen(req, None, 5)) as stats_file:
+            with closing(urlopen(req, None, 3)) as stats_file:
                 stats = json.load(stats_file)
                 
             if has_key(stats, 'last1min'):
@@ -1073,7 +1097,10 @@ def print_to_console() -> None:
 
     if DUMP1090_IS_AVAILABLE:
         if not NOFILTER_MODE:
+            if not FOLLOW_THIS_AIRCRAFT:
                 print(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}{rst}")
+            else:
+                print(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}, or \'{FOLLOW_THIS_AIRCRAFT}\'{rst}")
         else:
             print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******{rst}\n")
 
@@ -1111,6 +1138,9 @@ def print_to_console() -> None:
                     print_info.append(italic)
                 # else:
                 #     print_info.append("  ")
+        
+        if FOLLOW_THIS_AIRCRAFT == relevant_planes[a]['ID']:
+            print_info.append("--> ")
         
         # counter, callsign, iso, id
         print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
@@ -1377,12 +1407,13 @@ def main_loop_generator() -> None:
                 else:
                     distance = 0
                 ranges.append(distance)
-                if (not NOFILTER_MODE and (distance < RANGE and distance > 0)) or\
-                    NOFILTER_MODE:
+                if NOFILTER_MODE or\
+                   hex == FOLLOW_THIS_AIRCRAFT or\
+                   (not NOFILTER_MODE and (distance < RANGE and distance > 0)):
                     alt = a.get('alt_geom', a.get('alt_baro'))
                     if alt is None or alt == "ground": alt = 0
                     alt = alt * altitude_multiplier
-                    if alt < HEIGHT_LIMIT:
+                    if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT:
                         flight = a.get('flight')
                         rssi = a.get('rssi', 0)
                         vs = a.get('geom_rate', a.get('baro_rate', 0))
@@ -1683,7 +1714,7 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
-        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_limit_reached, active_plane_display
+        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_limit_reached
         if API_KEY is None or not API_KEY: return
         if NOFILTER_MODE or ENHANCED_READOUT: return
         # get us our dates to narrow down how many results the API will give us
@@ -1721,10 +1752,6 @@ class APIFetcher:
                 if ENHANCED_READOUT_AS_FALLBACK:
                     main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
                     ENHANCED_READOUT = True # recall that once this is enabled, any call to this function will immediately return
-                    with threading.Lock():
-                        time.sleep(1)
-                        active_plane_display = False # force the screen to redraw if it's currently showing an active plane
-                        main_logger.debug("Forcing display redraw to use ENHANCED_READOUT mode.")
             return
 
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
@@ -1840,6 +1867,7 @@ class DisplayFeeder:
                        or {}.
         All values are formatted as strings. """
         global idle_data, idle_data_2, active_data, active_plane_display
+        global ENHANCED_READOUT
         displayfeeder_start = time.perf_counter()
         filler_text = "---"
 
@@ -1948,6 +1976,8 @@ class DisplayFeeder:
         active_stats = {}
         if focus_plane and focus_plane_stats:
             flight_name = str(focus_plane_stats['Flight'])
+            if focus_plane == FOLLOW_THIS_AIRCRAFT:
+                flight_name = flight_name + "*"
             # flight name readout is limited to 8 characters
             if len(flight_name) > 8: flight_name = flight_name[:8]
             iso = str(focus_plane_stats['Country'])
@@ -1965,7 +1995,8 @@ class DisplayFeeder:
             dist_i = round(focus_plane_stats['Distance'], 1)
             if dist_i >= 0 and dist_i < 10: dist = str(dist_i)
             elif dist_i >= 10 and dist_i < 100: dist = str(dist_i)[:2]
-            elif dist_i >= 100: dist = str(dist_i)[:3]
+            elif dist_i >= 100 and dist_i < 1000: dist = str(dist_i)[:3]
+            elif dist_i >= 1000: dist = "999"
             else: dist = "0"
             distance = str(focus_plane_stats['Direction']) + dist
             # do our coordinate formatting
@@ -2040,6 +2071,18 @@ class DisplayFeeder:
             active_data = active_stats
             idle_data_2 = idle_stats_2
             process_time[3] = round((time.perf_counter() - displayfeeder_start) * 1000, 3)
+
+            # special handling for when we are tracking a specific aircraft under FOLLOW_THIS_AIRCRAFT
+            if focus_plane_stats and focus_plane_stats['ID'] == FOLLOW_THIS_AIRCRAFT:
+                if focus_plane_stats['Altitude'] < HEIGHT_LIMIT and focus_plane_stats['Distance'] < RANGE:
+                    ENHANCED_READOUT = ENHANCED_READOUT_INIT
+                else:
+                    ENHANCED_READOUT = True
+            else:
+                if API_KEY and not API_limit_reached and not ENHANCED_READOUT_INIT: # conditions when ENHANCED_READOUT should be False
+                    ENHANCED_READOUT = False
+                else:
+                    ENHANCED_READOUT = ENHANCED_READOUT_INIT
     
     def run_loop(self):
         def keep_alive():
@@ -2231,6 +2274,8 @@ class Display(
         self._callsign_blinker_cache = None
         self._callsign_blinker_cache_last = None
         self._callsign_frame_decrement = None
+        # switch between ENHANCED_READOUT and normal readout
+        self._enhanced_readout_last = ENHANCED_READOUT_INIT
 
         # Initialize animator
         super().__init__()
@@ -2247,6 +2292,10 @@ class Display(
             self.active_plane_display = active_plane_display
             self.reset_scene()
         self._last_active_state = self.active_plane_display
+        # in case this switches
+        if self._enhanced_readout_last != ENHANCED_READOUT:
+            self.reset_scene()
+        self._enhanced_readout_last = ENHANCED_READOUT
 
     def draw_square(self, x0:int, y0:int, x1:int, y1:int, color):
         for x in range(x0, x1):

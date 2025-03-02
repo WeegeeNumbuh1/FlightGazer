@@ -59,19 +59,20 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Height filtering
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
-  - 🆕 Brightness based on time of day or when there's an active aircraft shown
-  - 🆕 Display sunrise and sunset times or detailed signal stats for your dump1090 receiver
+  - Brightness based on time of day or when there's an active aircraft shown
+  - Display sunrise and sunset times or detailed signal stats for your ADS-B receiver
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
-  - 🆕 Colors 🌈
+  - Colors 🌈
+  - 🆕 Track a specific aircraft once it's detected by your ADS-B receiver
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Useful and detailed console output
 - Small memory footprint
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
 - Can be configured to run automatically inside `tmux`
-- 🆕 Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
-- 🆕 Easily update to latest builds here on Github
+- Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
+- Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
 
 </details>

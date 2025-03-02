@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.8.0 - 2025-03-02
+    - NEW: Track a specific aircraft via its ICAO hex, aka FOLLOW_MODE
+        - If a specific aircraft enters the reception area of your ADS-B receiver, this will allow FlightGazer to track it
+        - This is analogous to tar1090's "Isolate" feature
+        - When tracking a specific aircraft, it will enable Enhanced Readout mode for that specific aircraft,
+          regardless of the global ENHANCED_READOUT setting
+            - If the aircraft enters the set tracking area, it will switch to using the normal flight watching mode if that is available
+            - If there are multiple aircraft in the area and FlightGazer switches to this specific aircraft that is outside of the
+              tracking area, it will switch to Enhanced Readout
+        - In Interactive Mode the specific aircraft to follow will be prefixed with a "-->"
+        - On the aircraft display, the callsign is suffixed with a "*"
+        - This feature is limited to only one (1) aircraft, and cannot track multiple
+    - Modified the letter 'Q' in the 3x5.bdf font for better clarity in callsigns
+    - Small code fixes
+
 v.2.7.3 - 2025-02-28
     - Initialization script now has a live/demo mode where it will only setup the environment in /tmp
         - This also does not install the service in systemd
