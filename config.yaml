@@ -1,11 +1,12 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.8.0 # do not modify this
+CONFIG_VERSION: v.2.9.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
 FLYBY_STATS_ENABLED: true
+# [true/false]
 # Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
 # FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
@@ -17,28 +18,35 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# Filter out aircraft at an altitude higher than this (feet or meters)
+# [Integer: 500 ~ 75000] (feet or meters)
+# Filter out aircraft at an altitude higher than this.
 
 RANGE: 2
-# Radius of which aircraft need to be in for detailed tracking (nautical miles, kilometers, or miles)
+# [Float: 0.1 ~ 20] (nautical miles, kilometers, or miles based)
+# Radius of which aircraft need to be in for detailed tracking.
 
 FLYBY_STALENESS: 60
-# If the same aircraft appears again before this time, do not consider it as a flyby (in minutes, as an integer)
+# [Integer: 1 ~ 1440] (minutes)
+# If the same aircraft appears again before this time, do not consider it as a flyby.
 
 LOCATION_TIMEOUT: 60
-# How much time must pass before an aircraft's last location is considered stale and removed from tracking (in seconds).
-# Valid range: (15..60) as an integer. If less than 60, affects total aircraft count.
+# [Integer: 15 ~ 60] (seconds)
+# How much time must pass before an aircraft's last location is considered stale and removed from tracking.
+# If less than 60, affects total aircraft count.
 # This setting, if low enough, will cause aircraft that are present in the area to "drop out" more readily
 # if they don't report a timely location update.
 
 API_KEY: ''
+# [String]
 # Put your FlightAware API key here. Leave as '' to not use the API.
 
-API_DAILY_LIMIT: 
+API_DAILY_LIMIT:
+# [Integer: > 0, null, or empty]
 # Set this to an integer value if you want to limit calls.
 # If you want to have unlimited API calls, set this to null or an empty value.
 
 FOLLOW_THIS_AIRCRAFT: ''
+# [String]
 # If there is a specific aircraft you would like to follow, put its ICAO ID here. Leave this as '' to not use this feature.
 # This is not the Callsign nor Registration for the aircraft. It is a string of 6 hexidecimal values unique to the aircraft.
 # Only one (1) aircraft is allowed for this setting.
@@ -50,10 +58,12 @@ FOLLOW_THIS_AIRCRAFT: ''
 # FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
 
 CUSTOM_DUMP1090_LOCATION: ''
+# [String]
 # URL of your dump1090 install if it is in a different location or on a different network device.
 # ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing `/`)
 
 CUSTOM_DUMP978_LOCATION: ''
+# [String]
 # URL of your dump978 install if it is in a different location or on a different network device.
 # If you're not using dump978, leave the value as ''.
 # ex: http://192.168.xxx.xxx:8978
@@ -62,48 +72,65 @@ CUSTOM_DUMP978_LOCATION: ''
 # ==================================================
 
 ENHANCED_READOUT: false
+# [true/false]
 # If true, show more details on aircraft info screen and replaces origin and destination readout.
 # Will not use API even if a key is provided. Useful if API is not in use.
-# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI
+# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI.
 
 ENHANCED_READOUT_AS_FALLBACK: true
+# [true/false]
 # When true, switch to using `ENHANCED_READOUT` if the API Key fails at startup
 # or when `API_DAILY_LIMIT` is reached.
 # This setting only works if `ENHANCED_READOUT` is false.
 
 DISPLAY_SUNRISE_SUNSET: false
-# If true, show sunrise and sunset times on the Clock screen
+# [true/false]
+# If true, show sunrise and sunset times on the Clock screen.
 
 DISPLAY_RECEIVER_STATS: false
+# [true/false]
 # If true, show receiver stats (gain, noise, % loud signals) on the Clock screen.
 # Overwrites sunrise/sunset display if `DISPLAY_SUNRISE_SUNSET` is enabled.
 
 CLOCK_24HR: false
-# If true, use 24 hour clock. If false, 12 hour clock will be used
+# [true/false]
+# If true, use 24 hour clock. If false, 12 hour clock will be used.
+
+DISPLAY_SWITCH_PROGRESS_BAR: true
+# [true/false]
+# When true, display a progress bar at the bottom of the aircraft info screen to indicate how long
+# the current aircraft will remain on display. This progress bar will only appear if two (2) or more
+# aircraft are in the area.
 
 # ============== Brightness settings ===============
 # ==================================================
 
 BRIGHTNESS: 100
-# Set the LED brightness (0..100)
+# [Integer: 0 ~ 100]
+# Set the LED brightness.
 
 ENABLE_TWO_BRIGHTNESS: true
+# [true/false]
 # If true, enables dynamically switching brightness. If false, only `BRIGHTNESS` will be used.
 
 BRIGHTNESS_2: 50
-# Secondary LED brightness (0..100).
+# [Integer: 0 ~ 100]
+# Secondary LED brightness.
 # `BRIGHTNESS_2` will be used from sunset to sunrise ("night") and `BRIGHTNESS` will be used for all other times.
 
 BRIGHTNESS_SWITCH_TIME:
   Sunrise: 06:00
   Sunset: 18:00
+# [Time]
 # Set the time of day (in 24-hr format) to switch brightness levels.
 
 USE_SUNRISE_SUNSET: true
+# [true/false]
 # If true, use sunrise and sunset times to adjust brightness.
 # If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
+# [Integer: 0 ~ 100, null, or empty]
 # When there is an active aircraft, use a different brightness level (0..100). Useful for grabbing attention.
 # Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
 # `ENABLE_TWO_BRIGHTNESS` is enabled.
@@ -113,17 +140,22 @@ ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
 # ==================================================
 
 GPIO_SLOWDOWN: 2
+# [Integer: 0 ~ 4]
 # Set this to the specific value that works for your setup. 
-# Higher values are more suited for faster/more modern Raspberry Pi's
+# Higher values are more suited for faster/more modern Raspberry Pi's.
 
 HAT_PWM_ENABLED: true
+# [true/false]
 # If you set the quality modification for the RGB-Matrix hat, set to true. If not, set to false.
 
 RGB_ROWS: 32
-# Number of LED rows in your display
+# [Integer: 16, 32, or 64]
+# Number of LED rows in your display.
 
 RGB_COLS: 64
-# Number of LED columns in your display
+# [Integer: 16, 32, or 64]
+# Number of LED columns in your display.
 
 LED_PWM_BITS: 8
-# Lower decreases color depth but increases refresh rate. Adjust to taste
+# [Integer: 1 ~ 11]
+# Lower decreases color depth but increases refresh rate. Adjust to taste.

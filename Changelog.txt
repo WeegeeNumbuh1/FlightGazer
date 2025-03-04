@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.9.0 - 2025-03-04
+    - NEW: a progress bar is now present on the aircraft display when there are two or more aircraft in the area
+        - This serves as an indicator of when FlightGazer will switch to another aircraft or
+          how long it will display information about the current aircraft
+        - The progress bar is also a graphical representation of the algorithm readout added in v.1.5.2
+        - This element can be enabled or disabled with a new setting: DISPLAY_SWITCH_PROGRESS_BAR
+        - Like all other display elements, the color can be customized
+    - Updated docstrings in config file to show the types and range of data that can be accepted
+    - In Interactive mode, added notice when the display routine fails, either during setup or at runtime
+        - The display thread now has exception handling (it actually never did before), so in the exceedingly rare
+          case it breaks, it will restart up to 5 times, then stop displaying output
+
 v.2.8.0 - 2025-03-02
     - NEW: Track a specific aircraft via its ICAO hex, aka FOLLOW_MODE
         - If a specific aircraft enters the reception area of your ADS-B receiver, this will allow FlightGazer to track it

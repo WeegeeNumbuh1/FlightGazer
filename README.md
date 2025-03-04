@@ -43,6 +43,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 ## 💪 Features
 <details open><summary><b>Show/Hide</b></summary>
 
+***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
   - Shows an aircraft's callsign (or registration as fallback), distance *and* direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
@@ -74,6 +75,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
+- Hard-to-break 🤞
 
 </details>
 

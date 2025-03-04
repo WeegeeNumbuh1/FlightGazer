@@ -87,6 +87,9 @@ class Animator(object):
         except (KeyboardInterrupt, SystemExit):
             print("Screen animator exiting...")
             return
+        
+        except Exception as e:
+            raise e
 
     @property
     def delay(self):

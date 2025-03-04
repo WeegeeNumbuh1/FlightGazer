@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.8.0 --- 2025-03-02'
+VERSION: str = 'v.2.9.0 --- 2025-03-04'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -255,7 +255,8 @@ USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
-FOLLOW_THIS_AIRCRAFT: str = "" # new setting!
+FOLLOW_THIS_AIRCRAFT: str = ""
+DISPLAY_SWITCH_PROGRESS_BAR: bool = True # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -297,6 +298,7 @@ settings_values: dict = {
     "LOCATION_TIMEOUT": LOCATION_TIMEOUT,
     "ENHANCED_READOUT_AS_FALLBACK": ENHANCED_READOUT_AS_FALLBACK,
     "FOLLOW_THIS_AIRCRAFT": FOLLOW_THIS_AIRCRAFT,
+    "DISPLAY_SWITCH_PROGRESS_BAR": DISPLAY_SWITCH_PROGRESS_BAR,
 }
 """ Dict of default settings """
 
@@ -805,9 +807,9 @@ def configuration_check() -> None:
             main_logger.warning("aircraft won't be doing the thing aircraft do at that point (flying).")
             main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
             HEIGHT_LIMIT = (5000 * altitude_multiplier)
-        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (200 * altitude_multiplier):
+        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (500 * altitude_multiplier):
             main_logger.warning(f"{height_warning} too low. Are aircraft landing on your house?")
-            main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
+            main_logger.info(f">>> Setting to a reasonable minimum: {1000 * altitude_multiplier}{altitude_unit}.")
         del height_warning
         main_logger.info(f"Filtering summary: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}.")
     else:
@@ -1094,6 +1096,9 @@ def print_to_console() -> None:
 
     if DUMP1090_IS_AVAILABLE and (rlat is None or rlon is None) and not NOFILTER_MODE:
         print(f"{yellow_warning}********** Location is not set! No aircraft information will be shown! **********{rst}\n")
+
+    if not DISPLAY_IS_VALID and not NODISPLAY_MODE:
+        print(f"{red_warning}**********       Display output is unavailable.     **********{rst}\n")
 
     if DUMP1090_IS_AVAILABLE:
         if not NOFILTER_MODE:
@@ -1502,8 +1507,8 @@ def main_loop_generator() -> None:
                 if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
                     main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
-                    time.sleep(5)
-                main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                else:
+                    main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
                 time.sleep(5)
                 continue
 
@@ -2116,6 +2121,7 @@ class dump1090Watchdog:
             main_logger.error(">>> Permanently disabling dump1090 readout for this session.")
             main_logger.error(f"If this is a remote {dump1090} connection, please check your internet connectivity.")
             main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
+            main_logger.error(f"Please correct the underlying issue and restart FlightGazer.")
             return
         main_logger.error(f">>> Suspending checking {dump1090} for 10 minutes. This is occurrence: {watchdog_triggers}")
         time.sleep(600)
@@ -2267,6 +2273,7 @@ class Display(
         self._last_groundtrack = None
         self._last_vertspeed = None
         self._last_rssi = None
+        self._last_switch_progress_bar = None
         # brightness control
         self._last_brightness = self.matrix.brightness
         # blinker variables for callsign (see `callsign_blinker() below`)
@@ -2282,6 +2289,9 @@ class Display(
 
         # Overwrite any default settings from Animator
         self.delay = frames.PERIOD
+
+        # Error control: count how many times something broke in here
+        self.itbroke_count = 0
 
     # Control display "responsiveness" (the animator redraw, in seconds)
     refresh_speed = 0.1
@@ -3281,6 +3291,66 @@ class Display(
             self._last_activeplanes
             )
 
+    """ Switch-time progress bar at the bottom """
+    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
+    def switch_progress(self, count):
+        if not DISPLAY_SWITCH_PROGRESS_BAR or not self.active_plane_display:
+            self._last_switch_progress_bar = None
+            return
+        
+        plane_count_now = len(relevant_planes)
+        BASELINE_Y = 31
+        X_START = 0
+        # below taken from `print_to_console()`
+        select_divisor = 1
+        if plane_count_now == 2:
+            select_divisor = plane_latch_times[0]
+        elif plane_count_now == 3:
+            select_divisor = plane_latch_times[1]
+        elif plane_count_now >= 4:
+            select_divisor = plane_latch_times[2]
+        next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
+        # calculate the fill length based on the current iteration, the planned next select iteration, the associated latch time,
+        # and screen width, then align the result to the nearest pixel
+        # this moves the progress bar leftward as the next select iteration approaches
+        fill_length = int(round(((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * RGB_COLS, 0))
+
+        def draw_line(canvas, x_start:int, y_start:int, color, count:int):
+            """ draw a horizontal line of given pixel length """
+            if count > RGB_COLS: count = RGB_COLS
+            indicator_color = color
+            for i in range(count):
+                canvas.SetPixel(
+                    x_start + i,
+                    y_start,
+                    indicator_color.red,
+                    indicator_color.green,
+                    indicator_color.blue
+                )
+
+        # Undraw
+        if self._last_switch_progress_bar != plane_count_now:
+            if self._last_activeplanes is not None:
+                draw_line(
+                    self.canvas,
+                    X_START,
+                    BASELINE_Y,
+                    colors.BLACK,
+                    self._last_switch_progress_bar
+                    )
+
+        if plane_count_now < 2:
+            self._last_switch_progress_bar = 0
+        else:
+            self._last_switch_progress_bar = fill_length
+        draw_line(
+            self.canvas,
+            X_START,
+            BASELINE_Y,
+            colors.switch_progress_color,
+            self._last_switch_progress_bar
+            )
+
     # ========== Property Controls ===========
     # ========================================
     """ Control the screen brightness """
@@ -3335,6 +3405,24 @@ class Display(
 
         except (SystemExit, KeyboardInterrupt, ImportError):
             return
+        
+        except Exception as e:
+            self.itbroke_count += 1
+            if self.itbroke_count > 5:
+                self.clear_screen()
+                global DISPLAY_IS_VALID
+                DISPLAY_IS_VALID = False
+                main_logger.critical("*************************************************")
+                main_logger.critical("*   Display thread has failed too many times.   *")
+                main_logger.critical("*        Display will no longer be seen!        *")
+                main_logger.critical("*  Please raise this issue with the developer.  *")
+                main_logger.critical("*************************************************")
+                return
+            main_logger.error(f"Display thread error ({e}), count {self.itbroke_count}:\n", exc_info=True)
+            time.sleep(5)
+            self.clear_screen()
+            time.sleep(5)
+            self.run_screen() # restart
 
 # =========== Initialization II ============
 # ==========================================

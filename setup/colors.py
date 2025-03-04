@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.2.4.0
+VERSION: v.2.9.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -29,6 +29,7 @@ COOL_WHITE = graphics.Color(168, 196, 255)
 WHITE = graphics.Color(255, 255, 255)
 GREY = graphics.Color(192, 192, 192)
 DARK_GREY = graphics.Color(64, 64, 64)
+FAINT = graphics.Color(30, 30, 30)
 RED = graphics.Color(255, 0, 0)
 RED_LIGHT = graphics.Color(255, 195, 195)
 RED_DARK = graphics.Color(150, 12, 12)
@@ -104,5 +105,6 @@ time_rssi_color = YELLOW
 
 # plane count indicator
 plane_count_color = RED
+switch_progress_color = FAINT
 
 # CONFIG_END
