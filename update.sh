@@ -108,10 +108,10 @@ if [ $? -eq 0 ]; then
         echo "Done." | tee -a $MIGRATE_LOG
     else
         cp -f ${BASEDIR}/setup/colors.py ${TEMPDIR}/setup/colors_old.py >/dev/null 2>&1
-        echo -e "${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
+        echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
         echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
         echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
-        echo -e "> Your previous color configuration will be backed up as: ${BASEDIR}/setup/colors_old.py${NC}"
+        echo -e "> Your previous color configuration will be backed up as: ${BASEDIR}/setup/colors_old.py${NC}" | tee -a $MIGRATE_LOG
         # no need to do any fancy interim migration here, we just overwrite the file in stage 2
         sleep 2s
     fi
@@ -150,16 +150,11 @@ chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl is-enabled flightgazer.service >/dev/null 2>&1
 if [ $? -ne 0 ]; then
-    echo "> Service does not exist!"
+    echo "> Service does not exist or is disabled!"
     echo -e "${ORANGE}> You must restart FlightGazer manually."
 else
-    if [ "$(systemctl is-enabled flightgazer.service)" = "disabled" ]; then
-        echo "> Service is disabled!"
-        echo -e "${ORANGE}> You must restart FlightGazer manually."
-    else
-        systemctl start flightgazer.service &
-        echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
-    fi
+    systemctl start flightgazer.service &
+    echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
 fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 if [ $MF -eq 1 ]; then
