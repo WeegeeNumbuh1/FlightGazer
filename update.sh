@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer.py
-# Last updated: v.2.7.3
+# Last updated: v.2.9.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -85,7 +85,7 @@ echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 # get current owner of the install directory
 read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
 echo -e "> ${BASEDIR} | Owner: ${OWNER_OF_FGDIR}, Group: ${GROUP_OF_FGDIR}"
-if [ -f "$BASEDIR/config.py" -a ! -f "$BASEDIR/config.yaml" ]; then
+if [ -f "$BASEDIR/config.py" ] && [ ! -f "$BASEDIR/config.yaml" ]; then
     echo "> Old version of FlightGazer detected. You must migrate your settings manually."
     mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
     chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/config_old.py >/dev/null 2>&1
@@ -99,12 +99,22 @@ else
         MIGRATE_FLAG=1
     fi
 fi
-echo -n "> Migrating color configuration... "
+echo -n "> Migrating color configuration... " | tee -a $MIGRATE_LOG
 grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
 if [ $? -eq 0 ]; then
-    color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
-    mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
-    echo "Done."
+    if [ $(wc -l < ${TEMPPATH}/setup/colors.py) -eq $(wc -l < ${BASEDIR}/setup/colors.py) ]; then
+        color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
+        mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
+        echo "Done." | tee -a $MIGRATE_LOG
+    else
+        cp -f ${BASEDIR}/setup/colors.py ${TEMPDIR}/setup/colors_old.py >/dev/null 2>&1
+        echo -e "${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
+        echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
+        echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
+        echo -e "> Your previous color configuration will be backed up as: ${BASEDIR}/setup/colors_old.py${NC}"
+        # no need to do any fancy interim migration here, we just overwrite the file in stage 2
+        sleep 2s
+    fi
 else
     echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 fi

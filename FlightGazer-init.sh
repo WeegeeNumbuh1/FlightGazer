@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.8.0
+# Version = v.2.9.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -167,7 +167,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		>&2 echo -e "${NC}${RED}>>> Warning: Failed to connect to internet. File checking will be skipped.${FADE}"
 	fi
 
-	if [ ! -f "$CHECK_FILE" -a $INTERNET_STAT -eq 1 ]; then
+	if [ ! -f "$CHECK_FILE" ] && [ $INTERNET_STAT -eq 1 ]; then
 		>&2 echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. Internet connection is required.${NC}"
 		sleep 2s
 		exit 1
@@ -201,7 +201,7 @@ then
 	apt-get install -y tmux >/dev/null
 	echo ""
 	echo "  > Creating systemd service..."
-	if [ ! -f "/etc/systemd/system/flightgazer.service" -a "$LFLAG" = false ]; then
+	if [ ! -f "/etc/systemd/system/flightgazer.service" ] && [ "$LFLAG" = false ]; then
 		cat <<- EOF > /etc/systemd/system/flightgazer.service
 		[Unit]
 		Description=FlightGazer service
@@ -321,7 +321,7 @@ ENDTIME=$(date '+%s')
 echo "Setup/Initialization took $((ENDTIME - STARTTIME)) seconds."
 echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
-if [ $SKIP_CHECK -eq 1 -a "$DFLAG" = "" ]; then
+if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = "" ]; then
 	echo -e "${NC}${FADE}> Playing splash screen for 5 seconds..."
 	sleep 5s
 	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
@@ -361,7 +361,7 @@ else
 		if [ -t 1 ]; then
 			# always have the -i interactive flag in use if no other options are given
 			echo -e "${GREEN}> We're running in an interactive shell. Program output will be shown.${NC}${FADE}"
-			if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
+			if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
 				tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
 				echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
 				echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
@@ -371,7 +371,7 @@ else
 				trap interrupt SIGINT SIGTERM SIGHUP
 				echo -e "${GREEN}  Running in tmux is recommended for extended runs!\n${NC}${FADE}"
 				echo -e "\n${NC}${RED}>>> Use Ctrl+C to quit.${NC}${FADE}"
-				if [ "$TMUX_AVAIL" = false -a "$TFLAG" = true ]; then
+				if [ "$TMUX_AVAIL" = false ] && [ "$TFLAG" = true ]; then
 					echo "> Notice: Program will be running in this console window as tmux is not available!"
 				fi
 				TRADITIONAL_START=true
@@ -381,7 +381,7 @@ else
 		else 
 			# edit the entry in /etc/systemd/system/flightgazer.service manually if you want to start with additional flags
 			# then use `systemctl daemon-reload` to use the updated settings
-			if [ "$TMUX_AVAIL" = true -a "$TFLAG" = true ]; then
+			if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
 				tmux new-session -d -s FlightGazer "sudo ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
 				echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
 				echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"

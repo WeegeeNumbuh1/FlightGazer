@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.9.0 --- 2025-03-04'
+VERSION: str = 'v.2.9.1 --- 2025-03-05'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -439,6 +439,8 @@ dump1090: str = "readsb" if is_readsb else "dump1090"
 """ dump1090 or readsb """
 ENHANCED_READOUT_INIT: bool = False
 """ State of ENHANCED_READOUT after successfully parsing settings file """
+CPU_TEMP_SENSOR: str | None = None
+""" CPU temperature sensor present on system """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -614,6 +616,32 @@ def get_ip() -> str:
     finally:
         s.close()
     CURRENT_IP = IP
+
+def get_cpu_temp_sensor() -> str | None:
+    ''' Determines what CPU temp sensor (if available) is present.
+    Modified from my other project, UNRAID Status Screen. '''
+
+    if not hasattr(psutil, "sensors_temperatures"):
+        return None
+    else:
+        # check if there are any temperature sensors on the system
+        temps_test = psutil.sensors_temperatures()
+        if not temps_test:
+            return None
+    
+    # probe possible temperature names    
+    # generic names, then Intel, then AMD
+    probe_sensor_names = iter(['cpu_thermal', 'cpu_thermal_zone', 'coretemp', 'k10temp', 'k8temp',])
+    # try until we hit our first success
+    while True:
+        sensor_entry = next(probe_sensor_names, "nothing")
+        if sensor_entry == "nothing":
+            return None
+        try:
+            test1 = psutil.sensors_temperatures()[sensor_entry][0].current
+            return sensor_entry
+        except:
+            pass
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -1246,18 +1274,28 @@ def print_to_console() -> None:
     # print footer section
     print(f"\n{rst}{fade}> {dump1090} response {process_time[0]} ms | \
 Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
+    
     print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
+    
     if API_KEY:
         print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
     print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
+
     current_memory_usage = psutil.Process().memory_info().rss
     this_process_cpu = this_process.cpu_percent(interval=None)
-    print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
+    if CPU_TEMP_SENSOR is not None:
+        cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU @ {round(cpu_temp, 1)}°C | {round(current_memory_usage / 1048576, 3)}MiB")
+    else:
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
+
     if gen_info_str:
         print(gen_info_str)
+
     if dump1090_failures > 0:
         print(f">{rst}{yellow_text} {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}{rst}{fade}")
+
     if INSIDE_TMUX:
         print(f">{italic} Use \'Ctrl+B D\' to detach from this session. Ctrl+C to exit -and- quit FlightGazer.{rst}")
     else:
@@ -2079,7 +2117,8 @@ class DisplayFeeder:
 
             # special handling for when we are tracking a specific aircraft under FOLLOW_THIS_AIRCRAFT
             if focus_plane_stats and focus_plane_stats['ID'] == FOLLOW_THIS_AIRCRAFT:
-                if focus_plane_stats['Altitude'] < HEIGHT_LIMIT and focus_plane_stats['Distance'] < RANGE:
+                if focus_plane_stats['Altitude'] < HEIGHT_LIMIT and focus_plane_stats['Distance'] < RANGE\
+                   and not API_limit_reached:
                     ENHANCED_READOUT = ENHANCED_READOUT_INIT
                 else:
                     ENHANCED_READOUT = True
@@ -3447,6 +3486,11 @@ else:
 
 configuration_check()
 get_ip()
+CPU_TEMP_SENSOR = get_cpu_temp_sensor()
+if CPU_TEMP_SENSOR is not None:
+    main_logger.debug(f"CPU temperature sensor: {CPU_TEMP_SENSOR}")
+else:
+    main_logger.debug("No CPU temperature sensor found or temp readout not supported on this system.")
 HOSTNAME = socket.gethostname()
 main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
 flyby_stats() # initialize first

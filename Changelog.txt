@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.9.1 - 2025-03-05
+    - Fix update script to handle when we change the color settings file in source (it breaks the display)
+        - This bug was caused by how the updater migrates color config: it basically just copies the old one into the new one
+        - If there is a reference to a new display element (see: last update), it won't exist after migration
+        - The display renderer will crash because it cannot reference the color for the new display element
+        - Now we just simply compare line lengths between old and new color config files and just alert the user that colors
+          have been reverted to defaults when there is a mismatch
+    - The feature creep will continue until morale improves: read CPU temp in Interactive mode
+        - Stealing functionality from my other project, UNRAID Status Screen
+        - This was mostly just for me
+    - Initialization script touch ups
+
 v.2.9.0 - 2025-03-04
     - NEW: a progress bar is now present on the aircraft display when there are two or more aircraft in the area
         - This serves as an indicator of when FlightGazer will switch to another aircraft or
