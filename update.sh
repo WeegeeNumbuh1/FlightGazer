@@ -107,11 +107,11 @@ if [ $? -eq 0 ]; then
         mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
         echo "Done." | tee -a $MIGRATE_LOG
     else
-        cp -f ${BASEDIR}/setup/colors.py ${TEMPDIR}/setup/colors_old.py >/dev/null 2>&1
+        mv ${BASEDIR}/setup/colors.py ${BASEDIR}/setup/colors.bak >/dev/null 2>&1
         echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
         echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
         echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
-        echo -e "> Your previous color configuration will be backed up as: ${BASEDIR}/setup/colors_old.py${NC}" | tee -a $MIGRATE_LOG
+        echo -e "> Your previous color configuration has been backed up as: ${BASEDIR}/setup/colors.bak${NC}" | tee -a $MIGRATE_LOG
         # no need to do any fancy interim migration here, we just overwrite the file in stage 2
         sleep 2s
     fi
