@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer.py
-# Last updated: v.2.9.1
+# Last updated: v.2.9.2
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -63,6 +63,7 @@ if [ $? -ne 0 ]; then
     echo -e "${RED}>>> ERROR: Failed to download from Github. Updater cannot continue.${NC}"
     exit 1
 fi
+rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
 sleep 3s

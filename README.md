@@ -16,6 +16,30 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 
 As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24)
 
+**Table of Contents**
+- [About](#-about)
+- [What it looks like](#-what-it-looks-like)
+- [Features](#-features)
+- [Setup](#️-setup)
+  - [Prerequisites (Important)](#️-prerequisites-important)
+  - [Installation \& Getting Started](#-installation--getting-started)
+  - [Configuration](#️-configuration)
+- [Usage](#️-usage)
+  - [Interactive Mode](#️-interactive-mode)
+  - [Optional Behaviors](#-optional-behaviors)
+  - [Shutting Down \& Restarting](#-shutting-down--restarting)
+  - [Misc](#-misc)
+- [How to Update](#️-how-to-update)
+- [Uninstall](#-uninstall)
+- [FAQ's](#-frequently-asked-questions-not-really-but-they-could-pop-up)
+- [Known Issues](#-known-issues-shortcomings-and-reporting-issues)
+- [Changelog \& Planned Features](#️-changelog--planned-features)
+- [Additional Related/Similar Projects](#-additional-relatedsimilar-projects)
+- [Highlights Across Media](#️-highlights-across-media)
+- [Licence \& Warranty](#️-licence--warranty)
+- [Acknowledgements](#-acknowledgements)
+
+
 ## 👀 What it looks like
 
 <div align="center">
@@ -29,7 +53,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 
 |   |
 |---|
-| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br>- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown) |
+| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
 
 </details>
 
@@ -108,7 +132,7 @@ Using this project assumes you have the following:
 - Your location set in `dump1090`
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
-- [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional, installed by default when using the initalization script) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
+- [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional, installed by default when using the initialization script) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>
@@ -119,7 +143,7 @@ Make sure you meet the above prerequisites. To begin:
 git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
 ```
 > [!IMPORTANT]
-> Once the above command is completed, it is recommended to configure your setup now before running the initalization file. See the [Configuration](#️-configuration) section below, then return to this step.
+> Once the above command is completed, it is recommended to configure your setup now before running the initialization file. See the [Configuration](#️-configuration) section below, then return to this step.
 
 <details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
 

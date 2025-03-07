@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.9.2 - 2025-03-07
+    - Initialization script now skips checking RGBMatrixEmulator if it's already installed
+        - This is a workaround for when we use the updater; RGBMatrixEmulator will not work until next reboot due to a bug
+
 v.2.9.1 - 2025-03-05
     - Fix update script to handle when we change the color settings file in source (it breaks the display)
         - This bug was caused by how the updater migrates color config: it basically just copies the old one into the new one

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.9.1
+# Version = v.2.9.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -41,7 +41,7 @@ interrupt() {
 
 help_str(){
 	echo ""
-	echo "Usage: sudo $(basename $0) [-d] [-e] [-f] [-t] [-c] [-v] [-l] [-h]"
+	echo "Usage: sudo $BASEDIR/$(basename $0) [options]"
 	echo "[-h]     Print this help message."
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
@@ -128,13 +128,21 @@ fi
 echo -e "${GREEN}>>> Checking dependencies, let's begin.${NC}"
 echo -e "${FADE}"
 
+if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
+	echo -e "\n${NC}${RED}>>> ERROR: Cannot find ${BASEDIR}/FlightGazer.py."
+	sleep 2s
+	exit 1
+fi
+
 if [ ! -f "$CHECK_FILE" ];
 then 
 	echo "> First run detected, installing needed dependencies.
   This may take some time depending on your internet connection."
 	if [ "$LFLAG" = true ]; then
+		echo "****************************************************************************"
 		echo "> We are currently running in Live/Demo mode; no permanent changes to"
 		echo "  the system will occur. FlightGazer will run using dependencies in '/tmp'."
+		echo "****************************************************************************"
 	fi
 	VERB_TEXT='Installing: '
 else
@@ -188,6 +196,7 @@ if [ ! -f "$CHECK_FILE" ];
 then 
     echo "  > Updating package lists..."
 	echo "    > \"apt-get update\""
+	echo "      (this may take some time if this hasn't been run in awhile)"
 	apt-get update >/dev/null
 	echo "    > \"dpkg --configure -a\""
 	dpkg --configure -a >/dev/null
@@ -306,7 +315,10 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		echo -e "${CHECKMARK}${VERB_TEXT}yaml"
 		${VENVPATH}/bin/pip3 install --upgrade ruamel.yaml >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"
-		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
+		# workaround for bug when updating RGBMatrixEmulator which causes "frozen_os()" error until a system reboot
+		if [ ! -d "$VENVPATH"/lib/python*/site-packages/RGBMatrixEmulator ]; then
+			${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
+		fi
 	    echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."
@@ -328,11 +340,6 @@ if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = "" ]; then
 fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"
 kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
-if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
-	echo -e "\n${NC}${RED}>>> ERROR: Cannot find ${BASEDIR}/FlightGazer.py."
-	sleep 2s
-	exit 1
-fi
 	
 echo -ne "${FADE}"
 echo ""
