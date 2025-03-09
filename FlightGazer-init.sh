@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.9.2
+# Version = v.2.10.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -315,10 +315,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		echo -e "${CHECKMARK}${VERB_TEXT}yaml"
 		${VENVPATH}/bin/pip3 install --upgrade ruamel.yaml >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"
-		# workaround for bug when updating RGBMatrixEmulator which causes "frozen_os()" error until a system reboot
-		if [ ! -d "$VENVPATH"/lib/python*/site-packages/RGBMatrixEmulator ]; then
-			${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
-		fi
+		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
 	    echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."

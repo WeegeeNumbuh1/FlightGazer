@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.9.2 --- 2025-03-07'
+VERSION: str = 'v.2.10.0 --- 2025-03-08'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -256,7 +256,7 @@ ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
 FOLLOW_THIS_AIRCRAFT: str = ""
-DISPLAY_SWITCH_PROGRESS_BAR: bool = True # new setting!
+DISPLAY_SWITCH_PROGRESS_BAR: bool = True
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -373,9 +373,9 @@ plane_latch_times: list = [
     int(15 // LOOP_INTERVAL),
 ]
 """ Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
-focus_plane_api_results = deque([None] * 25, maxlen=25)
+focus_plane_api_results = deque([None] * 100, maxlen=100)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
-Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`} """
+Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`, `APIAccessed`} """
 unique_planes_seen: list = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`} """
@@ -602,7 +602,7 @@ def match_commandline(command_search: str, process_name: str) -> list:
  
     return list_of_processes
 
-def get_ip() -> str:
+def get_ip() -> None:
     ''' Gets us our local IP. Modified from my other project `UNRAID_Status_Screen`.
     Modifies the global `CURRENT_IP` '''
     global CURRENT_IP
@@ -1331,7 +1331,7 @@ def main_loop_generator() -> None:
         for a in range(entry_count):
             # search backwards through list
             if unique_planes_seen[-a-1]['ID'] == input_ID:
-                if unique_planes_seen[-a-1]['Time'] - time.monotonic() > stale_age:
+                if time.monotonic() - unique_planes_seen[-a-1]['Time'] > stale_age:
                     add_entry()
                     return
                 else: # if we recently have seen this plane
@@ -1769,6 +1769,7 @@ class APIFetcher:
         origin = None
         destination = None
         departure_time = None
+        stale_age = FLYBY_STALENESS * 60 # seconds
 
         flight_id = focus_plane_stats.get('Flight', "")
 
@@ -1780,8 +1781,11 @@ class APIFetcher:
             try:
                 if focus_plane_api_results[-i-1] is not None and\
                 focus_plane == focus_plane_api_results[-i-1]['ID']: # cache hit: no need to query the API; reads deque from right to left
-                    api_hits[3] += 1
-                    return
+                    if time.monotonic() - focus_plane_api_results[-i-1]['APIAccessed'] < stale_age:
+                        api_hits[3] += 1
+                        return
+                    else:
+                        break
             except: # if we bump into None or something else
                 break
 
@@ -1870,11 +1874,12 @@ class APIFetcher:
                 destination = str(abs(round(lon, 1))) + lon_str
 
             api_results = {
-                'ID':focus_plane,
-                'Flight':flight_id,
-                'Origin':origin,
-                'Destination':destination,
-                'Departure':departure_time
+                'ID': focus_plane,
+                'Flight': flight_id,
+                'Origin': origin,
+                'Destination': destination,
+                'Departure': departure_time,
+                'APIAccessed': time.monotonic()
                 }
             with threading.Lock():
                 focus_plane_api_results.append(api_results)
@@ -2190,9 +2195,8 @@ def brightness_controller() -> None:
         main_logger.info(f"Display will change to brightness level {ACTIVE_PLANE_DISPLAY_BRIGHTNESS} when an aircraft is detected.")
 
     try:
-        test1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
-        test2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
-        del test1, test2
+        switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
+        switch_time2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
         main_logger.info("Dynamic brightness is enabled.")
         main_logger.info(f"Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
     except: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
@@ -2208,8 +2212,6 @@ def brightness_controller() -> None:
             or not USE_SUNRISE_SUNSET:
             # note that depending on location and time of year, sunrise and sunset times can be None
             # thus we fall back on BRIGHNESS_SWITCH_TIME values (at this point the values have been known to work)
-            switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
-            switch_time2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
             sunrise_time = datetime.datetime.combine(current_time.date(), switch_time1).astimezone()
             sunset_time = datetime.datetime.combine(current_time.date(), switch_time2).astimezone()
         else:

@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer.py
-# Last updated: v.2.9.2
+# Last updated: v.2.10.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -46,6 +46,12 @@ if [ `id -u` -ne 0 ]; then
 fi
 if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	echo -e "\n${NC}${RED}>>> ERROR: Cannot find FlightGazer.py. This updater script must be in the same directory as FlightGazer.py!${NC}"
+	sleep 2s
+	exit 1
+fi
+
+if [ ! -d "${VENPATH}" ]; then
+	echo -e "\n${NC}${RED}>>> ERROR: Cannot find FlightGazer virtual environment! Has FlightGazer been installed before?${NC}"
 	sleep 2s
 	exit 1
 fi

@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.10.0 - 2025-03-08
+    - 10 releases for this version, wow
+    - API results cache is now tied to FLYBY_STALENESS
+        - If the same aircraft appears within the FLYBY_STALENESS time, it will reuse the same API result
+    - Fix undiscovered bug regarding FLYBY_STALENESS since that feature was introduced (v.1.3.0): it didn't fully work (lmao)
+        - Caused by subtracting the current time from the last seen time of the aircraft and comparing
+          it to the FLYBY_STALENESS time: it always resulted in a negative number. This should've been the other way around. Oops.
+    - Change some settings defaults:
+        - Sunrise and sunset are now defaulted to true
+        - Brightness is now set for ACTIVE_PLANE_BRIGHTNESS
+        - Main brightness lowered to 75, secondary brightness lowered to 40
+    - Updater script now checks if FlightGazer has been installed in the system
+    - Reverted change from v.2.9.2: Initialization script will check RGBMatrixEmulator again
+        - The bug for RGBMatrixEmulator has been fixed: (https://github.com/ty-porter/RGBMatrixEmulator/compare/v0.12.3...v0.12.4)
+
 v.2.9.2 - 2025-03-07
     - Initialization script now skips checking RGBMatrixEmulator if it's already installed
         - This is a workaround for when we use the updater; RGBMatrixEmulator will not work until next reboot due to a bug

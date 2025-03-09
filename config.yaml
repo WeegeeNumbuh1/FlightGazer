@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.9.1 # do not modify this
+CONFIG_VERSION: v.2.10.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -28,6 +28,7 @@ RANGE: 2
 FLYBY_STALENESS: 60
 # [Integer: 1 ~ 1440] (minutes)
 # If the same aircraft appears again before this time, do not consider it as a flyby.
+# Additionally, API results for the aircraft will be reused.
 
 LOCATION_TIMEOUT: 60
 # [Integer: 15 ~ 60] (seconds)
@@ -83,7 +84,7 @@ ENHANCED_READOUT_AS_FALLBACK: true
 # or when `API_DAILY_LIMIT` is reached.
 # This setting only works if `ENHANCED_READOUT` is false.
 
-DISPLAY_SUNRISE_SUNSET: false
+DISPLAY_SUNRISE_SUNSET: true
 # [true/false]
 # If true, show sunrise and sunset times on the Clock screen.
 
@@ -105,7 +106,7 @@ DISPLAY_SWITCH_PROGRESS_BAR: true
 # ============== Brightness settings ===============
 # ==================================================
 
-BRIGHTNESS: 100
+BRIGHTNESS: 75
 # [Integer: 0 ~ 100]
 # Set the LED brightness.
 
@@ -113,7 +114,7 @@ ENABLE_TWO_BRIGHTNESS: true
 # [true/false]
 # If true, enables dynamically switching brightness. If false, only `BRIGHTNESS` will be used.
 
-BRIGHTNESS_2: 50
+BRIGHTNESS_2: 40
 # [Integer: 0 ~ 100]
 # Secondary LED brightness.
 # `BRIGHTNESS_2` will be used from sunset to sunrise ("night") and `BRIGHTNESS` will be used for all other times.
@@ -129,7 +130,7 @@ USE_SUNRISE_SUNSET: true
 # If true, use sunrise and sunset times to adjust brightness.
 # If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
 
-ACTIVE_PLANE_DISPLAY_BRIGHTNESS:
+ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
 # [Integer: 0 ~ 100, null, or empty]
 # When there is an active aircraft, use a different brightness level (0..100). Useful for grabbing attention.
 # Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
