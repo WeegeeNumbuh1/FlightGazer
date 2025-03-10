@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.2.10.1 - 2025-03-10
+    - If location is not set, display will now show "N/A" for FLYBY and RANGE to indicate this
+    - If dump1090 isn't found or we are currently under a watchdog timeout, TRACKING will show "N/A" as well
+    - Additional minor display text formatting tweaks
+    - Minor text output tweaks
+
 v.2.10.0 - 2025-03-08
     - 10 releases for this version, wow
     - API results cache is now tied to FLYBY_STALENESS

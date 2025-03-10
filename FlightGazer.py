@@ -17,7 +17,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.10.0 --- 2025-03-08'
+VERSION: str = 'v.2.10.1 --- 2025-03-10'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -962,36 +962,37 @@ def read_receiver_stats() -> None:
         gain_now = None
         noise_now = None
         loud_percentage = None
-        try:
-            req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
-            with closing(urlopen(req, None, 3)) as stats_file:
-                stats = json.load(stats_file)
-                
-            if has_key(stats, 'last1min'):
-                try:
-                    noise_now = stats['last1min']['local']['noise']
-                except KeyError:
+        if DUMP1090_IS_AVAILABLE:
+            try:
+                req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
+                with closing(urlopen(req, None, 3)) as stats_file:
+                    stats = json.load(stats_file)
+                    
+                if has_key(stats, 'last1min'):
+                    try:
+                        noise_now = stats['last1min']['local']['noise']
+                    except KeyError:
+                        noise_now = None
+                    try:
+                        messages1min = stats['last1min']['messages']
+                        loud_messages = stats['last1min']['local']['strong_signals']
+                        if messages1min == 0:
+                            loud_percentage = 0
+                        else:
+                            loud_percentage = (loud_messages / messages1min) * 100
+                    except KeyError:
+                        loud_percentage = None
+                else:
                     noise_now = None
-                try:
-                    messages1min = stats['last1min']['messages']
-                    loud_messages = stats['last1min']['local']['strong_signals']
-                    if messages1min == 0:
-                        loud_percentage = 0
-                    else:
-                        loud_percentage = (loud_messages / messages1min) * 100
-                except KeyError:
                     loud_percentage = None
-            else:
-                noise_now = None
-                loud_percentage = None
+                    
+                if has_key(stats, 'gain_db'):
+                    gain_now = stats['gain_db']
+                else:
+                    gain_now = None
                 
-            if has_key(stats, 'gain_db'):
-                gain_now = stats['gain_db']
-            else:
-                gain_now = None
-            
-        except:
-            pass
+            except:
+                pass
 
         with threading.Lock():
             receiver_stats['Gain'] = gain_now
@@ -1112,10 +1113,12 @@ def print_to_console() -> None:
     yellow_text = "\x1b[0;33m"
 
     cls()
+    # header section
     print(f"{rst}{green_highlight}===== FlightGazer {ver_str} Console Output ====={rst} {fade}Time now: {time_print} | Runtime: {timedelta_clean(run_time)}{rst}")
     if not DUMP1090_IS_AVAILABLE:
         if watchdog_triggers == 0:
-            print(f"{red_warning}********** {dump1090} did not successfully load. There will be no data! **********{rst}\n")
+            print(f"{red_warning}********** dump1090 did not successfully load. There will be no data! **********{rst}\n")
+            print(f"{white_highlight}Please check your settings, your network connection, and the status of dump1090. Then, restart FlightGazer.{rst}")
         elif watchdog_triggers > 0 and watchdog_triggers < watchdog_setpoint:
             print(f"{yellow_warning}***** Watchdog triggered. There is currently a pause on {dump1090} processing. *****{rst}\n")
         elif watchdog_triggers >= watchdog_setpoint:
@@ -1157,6 +1160,7 @@ def print_to_console() -> None:
         elif len(focus_plane_ids_scratch) == 0:
             print(f"{fade}Aircraft scratchpad: {{}}{rst}")
 
+    # aircraft readout section
     for a in range(plane_count):
         print_info = []
         print_info.append(f"{rst}")
@@ -1229,12 +1233,11 @@ def print_to_console() -> None:
                 if api_dest is None: api_dest = "?"
                 api_dpart_time = focus_plane_api_results[-i-1]['Departure']
                 if api_dpart_time is not None:
-                    api_dpart_delta = (datetime.datetime.now(datetime.timezone.utc) - api_dpart_time)
-                    api_dpart_delta = str(api_dpart_delta).split(".")[0]
+                    api_dpart_delta = strfdelta((datetime.datetime.now(datetime.timezone.utc) - api_dpart_time), "{H}h{M:02}m")
                 else:
                     api_dpart_delta = "?"
                 print(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: \
-    {api_orig} -> {api_dest}, {api_dpart_delta} flight time{rst}")
+    [ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
                 break
         except: # if we bump into None or something else
             break
@@ -1929,23 +1932,34 @@ class DisplayFeeder:
         total_planes = "0"
         current_range = "0"
         if general_stats: # should always exist but just in case
-            if len(unique_planes_seen) > 9999:
-                total_flybys = "9999"
+            if rlat is not None and rlon is not None:
+                if len(unique_planes_seen) >= 0 and len(unique_planes_seen) <= 9999:
+                    total_flybys = str(len(unique_planes_seen))
+                elif len(unique_planes_seen) > 9999:
+                    total_flybys = "9999"
+                else: total_flybys = "0"
             else:
-                total_flybys = str(len(unique_planes_seen))
-            if general_stats['Tracking'] > 999:
-                total_planes = ">999"
+                total_flybys = "N/A"
+            
+            if DUMP1090_IS_AVAILABLE:
+                if general_stats['Tracking'] > 999:
+                    total_planes = ">999"
+                else:
+                    total_planes = str(general_stats['Tracking'])
             else:
-                total_planes = str(general_stats['Tracking'])
-            current_range_i = general_stats['Range']
-            if current_range_i > 999:
-                current_range = ">999"
-            elif current_range_i >= 100: # just get us the integer values
-                current_range = str(round(current_range_i, 0))[:3]
-            elif current_range_i >=10 and current_range_i < 100:
-                current_range = str(round(current_range_i, 1))
-            elif current_range_i >= 0 and current_range_i < 10:
-                current_range = str(round(current_range_i, 2))
+                total_planes = "N/A"
+
+            if DUMP1090_IS_AVAILABLE and (rlat is not None and rlon is not None):
+                if general_stats['Range'] >= 1000:
+                    current_range = ">999"
+                elif general_stats['Range'] >= 100 and general_stats['Range'] < 1000: # just get us the integer values
+                    current_range = str(int(round(general_stats['Range'], 0)))
+                elif general_stats['Range'] >=10 and general_stats['Range'] < 100:
+                    current_range = str(round(general_stats['Range'], 1))
+                elif general_stats['Range'] >= 0 and general_stats['Range'] < 10:
+                    current_range = str(round(general_stats['Range'], 2))
+            else:
+                current_range = "N/A"
 
         idle_stats = {
             'Flybys': total_flybys,
@@ -2040,13 +2054,19 @@ class DisplayFeeder:
             alt = str(int(round(focus_plane_stats['Altitude'], 0)))
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
-            dist_i = round(focus_plane_stats['Distance'], 1)
-            if dist_i >= 0 and dist_i < 10: dist = str(dist_i)
-            elif dist_i >= 10 and dist_i < 100: dist = str(dist_i)[:2]
-            elif dist_i >= 100 and dist_i < 1000: dist = str(dist_i)[:3]
-            elif dist_i >= 1000: dist = "999"
-            else: dist = "0"
-            distance = str(focus_plane_stats['Direction']) + dist
+            if rlat is not None and rlon is not None:
+                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 10:
+                    dist = str(round(focus_plane_stats['Distance'], 1))
+                elif focus_plane_stats['Distance'] >= 10 and focus_plane_stats['Distance'] < 100:
+                    dist = str(int(round(focus_plane_stats['Distance'], 0)))
+                elif focus_plane_stats['Distance'] >= 100 and focus_plane_stats['Distance'] < 1000:
+                    dist = str(int(round(focus_plane_stats['Distance'], 0)))
+                elif focus_plane_stats['Distance'] >= 1000:
+                    dist = "999"
+                else: dist = "0"
+                distance = str(focus_plane_stats['Direction']) + dist
+            else:
+                distance = "-----"
             # do our coordinate formatting
             lat_i = focus_plane_stats['Latitude']
             lon_i = focus_plane_stats['Longitude']
