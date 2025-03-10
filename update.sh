@@ -50,7 +50,7 @@ if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	exit 1
 fi
 
-if [ ! -d "${VENPATH}" ]; then
+if [ ! -d "${VENVPATH}" ]; then
 	echo -e "\n${NC}${RED}>>> ERROR: Cannot find FlightGazer virtual environment! Has FlightGazer been installed before?${NC}"
 	sleep 2s
 	exit 1
