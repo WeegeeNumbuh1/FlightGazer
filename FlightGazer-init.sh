@@ -330,7 +330,7 @@ ENDTIME=$(date '+%s')
 echo "Setup/Initialization took $((ENDTIME - STARTTIME)) seconds."
 echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
-if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = "" ]; then
+if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
 	echo -e "${NC}${FADE}> Playing splash screen for 5 seconds..."
 	sleep 5s
 	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1

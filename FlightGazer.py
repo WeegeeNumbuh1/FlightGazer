@@ -157,8 +157,6 @@ CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
 USER_AGENT: dict = {'User-Agent': "Wget/1.21.3"}
 """ Use Wget user-agent for our requests """
-DUMP1090_IS_AVAILABLE: bool = False
-""" If we fail to load dump1090, set to False and continue. We assume it isn't loaded at first. """
 LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
@@ -411,6 +409,9 @@ CURRENT_IP = ""
 """ IP address of device running this script """
 
 # runtime stuff
+DUMP1090_IS_AVAILABLE: bool = False
+""" If we fail to load dump1090, set to False and continue. Set to True when connected to dump1090.
+This is also changed to False when the watchdog kicks in. """
 process_time: list = [0,0,0,0]
 """ For debug; [json parse, filter data, API response, format data] ms """
 api_hits: list = [0,0,0,0]
