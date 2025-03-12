@@ -33,10 +33,10 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 - [Uninstall](#-uninstall)
 - [FAQ's](#-frequently-asked-questions-not-really-but-they-could-pop-up)
 - [Known Issues](#-known-issues-shortcomings-and-reporting-issues)
-- [Changelog \& Planned Features](#️-changelog--planned-features)
+- [Changelog \& Contributing](#️-changelog-planned-features-and-contributing)
 - [Additional Related/Similar Projects](#-additional-relatedsimilar-projects)
 - [Highlights Across Media](#️-highlights-across-media)
-- [Licence \& Warranty](#️-licence--warranty)
+- [License \& Warranty](#️-license--warranty)
 - [Acknowledgements](#-acknowledgements)
 
 
@@ -53,7 +53,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 
 |   |
 |---|
-| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
+| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>&emsp;- Extended calendar info<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
 
 </details>
 
@@ -85,11 +85,11 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - Brightness based on time of day or when there's an active aircraft shown
-  - Display sunrise and sunset times or detailed signal stats for your ADS-B receiver
+  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - API limiting per day (those API calls can get expensive)
   - Colors 🌈
-  - 🆕 Track a specific aircraft once it's detected by your ADS-B receiver
+  - Track a specific aircraft once it's detected by your ADS-B receiver
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Useful and detailed console output
 - Small memory footprint
@@ -487,13 +487,17 @@ Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `settings_migrate.log` if present) which can be found in the FlightGazer directory.
 
-## ✏️ Changelog & Planned Features
+## ✏️ Changelog, Planned Features, and Contributing
 Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [x] Brightness changing
 - [ ] Docker image?
 - [ ] Settings management from webpage?
+
+As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
+Suggestions and comments, however, are welcomed.<br>
+If you'd like to make your own edits that changes the way the project operates, please fork this project.
 
 ## 📖 Additional Related/Similar Projects
 
@@ -507,8 +511,15 @@ Faraway ideas:
 ## 🎖️ Highlights Across Media
 \* (dust) \* 
 
-## ⚖️ Licence & Warranty
-\* (to be chosen eventually) \*
+## ⚖️ License & Warranty
+FlightGazer is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.<br>
+In terms of warranty:
+
+```
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+```
 
 ## ✅ Acknowledgements
 Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator). This tool was invaluable for getting the layout dialed in and figuring out the logic needed to update the display correctly, all while avoiding having to program directly on the Raspberry Pi itself (VSCode Remote on a Zero 2W is literally impossible, I've tried).

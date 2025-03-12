@@ -1,7 +1,7 @@
 #!/bin/bash
 {
-# Updater script for FlightGazer.py
-# Last updated: v.2.10.0
+# Updater script for FlightGazer
+# Last updated: v.3.0.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -70,6 +70,10 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
+if [ f "${TEMPPATH}/version" ]; then
+    VER_STR=$(head -c 12 ${TEMPPATH}/version)
+    echo -e "> Downloaded FlightGazer version: ${VER_STR}"
+fi
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
 sleep 3s

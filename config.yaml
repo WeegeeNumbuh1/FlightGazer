@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.2.10.1 # do not modify this
+CONFIG_VERSION: v.3.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -84,14 +84,18 @@ ENHANCED_READOUT_AS_FALLBACK: true
 # or when `API_DAILY_LIMIT` is reached.
 # This setting only works if `ENHANCED_READOUT` is false.
 
-DISPLAY_SUNRISE_SUNSET: true
-# [true/false]
-# If true, show sunrise and sunset times on the Clock screen.
-
-DISPLAY_RECEIVER_STATS: false
-# [true/false]
-# If true, show receiver stats (gain, noise, % loud signals) on the Clock screen.
-# Overwrites sunrise/sunset display if `DISPLAY_SUNRISE_SUNSET` is enabled.
+CLOCK_CENTER_ROW:
+  ROW1: 1
+  ROW2: 0
+# Choose what to display on the Clock screen center row.
+# Leave only ROW1 filled to show just one row of data.
+# When ROW1 and ROW2 are filled, the Clock display will use a smaller font to maximize space.
+# Having ROW1 blank but ROW2 filled will force using the smaller font on the Clock display.
+# Options:
+# 0, null, or blank = Don't use this option
+# 1 = Sunset/Sunrise
+# 2 = ADS-B receiver stats (gain, noise, % loud signals)
+# 3 = Extended calendar info (month, week number, day of the year)
 
 CLOCK_24HR: false
 # [true/false]
@@ -148,14 +152,6 @@ GPIO_SLOWDOWN: 2
 HAT_PWM_ENABLED: true
 # [true/false]
 # If you set the quality modification for the RGB-Matrix hat, set to true. If not, set to false.
-
-RGB_ROWS: 32
-# [Integer: 16, 32, or 64]
-# Number of LED rows in your display.
-
-RGB_COLS: 64
-# [Integer: 16, 32, or 64]
-# Number of LED columns in your display.
 
 LED_PWM_BITS: 8
 # [Integer: 1 ~ 11]

@@ -2,7 +2,8 @@
 # Shows a splash screen while we wait for the main script to load
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
-# Last updated: v.2.7.0
+# Additionally this file must be in the utilities directory to work properly.
+# Last updated: v.3.0.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -15,8 +16,10 @@ import argparse
 from pathlib import Path
 try:
     try:
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
+        from rgbmatrix import graphics
+        from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
     except:
+        from RGBMatrixEmulator import graphics
         from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 except: # if display can't be loaded, don't bother showing the splash screen
     sys.exit(1)
@@ -24,10 +27,22 @@ try:
     from PIL import Image
 except:
     sys.exit(1)
-    
+
+CURRENT_DIR = Path(__file__).resolve().parent
+try:
+    with open(Path(f"{CURRENT_DIR}/../version"), 'rb') as f:
+        VER_STR = f.read(12).decode('utf-8').strip()
+except:
+    VER_STR = "UNKNOWN"
+
 def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
     sys.exit(0)
+
+try:
+    loaded_font = graphics.Font().LoadFont(f"{CURRENT_DIR}/../fonts/3x3.bdf")
+except FileNotFoundError:
+    NO_TEXT_SPLASH = True
 
 class ImageScroller():
     def __init__(self, *args, **kwargs):
@@ -66,7 +81,7 @@ class ImageScroller():
                 sys.exit(1)
         self.image = self.image.resize([self.matrix.width, self.matrix.height])
 
-        double_buffer = self.matrix.CreateFrameCanvas()
+        self.double_buffer = self.matrix.CreateFrameCanvas()
         img_width, img_height = self.image.size
 
         # let's scroll
@@ -77,10 +92,29 @@ class ImageScroller():
                 xpos = 0
             
             # scrolls to the right
-            double_buffer.SetImage(self.image, xpos)
-            double_buffer.SetImage(self.image, xpos - img_width)
+            self.double_buffer.SetImage(self.image, xpos)
+            self.double_buffer.SetImage(self.image, xpos - img_width)
 
-            double_buffer = self.matrix.SwapOnVSync(double_buffer)
+            if not NO_TEXT_SPLASH:
+                _ = graphics.DrawText(
+                    self.double_buffer,
+                    loaded_font,
+                    1,
+                    31,
+                    graphics.Color(30, 30, 30),
+                    f"VER:{VER_STR}",
+                )
+
+                _ = graphics.DrawText(
+                    self.double_buffer,
+                    loaded_font,
+                    20,
+                    4,
+                    graphics.Color(60, 60, 60),
+                    "NOW LOADING",
+                )
+
+            self.double_buffer = self.matrix.SwapOnVSync(self.double_buffer)
             sleep(0.04)
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.2.9.0
+VERSION: v.3.0.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -73,8 +73,9 @@ track_color = GREEN
 range_header_color = YELLOW_DARK
 range_color = YELLOW
 
-# sunrise/sunset/receiver stats in the middle
-stats_color = DARK_GREY
+# clock center row
+center_row1_color = DARK_GREY
+center_row2_color = DARK_GREY
 
 # ======== Plane Readout Colors =========
 # =======================================

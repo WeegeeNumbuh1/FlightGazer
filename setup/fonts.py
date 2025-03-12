@@ -8,6 +8,7 @@ except:
 
 # Fonts
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+microscopic = graphics.Font()
 smallest = graphics.Font()
 extrasmall = graphics.Font()
 small = graphics.Font()
@@ -15,6 +16,7 @@ regular = graphics.Font()
 regularplus = graphics.Font()
 large = graphics.Font()
 large_bold = graphics.Font()
+microscopic.LoadFont(f"{DIR_PATH}/../fonts/3x3.bdf")
 smallest.LoadFont(f"{DIR_PATH}/../fonts/3x5.bdf")
 extrasmall.LoadFont(f"{DIR_PATH}/../fonts/4x5.bdf")
 small.LoadFont(f"{DIR_PATH}/../fonts/5x8.bdf")

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.2.10.0
+# Version = v.3.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -41,7 +41,7 @@ interrupt() {
 
 help_str(){
 	echo ""
-	echo "Usage: sudo $BASEDIR/$(basename $0) [options]"
+	echo "Usage: sudo bash $BASEDIR/$(basename $0) [options]"
 	echo "[-h]     Print this help message."
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
@@ -56,6 +56,7 @@ help_str(){
 	echo "[-c]     Install/check dependencies only. Do not start main script."
 	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
 	echo ""
+	echo "Report bugs to WeegeeNumbuh1 <https://github.com/WeegeeNumbuh1/FlightGazer>"
 }
 
 DFLAG=""
@@ -332,7 +333,7 @@ echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
 if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
 	echo -e "${NC}${FADE}> Playing splash screen for 5 seconds..."
-	sleep 5s
+	sleep 6s # give an extra second to fire up the screen
 	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
 fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"

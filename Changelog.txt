@@ -5,6 +5,22 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.0.0 - 2025-03-11
+    - NEW: 3x3 font created by the author as an exercise in the smallest possible font viable for these RGB matrix screens
+    - NEW: Option for extended calendar info on Clock display: month, week number, day of the year
+    - NEW: CLOCK_CENTER_ROW setting which supersedes DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS
+        - Now there are two rows of data that can be shown in the center section of the clock display
+        - This is customizable, eg: extended calendar info in row 1, sunrise/sunset in row 2, etc
+        - Leaving only one row filled will retain previous functionality as before
+        - When 2 rows are selected, the display will use the new 3x3 font to maximize space
+        - The color for each row can be changed, of course
+    - Depreciate RGB_ROW and RGB_COL settings
+        - RGBMatrix size is now fixed to 32x64 (there was no point in changing the size anyway)
+        - These settings were vestigial remains from v.0.x versions
+    - Splash screen now reads version number of FlightGazer
+    - Updater script also shows which version of FlightGazer is being pulled from GitHub
+    - FlightGazer is now GPLv3 licensed
+
 v.2.10.1 - 2025-03-10
     - If location is not set, display will now show "N/A" for FLYBY and RANGE to indicate this
     - If dump1090 isn't found or we are currently under a watchdog timeout, TRACKING will show "N/A" as well

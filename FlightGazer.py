@@ -10,14 +10,29 @@
 A program heavily inspired by https://github.com/ColinWaddell/its-a-plane-python, but supplements flight information of
 nearby aircraft with real-time ADS-B and UAT data from dump1090 and dump978. Uses the FlightAware API instead of FlightRadar24.
 """
-    
+"""
+    Copyright (C) 2025, WeegeeNumbuh1.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
 # =============== Imports ==================
 # ==========================================
 import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.2.10.1 --- 2025-03-10'
+VERSION: str = 'v.3.0.0 --- 2025-03-11'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -50,8 +65,11 @@ from utilities.animator import Animator
 from setup import frames
 
 argflags = argparse.ArgumentParser(
-    description="FlightGazer, a program to show dump1090 info to an RGB-Matrix display.",
-    epilog="Protip: Ensure your location is set in your dump1090 configuration!"
+    description="FlightGazer, a program to show dump1090 info to an RGB-Matrix display.\n\
+    Copyright (C) 2025, WeegeeNumbuh1.\n\
+    This program comes with ABSOLUTELY NO WARRANTY; for details see the GNU GPL v3.",
+    epilog="Protip: Ensure your location is set in your dump1090 configuration!\n\
+Report bugs to WeegeeNumbuh1: <https://github.com/WeegeeNumbuh1/FlightGazer>"
     )
 argflags.add_argument('-i', '--interactive',
                       action='store_true',
@@ -152,6 +170,7 @@ main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
+# Actual constants
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
@@ -161,6 +180,8 @@ LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
 Affects how often other processing threads handle data as they are triggered on every update.
 Should be left at 2 (or slower) """
+RGB_COLS: int = 64
+RGB_ROWS: int = 32
 if VERBOSE_MODE: main_logger.debug("Verbose mode enabled.")
 
 # load in all the display-related modules
@@ -238,14 +259,10 @@ CUSTOM_DUMP978_LOCATION: str = ""
 BRIGHTNESS: int = 100
 GPIO_SLOWDOWN: int = 2
 HAT_PWM_ENABLED: bool = False
-RGB_ROWS: int = 32
-RGB_COLS: int = 64
 LED_PWM_BITS: int = 8
 UNITS: int = 0
 FLYBY_STALENESS: int = 60
 ENHANCED_READOUT: bool = False
-DISPLAY_SUNRISE_SUNSET: bool = False
-DISPLAY_RECEIVER_STATS: bool = False
 ENABLE_TWO_BRIGHTNESS: bool = True
 BRIGHTNESS_2: int = 50
 BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise":"06:00","Sunset":"18:00"}
@@ -255,6 +272,7 @@ LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
 FOLLOW_THIS_AIRCRAFT: str = ""
 DISPLAY_SWITCH_PROGRESS_BAR: bool = True
+CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None} # new setting! (supersedes DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS)
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -268,7 +286,7 @@ DISPLAY_SWITCH_PROGRESS_BAR: bool = True
 # NB: if we don't want to load certain settings,
 #     we can simply remove elements from this dictionary
 #     but be cautious of leaving out keys that are used elsewhere
-settings_values: dict = {
+default_settings: dict = {
     "FLYBY_STATS_ENABLED": FLYBY_STATS_ENABLED,
     "HEIGHT_LIMIT": HEIGHT_LIMIT,
     "RANGE": RANGE,
@@ -280,14 +298,10 @@ settings_values: dict = {
     "BRIGHTNESS": BRIGHTNESS,
     "GPIO_SLOWDOWN": GPIO_SLOWDOWN,
     "HAT_PWM_ENABLED": HAT_PWM_ENABLED,
-    "RGB_ROWS": RGB_ROWS,
-    "RGB_COLS": RGB_COLS,
     "LED_PWM_BITS": LED_PWM_BITS,
     "UNITS": UNITS,
     "FLYBY_STALENESS": FLYBY_STALENESS,
     "ENHANCED_READOUT": ENHANCED_READOUT,
-    "DISPLAY_SUNRISE_SUNSET": DISPLAY_SUNRISE_SUNSET,
-    "DISPLAY_RECEIVER_STATS": DISPLAY_RECEIVER_STATS,
     "ENABLE_TWO_BRIGHTNESS": ENABLE_TWO_BRIGHTNESS,
     "BRIGHTNESS_2": BRIGHTNESS_2,
     "BRIGHTNESS_SWITCH_TIME": BRIGHTNESS_SWITCH_TIME,
@@ -297,6 +311,7 @@ settings_values: dict = {
     "ENHANCED_READOUT_AS_FALLBACK": ENHANCED_READOUT_AS_FALLBACK,
     "FOLLOW_THIS_AIRCRAFT": FOLLOW_THIS_AIRCRAFT,
     "DISPLAY_SWITCH_PROGRESS_BAR": DISPLAY_SWITCH_PROGRESS_BAR,
+    "CLOCK_CENTER_ROW": CLOCK_CENTER_ROW,
 }
 """ Dict of default settings """
 
@@ -329,12 +344,12 @@ In the future, additional settings could be defined, which older config files
 will not have, so we attempt to load what we can and handle cases when the setting value is missing.
 This shouldn't be an issue when FlightGazer is updated with the update script, but we still have to import the settings. '''
 if not CONFIG_MISSING:
-    for setting_key in settings_values:
+    for setting_key in default_settings:
         try:
             globals()[f"{setting_key}"] = config[setting_key] # match setting key from config file with expected keys
         except:
             # ensure we can always revert to default values 
-            globals()[f"{setting_key}"] = settings_values[setting_key]
+            globals()[f"{setting_key}"] = default_settings[setting_key]
             main_logger.warning(f"{setting_key} missing, using default value")
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
@@ -442,6 +457,10 @@ ENHANCED_READOUT_INIT: bool = False
 """ State of ENHANCED_READOUT after successfully parsing settings file """
 CPU_TEMP_SENSOR: str | None = None
 """ CPU temperature sensor present on system """
+CLOCK_CENTER_ENABLED: bool = False
+""" True when CLOCK_CENTER_ROW is not None """
+CLOCK_CENTER_ROW_2ROWS: bool = False
+""" True when CLOCK_CENTER_ROW is set to use two rows """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -779,39 +798,71 @@ def probe_API() -> tuple[int | None, float | None]:
         return None, None
     
 def configuration_check() -> None:
-    """ Configuration checker and runtime adjustments. """
+    """ Configuration checker and runtime adjustments. Actually very important. """
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
     global API_KEY, API_DAILY_LIMIT
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS, ENHANCED_READOUT, ENHANCED_READOUT_INIT
-    global RGB_COLS, RGB_ROWS
+    global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
+    global LED_PWM_BITS
 
-    valid_rgb_sizes = [16, 32, 64]
-    if (not isinstance(RGB_ROWS, int) or not isinstance(RGB_ROWS, int)) or\
-        (RGB_ROWS not in valid_rgb_sizes or RGB_COLS not in valid_rgb_sizes):
-        main_logger.warning(f"Selected RGB dimensions is not a valid size.")
-        main_logger.info(f">>> Setting values to default. ({settings_values['RGB_ROWS']}x{settings_values['RGB_COLS']})")
-        RGB_ROWS = settings_values['RGB_ROWS']
-        RGB_COLS = settings_values['RGB_COLS']
+    try:
+        for key in CLOCK_CENTER_ROW:
+            if (CLOCK_CENTER_ROW[key] is not None and not isinstance(CLOCK_CENTER_ROW[key], int))\
+            or (CLOCK_CENTER_ROW[key] is None or CLOCK_CENTER_ROW[key] == 0):
+                main_logger.info(f"{key} for Clock center readout is disabled.")
+                CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
+            elif CLOCK_CENTER_ROW[key] == 1:
+                main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
+            elif CLOCK_CENTER_ROW[key] == 2:
+                main_logger.info(f"{key} for Clock center will display Receiver Stats.")
+            elif CLOCK_CENTER_ROW[key] == 3:
+                main_logger.info(f"{key} for Clock center will display extended calendar info.")
+            else:
+                main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
+                CLOCK_CENTER_ROW[key] = None
+    except KeyError:
+        main_logger.warning("Clock center readout is not properly configured.")
+        CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
 
+    if CLOCK_CENTER_ROW['ROW1'] is None and CLOCK_CENTER_ROW['ROW2'] is None:
+        CLOCK_CENTER_ENABLED = False
+        main_logger.info("Clock center readout is disabled.")
     else:
-        if LOCATION_TIMEOUT == 60:
-            main_logger.info("Location timeout set to 60 seconds. This will match to dump1090's behavior.")
-        else:
-            main_logger.info(f"Location timeout set to {LOCATION_TIMEOUT} seconds.")
+        CLOCK_CENTER_ENABLED = True
+
+    if (isinstance(CLOCK_CENTER_ROW['ROW1'], int) and isinstance(CLOCK_CENTER_ROW['ROW2'], int))\
+    or (CLOCK_CENTER_ROW['ROW1'] is None and isinstance(CLOCK_CENTER_ROW['ROW2'], int)):
+        main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
+        CLOCK_CENTER_ROW_2ROWS = True
+
+    if CLOCK_CENTER_ENABLED and (CLOCK_CENTER_ROW['ROW1'] == CLOCK_CENTER_ROW['ROW2']):
+        main_logger.warning("Clock center readout options are the same. Reverting to only one row.")
+        CLOCK_CENTER_ROW_2ROWS = False
+        CLOCK_CENTER_ROW['ROW2'] = None
+
+    if LED_PWM_BITS is None or not isinstance(LED_PWM_BITS, int) or (LED_PWM_BITS < 1 or LED_PWM_BITS > 11):
+        main_logger.warning(f"LED_PWM_BITS is out of bounds or not an integer.")
+        main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
+        LED_PWM_BITS = default_settings['LED_PWM_BITS']
+
+    if LOCATION_TIMEOUT == 60:
+        main_logger.info("Location timeout set to 60 seconds. This will match to dump1090's behavior.")
+    else:
+        main_logger.info(f"Location timeout set to {LOCATION_TIMEOUT} seconds.")
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
-            main_logger.warning(f"RANGE is not a number. Setting to default value ({settings_values['RANGE']}).")
-            globals()['RANGE'] = settings_values['RANGE']
+            main_logger.warning(f"RANGE is not a number. Setting to default value ({default_settings['RANGE']}).")
+            globals()['RANGE'] = default_settings['RANGE']
         if not isinstance(HEIGHT_LIMIT, int):
-            main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({settings_values['HEIGHT_LIMIT']}).")
-            globals()['HEIGHT_LIMIT'] = settings_values['HEIGHT_LIMIT']
+            main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({default_settings['HEIGHT_LIMIT']}).")
+            globals()['HEIGHT_LIMIT'] = default_settings['HEIGHT_LIMIT']
 
         if not isinstance(LOCATION_TIMEOUT, int) or\
         (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
             main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
-            main_logger.info(f">>> Setting to default ({settings_values['LOCATION_TIMEOUT']})")
-            LOCATION_TIMEOUT = settings_values['LOCATION_TIMEOUT']
+            main_logger.info(f">>> Setting to default ({default_settings['LOCATION_TIMEOUT']})")
+            LOCATION_TIMEOUT = default_settings['LOCATION_TIMEOUT']
 
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
@@ -848,8 +899,8 @@ def configuration_check() -> None:
     
     if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
         main_logger.warning(f"Desired flyby staleness is out of bounds.")
-        main_logger.info(f">>> Setting to default ({settings_values['FLYBY_STALENESS']})")
-        FLYBY_STALENESS = settings_values['FLYBY_STALENESS']
+        main_logger.info(f">>> Setting to default ({default_settings['FLYBY_STALENESS']})")
+        FLYBY_STALENESS = default_settings['FLYBY_STALENESS']
 
     if FOLLOW_THIS_AIRCRAFT:
         try:
@@ -869,13 +920,6 @@ def configuration_check() -> None:
     if not FLYBY_STATS_ENABLED:
         main_logger.info("Flyby stats will not be written.")
 
-    if DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
-        main_logger.warning("Display option for sunrise and sunset times is enabled, however, receiver stats will be displayed instead.")
-    elif DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
-        main_logger.info("Sunrise and sunset times will be displayed.")
-    elif not DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS:
-        main_logger.info("Receiver stats will be displayed.")
-
     brightness_list = ["BRIGHTNESS", "BRIGHTNESS_2", "ACTIVE_PLANE_DISPLAY_BRIGHTNESS"]
     for setting_entry in brightness_list:
         try:
@@ -884,8 +928,8 @@ def configuration_check() -> None:
                     continue
             if not isinstance(imported_value, int) or (imported_value < 0 or imported_value > 100):
                 main_logger.warning(f"{setting_entry} is out of bounds or not an integer.")
-                main_logger.info(f">>> Using default value ({settings_values[setting_entry]}).")
-                globals()[f"{setting_entry}"] = settings_values[setting_entry]
+                main_logger.info(f">>> Using default value ({default_settings[setting_entry]}).")
+                globals()[f"{setting_entry}"] = default_settings[setting_entry]
         except KeyError:
             pass
 
@@ -1968,7 +2012,7 @@ class DisplayFeeder:
             'Range': current_range,
         }
 
-        # idle_stats_2
+        # idle_stats_2 (clock center row)
         sunrise = ""
         sunset = ""
         receiver_string = ""
@@ -2258,21 +2302,15 @@ class Display(
 ):
     """ Our Display driver. """
     """ Programmer's notes:
-    Adapted from Colin Waddell's approach to work with this program's data setup.
+    Uses techniques from Colin Waddell's its-a-plane-python project but diverges significantly from his design.
 
-    In his original design, all the display "scenes" are integrated with one another via multiple inheritance in what I consider
-    a "walled-garden" approach: one module `Overhead()` served as the data generator that controlled which
-    scenes were on the current canvas, including the relevant data to display. The design for that module was such that
-    it would pull data from the original API and insert the data within `Display()`'s `self` instance.
-    Additionally, `Overhead()` would generate a queue of data for other modules/scenes to parse through, and once
-    all the data had been read out, we switch back to being a clock.
+    This Display class is a huge mess, but it works and its structure has not changed since v.0.8.0.
+    Why is this class not broken out as its own module? Threading and global variables, basically. A rewrite at this point isn't worth it imho.
+    Data to display is handled and parsed by `DisplayFeeder` while time-based elements like the clock are handled internally.
+    Actual draw routines and shape primitives are also handled internally.
+    The actual workings of this class should already be well-explained with all the comments and docstrings.
 
-    We are using a queue-less and dynamic approach; the displayed data can switch whenever based on the current data.
-    Moreover, our data exists in global variables; we would not be able to break out the scenes in this code into their own modules.
-    Hence, we're basically going to shove all of the scenes inspired by Waddell, including our added stuff, as part of this single class
-    and let `DisplayFeeder` control what we do.
-
-    NB: Use the @Animator decorator to control both how often elements update and our logic evaluations. """
+    NB: Use the @Animator decorator to control both how often elements update along with associated logic evaluations. """
     def __init__(self):
 
         # Setup Display
@@ -2317,9 +2355,9 @@ class Display(
         self._last_flybys = None
         self._last_track = None
         self._last_range = None
-        # idle stats 2
-        self._last_sunrise_sunset = None
-        self._last_receiver_stats = None
+        # idle stats 2 (clock center row)
+        self._row1_data = None
+        self._row2_data = None
         # active stats (plane info)
         self._last_callsign = None
         self._last_origin = None
@@ -2358,6 +2396,7 @@ class Display(
     # Control display "responsiveness" (the animator redraw, in seconds)
     refresh_speed = 0.1
 
+    """ Watches when we need to switch to active plane display or if ENHANCED_READOUT changes """
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def scene_switch(self, count):
         if self._last_active_state != active_plane_display:
@@ -2611,7 +2650,7 @@ class Display(
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_header(self, count):
         if self.active_plane_display: return
-        HEADER_TEXT_FONT = fonts.smallest
+        HEADER_TEXT_FONT = fonts.smallest if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
         FLYBY_HEADING_COLOR = colors.flyby_header_color
         TRACK_HEADING_COLOR = colors.track_header_color
         RANGE_HEADING_COLOR = colors.range_header_color
@@ -2725,16 +2764,12 @@ class Display(
             range_now,
         )
     
-    """ Idle Stats 2: Sunrise/Sunset or Receiver Stats """
+    """ Idle Stats 2: Clock center row """
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_stats_2(self, count):
-        if self.active_plane_display:
-            self._last_sunrise_sunset = None
-            self._last_receiver_stats = None
-            return
-        if not DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
-            self._last_sunrise_sunset = None
-            self._last_receiver_stats = None
+        if self.active_plane_display or not CLOCK_CENTER_ENABLED:
+            self._row1_data = None
+            self._row2_data = None
             return
         
         def center_align(text_len:int) -> int:
@@ -2747,59 +2782,81 @@ class Display(
                 # font is monospaced and each glyph is 4 pixels wide
                 return (30 - ((text_len - 1) * 2))
         
-        STATS_2_FONT = fonts.smallest
-        STATS_2_COLOR = colors.stats_color
-        STATS_2_Y = 18
+        ROW1_FONT = fonts.smallest if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
+        ROW_2_FONT = fonts.microscopic
+        ROW1_COLOR = colors.center_row1_color
+        ROW2_COLOR = colors.center_row2_color
+        ROW1_Y = 18 if not CLOCK_CENTER_ROW_2ROWS else 16
+        ROW2_Y = 20
         try:
             sunrise_sunset_now = idle_data_2['SunriseSunset']
             receiver_stats_now = idle_data_2['ReceiverStats']
+            calendar_info_now = datetime.datetime.now().strftime('%b WK%V D%j').upper() if CLOCK_CENTER_ROW_2ROWS else\
+                                datetime.datetime.now().strftime('%b wk%V d%j')
         except: return
+        # row 1 data
+        if CLOCK_CENTER_ROW['ROW1'] is None:
+            row1_data = ""
+        elif CLOCK_CENTER_ROW['ROW1'] == 1:
+            row1_data = sunrise_sunset_now
+        elif CLOCK_CENTER_ROW['ROW1'] == 2:
+            row1_data = receiver_stats_now
+        elif CLOCK_CENTER_ROW['ROW1'] == 3:
+            row1_data = calendar_info_now
+        # row 2 data
+        if CLOCK_CENTER_ROW['ROW2'] is None:
+            row2_data = ""
+        elif CLOCK_CENTER_ROW['ROW2'] == 1:
+            row2_data = sunrise_sunset_now
+        elif CLOCK_CENTER_ROW['ROW2'] == 2:
+            row2_data = receiver_stats_now
+        elif CLOCK_CENTER_ROW['ROW2'] == 3:
+            row2_data = calendar_info_now
+
         # Undraw sections
-        if DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
-            if self._last_sunrise_sunset != sunrise_sunset_now:
-                if self._last_sunrise_sunset is not None:
+        if self._row1_data != row1_data:
+            if self._row1_data is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    ROW1_FONT,
+                    center_align(len(self._row1_data)),
+                    ROW1_Y,
+                    colors.BLACK,
+                    self._row1_data,
+                )
+        if CLOCK_CENTER_ROW_2ROWS:
+            if self._row2_data != row2_data:
+                if self._row2_data is not None:
                     _ = graphics.DrawText(
                         self.canvas,
-                        STATS_2_FONT,
-                        center_align(len(self._last_sunrise_sunset)),
-                        STATS_2_Y,
+                        ROW_2_FONT,
+                        center_align(len(self._row2_data)),
+                        ROW2_Y,
                         colors.BLACK,
-                        self._last_sunrise_sunset,
-                    )
-        if not DISPLAY_SUNRISE_SUNSET or DISPLAY_RECEIVER_STATS:
-            if self._last_receiver_stats != receiver_stats_now:
-                if self._last_receiver_stats is not None:
-                    _ = graphics.DrawText(
-                        self.canvas,
-                        STATS_2_FONT,
-                        center_align(len(self._last_receiver_stats)),
-                        STATS_2_Y,
-                        colors.BLACK,
-                        self._last_receiver_stats,
+                        self._row2_data,
                     )
         
         # store our current data for readout in the future
-        self._last_sunrise_sunset = sunrise_sunset_now
-        self._last_receiver_stats = receiver_stats_now
+        self._row1_data = row1_data
+        self._row2_data = row2_data
 
         # Update the values on the display
-        if DISPLAY_SUNRISE_SUNSET and not DISPLAY_RECEIVER_STATS:
+        _ = graphics.DrawText(
+            self.canvas,
+            ROW1_FONT,
+            center_align(len(row1_data)),
+            ROW1_Y,
+            ROW1_COLOR,
+            row1_data,
+        )
+        if CLOCK_CENTER_ROW_2ROWS:
             _ = graphics.DrawText(
                 self.canvas,
-                STATS_2_FONT,
-                center_align(len(sunrise_sunset_now)),
-                STATS_2_Y,
-                STATS_2_COLOR,
-                sunrise_sunset_now,
-            )
-        if not DISPLAY_SUNRISE_SUNSET or DISPLAY_RECEIVER_STATS:
-            _ = graphics.DrawText(
-                self.canvas,
-                STATS_2_FONT,
-                center_align(len(receiver_stats_now)),
-                STATS_2_Y,
-                STATS_2_COLOR,
-                receiver_stats_now,
+                ROW_2_FONT,
+                center_align(len(row2_data)),
+                ROW2_Y,
+                ROW2_COLOR,
+                row2_data,
             )
 
     # ======== Active Plane Readout ==========
@@ -3378,7 +3435,7 @@ class Display(
         fill_length = int(round(((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * RGB_COLS, 0))
 
         def draw_line(canvas, x_start:int, y_start:int, color, count:int):
-            """ draw a horizontal line of given pixel length """
+            """ draw a horizontal line of given pixel length (this is not graphics.DrawLine) """
             if count > RGB_COLS: count = RGB_COLS
             indicator_color = color
             for i in range(count):
