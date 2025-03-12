@@ -70,9 +70,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
-if [ f "${TEMPPATH}/version" ]; then
+if [ -f "${TEMPPATH}/version" ]; then
     VER_STR=$(head -c 12 ${TEMPPATH}/version)
-    echo -e "> Downloaded FlightGazer version: ${VER_STR}"
+    echo -e "${NC}> Downloaded FlightGazer version: ${VER_STR}"
 fi
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service

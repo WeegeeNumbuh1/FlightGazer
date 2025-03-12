@@ -17,7 +17,7 @@ from pathlib import Path
 try:
     try:
         from rgbmatrix import graphics
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
+        from rgbmatrix import RGBMatrix, RGBMatrixOptions
     except:
         from RGBMatrixEmulator import graphics
         from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
@@ -39,8 +39,10 @@ def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
     sys.exit(0)
 
+NO_TEXT_SPLASH = False
 try:
-    loaded_font = graphics.Font().LoadFont(f"{CURRENT_DIR}/../fonts/3x3.bdf")
+    loaded_font = graphics.Font()
+    loaded_font.LoadFont(f"{CURRENT_DIR}/../fonts/3x3.bdf")
 except FileNotFoundError:
     NO_TEXT_SPLASH = True
 
