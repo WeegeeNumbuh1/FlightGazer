@@ -32,7 +32,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.0.0 --- 2025-03-11'
+VERSION: str = 'v.3.0.1 --- 2025-03-12'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -806,6 +806,8 @@ def configuration_check() -> None:
     global LED_PWM_BITS
 
     try:
+        if len(CLOCK_CENTER_ROW) != 2:
+            raise KeyError
         for key in CLOCK_CENTER_ROW:
             if (CLOCK_CENTER_ROW[key] is not None and not isinstance(CLOCK_CENTER_ROW[key], int))\
             or (CLOCK_CENTER_ROW[key] is None or CLOCK_CENTER_ROW[key] == 0):
@@ -845,10 +847,7 @@ def configuration_check() -> None:
         main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
         LED_PWM_BITS = default_settings['LED_PWM_BITS']
 
-    if LOCATION_TIMEOUT == 60:
-        main_logger.info("Location timeout set to 60 seconds. This will match to dump1090's behavior.")
-    else:
-        main_logger.info(f"Location timeout set to {LOCATION_TIMEOUT} seconds.")
+
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
@@ -863,6 +862,11 @@ def configuration_check() -> None:
             main_logger.warning(f"LOCATION TIMEOUT is out of bounds or not an integer.")
             main_logger.info(f">>> Setting to default ({default_settings['LOCATION_TIMEOUT']})")
             LOCATION_TIMEOUT = default_settings['LOCATION_TIMEOUT']
+        else:
+            if LOCATION_TIMEOUT == 60:
+                main_logger.info("Location timeout set to 60 seconds. This will match dump1090's behavior.")
+            else:
+                main_logger.info(f"Location timeout set to {LOCATION_TIMEOUT} seconds.")
 
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
@@ -901,6 +905,9 @@ def configuration_check() -> None:
         main_logger.warning(f"Desired flyby staleness is out of bounds.")
         main_logger.info(f">>> Setting to default ({default_settings['FLYBY_STALENESS']})")
         FLYBY_STALENESS = default_settings['FLYBY_STALENESS']
+    if NOFILTER_MODE and FLYBY_STALENESS < 60:
+        main_logger.info(f"No Filter mode enabled, flyby staleness now set to 60 minutes.")
+        FLYBY_STALENESS = 60
 
     if FOLLOW_THIS_AIRCRAFT:
         try:
@@ -2356,8 +2363,8 @@ class Display(
         self._last_track = None
         self._last_range = None
         # idle stats 2 (clock center row)
-        self._row1_data = None
-        self._row2_data = None
+        self._last_row1_data = None
+        self._last_row2_data = None
         # active stats (plane info)
         self._last_callsign = None
         self._last_origin = None
@@ -2768,8 +2775,8 @@ class Display(
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_stats_2(self, count):
         if self.active_plane_display or not CLOCK_CENTER_ENABLED:
-            self._row1_data = None
-            self._row2_data = None
+            self._last_row1_data = None
+            self._last_row2_data = None
             return
         
         def center_align(text_len:int) -> int:
@@ -2814,31 +2821,31 @@ class Display(
             row2_data = calendar_info_now
 
         # Undraw sections
-        if self._row1_data != row1_data:
-            if self._row1_data is not None:
+        if self._last_row1_data != row1_data:
+            if self._last_row1_data is not None:
                 _ = graphics.DrawText(
                     self.canvas,
                     ROW1_FONT,
-                    center_align(len(self._row1_data)),
+                    center_align(len(self._last_row1_data)),
                     ROW1_Y,
                     colors.BLACK,
-                    self._row1_data,
+                    self._last_row1_data,
                 )
         if CLOCK_CENTER_ROW_2ROWS:
-            if self._row2_data != row2_data:
-                if self._row2_data is not None:
+            if self._last_row2_data != row2_data:
+                if self._last_row2_data is not None:
                     _ = graphics.DrawText(
                         self.canvas,
                         ROW_2_FONT,
-                        center_align(len(self._row2_data)),
+                        center_align(len(self._last_row2_data)),
                         ROW2_Y,
                         colors.BLACK,
-                        self._row2_data,
+                        self._last_row2_data,
                     )
         
         # store our current data for readout in the future
-        self._row1_data = row1_data
-        self._row2_data = row2_data
+        self._last_row1_data = row1_data
+        self._last_row2_data = row2_data
 
         # Update the values on the display
         _ = graphics.DrawText(
@@ -3508,8 +3515,8 @@ class Display(
             self._last_groundtrack = None
             self._last_vertspeed = None
             self._last_rssi = None
-            self._last_sunrise_sunset = None
-            self._last_receiver_stats = None
+            self._last_row1_data = None
+            self._last_row2_data = None
 
     """ Actually show the display """        
     @Animator.KeyFrame.add(1)

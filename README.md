@@ -243,7 +243,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.2.10.0 Console Output ===== Time now: 2025-03-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.3.0.0 Console Output ===== Time now: 2025-03-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
@@ -257,7 +257,7 @@ API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 > Detected 154 aircraft, 2 aircraft in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
 > Total flybys today: 13 | Aircraft selections: 13
-> CPU & memory usage: 16.925% overall CPU @ 45.3C | 7.734MiB
+> CPU & memory usage: 16.925% overall CPU @ 45.3°C | 7.734MiB
 > Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.
 ```
 </details>

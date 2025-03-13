@@ -5,6 +5,14 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.0.1 - 2025-03-12
+    - When No Filter mode is enabled, set flyby staleness to a minimum of 60 minutes
+        - This should cover most cases (and has been since this setting was added) as
+          most aircraft can cross the widest portion of an ADS-B receiver's coverage (~500nm) within this time
+        - If the flyby staleness value is greater than 60 minutes, this has no effect
+    - Minor code cleanups
+    - Initialization script now reads version number too
+
 v.3.0.0 - 2025-03-11
     - NEW: 3x3 font created by the author as an exercise in the smallest possible font viable for these RGB matrix screens
     - NEW: Option for extended calendar info on Clock display: month, week number, day of the year

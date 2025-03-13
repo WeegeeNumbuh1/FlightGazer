@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.0.0
+# Version = v.3.0.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -111,6 +111,10 @@ fi
 
 echo -ne "\033]0;FlightGazer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to FlightGazer!${NC}"
+if [ -f "${BASEDIR}/version" ]; then
+    VER_STR=$(head -c 12 ${BASEDIR}/version)
+    echo -e "    Version: ${VER_STR}"
+fi
 if [ `id -u` -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
 	sleep 1s
