@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.1.0 - 2025-03-13
+    - NEW: New option to use an alternative font for all the small text on the display
+        - This 3x5 font is less squared-off and maximizes differences between homoglyphs (eg: '5' vs 'S', 'O' vs '0', etc)
+        - Fans of TI-83/84 calculators will recognize this new font (it was adapted by the Author)
+    - Display now starts sooner in the startup phase
+    - In Enhanced Readout mode, the Track metric now shows an arrow corresponding to the direction shown
+        - eg: 90 degrees will show an arrow pointing right (east), 315 degrees pointing upward-left (northwest), etc
+        - Finally using some of the changes implemented in v.2.0.0
+    - Edits to a few glyphs in the 3x3 font for better clarity
+    - Remove 5x8.bdf font from Project as it was never used since the start
+    - Created a new 4x4 font just for this project for future use
+
 v.3.0.1 - 2025-03-12
     - When No Filter mode is enabled, set flyby staleness to a minimum of 60 minutes
         - This should cover most cases (and has been since this setting was added) as

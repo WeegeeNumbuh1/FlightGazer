@@ -90,6 +90,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - API limiting per day (those API calls can get expensive)
   - Colors 🌈
   - Track a specific aircraft once it's detected by your ADS-B receiver
+  - 🆕 Switch between font styles
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Useful and detailed console output
 - Small memory footprint

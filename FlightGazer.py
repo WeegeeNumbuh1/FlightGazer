@@ -32,7 +32,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.0.1 --- 2025-03-12'
+VERSION: str = 'v.3.1.0 --- 2025-03-13'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -272,7 +272,8 @@ LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
 FOLLOW_THIS_AIRCRAFT: str = ""
 DISPLAY_SWITCH_PROGRESS_BAR: bool = True
-CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None} # new setting! (supersedes DISPLAY_SUNRISE_SUNSET and DISPLAY_RECEIVER_STATS)
+CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None}
+ALTERNATIVE_FONT: bool = False # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -312,6 +313,7 @@ default_settings: dict = {
     "FOLLOW_THIS_AIRCRAFT": FOLLOW_THIS_AIRCRAFT,
     "DISPLAY_SWITCH_PROGRESS_BAR": DISPLAY_SWITCH_PROGRESS_BAR,
     "CLOCK_CENTER_ROW": CLOCK_CENTER_ROW,
+    "ALTERNATIVE_FONT": ALTERNATIVE_FONT,
 }
 """ Dict of default settings """
 
@@ -847,8 +849,6 @@ def configuration_check() -> None:
         main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
         LED_PWM_BITS = default_settings['LED_PWM_BITS']
 
-
-
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
             main_logger.warning(f"RANGE is not a number. Setting to default value ({default_settings['RANGE']}).")
@@ -939,6 +939,9 @@ def configuration_check() -> None:
                 globals()[f"{setting_entry}"] = default_settings[setting_entry]
         except KeyError:
             pass
+
+    if ALTERNATIVE_FONT:
+        main_logger.info("Using the alternative font style.")
 
     main_logger.info("Settings check complete.")
 
@@ -1974,6 +1977,14 @@ class DisplayFeeder:
         displayfeeder_start = time.perf_counter()
         filler_text = "---"
 
+        def track_arrow(trk: int | float) -> str:
+            """ Same routine as `main_loop_generator.relative_direction()`, just spits out arrows this time.
+            (This runs under the assumption we're using the `fonts.smallest` or `fonts.microscopic` fonts;
+            don't use with other fonts!) """
+            dirs = ['▲', '◥', '▶', '◢', '▼', '◣', '◀', '◤']
+            ix = round(trk / (360. / len(dirs)))
+            return dirs[ix % len(dirs)]
+
         if active_data: # check if active_data exists and do a comparison after we're done
             active_data_i = True
         else:
@@ -2128,7 +2139,12 @@ class DisplayFeeder:
             elif lon_i <0: lon_str = "W"
             lat = "{0:.3f}".format(abs(lat_i)) + lat_str
             lon = "{0:.3f}".format(abs(lon_i)) + lon_str
-            track = "T " + str(int(round(focus_plane_stats['Track'], 0))) + "°"
+            # track indicator
+            trkstr = ['T']
+            trkstr.append(track_arrow(focus_plane_stats['Track']))
+            trkstr.append(str(int(round(focus_plane_stats['Track'], 0))))
+            trkstr.append("°")
+            track = "".join(trkstr)
             # vertical speed is an interesting one; we are limited to 6 characters:
             # 1 for indicator, 1 for sign, and 4 for values
             vs_i = int(round(focus_plane_stats['VertSpeed'], 0))
@@ -2508,7 +2524,7 @@ class Display(
         if self.active_plane_display:
             self._last_seconds = None
             return
-        SECONDS_FONT = fonts.smallest
+        SECONDS_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         SECONDS_POSITION = (41, 12)
         SECONDS_COLOR = colors.seconds_color
 
@@ -2547,7 +2563,7 @@ class Display(
             self._last_ampm = None
             return
         AMPM_COLOR = colors.am_pm_color
-        AMPM_FONT = fonts.smallest
+        AMPM_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         AMPM_POSITION = (41, 6)
         now = datetime.datetime.now()
         current_ampm = now.strftime("%p")
@@ -2584,7 +2600,7 @@ class Display(
             self._last_day = None
             return
         DAY_COLOR = colors.day_of_week_color
-        DAY_FONT = fonts.smallest
+        DAY_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DAY_POSITION = (51, 6)
         now = datetime.datetime.now()
         current_day = now.strftime("%a").upper()
@@ -2621,7 +2637,7 @@ class Display(
             self._last_date = None
             return
         DATE_COLOR = colors.date_color
-        DATE_FONT = fonts.smallest
+        DATE_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DATE_POSITION = (55, 12)
         now = datetime.datetime.now()
         current_date = now.strftime("%d")
@@ -2657,7 +2673,8 @@ class Display(
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def idle_header(self, count):
         if self.active_plane_display: return
-        HEADER_TEXT_FONT = fonts.smallest if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
+        small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
+        HEADER_TEXT_FONT = small_font_style if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
         FLYBY_HEADING_COLOR = colors.flyby_header_color
         TRACK_HEADING_COLOR = colors.track_header_color
         RANGE_HEADING_COLOR = colors.range_header_color
@@ -2695,7 +2712,7 @@ class Display(
             self._last_track = None
             self._last_range = None
             return
-        STATS_TEXT_FONT = fonts.extrasmall
+        STATS_TEXT_FONT = fonts.small
         FLYBY_TEXT_COLOR = colors.flyby_color
         TRACK_TEXT_COLOR = colors.track_color
         RANGE_TEXT_COLOR = colors.range_color
@@ -2789,7 +2806,8 @@ class Display(
                 # font is monospaced and each glyph is 4 pixels wide
                 return (30 - ((text_len - 1) * 2))
         
-        ROW1_FONT = fonts.smallest if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
+        small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
+        ROW1_FONT = small_font_style if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
         ROW_2_FONT = fonts.microscopic
         ROW1_COLOR = colors.center_row1_color
         ROW2_COLOR = colors.center_row2_color
@@ -2876,7 +2894,7 @@ class Display(
             self._last_distance = None
             self._last_country = None
             return
-        TOP_HEADER_FONT = fonts.smallest
+        TOP_HEADER_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         CALLSIGN_COLOR = colors.callsign_color
         DISTANCE_COLOR = colors.distance_color
         COUNTRY_COLOR = colors.country_color
@@ -3058,7 +3076,7 @@ class Display(
         elif len(origin_now) > 4:
             _ = graphics.DrawText(
                 self.canvas,
-                fonts.extrasmall,
+                fonts.small,
                 ORIGIN_X_POS,
                 JOURNEY_Y_BASELINE,
                 ORIGIN_COLOR,
@@ -3087,7 +3105,7 @@ class Display(
         elif len(destination_now) > 4:
             _ = graphics.DrawText(
                 self.canvas,
-                fonts.extrasmall,
+                fonts.small,
                 DESTINATION_X_POS,
                 JOURNEY_Y_BASELINE,
                 DESTINATION_COLOR,
@@ -3106,7 +3124,7 @@ class Display(
         LON_Y_POS = 18
         LATITUDE_COLOR = colors.latitude_color
         LONGITUDE_COLOR = colors.longitude_color
-        FONT = fonts.extrasmall
+        FONT = fonts.small
         try:
             lat_now = active_data['Latitude']
             lon_now = active_data['Longitude']
@@ -3159,7 +3177,7 @@ class Display(
     @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
     def active_header(self, count):
         if not self.active_plane_display: return
-        HEADER_TEXT_FONT = fonts.extrasmall
+        HEADER_TEXT_FONT = fonts.small
         ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
         SPEED_HEADING_COLOR = colors.speed_heading_color
         TIME_HEADING_COLOR = colors.time_rssi_heading_color
@@ -3207,7 +3225,7 @@ class Display(
             self._last_speed = None
             self._last_flighttime = None
             return
-        STATS_TEXT_FONT = fonts.smallest
+        STATS_TEXT_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         ALTITUDE_TEXT_COLOR = colors.altitude_color
         SPEED_TEXT_COLOR = colors.speed_color
         TIME_TEXT_COLOR = colors.time_rssi_color
@@ -3323,7 +3341,7 @@ class Display(
         X_POS = 39
         GT_Y_POS = 12
         VS_Y_POS = 18
-        FONT = fonts.smallest
+        FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         GT_COLOR = colors.groundtrack_color
         VS_COLOR = colors.verticalspeed_color
         try:
@@ -3571,7 +3589,8 @@ else:
     del matching_processes
     main_logger.info("Cleared for takeoff.")
 
-configuration_check()
+configuration_check() # very important
+
 get_ip()
 CPU_TEMP_SENSOR = get_cpu_temp_sensor()
 if CPU_TEMP_SENSOR is not None:
@@ -3591,6 +3610,20 @@ schedule.every().hour.do(get_ip) # in case the IP changes
 if rlat is not None or rlon is not None:
     schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 
+if DISPLAY_IS_VALID and not NODISPLAY_MODE:
+    main_logger.info("Initializing display...")
+    if 'RGBMatrixEmulator' in sys.modules:
+        main_logger.info("We are using 'RGBMatrixEmulator'")
+    else:
+        main_logger.info("We are using 'rgbmatrix'")
+    display = Display()
+    display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
+    brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
+    display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)    
+    display_stuff.start()
+    brightness_stuff.start()
+    display_sender.start()
+
 dump1090_check()
 read_1090_config()
 suntimes()
@@ -3600,27 +3633,14 @@ def main() -> None:
     # register our loop breaker
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
-        
+
     periodic_stuff = threading.Thread(target=schedule_thread, name='Scheduling-Thread', daemon=True)
     periodic_stuff.start()
     main_stuff = threading.Thread(target=main_loop_generator, name='Main-Data-Loop', daemon=True)
     airplane_watcher = threading.Thread(target=AirplaneParser, name='Airplane-Parser', daemon=True)
     api_getter = threading.Thread(target=APIFetcher, name='API-Fetch-Thread', daemon=True)
-    display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
-    brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
     watchdog_stuff = threading.Thread(target=dump1090Watchdog, name='Dump1090-Watchdog', daemon=True)
-
-    if DISPLAY_IS_VALID and not NODISPLAY_MODE:
-        main_logger.info("Initializing display...")
-        if 'RGBMatrixEmulator' in sys.modules:
-            main_logger.info("We are using 'RGBMatrixEmulator'")
-        else:
-            main_logger.info("We are using 'rgbmatrix'")
-        display = Display()
-        display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
-        display_stuff.start()
-        brightness_stuff.start()
 
     if INTERACTIVE:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
@@ -3659,7 +3679,6 @@ If you close this window now, FlightGazer will exit uncleanly.\a\n")
     main_stuff.start()
     airplane_watcher.start()
     api_getter.start()
-    display_sender.start()
     receiver_stuff.start()
     watchdog_stuff.start()
     main_logger.debug(f"Running with {this_process.num_threads()} threads.")
