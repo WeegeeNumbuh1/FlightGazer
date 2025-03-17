@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.3.1.0 # do not modify this
+CONFIG_VERSION: v.3.2.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -10,6 +10,7 @@ FLYBY_STATS_ENABLED: true
 # Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
 # FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
+# It is recommended to leave this left as true when the API is in use.
 
 UNITS: 0
 # Select which units to use. 
@@ -18,12 +19,36 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# [Integer: 500 ~ 75000] (feet or meters)
+# [Integer: 1000 ~ 75000] (feet or meters)
 # Filter out aircraft at an altitude higher than this.
 
 RANGE: 2
 # [Float: 0.2 ~ 20] (nautical miles, kilometers, or miles based on UNITS)
 # Radius of which aircraft need to be in for detailed tracking.
+
+# ================ API settings ====================
+# ==================================================
+
+API_KEY: ''
+# [String]
+# Put your FlightAware API key here. Leave as '' to not use the API.
+
+API_DAILY_LIMIT:
+# [Integer: > 0, null, or empty]
+# Set this to an integer value if you want to limit calls.
+# If you want to have unlimited API calls, set this to null or an empty value.
+
+API_COST_LIMIT: 5.00
+# [Float: dollar amount (no currency sign), null, or empty]
+# Limit API usage of an API key based on its running cost over the past 30 days. (ex: $10.00)
+# If the cost exceeds this value, API calls will stop and will not resume.
+# If the cost upon startup exceeds this value, the API will not be used.
+# API_DAILY_LIMIT takes higher priority than this setting in controlling API usage, but if either limit is reached,
+# API calls will stop.
+# If you want to have unlimited API calls, set this to null or an empty value.
+
+# ============== Advanced settings =================
+# ==================================================
 
 FLYBY_STALENESS: 60
 # [Integer: 1 ~ 1440] (minutes)
@@ -37,37 +62,28 @@ LOCATION_TIMEOUT: 60
 # This setting, if low enough, will cause aircraft that are present in the area to "drop out" more readily
 # if they don't report a timely location update.
 
-API_KEY: ''
-# [String]
-# Put your FlightAware API key here. Leave as '' to not use the API.
-
-API_DAILY_LIMIT:
-# [Integer: > 0, null, or empty]
-# Set this to an integer value if you want to limit calls.
-# If you want to have unlimited API calls, set this to null or an empty value.
-
-FOLLOW_THIS_AIRCRAFT: ''
-# [String]
-# If there is a specific aircraft you would like to follow, put its ICAO ID here. Leave this as '' to not use this feature.
-# This is not the Callsign nor Registration for the aircraft. It is a string of 6 hexidecimal values unique to the aircraft.
-# Only one (1) aircraft is allowed for this setting.
-# If this aircraft enters the reception area for your ADS-B receiver (not the values set by `HEIGHT_LIMIT` or `RANGE`)
-# then FlightGazer will start tracking it as if it were inside your designated RANGE.
-# When tracking this aircraft, FlightGazer will use its ENHANCED_READOUT mode regardless of the setting for that option.
-# If this aircraft does enter your defined area, FlightGazer will follow the same settings
-# that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
-# FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
-
 CUSTOM_DUMP1090_LOCATION: ''
 # [String]
 # URL of your dump1090 install if it is in a different location or on a different network device.
-# ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing `/`)
+# ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing /)
 
 CUSTOM_DUMP978_LOCATION: ''
 # [String]
 # URL of your dump978 install if it is in a different location or on a different network device.
 # If you're not using dump978, leave the value as ''.
 # ex: http://192.168.xxx.xxx:8978
+
+FOLLOW_THIS_AIRCRAFT: ''
+# [String]
+# If there is a specific aircraft you would like to follow, put its ICAO ID here. Leave this as '' to not use this feature.
+# This is not the Callsign nor Registration for the aircraft. It is a string of 6 hexidecimal values unique to the aircraft.
+# Only one (1) aircraft is allowed for this setting.
+# If this aircraft enters the reception area for your ADS-B receiver (not the values set by HEIGHT_LIMIT or RANGE)
+# then FlightGazer will start tracking it as if it were inside your designated RANGE.
+# When tracking this aircraft, FlightGazer will use its ENHANCED_READOUT mode regardless of the setting for that option.
+# If this aircraft does enter your defined area, FlightGazer will follow the same settings
+# that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
+# FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
 
 # ============= Screen Output settings =============
 # ==================================================
@@ -80,13 +96,21 @@ ENHANCED_READOUT: false
 
 ENHANCED_READOUT_AS_FALLBACK: true
 # [true/false]
-# When true, switch to using `ENHANCED_READOUT` if the API Key fails at startup
-# or when `API_DAILY_LIMIT` is reached.
-# This setting only works if `ENHANCED_READOUT` is false.
+# When true, switch to using ENHANCED_READOUT if the API Key fails at startup
+# or when API_DAILY_LIMIT is reached.
+# This setting only works if ENHANCED_READOUT is false.
+
+JOURNEY_PLUS: false
+# [true/false]
+# CURRENTLY DOES NOT DO ANYTHING!
+# A future FlightGazer release will enable this setting's functionality.
+# A hybrid between ENHANCED_READOUT and the default aircraft info. 
+# Adds aircraft coordinates and RSSI to the this layout.
+# Enable this if you prefer maximizing information overload.
 
 CLOCK_CENTER_ROW:
   ROW1: 1
-  ROW2: 0
+  ROW2: 2
 # Choose what to display on the Clock screen center row.
 # Leave only ROW1 filled with a non-zero number to show just one row of data.
 # When ROW1 and ROW2 are filled, the Clock display will use a smaller font to maximize space.
@@ -121,12 +145,12 @@ BRIGHTNESS: 75
 
 ENABLE_TWO_BRIGHTNESS: true
 # [true/false]
-# If true, enables dynamically switching brightness. If false, only `BRIGHTNESS` will be used.
+# If true, enables dynamically switching brightness. If false, only BRIGHTNESS will be used.
 
 BRIGHTNESS_2: 40
 # [Integer: 0 ~ 100]
 # Secondary LED brightness.
-# `BRIGHTNESS_2` will be used from sunset to sunrise ("night") and `BRIGHTNESS` will be used for all other times.
+# BRIGHTNESS_2 will be used from sunset to sunrise ("night") and BRIGHTNESS will be used for all other times.
 
 BRIGHTNESS_SWITCH_TIME:
   Sunrise: 06:00
@@ -137,13 +161,13 @@ BRIGHTNESS_SWITCH_TIME:
 USE_SUNRISE_SUNSET: true
 # [true/false]
 # If true, use sunrise and sunset times to adjust brightness.
-# If sunrise or sunset times are not available, will fall back to `BRIGHTNESS_SWITCH_TIME` values.
+# If sunrise or sunset times are not available, will fall back to BRIGHTNESS_SWITCH_TIME values.
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
 # [Integer: 0 ~ 100, null, or empty]
-# When there is an active aircraft, use a different brightness level (0..100). Useful for grabbing attention.
+# When there is an active aircraft, use a different brightness level. Useful for grabbing attention.
 # Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
-# `ENABLE_TWO_BRIGHTNESS` is enabled.
+# ENABLE_TWO_BRIGHTNESS is enabled.
 # If you do not want the brightness to change, set this to null or an empty value.
 
 # ============== RGB-Matrix settings ===============

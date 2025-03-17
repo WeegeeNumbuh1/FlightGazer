@@ -87,7 +87,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Brightness based on time of day or when there's an active aircraft shown
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
-  - API limiting per day (those API calls can get expensive)
+  - API limiting per day or by monthly cost (those API calls can get expensive)
   - Colors 🌈
   - Track a specific aircraft once it's detected by your ADS-B receiver
   - 🆕 Switch between font styles
@@ -244,8 +244,8 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.3.0.0 Console Output ===== Time now: 2025-03-01 00:00:00 | Runtime: 98 days, 23:48:05
-Filters enabled: <60nmi, <15000ft
+===== FlightGazer v.3.2.0 Console Output ===== Time now: 2025-03-01 00:00:00 | Runtime: 98 days, 23:48:05
+Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
 Aircraft scratchpad: {'aa3ae5', 'a10d75'}
@@ -256,9 +256,9 @@ API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 
 > dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
 > Detected 154 aircraft, 2 aircraft in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
-> API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits
+> API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits | Estimated cost: $4.20
 > Total flybys today: 13 | Aircraft selections: 13
-> CPU & memory usage: 16.925% overall CPU @ 45.3°C | 7.734MiB
+> CPU & memory usage: 16.9% overall CPU @ 45.3°C | 7.734MiB
 > Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.
 ```
 </details>

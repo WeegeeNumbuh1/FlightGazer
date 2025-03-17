@@ -5,6 +5,24 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.x.0 - Planned
+    - NEW: The best of both worlds: Enhanced Readout + the original journey indicators
+        - Coordinates and RSSI are now shown at the same time along with origin and destination readout
+        - Can be enabled with a new setting: JOURNEY_PLUS
+
+v.3.2.0 - 2025-03-17
+    - NEW: Another option for API limiting: API_COST_LIMIT
+        - Since API use is already checked upon startup based on the key (v.2.1.2), this setting can now limit
+          usage by this metric
+        - FlightGazer will also maintain a running cost and also check FlightAware periodically to ensure
+          usage remains under this limit
+        - Estimated API cost for the day is now shown in Interactive mode
+        - Some code refactoring to accommodate this change
+    - Re-categorized the config file for better layout
+    - Added JOURNEY_PLUS setting (does nothing at the moment)
+    - Refined out-of-bounds range and height limiting
+    - Minor tweaks to footer formatting in Interactive readout
+   
 v.3.1.0 - 2025-03-13
     - NEW: New option to use an alternative font for all the small text on the display
         - This 3x5 font is less squared-off and maximizes differences between homoglyphs (eg: '5' vs 'S', 'O' vs '0', etc)

@@ -32,7 +32,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.1.0 --- 2025-03-13'
+VERSION: str = 'v.3.2.0 --- 2025-03-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -182,6 +182,9 @@ Affects how often other processing threads handle data as they are triggered on 
 Should be left at 2 (or slower) """
 RGB_COLS: int = 64
 RGB_ROWS: int = 32
+API_COST_PER_CALL: float = 0.005
+""" How much it costs to do a single API call (may change in the future).
+Current as of `VERSION` """
 if VERBOSE_MODE: main_logger.debug("Verbose mode enabled.")
 
 # load in all the display-related modules
@@ -249,8 +252,8 @@ if CORE_COUNT is None: CORE_COUNT = 1
 
 # Define our settings and initialize to defaults
 FLYBY_STATS_ENABLED: bool = False
-HEIGHT_LIMIT: float = 15000
-RANGE: float = 2
+HEIGHT_LIMIT: int|float = 15000
+RANGE: int|float = 2
 API_KEY: str|None = ""
 API_DAILY_LIMIT: int|None = None
 CLOCK_24HR: bool = True
@@ -273,7 +276,9 @@ ENHANCED_READOUT_AS_FALLBACK: bool = False
 FOLLOW_THIS_AIRCRAFT: str = ""
 DISPLAY_SWITCH_PROGRESS_BAR: bool = True
 CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None}
-ALTERNATIVE_FONT: bool = False # new setting!
+ALTERNATIVE_FONT: bool = False
+API_COST_LIMIT: float|None = None # new setting!
+JOURNEY_PLUS: bool = False # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -314,6 +319,8 @@ default_settings: dict = {
     "DISPLAY_SWITCH_PROGRESS_BAR": DISPLAY_SWITCH_PROGRESS_BAR,
     "CLOCK_CENTER_ROW": CLOCK_CENTER_ROW,
     "ALTERNATIVE_FONT": ALTERNATIVE_FONT,
+    "API_COST_LIMIT": API_COST_LIMIT,
+    "JOURNEY_PLUS": JOURNEY_PLUS,
 }
 """ Dict of default settings """
 
@@ -355,8 +362,6 @@ if not CONFIG_MISSING:
             main_logger.warning(f"{setting_key} missing, using default value")
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
-
-main_logger.info("Checking settings configuration...")
 
 # =========== Global Variables =============
 # ==========================================
@@ -430,7 +435,7 @@ DUMP1090_IS_AVAILABLE: bool = False
 """ If we fail to load dump1090, set to False and continue. Set to True when connected to dump1090.
 This is also changed to False when the watchdog kicks in. """
 process_time: list = [0,0,0,0]
-""" For debug; [json parse, filter data, API response, format data] ms """
+""" [json parse, filter data, API response, format data] ms """
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 flyby_stats_present: bool = False
@@ -446,8 +451,8 @@ watchdog_setpoint: int = 3
 """ How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 selection_events: int = 0
 """ Track amount of times the plane selector is triggered. (this is just a verbose stat) """
-API_limit_reached: bool = False
-""" This flag will be set to True if we reach the API limit.
+API_daily_limit_reached: bool = False
+""" This flag will be set to True if we reach `API_DAILY_LIMIT`.
 Currently controls the fallback for ENHANCED_READOUT. """
 dump1090_receiver_version: str = ''
 """ What version of dump1090 we're connected to as read from the `receiver.json` file. """
@@ -463,6 +468,10 @@ CLOCK_CENTER_ENABLED: bool = False
 """ True when CLOCK_CENTER_ROW is not None """
 CLOCK_CENTER_ROW_2ROWS: bool = False
 """ True when CLOCK_CENTER_ROW is set to use two rows """
+api_usage_cost_baseline: float = 0.
+""" API usage when we first started FlightGazer, and updated at around midnight. """
+estimated_api_cost: float = 0.
+""" API usage so far in the day. Resets at midnight. """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -479,7 +488,13 @@ distance_multiplier: float = 1
 altitude_multiplier: float = 1
 speed_multiplier: float = 1
 
-if UNITS == 1: # metric
+if UNITS is None\
+   or not isinstance(UNITS, int)\
+   or UNITS == 0\
+   or UNITS < 0\
+   or UNITS > 2:
+    main_logger.info("Using default aeronautical units (nmi, ft, kt)")
+elif UNITS == 1: # metric
     distance_unit = "km"
     altitude_unit = "m"
     speed_unit = "km/h"
@@ -493,8 +508,6 @@ elif UNITS == 2: # imperial
     distance_multiplier = 1.150779
     speed_multiplier = 1.150783
     main_logger.info("Using imperial units (mi, ft, mph)")
-else:
-    main_logger.info("Using default aeronautical units (nmi, ft, kt)")
 
 # =========== Program Setup I ==============
 # =============( Utilities )================
@@ -549,10 +562,10 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     include seconds, minutes, hours, days, and weeks.  Each field is optional.
 
     Some examples:
-        '{D:02}d {H:02}h {M:02}m {S:02}s' --> '05d 08h 04m 02s' (default)
-        '{W}w {D}d {H}:{M:02}:{S:02}'     --> '4w 5d 8:04:02'
-        '{D:2}d {H:2}:{M:02}:{S:02}'      --> ' 5d  8:04:02'
-        '{H}h {S}s'                       --> '72h 800s'
+    >>> '{D:02}d {H:02}h {M:02}m {S:02}s' --> '05d 08h 04m 02s' (default)
+    >>> '{W}w {D}d {H}:{M:02}:{S:02}'     --> '4w 5d 8:04:02'
+    >>> '{D:2}d {H:2}:{M:02}:{S:02}'      --> ' 5d  8:04:02'
+    >>> '{H}h {S}s'                       --> '72h 800s'
 
     The inputtype argument allows tdelta to be a regular number instead of the  
     default, which is a datetime.timedelta object.  Valid inputtype strings: 
@@ -588,21 +601,43 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     return f.format(fmt, **values)
 
 def runtime_accumulators_reset() -> None:
-    """ Resets the tracked planes set and other daily accumulators (schedule this) """
-    time.sleep(2) # wait for hourly events to complete
+    """ Resets the tracked planes set and other daily accumulators.
+    Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
-    global unique_planes_seen, api_hits, selection_events, ENHANCED_READOUT, API_limit_reached
-    main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events. \
-{api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data.")
+    time.sleep(2) # wait for hourly events to complete
+    global unique_planes_seen, selection_events, ENHANCED_READOUT
+    global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost
+    main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events.")
+    main_logger.info(f"API STATS for {date_now_str}:   {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. | \
+Estimated cost: ${estimated_api_cost}")
     with threading.Lock():
         unique_planes_seen.clear()
         for i in range(len(api_hits)):
             api_hits[i] = 0
-        if ENHANCED_READOUT_AS_FALLBACK and API_limit_reached:
+        if ENHANCED_READOUT_AS_FALLBACK and API_daily_limit_reached:
             ENHANCED_READOUT = False
-            API_limit_reached = False
+            API_daily_limit_reached = False
             main_logger.info("API calls have been reset. Restoring to previous display mode (ENHANCED_READOUT = False).")
         selection_events = 0
+
+    # update current API usage to what's reported on FlightAware's side
+    if API_KEY:
+        api_calls, api_cost = probe_API()
+        api_usage_cost_sofar = api_usage_cost_baseline + estimated_api_cost
+        if api_cost is not None:
+            main_logger.info(f"Queried API, actual usage is ${api_cost}, with {api_calls} total calls over the past 30 days.")
+            api_usage_cost_baseline = api_cost
+            if API_COST_LIMIT is not None:
+                main_logger.info(f"${API_COST_LIMIT} - {api_cost} of API credit remains.")
+            if api_usage_cost_sofar > api_cost: # stay on the safer side, as the reported API usage lags behind by 10 minutes
+                estimated_api_cost = (api_usage_cost_sofar - api_cost) # set the difference to the daily running cost
+            else: # we underestimated the usage cost
+                estimated_api_cost = 0.
+        else: # don't reset/adjust the counters
+            main_logger.warning("Unable to query API usage, will try again in 24 hours.")
+            if API_COST_LIMIT is not None:
+                main_logger.info(f">>> Running on the assumption that ${API_COST_LIMIT - (api_usage_cost_sofar)} of credit remains.")
+
     return
 
 def match_commandline(command_search: str, process_name: str) -> list:
@@ -733,7 +768,7 @@ def dump1090_check() -> None:
     DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
 
 def read_1090_config() -> None:
-    """ Gets us our location, if it is configured in dump1090. """
+    """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to. """
     global rlat, rlon, DISPLAY_SUNRISE_SUNSET, dump1090_receiver_version, is_readsb
     if not DUMP1090_IS_AVAILABLE: return
     try:
@@ -752,6 +787,8 @@ def read_1090_config() -> None:
                 if 'wiedehopf' in dump1090_receiver_version:
                     is_readsb = True
                     main_logger.debug("Connected to readsb!")
+            elif not has_key(receiver, 'version'):
+                main_logger.warning("Connected to an unknown ADS-B decoder.")
 
             if has_key(receiver,'lat'): #if location is set
                 if receiver['lat'] != rlat_last or receiver['lon'] != rlon_last:
@@ -790,11 +827,14 @@ def probe_API() -> tuple[int | None, float | None]:
         response.raise_for_status()
         if response.status_code == 200:
             response_json = response.json()
-            api_calls = response_json['total_calls']
-            api_cost = response_json['total_cost']
+            api_calls: int = response_json['total_calls']
+            api_cost: float = response_json['total_cost']
             return api_calls, api_cost
         else:
             return None, None
+    except KeyError:
+        main_logger.warning(f"API returned a response that cannot be parsed.")
+        return None, None
     except:
         main_logger.debug(f"API call failed. Returned: {response.status_code}")
         return None, None
@@ -802,10 +842,11 @@ def probe_API() -> tuple[int | None, float | None]:
 def configuration_check() -> None:
     """ Configuration checker and runtime adjustments. Actually very important. """
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
-    global API_KEY, API_DAILY_LIMIT
-    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS, ENHANCED_READOUT, ENHANCED_READOUT_INIT
+    global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS
+
+    main_logger.info("Checking settings configuration...")
 
     try:
         if len(CLOCK_CENTER_ROW) != 2:
@@ -851,11 +892,11 @@ def configuration_check() -> None:
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
-            main_logger.warning(f"RANGE is not a number. Setting to default value ({default_settings['RANGE']}).")
-            globals()['RANGE'] = default_settings['RANGE']
+            main_logger.warning(f"RANGE is not a number. Setting to default value ({default_settings['RANGE'] * distance_multiplier:.2f}{distance_unit}).")
+            globals()['RANGE'] = round(default_settings['RANGE'] * distance_multiplier, 2)
         if not isinstance(HEIGHT_LIMIT, int):
-            main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({default_settings['HEIGHT_LIMIT']}).")
-            globals()['HEIGHT_LIMIT'] = default_settings['HEIGHT_LIMIT']
+            main_logger.warning(f"HEIGHT_LIMIT is not an integer. Setting to default value ({default_settings['HEIGHT_LIMIT'] * altitude_multiplier}{altitude_unit}).")
+            globals()['HEIGHT_LIMIT'] = round(default_settings['HEIGHT_LIMIT'] * altitude_multiplier, 2)
 
         if not isinstance(LOCATION_TIMEOUT, int) or\
         (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
@@ -870,32 +911,31 @@ def configuration_check() -> None:
 
         # set hard limits for range
         if RANGE > (20 * distance_multiplier):
-            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier}{distance_unit}.")
+            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is out of bounds. Limiting to {20 * distance_multiplier:.2f}{distance_unit}.")
             main_logger.info(">>> If you would like to see more aircraft, consider \'No Filter\' mode. Use the \'-f\' flag.")
-            RANGE = (20 * distance_multiplier)
+            RANGE = round(20 * distance_multiplier, 2)
         elif RANGE < (0.2 * distance_multiplier):
-            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier}{distance_unit}.")
-            RANGE = (0.2 * distance_multiplier)
+            main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is too low. Limiting to {0.2 * distance_multiplier:.2f}{distance_unit}.")
+            RANGE = round(0.2 * distance_multiplier, 2)
 
         height_warning = f"Warning: Desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
         if HEIGHT_LIMIT >= (275000 * altitude_multiplier):
             main_logger.warning(f"{height_warning} beyond the theoretical limit for flight.")
-            main_logger.info(f">>> Setting to a reasonable value:{75000 * altitude_multiplier}{altitude_unit}")
-            HEIGHT_LIMIT = (75000 * altitude_multiplier)
+            main_logger.info(f">>> Setting to a reasonable value:{75000 * altitude_multiplier:.2f}{altitude_unit}")
+            HEIGHT_LIMIT = round(75000 * altitude_multiplier, 2)
         elif HEIGHT_LIMIT > (75000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
             main_logger.warning(f"{height_warning} beyond typical aviation flight levels.")
-            main_logger.info(f">>> Limiting to {75000 * altitude_multiplier}{altitude_unit}.")
-            HEIGHT_LIMIT = (75000 * altitude_multiplier)
-        elif HEIGHT_LIMIT <= 0:
-            main_logger.warning(f"{height_warning} ground level or underground.")
-            main_logger.warning("aircraft won't be doing the thing aircraft do at that point (flying).")
-            main_logger.info(f">>> Setting to a reasonable value: {5000 * altitude_multiplier}{altitude_unit}.")
-            HEIGHT_LIMIT = (5000 * altitude_multiplier)
-        elif HEIGHT_LIMIT > 0 and HEIGHT_LIMIT < (500 * altitude_multiplier):
-            main_logger.warning(f"{height_warning} too low. Are aircraft landing on your house?")
-            main_logger.info(f">>> Setting to a reasonable minimum: {1000 * altitude_multiplier}{altitude_unit}.")
-        del height_warning
-        main_logger.info(f"Filtering summary: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}.")
+            main_logger.info(f">>> Limiting to {75000 * altitude_multiplier:.2f}{altitude_unit}.")
+            HEIGHT_LIMIT = round(75000 * altitude_multiplier, 2)
+        elif HEIGHT_LIMIT < (1000 * altitude_multiplier):
+            if HEIGHT_LIMIT <= 0:
+                main_logger.warning(f"{height_warning} ground level or underground.")
+                main_logger.warning("Aircraft won't be doing the thing aircraft do at that point (flying).")
+            else:
+                main_logger.warning(f"{height_warning} too low. Are aircraft landing on your house?")
+            main_logger.info(f">>> Setting to a reasonable minimum: {1000 * altitude_multiplier:.2f}{altitude_unit}.")
+            HEIGHT_LIMIT = round(1000 * altitude_multiplier, 2)
+        main_logger.info(f"Filtering summary: <{RANGE:.2f}{distance_unit}, <{HEIGHT_LIMIT:.2f}{altitude_unit}.")
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
@@ -943,7 +983,16 @@ def configuration_check() -> None:
     if ALTERNATIVE_FONT:
         main_logger.info("Using the alternative font style.")
 
+    if JOURNEY_PLUS:
+        main_logger.info("JOURNEY_PLUS mode is enabled, but the functionality is not present.")
+        main_logger.info("A later version of FlightGazer will enable this. Thanks for the interest!")
+
     main_logger.info("Settings check complete.")
+
+def configuration_check_api() -> None:
+    """ Check the API configuration. """
+    global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT
+    global ENHANCED_READOUT, ENHANCED_READOUT_INIT
 
     # check the API config
     main_logger.info("Checking API settings...")
@@ -961,7 +1010,18 @@ def configuration_check() -> None:
                 main_logger.warning("API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
                 API_DAILY_LIMIT = None
                 API_KEY = ""
+        
+        if (API_KEY and (
+            API_COST_LIMIT is not None 
+            and not isinstance(API_COST_LIMIT, (float, int))
+            )) or (
+            isinstance(API_COST_LIMIT, (float, int))
+            and API_COST_LIMIT <= 0):
+                main_logger.warning("API_COST_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
+                API_COST_LIMIT = None
+                API_KEY = ""
 
+        # test if the API key works
         if API_KEY:
             api_use = None
             api_cost = None
@@ -973,17 +1033,30 @@ def configuration_check() -> None:
             else:
                 main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")
                 main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+                api_usage_cost_baseline = api_cost
 
         if API_KEY: # test again
             if ENHANCED_READOUT:
                 main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
             else:
+                if ENHANCED_READOUT_AS_FALLBACK and DISPLAY_IS_VALID:
+                    main_logger.info("ENHANCED_READOUT_AS_FALLBACK is enabled. When an API limit is reached, ENHANCED_READOUT will be used.")
+
                 if API_DAILY_LIMIT is None:
-                    main_logger.info("No limit set for API calls.")
+                    main_logger.info("No daily limit set for API calls.")
                 else:
                     main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
-                    if ENHANCED_READOUT_AS_FALLBACK and DISPLAY_IS_VALID:
-                        main_logger.info("ENHANCED_READOUT_AS_FALLBACK is enabled. When API limit is reached, ENHANCED_READOUT will be used.")
+
+                if API_COST_LIMIT is None:
+                    main_logger.info("No cost limit set for API calls.")
+                else:
+                    if api_cost < API_COST_LIMIT:
+                        main_logger.info(f"Limiting API calls to when usage is near ${API_COST_LIMIT:.2f}. (${API_COST_LIMIT - api_cost:.2f} available to use)")
+                    else:
+                        main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
+                        main_logger.info(">>> Disabling API.")
+                        API_KEY = ""
+
         else:
             main_logger.info("API is unavailable. Additional API-derived info will not be available.")
             if DISPLAY_IS_VALID:
@@ -1330,23 +1403,25 @@ def print_to_console() -> None:
         # gen_info_str = "".join(gen_info)
 
     # print footer section
-    print(f"\n{rst}{fade}> {dump1090} response {process_time[0]} ms | \
-Processing {process_time[1]} ms | Display formatting {process_time[3]} ms | Last API response {process_time[2]} ms")
+    print(f"\n{rst}{fade}> {dump1090} response {process_time[0]:.3f} ms | \
+Processing {process_time[1]:.3f} ms | Display formatting {process_time[3]:.3f} ms | Last API response {process_time[2]:.3f} ms")
     
     print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     
     if API_KEY:
-        print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits")
+        print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits | \
+Estimated cost: ${estimated_api_cost:.2f}")
+
     print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
 
     current_memory_usage = psutil.Process().memory_info().rss
     this_process_cpu = this_process.cpu_percent(interval=None)
     if CPU_TEMP_SENSOR is not None:
         cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
-        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU @ {round(cpu_temp, 1)}°C | {round(current_memory_usage / 1048576, 3)}MiB")
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU @ {round(cpu_temp, 1)}°C | {round(current_memory_usage / 1048576, 3):.3f}MiB")
     else:
-        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 3)}% overall CPU | {round(current_memory_usage / 1048576, 3)}MiB")
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU | {round(current_memory_usage / 1048576, 3):.3f}MiB")
 
     if gen_info_str:
         print(gen_info_str)
@@ -1815,7 +1890,7 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
-        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_limit_reached
+        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_daily_limit_reached, estimated_api_cost, API_KEY
         if API_KEY is None or not API_KEY: return
         if NOFILTER_MODE or ENHANCED_READOUT: return
         # get us our dates to narrow down how many results the API will give us
@@ -1847,16 +1922,29 @@ class APIFetcher:
             except: # if we bump into None or something else
                 break
 
-        # this is for limiting API calls per day; just bumps up the "no data" count
+        # our API call limiters
         if API_DAILY_LIMIT is not None and api_hits[0] >= API_DAILY_LIMIT:
-            api_hits[2] += 1
-            if not API_limit_reached:
+            if not API_daily_limit_reached:
                 # send this message only once until the limit is reset
                 main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. No more API calls will occur until the next day.")
-                API_limit_reached = True
+                API_daily_limit_reached = True
+                process_time[3] = 0
                 if ENHANCED_READOUT_AS_FALLBACK:
                     main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
                     ENHANCED_READOUT = True # recall that once this is enabled, any call to this function will immediately return
+            return
+        
+        # We use a 1 cent buffer just to account for any kind of calculation difference between
+        # the actual API use and our running cost
+        if API_COST_LIMIT is not None and (api_usage_cost_baseline + estimated_api_cost) >= (API_COST_LIMIT - 0.01):
+            # note this is much simpler than how we handle API_DAILY_LIMIT; we just blank API_KEY,
+            # and everything *should* handle the rest
+            main_logger.info(f"API cost limit (${API_COST_LIMIT}) reached. Disabling API usage.")
+            API_KEY = ""
+            process_time[3] = 0
+            if ENHANCED_READOUT_AS_FALLBACK:
+                main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
+                ENHANCED_READOUT = True
             return
 
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
@@ -1940,6 +2028,7 @@ class APIFetcher:
                 'APIAccessed': time.monotonic()
                 }
             with threading.Lock():
+                estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
                 focus_plane_api_results.append(api_results)
 
     def run_loop(self):
@@ -2211,12 +2300,12 @@ class DisplayFeeder:
             # special handling for when we are tracking a specific aircraft under FOLLOW_THIS_AIRCRAFT
             if focus_plane_stats and focus_plane_stats['ID'] == FOLLOW_THIS_AIRCRAFT:
                 if focus_plane_stats['Altitude'] < HEIGHT_LIMIT and focus_plane_stats['Distance'] < RANGE\
-                   and not API_limit_reached:
+                   and not API_daily_limit_reached:
                     ENHANCED_READOUT = ENHANCED_READOUT_INIT
                 else:
                     ENHANCED_READOUT = True
             else:
-                if API_KEY and not API_limit_reached and not ENHANCED_READOUT_INIT: # conditions when ENHANCED_READOUT should be False
+                if API_KEY and not API_daily_limit_reached and not ENHANCED_READOUT_INIT: # conditions when ENHANCED_READOUT should be False
                     ENHANCED_READOUT = False
                 else:
                     ENHANCED_READOUT = ENHANCED_READOUT_INIT
@@ -3590,6 +3679,7 @@ else:
     main_logger.info("Cleared for takeoff.")
 
 configuration_check() # very important
+configuration_check_api()
 
 get_ip()
 CPU_TEMP_SENSOR = get_cpu_temp_sensor()
