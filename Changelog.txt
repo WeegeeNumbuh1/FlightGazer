@@ -10,6 +10,14 @@ v.3.x.0 - Planned
         - Coordinates and RSSI are now shown at the same time along with origin and destination readout
         - Can be enabled with a new setting: JOURNEY_PLUS
 
+v.3.2.1 - 2025-03-18
+    - wow, the fabled 3.2.1 version
+    - Changed internal methods on how to handle when the API cost limit is reached: if the usage cost
+      decreases below the set amount after checking with FlightAware, API use can resume without having to
+      restart FlightGazer
+    - Minor logging output tweaks
+    - In Interactive mode, the API stats line will now show which API limit was reached, if those settings are enabled
+
 v.3.2.0 - 2025-03-17
     - NEW: Another option for API limiting: API_COST_LIMIT
         - Since API use is already checked upon startup based on the key (v.2.1.2), this setting can now limit

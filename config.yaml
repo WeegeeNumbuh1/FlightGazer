@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.3.2.0 # do not modify this
+CONFIG_VERSION: v.3.2.1 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -110,7 +110,7 @@ JOURNEY_PLUS: false
 
 CLOCK_CENTER_ROW:
   ROW1: 1
-  ROW2: 2
+  ROW2: 0
 # Choose what to display on the Clock screen center row.
 # Leave only ROW1 filled with a non-zero number to show just one row of data.
 # When ROW1 and ROW2 are filled, the Clock display will use a smaller font to maximize space.

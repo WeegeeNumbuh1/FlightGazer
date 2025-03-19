@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.3.0.0
+# Last updated: v.3.2.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:

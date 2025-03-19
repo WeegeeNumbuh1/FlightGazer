@@ -7,8 +7,9 @@
 #                        _/_/
                                      
 """ 
-A program heavily inspired by https://github.com/ColinWaddell/its-a-plane-python, but supplements flight information of
-nearby aircraft with real-time ADS-B and UAT data from dump1090 and dump978. Uses the FlightAware API instead of FlightRadar24.
+A program to show live ADS-B info of nearby aircraft to an RGB-Matrix display.
+Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
+Uses the FlightAware API instead of FlightRadar24 for info outside what ADS-B can provide.
 """
 """
     Copyright (C) 2025, WeegeeNumbuh1.
@@ -32,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.2.0 --- 2025-03-17'
+VERSION: str = 'v.3.2.1 --- 2025-03-18'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -135,9 +136,26 @@ main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
 CURRENT_USER = getuser()
 LOGFILE = Path(f"{CURRENT_DIR}/FlightGazer-log.log")
-LOGFILE.touch(mode=0o777, exist_ok=True)
-with open(LOGFILE, 'a') as f:
-    f.write("\n") # append a newline at the start of logging
+try: # should basically work all the time since we're running as root, but this costs nothing
+    LOGFILE.touch(mode=0o777, exist_ok=True)
+    with open(LOGFILE, 'a') as f:
+        f.write("\n") # append a newline at the start of logging
+    del f
+except PermissionError:
+    import tempfile
+    workingtempdir = tempfile.gettempdir()
+    if os.name == 'posix':
+        LOGFILE = Path(f"{workingtempdir}/FlightGazer-log.log")
+        LOGFILE.touch(mode=0o777, exist_ok=True)
+        with open(LOGFILE, 'a') as f:
+            f.write("\n")
+        del f
+    if os.name == 'nt':
+        LOGFILE = Path(f"{workingtempdir}/FlightGazer-log.log")
+        LOGFILE.touch(mode=0o777, exist_ok=True)
+        with open(LOGFILE, 'a') as f:
+            f.write("\n")
+        del f
 
 logging_format = logging.Formatter(
     fmt='%(asctime)s.%(msecs)03d - %(threadName)s | %(levelname)s: %(message)s',
@@ -168,6 +186,8 @@ main_logger.info(f"FlightGazer Version: {VERSION}")
 main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
 main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+if LOGFILE != Path(f"{CURRENT_DIR}/FlightGazer-log.log"):
+    main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
 # Actual constants
@@ -362,6 +382,7 @@ if not CONFIG_MISSING:
             main_logger.warning(f"{setting_key} missing, using default value")
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
+if config: del config
 
 # =========== Global Variables =============
 # ==========================================
@@ -472,6 +493,8 @@ api_usage_cost_baseline: float = 0.
 """ API usage when we first started FlightGazer, and updated at around midnight. """
 estimated_api_cost: float = 0.
 """ API usage so far in the day. Resets at midnight. """
+API_cost_limit_reached: bool = False
+""" Flag to indicate we hit the defined cost limit. """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -606,10 +629,11 @@ def runtime_accumulators_reset() -> None:
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     time.sleep(2) # wait for hourly events to complete
     global unique_planes_seen, selection_events, ENHANCED_READOUT
-    global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost
+    global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events.")
-    main_logger.info(f"API STATS for {date_now_str}:   {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. | \
-Estimated cost: ${estimated_api_cost}")
+    if sum(api_hits) > 0: # if we used the API at all
+        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. \
+Estimated cost: ${estimated_api_cost:.2f}")
     with threading.Lock():
         unique_planes_seen.clear()
         for i in range(len(api_hits)):
@@ -625,18 +649,24 @@ Estimated cost: ${estimated_api_cost}")
         api_calls, api_cost = probe_API()
         api_usage_cost_sofar = api_usage_cost_baseline + estimated_api_cost
         if api_cost is not None:
-            main_logger.info(f"Queried API, actual usage is ${api_cost}, with {api_calls} total calls over the past 30 days.")
+            main_logger.info(f"Queried API, actual usage is ${api_cost:.2f}, with {api_calls} total calls over the past 30 days.")
             api_usage_cost_baseline = api_cost
+            main_logger.debug(f"Difference between calculated (${api_usage_cost_sofar:.3f}) and actual cost: ${abs(api_usage_cost_sofar - api_cost):.3f}")
             if API_COST_LIMIT is not None:
-                main_logger.info(f"${API_COST_LIMIT} - {api_cost} of API credit remains.")
-            if api_usage_cost_sofar > api_cost: # stay on the safer side, as the reported API usage lags behind by 10 minutes
-                estimated_api_cost = (api_usage_cost_sofar - api_cost) # set the difference to the daily running cost
-            else: # we underestimated the usage cost
                 estimated_api_cost = 0.
+                if api_cost < API_COST_LIMIT:
+                    main_logger.info(f"${API_COST_LIMIT - api_cost:.2f} of API credit remains before reaching cost limit (${API_COST_LIMIT:.2f}).")
+                    if API_cost_limit_reached:
+                        main_logger.info(f"There are credits available again, API will be re-enabled.")
+                        API_cost_limit_reached = False
+                else:
+                    main_logger.info(f"API usage currently exceeds the set cost limit (${API_COST_LIMIT:.2f}).")
+                    if not API_cost_limit_reached:
+                        API_cost_limit_reached = True
         else: # don't reset/adjust the counters
             main_logger.warning("Unable to query API usage, will try again in 24 hours.")
             if API_COST_LIMIT is not None:
-                main_logger.info(f">>> Running on the assumption that ${API_COST_LIMIT - (api_usage_cost_sofar)} of credit remains.")
+                main_logger.info(f">>> Running on the assumption that ${API_COST_LIMIT - api_usage_cost_sofar:.2f} of credit remains.")
 
     return
 
@@ -660,7 +690,7 @@ def match_commandline(command_search: str, process_name: str) -> list:
     return list_of_processes
 
 def get_ip() -> None:
-    ''' Gets us our local IP. Modified from my other project `UNRAID_Status_Screen`.
+    ''' Gets us our local IP. Modified from my other project `UNRAID Status Screen`.
     Modifies the global `CURRENT_IP` '''
     global CURRENT_IP
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -991,7 +1021,7 @@ def configuration_check() -> None:
 
 def configuration_check_api() -> None:
     """ Check the API configuration. """
-    global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT
+    global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT, API_cost_limit_reached
     global ENHANCED_READOUT, ENHANCED_READOUT_INIT
 
     # check the API config
@@ -1032,7 +1062,7 @@ def configuration_check_api() -> None:
                 API_KEY = ""
             else:
                 main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")
-                main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost}.")
+                main_logger.info(f">>> Stats from the past 30 days: {api_use} total calls, costing ${api_cost:.2f}.")
                 api_usage_cost_baseline = api_cost
 
         if API_KEY: # test again
@@ -1055,6 +1085,7 @@ def configuration_check_api() -> None:
                     else:
                         main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
                         main_logger.info(">>> Disabling API.")
+                        API_cost_limit_reached = True
                         API_KEY = ""
 
         else:
@@ -1410,8 +1441,13 @@ Processing {process_time[1]:.3f} ms | Display formatting {process_time[3]:.3f} m
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     
     if API_KEY:
-        print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits | \
+        if not API_daily_limit_reached and not API_cost_limit_reached:
+            print(f"> API stats for today: {api_hits[0]} success, {api_hits[1]} fail, {api_hits[2]} no data, {api_hits[3]} cache hits | \
 Estimated cost: ${estimated_api_cost:.2f}")
+        elif API_daily_limit_reached:
+            print(f"> API daily limit ({API_DAILY_LIMIT}) reached. No more API calls for the rest of today.")
+        elif API_cost_limit_reached:
+            print(f"> {rst}{yellow_text}API cost limit (${API_COST_LIMIT:.2f}) reached. API calls have stopped.{rst}{fade}")
 
     print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
 
@@ -1890,9 +1926,11 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
-        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT, API_daily_limit_reached, estimated_api_cost, API_KEY
+        global process_time, focus_plane_api_results, api_hits, ENHANCED_READOUT
+        global API_daily_limit_reached, estimated_api_cost, API_KEY, API_cost_limit_reached
         if API_KEY is None or not API_KEY: return
         if NOFILTER_MODE or ENHANCED_READOUT: return
+        if API_daily_limit_reached or API_cost_limit_reached: return
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
         time_delta_yesterday = date_now - datetime.timedelta(days=1)
@@ -1937,10 +1975,9 @@ class APIFetcher:
         # We use a 1 cent buffer just to account for any kind of calculation difference between
         # the actual API use and our running cost
         if API_COST_LIMIT is not None and (api_usage_cost_baseline + estimated_api_cost) >= (API_COST_LIMIT - 0.01):
-            # note this is much simpler than how we handle API_DAILY_LIMIT; we just blank API_KEY,
-            # and everything *should* handle the rest
-            main_logger.info(f"API cost limit (${API_COST_LIMIT}) reached. Disabling API usage.")
-            API_KEY = ""
+            main_logger.warning(f"API cost limit (${API_COST_LIMIT}) reached. Disabling API usage.")
+            main_logger.info(f"Estimated cost today: ${estimated_api_cost:.2f}")
+            API_cost_limit_reached = True
             process_time[3] = 0
             if ENHANCED_READOUT_AS_FALLBACK:
                 main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")

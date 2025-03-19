@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.1.0
+# Version = v.3.2.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -180,7 +180,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		>&2 echo -e "${NC}${RED}>>> Warning: Failed to connect to internet. File checking will be skipped.${FADE}"
 	fi
 
-	if [ ! -f "$CHECK_FILE" ] && [ $INTERNET_STAT -eq 1 ]; then
+	if [ ! -f "$CHECK_FILE" ] && [ $INTERNET_STAT -eq 1 ] && [ ! -d "$VENVPATH" ]; then
 		>&2 echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. Internet connection is required.${NC}"
 		sleep 2s
 		exit 1
