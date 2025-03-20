@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.2.1 --- 2025-03-18'
+VERSION: str = 'v.3.2.2 --- 2025-03-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1168,6 +1168,9 @@ def suntimes() -> None:
         try:
             sunset_sunrise['Sunrise'] = sun.get_sunrise_time(time_now).astimezone()
             sunset_sunrise['Sunset'] = sun.get_sunset_time(time_now).astimezone()
+            if sunset_sunrise['Sunset'] < sunset_sunrise['Sunrise']:
+                main_logger.debug("suntimes bug present, correcting sunset time.")
+                sunset_sunrise['Sunset'] += datetime.timedelta(days=1)
         except SunTimeException:
             sunset_sunrise['Sunrise'] = None
             sunset_sunrise['Sunset'] = None
@@ -1214,18 +1217,19 @@ def flyby_stats() -> None:
             date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
             last_date = (last_line.split(",")[0]).split(" ")[0] # splitting strftime('%Y-%m-%d %H:%M')
             if date_now_str == last_date:
-                global api_hits, unique_planes_seen
+                global api_hits, unique_planes_seen, estimated_api_cost
                 planes_seen = int(last_line.split(",")[1])
                 api_hits[0] = int(last_line.split(",")[2])
                 api_hits[1] = int(last_line.split(",")[3])
                 api_hits[2] = int(last_line.split(",")[4])
+                estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
                 for i in range(planes_seen): # fill the set with filler values, we don't recall the last contents of `unique_planes_seen`
                     unique_planes_seen.append(
                         {"ID":i+1,
                          "Time":time.monotonic(),
                         }
                          )
-                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}. API calls: {api_hits[0]}")
+                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}. API calls: {api_hits[0] + api_hits[2]}")
         return
     
     elif not FLYBY_STATS_FILE.is_file():
@@ -1396,7 +1400,7 @@ def print_to_console() -> None:
                 else:
                     api_dpart_delta = "?"
                 print(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: \
-    [ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
+[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
                 break
         except: # if we bump into None or something else
             break
@@ -1455,7 +1459,7 @@ Estimated cost: ${estimated_api_cost:.2f}")
     this_process_cpu = this_process.cpu_percent(interval=None)
     if CPU_TEMP_SENSOR is not None:
         cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
-        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU @ {round(cpu_temp, 1)}°C | {round(current_memory_usage / 1048576, 3):.3f}MiB")
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU @ {cpu_temp:.1f}°C | {round(current_memory_usage / 1048576, 3):.3f}MiB")
     else:
         print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU | {round(current_memory_usage / 1048576, 3):.3f}MiB")
 

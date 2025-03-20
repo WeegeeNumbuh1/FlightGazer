@@ -10,6 +10,13 @@ v.3.x.0 - Planned
         - Coordinates and RSSI are now shown at the same time along with origin and destination readout
         - Can be enabled with a new setting: JOURNEY_PLUS
 
+v.3.2.2 - 2025-03-20
+    - Add workaround for bug in suntime module that causes the sunset time result to be one day before the current day
+        - When using dynamic brightness control, the display will permanently remain in the night mode brightness
+          due to this bug (does not affect ACTIVE_PLANE_BRIGHTNESS)
+        - https://github.com/SatAgro/suntime/issues/12#issuecomment-621755084
+    - When reloading flyby stats file, we recalculate estimated API usage cost as well
+
 v.3.2.1 - 2025-03-18
     - wow, the fabled 3.2.1 version
     - Changed internal methods on how to handle when the API cost limit is reached: if the usage cost
