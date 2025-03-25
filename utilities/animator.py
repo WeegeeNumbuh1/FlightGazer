@@ -12,12 +12,12 @@ def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     os.write(sys.stdout.fileno(), b"\nDisplay Driver: Exit signal received, shutting down now.\n")
     animator_logger.info("Exit signal received, shutting down now.")
+    animator_logger.debug(f"Rendered {getattr(Animator, 'frame', 'N/A')} frames.")
     raise ImportError # hacky
     """ We don't use SystemExit because we will need to try-except it, and the main thread
     will catch the same signal from the main system when we call for external termination or a KeyboardInterrupt,
     which depends on how the main script was initiated. It will cause the signal handler to be called twice,
     which is undesirable. """
-    # sys.exit(0) # main thread needs to try-except this or else we just quit without our thread cleanup
 
 class Animator(object):
     class KeyFrame(object):
@@ -26,7 +26,6 @@ class Animator(object):
             def wrapper(func):
                 func.properties = {"divisor": divisor, "offset": offset, "count": 0}
                 return func
-
             return wrapper
 
     def __init__(self):

@@ -49,11 +49,11 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 | <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When an aircraft enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
 |---|---|
 | <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple aircraft in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
-| <div align="center"><img src="media/FG_EdgeCase.gif" alt="FlightGazer EdgeCase gif"><br><i>Handles even odd edge cases like this.</i></div> | <div align="center"><b>Neat 👍</b></div> |
+| <div align="center"><img src="media/FG_SplashScreen.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> | <div align="center"><b>Neat 👍</b></div> |
 
 |   |
 |---|
-| <div align="center"> <b>New features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>&emsp;- Extended calendar info<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
+| <div align="center"> <b>Additional features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>&emsp;- Extended calendar info<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
 
 </details>
 
@@ -90,7 +90,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - API limiting per day or by monthly cost (those API calls can get expensive)
   - Colors 🌈
   - Track a specific aircraft once it's detected by your ADS-B receiver
-  - 🆕 Switch between font styles
+  - Switch between font styles
 - Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Useful and detailed console output
 - Small memory footprint
@@ -101,6 +101,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Hard-to-break 🤞
+- Constant development
 
 </details>
 
@@ -211,6 +212,13 @@ Note that FlightGazer will still be running *and* driving the screen even with a
 `BRIGHTNESS: 0`<br>
 `ENABLE_TWO_BRIGHTNESS: false`<br>
 `ACTIVE_PLANE_DISPLAY_BRIGHTNESS: <your value here>`
+
+</details>
+
+<details><summary>Hiding elements on the display</summary>
+
+Go to the color config file and set whatever element you don't want to show to `BLACK`.<br>
+Example: `clock_color = BLACK`
 
 </details>
 <details><summary>Reduce flickering on a physical RGB matrix display</summary>

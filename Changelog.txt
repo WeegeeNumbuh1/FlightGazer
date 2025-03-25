@@ -10,6 +10,21 @@ v.3.x.0 - Planned
         - Coordinates and RSSI are now shown at the same time along with origin and destination readout
         - Can be enabled with a new setting: JOURNEY_PLUS
 
+v.3.3.0 - 2025-03-24
+    - Massively improved display responsiveness to data changes when showing active aircraft info
+        - Was caused by the DisplayFeeder routine reading data before the internal aircraft selector algorithm
+          could finish, thus the data readout lagged behind by 1 refresh cycle.
+          This affected the switchover and when the display would show updated info when switching aircraft.
+          - This was present since v.1.0.0
+        - Refactored all internal display routines to maximize responsiveness and to take advantage of unused but existing methods
+        - This should be as responsive as it gets without having to increase the internal tick rate
+            - For the nerds reading this, this value has been 10Hz since inception
+    - Introduce log housekeeping: init script will check and keep the latest 1000 lines of the log
+    - Minor log output tweaks (as usual)
+    - Modify configuration file for RGBMatrixEmulator to take advantage of newer pixel look
+        - Only affects new installs
+        - https://github.com/ty-porter/RGBMatrixEmulator/releases/tag/v0.13.0
+
 v.3.2.2 - 2025-03-20
     - Add workaround for bug in suntime module that causes the sunset time result to be one day before the current day
         - When using dynamic brightness control, the display will permanently remain in the night mode brightness

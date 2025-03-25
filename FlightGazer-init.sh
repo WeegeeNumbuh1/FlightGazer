@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.2.1
+# Version = v.3.3.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -173,6 +173,14 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		exit 1
 	fi
 
+	# check if this is a systemd system
+	command -v systemctl --version 2>&1 >/dev/null
+	if [ $? -ne 0 ]; then
+		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use systemd.${NC}"
+		sleep 2s
+		exit 1
+	fi
+
 	# check internet connection
 	wget -q --timeout=10 --spider http://google.com
 	if [ $? -ne 0 ]; then
@@ -251,15 +259,16 @@ then
 {
     "pixel_outline": 0,
     "pixel_size": 16,
-    "pixel_style": "circle",
+    "pixel_style": "real",
+    "pixel_glow": 1,
     "display_adapter": "browser",
     "suppress_font_warnings": true,
     "suppress_adapter_load_errors": true,
     "browser": {
         "_comment": "For use with the browser adapter only.",
         "port": 8888,
-        "target_fps": 12,
-        "fps_display": false,
+        "target_fps": 10,
+        "fps_display": true,
         "quality": 70,
         "image_border": true,
         "debug_text": false,
@@ -329,6 +338,13 @@ if [ $SKIP_CHECK -eq 0 ]; then
 	touch $LOGFILE
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
 	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
+fi
+
+if [ -f "$LOGFILE" ] && [ $(wc -l < $LOGFILE) -gt 1000 ]; then
+	time_now=$(date '+%Y-%m-%d %H:%M')
+	echo "$(tail -n 1000 $LOGFILE)" > $LOGFILE
+	sed -i -e "1i********** $time_now --- This logfile has been truncated to the latest 1000 lines. **********\\" $LOGFILE
+	echo "> Logfile housekeeping: truncated logfile to latest 1000 lines."
 fi
 
 ENDTIME=$(date '+%s')

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.2.2 --- 2025-03-20'
+VERSION: str = 'v.3.3.0 --- 2025-03-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -499,6 +499,7 @@ API_cost_limit_reached: bool = False
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
 PLANE_SELECTED: str = "plane-in-range"
+PLANE_SELECTOR_DONE: str = "there-is-plane-data"
 DISPLAY_SWITCH: str = "reset-scene"
 END_THREADS: str = "terminate"
 KICK_DUMP1090_WATCHDOG: str = "kick-watchdog"
@@ -878,47 +879,48 @@ def configuration_check() -> None:
 
     main_logger.info("Checking settings configuration...")
 
-    try:
-        if len(CLOCK_CENTER_ROW) != 2:
-            raise KeyError
-        for key in CLOCK_CENTER_ROW:
-            if (CLOCK_CENTER_ROW[key] is not None and not isinstance(CLOCK_CENTER_ROW[key], int))\
-            or (CLOCK_CENTER_ROW[key] is None or CLOCK_CENTER_ROW[key] == 0):
-                main_logger.info(f"{key} for Clock center readout is disabled.")
-                CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
-            elif CLOCK_CENTER_ROW[key] == 1:
-                main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
-            elif CLOCK_CENTER_ROW[key] == 2:
-                main_logger.info(f"{key} for Clock center will display Receiver Stats.")
-            elif CLOCK_CENTER_ROW[key] == 3:
-                main_logger.info(f"{key} for Clock center will display extended calendar info.")
-            else:
-                main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
-                CLOCK_CENTER_ROW[key] = None
-    except KeyError:
-        main_logger.warning("Clock center readout is not properly configured.")
-        CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
+    if not NODISPLAY_MODE:
+        try:
+            if len(CLOCK_CENTER_ROW) != 2:
+                raise KeyError
+            for key in CLOCK_CENTER_ROW:
+                if (CLOCK_CENTER_ROW[key] is not None and not isinstance(CLOCK_CENTER_ROW[key], int))\
+                or (CLOCK_CENTER_ROW[key] is None or CLOCK_CENTER_ROW[key] == 0):
+                    main_logger.info(f"{key} for Clock center readout is disabled.")
+                    CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
+                elif CLOCK_CENTER_ROW[key] == 1:
+                    main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
+                elif CLOCK_CENTER_ROW[key] == 2:
+                    main_logger.info(f"{key} for Clock center will display Receiver Stats.")
+                elif CLOCK_CENTER_ROW[key] == 3:
+                    main_logger.info(f"{key} for Clock center will display extended calendar info.")
+                else:
+                    main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
+                    CLOCK_CENTER_ROW[key] = None
+        except KeyError:
+            main_logger.warning("Clock center readout is not properly configured.")
+            CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
 
-    if CLOCK_CENTER_ROW['ROW1'] is None and CLOCK_CENTER_ROW['ROW2'] is None:
-        CLOCK_CENTER_ENABLED = False
-        main_logger.info("Clock center readout is disabled.")
-    else:
-        CLOCK_CENTER_ENABLED = True
+        if CLOCK_CENTER_ROW['ROW1'] is None and CLOCK_CENTER_ROW['ROW2'] is None:
+            CLOCK_CENTER_ENABLED = False
+            main_logger.info("Clock center readout is disabled.")
+        else:
+            CLOCK_CENTER_ENABLED = True
 
-    if (isinstance(CLOCK_CENTER_ROW['ROW1'], int) and isinstance(CLOCK_CENTER_ROW['ROW2'], int))\
-    or (CLOCK_CENTER_ROW['ROW1'] is None and isinstance(CLOCK_CENTER_ROW['ROW2'], int)):
-        main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
-        CLOCK_CENTER_ROW_2ROWS = True
+        if (isinstance(CLOCK_CENTER_ROW['ROW1'], int) and isinstance(CLOCK_CENTER_ROW['ROW2'], int))\
+        or (CLOCK_CENTER_ROW['ROW1'] is None and isinstance(CLOCK_CENTER_ROW['ROW2'], int)):
+            main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
+            CLOCK_CENTER_ROW_2ROWS = True
 
-    if CLOCK_CENTER_ENABLED and (CLOCK_CENTER_ROW['ROW1'] == CLOCK_CENTER_ROW['ROW2']):
-        main_logger.warning("Clock center readout options are the same. Reverting to only one row.")
-        CLOCK_CENTER_ROW_2ROWS = False
-        CLOCK_CENTER_ROW['ROW2'] = None
+        if CLOCK_CENTER_ENABLED and (CLOCK_CENTER_ROW['ROW1'] == CLOCK_CENTER_ROW['ROW2']):
+            main_logger.warning("Clock center readout options are the same. Reverting to only one row.")
+            CLOCK_CENTER_ROW_2ROWS = False
+            CLOCK_CENTER_ROW['ROW2'] = None
 
-    if LED_PWM_BITS is None or not isinstance(LED_PWM_BITS, int) or (LED_PWM_BITS < 1 or LED_PWM_BITS > 11):
-        main_logger.warning(f"LED_PWM_BITS is out of bounds or not an integer.")
-        main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
-        LED_PWM_BITS = default_settings['LED_PWM_BITS']
+        if LED_PWM_BITS is None or not isinstance(LED_PWM_BITS, int) or (LED_PWM_BITS < 1 or LED_PWM_BITS > 11):
+            main_logger.warning(f"LED_PWM_BITS is out of bounds or not an integer.")
+            main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
+            LED_PWM_BITS = default_settings['LED_PWM_BITS']
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
@@ -1613,7 +1615,9 @@ def main_loop_generator() -> None:
                 if hex in unique_ids and not NOFILTER_MODE: continue
                 unique_ids.add(hex)
                 # filter planes that have valid tracking data and were seen recently
-                if seen_pos is None or seen_pos > LOCATION_TIMEOUT or broadcast_type == 'tisb_other':
+                if seen_pos is None\
+                    or seen_pos > LOCATION_TIMEOUT\
+                    or broadcast_type == 'tisb_other':
                     continue
                 total +=1
                 lat = a.get('lat')
@@ -1772,14 +1776,14 @@ class AirplaneParser:
                 if self._rare_occurrences >= 5:
                     main_logger.info(f"Re-enabling \'rare message\' printout. There were {self._rare_occurrences} rare occurrences for {self._current_date}.")
                 self._rare_occurrences = 0
+            self._rare_occurrences += 1
+            if self._rare_occurrences <= 5:
+                main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
+                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
             if self._rare_occurrences == 5 and date_now_str == self._current_date:
                 main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
                 main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day and until it is re-triggered afterwards.")
                 main_logger.info("    (Aircraft selection is still working normally)")
-            elif self._rare_occurrences < 5:
-                main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
-                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
-            self._rare_occurrences += 1
             self._current_date = date_now_str
 
         def select():
@@ -1906,6 +1910,8 @@ class AirplaneParser:
         
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
+        
+        dispatcher.send(message='', signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
         
         if INTERACTIVE:
             print_to_console()
@@ -2087,12 +2093,12 @@ class DisplayFeeder:
     def __init__(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        register_signal_handler(self.loop, self.data_packet, signal=DATA_UPDATED, sender=main_loop_generator)
+        register_signal_handler(self.loop, self.data_packet, signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_loop()
 
     def data_packet(self, message):
-        """ Every time `main_loop_generator()` fires, grab a copy of our global variables and convert them
+        """ Every time `AirplaneParser.plane_selector` finishes, grab a copy of our global variables and convert them
         into a coalesed data packet for the Display. We also control scene switching here and which scene to display.
         Outputs two dicts, `idle_stats` and `active_stats`.
         `idle_stats` = {'Flybys', 'Track', 'Range'}
@@ -2463,7 +2469,21 @@ class Display(
     Actual draw routines and shape primitives are also handled internally.
     The actual workings of this class should already be well-explained with all the comments and docstrings.
 
-    NB: Use the @Animator decorator to control both how often elements update along with associated logic evaluations. """
+    Use the @Animator decorator to control both how often elements update along with associated logic evaluations.
+    When using the decorator, the second (optional) argument specifies the offset for each element in the render queue such that
+    when (global frame counter - offset) % frame duration == 0, the function will run (except for the first frame).
+    Additional quirks: functions when requested to render on the same frame as another are rendered alphabetically, not
+    in the order they are defined in the class. Hence why functions within this class will have a letter prefix before their name.
+    Additionally, each function has their own internal frame counter `count` for each time they are run, incremented by `Animator`.
+    If a function returns True, this resets that internal counter.
+
+    Frame ---->  0      1      2      3      4 ...
+    a_func(1)    ░░░0░░░▒▒▒1▒▒▒░░░2░░░▒▒▒3▒▒▒
+    ab_func(2,1) ░░░░░░░0░░░░░░▒▒▒▒▒▒▒1▒▒▒▒▒▒
+    b_func(1)    ░░░0░░░▒▒▒1▒▒▒░░░2░░░▒▒▒3▒▒▒
+    c_func(3,1)         ░░░░░░░░░░0░░░░░░░░░░
+    ...
+    """
     def __init__(self):
 
         # Setup Display
@@ -2529,7 +2549,7 @@ class Display(
         self._last_switch_progress_bar = None
         # brightness control
         self._last_brightness = self.matrix.brightness
-        # blinker variables for callsign (see `callsign_blinker() below`)
+        # blinker variables for callsign (see `callsign_blinker()`)
         self._callsign_is_blanked = False
         self._callsign_blinker_cache = None
         self._callsign_blinker_cache_last = None
@@ -2546,12 +2566,21 @@ class Display(
         # Error control: count how many times something broke in here
         self.itbroke_count = 0
 
-    # Control display "responsiveness" (the animator redraw, in seconds)
-    refresh_speed = 0.1
+    # Control display "responsiveness" (how often each function should update, in frames)
+    refresh_speed = math.ceil(frames.PER_SECOND * 0.1)
+
+    def draw_square(self, x0:int, y0:int, x1:int, y1:int, color):
+        for x in range(x0, x1):
+            _ = graphics.DrawLine(self.canvas, x, y0, x, y1, color)
+
+    @Animator.KeyFrame.add(0)
+    def a_clear_screen(self):
+        # First operation after a screen reset
+        self.canvas.Clear()
 
     """ Watches when we need to switch to active plane display or if ENHANCED_READOUT changes """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def scene_switch(self, count):
+    @Animator.KeyFrame.add(1)
+    def aa_scene_switch(self, count):
         if self._last_active_state != active_plane_display:
             self.active_plane_display = active_plane_display
             self.reset_scene()
@@ -2560,19 +2589,11 @@ class Display(
         if self._enhanced_readout_last != ENHANCED_READOUT:
             self.reset_scene()
         self._enhanced_readout_last = ENHANCED_READOUT
-
-    def draw_square(self, x0:int, y0:int, x1:int, y1:int, color):
-        for x in range(x0, x1):
-            _ = graphics.DrawLine(self.canvas, x, y0, x, y1, color)
-
-    @Animator.KeyFrame.add(0)
-    def clear_screen(self):
-        # First operation after a screen reset
-        self.canvas.Clear()
+        return True
 
     """ Blink the callsign upon plane change or if active plane display starts """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def callsign_blinker(self, count):
+    @Animator.KeyFrame.add(1)
+    def b_callsign_blinker(self, count):
         half_cycle_time: float = 0.5 # in seconds
         frame_count_per_sec = frames.PER_SECOND
         switch_after_these_many_frames = int(round(frame_count_per_sec * half_cycle_time, 0))
@@ -2589,7 +2610,7 @@ class Display(
             # reset the decrementer if we haven't initialized it yet or plane display is off 
             reinit()
             self._callsign_blinker_cache_last = None
-            return
+            return True
         self._callsign_blinker_cache = focus_plane_stats['ID'] # get current hex ID at this loop
         # if the callsign changed after we're done blinking (decrement == 0) and active plane display is still true
         if self._callsign_blinker_cache_last is not None and\
@@ -2597,7 +2618,7 @@ class Display(
             reinit()
         if self._callsign_frame_decrement == 0: # stop the blinking
             self._callsign_is_blanked = False
-            return
+            return True
         if self._callsign_frame_decrement % switch_after_these_many_frames == 0:
             self._callsign_is_blanked = not self._callsign_is_blanked # the actual "blink"
         self._callsign_frame_decrement -= 1
@@ -2606,12 +2627,51 @@ class Display(
     # =========== Clock Elements =============
     # ========================================
 
+    """ Seconds """
+    @Animator.KeyFrame.add(refresh_speed)
+    def c_second(self, count):
+        if self.active_plane_display:
+            self._last_seconds = None
+            return True
+        SECONDS_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
+        SECONDS_POSITION = (41, 12)
+        SECONDS_COLOR = colors.seconds_color
+
+        now = datetime.datetime.now()
+        current_timesec = now.strftime("%S")
+
+        # Only draw if seconds needs to be updated
+        if self._last_seconds != current_timesec:
+            # Undraw last seconds if different from current
+            if self._last_seconds is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    SECONDS_FONT,
+                    SECONDS_POSITION[0],
+                    SECONDS_POSITION[1],
+                    colors.BLACK,
+                    self._last_seconds,
+                )
+
+            self._last_seconds = current_timesec
+
+            # Draw seconds
+            _ = graphics.DrawText(
+                self.canvas,
+                SECONDS_FONT,
+                SECONDS_POSITION[0],
+                SECONDS_POSITION[1],
+                SECONDS_COLOR,
+                current_timesec,
+            )
+            return True
+
     """ Hour and minute """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def clock(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def d_clock(self, count):
         if self.active_plane_display:
             self._last_time = None
-            return
+            return True
         CLOCK_FONT = fonts.large_bold
         CLOCK_POSITION = (1, 12)
         CLOCK_COLOR = colors.clock_color
@@ -2647,51 +2707,14 @@ class Display(
                 CLOCK_COLOR,
                 current_time,
             )
-    
-    """ Seconds """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def second(self, count):
-        if self.active_plane_display:
-            self._last_seconds = None
-            return
-        SECONDS_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
-        SECONDS_POSITION = (41, 12)
-        SECONDS_COLOR = colors.seconds_color
-
-        now = datetime.datetime.now()
-        current_timesec = now.strftime("%S")
-
-        # Only draw if seconds needs to be updated
-        if self._last_seconds != current_timesec:
-            # Undraw last seconds if different from current
-            if self._last_seconds is not None:
-                _ = graphics.DrawText(
-                    self.canvas,
-                    SECONDS_FONT,
-                    SECONDS_POSITION[0],
-                    SECONDS_POSITION[1],
-                    colors.BLACK,
-                    self._last_seconds,
-                )
-
-            self._last_seconds = current_timesec
-
-            # Draw seconds
-            _ = graphics.DrawText(
-                self.canvas,
-                SECONDS_FONT,
-                SECONDS_POSITION[0],
-                SECONDS_POSITION[1],
-                SECONDS_COLOR,
-                current_timesec,
-            )
+            return True
 
     """ AM/PM Indicator """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def ampm(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def e_ampm(self, count):
         if self.active_plane_display or CLOCK_24HR:
             self._last_ampm = None
-            return
+            return True
         AMPM_COLOR = colors.am_pm_color
         AMPM_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         AMPM_POSITION = (41, 6)
@@ -2722,13 +2745,14 @@ class Display(
                 AMPM_COLOR,
                 current_ampm,
             )
+            return True
     
     """ Day of the week """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def day(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def f_day(self, count):
         if self.active_plane_display:
             self._last_day = None
-            return
+            return True
         DAY_COLOR = colors.day_of_week_color
         DAY_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DAY_POSITION = (51, 6)
@@ -2759,13 +2783,14 @@ class Display(
                 DAY_COLOR,
                 current_day,
             )
+            return True
 
     """ Date """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def date(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def g_date(self, count):
         if self.active_plane_display:
             self._last_date = None
-            return
+            return True
         DATE_COLOR = colors.date_color
         DATE_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DATE_POSITION = (55, 12)
@@ -2796,13 +2821,14 @@ class Display(
                 DATE_COLOR,
                 current_date,
             )
+            return True
     
     # ========= Idle Stats Elements ==========
     # ========================================
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def idle_header(self, count):
-        if self.active_plane_display: return
+    @Animator.KeyFrame.add(refresh_speed)
+    def h_idle_header(self, count):
+        if self.active_plane_display: return True
         small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         HEADER_TEXT_FONT = small_font_style if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
         FLYBY_HEADING_COLOR = colors.flyby_header_color
@@ -2835,13 +2861,13 @@ class Display(
         )
     
     """ Our idle stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def stats_readout(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def i_stats_readout(self, count):
         if self.active_plane_display:
             self._last_flybys = None
             self._last_track = None
             self._last_range = None
-            return
+            return True
         STATS_TEXT_FONT = fonts.small
         FLYBY_TEXT_COLOR = colors.flyby_color
         TRACK_TEXT_COLOR = colors.track_color
@@ -2850,12 +2876,13 @@ class Display(
         FLYBY_X_POS = 1
         TRACK_X_POS = 24
         RANGE_X_POS = 45
-        try:
-            flybys_now = idle_data['Flybys']
-            tracking_now = idle_data['Track']
-            range_now = idle_data['Range']
-        except: return
-        # Undraw sections
+        return_flag = False
+
+        flybys_now = idle_data.get('Flybys', "N/A")
+        tracking_now = idle_data.get('Track', "N/A")
+        range_now = idle_data.get('Range', "N/A")
+
+        # render only if the values have changed
         if self._last_flybys != flybys_now:
             if self._last_flybys is not None:
                 _ = graphics.DrawText(
@@ -2866,6 +2893,19 @@ class Display(
                     colors.BLACK,
                     self._last_flybys,
                 )
+
+            self._last_flybys = flybys_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                FLYBY_X_POS,
+                READOUT_TEXT_Y,
+                FLYBY_TEXT_COLOR,
+                flybys_now,
+            )
+            return_flag = True
+
         if self._last_track != tracking_now:
             if self._last_track is not None:
                 _ = graphics.DrawText(
@@ -2876,6 +2916,19 @@ class Display(
                     colors.BLACK,
                     self._last_track,
                 )
+
+            self._last_track = tracking_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                TRACK_X_POS,
+                READOUT_TEXT_Y,
+                TRACK_TEXT_COLOR,
+                tracking_now,
+            )
+            return_flag = True
+
         if self._last_range != range_now:
             if self._last_range is not None:
                 _ = graphics.DrawText(
@@ -2887,44 +2940,28 @@ class Display(
                     self._last_range,
                 )
 
-        # store our current data for readout in the future
-        self._last_flybys = flybys_now
-        self._last_track = tracking_now
-        self._last_range = range_now
+            self._last_range = range_now
 
-        # Update the values on the display
-        _ = graphics.DrawText(
-            self.canvas,
-            STATS_TEXT_FONT,
-            FLYBY_X_POS,
-            READOUT_TEXT_Y,
-            FLYBY_TEXT_COLOR,
-            flybys_now,
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            STATS_TEXT_FONT,
-            TRACK_X_POS,
-            READOUT_TEXT_Y,
-            TRACK_TEXT_COLOR,
-            tracking_now,
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            STATS_TEXT_FONT,
-            RANGE_X_POS,
-            READOUT_TEXT_Y,
-            RANGE_TEXT_COLOR,
-            range_now,
-        )
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                RANGE_X_POS,
+                READOUT_TEXT_Y,
+                RANGE_TEXT_COLOR,
+                range_now,
+            )
+            return_flag = True
+
+        return return_flag
     
     """ Idle Stats 2: Clock center row """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def idle_stats_2(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def j_idle_stats_2(self, count):
         if self.active_plane_display or not CLOCK_CENTER_ENABLED:
             self._last_row1_data = None
             self._last_row2_data = None
-            return
+            return True
+        return_flag = False
         
         def center_align(text_len:int) -> int:
             """ Center aligns text based on its length across the screen """
@@ -2943,12 +2980,12 @@ class Display(
         ROW2_COLOR = colors.center_row2_color
         ROW1_Y = 18 if not CLOCK_CENTER_ROW_2ROWS else 16
         ROW2_Y = 20
-        try:
-            sunrise_sunset_now = idle_data_2['SunriseSunset']
-            receiver_stats_now = idle_data_2['ReceiverStats']
-            calendar_info_now = datetime.datetime.now().strftime('%b WK%V D%j').upper() if CLOCK_CENTER_ROW_2ROWS else\
-                                datetime.datetime.now().strftime('%b wk%V d%j')
-        except: return
+
+        sunrise_sunset_now = idle_data_2.get('SunriseSunset', "▲--:-- ▼--:--")
+        receiver_stats_now = idle_data_2.get('ReceiverStats', "G --- N --- L--")
+        calendar_info_now = datetime.datetime.now().strftime('%b WK%V D%j').upper() if CLOCK_CENTER_ROW_2ROWS else\
+                            datetime.datetime.now().strftime('%b wk%V d%j')
+        
         # row 1 data
         if CLOCK_CENTER_ROW['ROW1'] is None:
             row1_data = ""
@@ -2968,7 +3005,6 @@ class Display(
         elif CLOCK_CENTER_ROW['ROW2'] == 3:
             row2_data = calendar_info_now
 
-        # Undraw sections
         if self._last_row1_data != row1_data:
             if self._last_row1_data is not None:
                 _ = graphics.DrawText(
@@ -2979,6 +3015,18 @@ class Display(
                     colors.BLACK,
                     self._last_row1_data,
                 )
+            self._last_row1_data = row1_data
+
+            _ = graphics.DrawText(
+                self.canvas,
+                ROW1_FONT,
+                center_align(len(row1_data)),
+                ROW1_Y,
+                ROW1_COLOR,
+                row1_data,
+            )
+            return_flag = True
+
         if CLOCK_CENTER_ROW_2ROWS:
             if self._last_row2_data != row2_data:
                 if self._last_row2_data is not None:
@@ -2990,40 +3038,30 @@ class Display(
                         colors.BLACK,
                         self._last_row2_data,
                     )
-        
-        # store our current data for readout in the future
-        self._last_row1_data = row1_data
-        self._last_row2_data = row2_data
+                self._last_row2_data = row2_data
 
-        # Update the values on the display
-        _ = graphics.DrawText(
-            self.canvas,
-            ROW1_FONT,
-            center_align(len(row1_data)),
-            ROW1_Y,
-            ROW1_COLOR,
-            row1_data,
-        )
-        if CLOCK_CENTER_ROW_2ROWS:
-            _ = graphics.DrawText(
-                self.canvas,
-                ROW_2_FONT,
-                center_align(len(row2_data)),
-                ROW2_Y,
-                ROW2_COLOR,
-                row2_data,
-            )
+                _ = graphics.DrawText(
+                    self.canvas,
+                    ROW_2_FONT,
+                    center_align(len(row2_data)),
+                    ROW2_Y,
+                    ROW2_COLOR,
+                    row2_data,
+                )
+                return_flag = True
+
+        return return_flag
 
     # ======== Active Plane Readout ==========
     # ========================================
     """ Header information: Callsign, Distance, Country """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def top_header(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def k_top_header(self, count):
         if not self.active_plane_display:
             self._last_callsign = None
             self._last_distance = None
             self._last_country = None
-            return
+            return True
         TOP_HEADER_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         CALLSIGN_COLOR = colors.callsign_color
         DISTANCE_COLOR = colors.distance_color
@@ -3032,15 +3070,16 @@ class Display(
         CALLSIGN_X_POS = 1
         DISTANCE_X_POS = 35
         COUNTRY_X_POS = 56
-        try:
-            # we want to blink this text
-            if not self._callsign_is_blanked:
-                callsign_now = active_data['Callsign']
-            else:
-                callsign_now = ""
-            distance_now = active_data['Distance']
-            country_now = active_data['Country']
-        except: return
+        return_flag = False
+
+        # we want to blink this text
+        if not self._callsign_is_blanked:
+            callsign_now = active_data.get('Callsign', "")
+        else:
+            callsign_now = ""
+        distance_now = active_data.get('Distance', "  N/A")
+        country_now = active_data.get('Country', "??")
+
         # Undraw sections
         if self._last_callsign != callsign_now:
             if self._last_callsign is not None:
@@ -3052,6 +3091,18 @@ class Display(
                     colors.BLACK,
                     self._last_callsign
                 )
+            self._last_callsign = callsign_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                TOP_HEADER_FONT,
+                CALLSIGN_X_POS,
+                BASELINE_Y,
+                CALLSIGN_COLOR,
+                callsign_now
+            )
+            return_flag = True
+
         if self._last_distance != distance_now:
             if self._last_distance is not None:
                 _ = graphics.DrawText(
@@ -3062,6 +3113,18 @@ class Display(
                     colors.BLACK,
                     self._last_distance
                 )
+            self._last_distance = distance_now
+    
+            _ = graphics.DrawText(
+                self.canvas,
+                TOP_HEADER_FONT,
+                DISTANCE_X_POS,
+                BASELINE_Y,
+                DISTANCE_COLOR,
+                distance_now
+            )
+            return_flag = True
+
         if self._last_country != country_now:
             if self._last_country is not None:
                 _ = graphics.DrawText(
@@ -3072,44 +3135,29 @@ class Display(
                     colors.BLACK,
                     self._last_country
                 )
-        # store our current data for readout in the future
-        self._last_callsign = callsign_now
-        self._last_distance = distance_now
-        self._last_country = country_now
+            self._last_country = country_now
 
-        # Update the values on the display
-        _ = graphics.DrawText(
-            self.canvas,
-            TOP_HEADER_FONT,
-            CALLSIGN_X_POS,
-            BASELINE_Y,
-            CALLSIGN_COLOR,
-            callsign_now
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            TOP_HEADER_FONT,
-            DISTANCE_X_POS,
-            BASELINE_Y,
-            DISTANCE_COLOR,
-            distance_now
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            TOP_HEADER_FONT,
-            COUNTRY_X_POS,
-            BASELINE_Y,
-            COUNTRY_COLOR,
-            country_now
-        )
+            _ = graphics.DrawText(
+                self.canvas,
+                TOP_HEADER_FONT,
+                COUNTRY_X_POS,
+                BASELINE_Y,
+                COUNTRY_COLOR,
+                country_now
+            )
+            return_flag = True
+
+        return return_flag
 
     """ Our journey indicator (origin and destination) """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def journey(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def l_journey(self, count):
         if not self.active_plane_display or ENHANCED_READOUT:
             self._last_origin = None
             self._last_destination = None
-            return
+            return True
+        return_flag = False
+
         def journey_arrow(canvas, x:int, y:int, width:int, height:int, color):
             ARROW_POINT_POSITION = (x, y)
             ARROW_WIDTH = width
@@ -3162,11 +3210,12 @@ class Display(
         DESTINATION_COLOR = colors.destination_color
         ARROW_COLOR = colors.arrow_color
 
-        try:
-            origin_now = active_data['Origin']
-            destination_now = active_data['Destination']
-        except: return
+        origin_now = active_data.get('Origin', "---")
+        destination_now = active_data.get('Destination', "---")
+
         # Undraw method
+        # Note this is different than the other methods as we just black out the area instead
+        # of undrawing the text
         if self._last_origin != origin_now or self._last_destination != destination_now:
             if self._last_origin is not None or self._last_destination is not None:
                 self.draw_square(
@@ -3176,6 +3225,7 @@ class Display(
                     JOURNEY_Y_BASELINE - 10,
                     colors.BLACK
                 )
+            return_flag = True
 
         # store our current data for readout in the future
         self._last_origin = origin_now
@@ -3242,23 +3292,26 @@ class Display(
                 destination_now
             )
 
+        return return_flag
+
     """ Enhanced readout: replace journey with latitude and longitude """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def lat_lon(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def m_lat_lon(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_latitude = None
             self._last_longitude = None
-            return
+            return True
         X_POS = 1
         LAT_Y_POS = 12
         LON_Y_POS = 18
         LATITUDE_COLOR = colors.latitude_color
         LONGITUDE_COLOR = colors.longitude_color
         FONT = fonts.small
-        try:
-            lat_now = active_data['Latitude']
-            lon_now = active_data['Longitude']
-        except: return
+        return_flag = False
+
+        lat_now = active_data.get('Latitude', "0.000N")
+        lon_now = active_data.get('Longitude', "0.000E")
+        
         # Undraw sections
         if self._last_latitude != lat_now:
             if self._last_latitude is not None:
@@ -3270,6 +3323,18 @@ class Display(
                     colors.BLACK,
                     self._last_latitude
                 )
+            self._last_latitude = lat_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                FONT,
+                X_POS,
+                LAT_Y_POS,
+                LATITUDE_COLOR,
+                lat_now
+            )
+            return_flag = True
+
         if self._last_longitude != lon_now:
             if self._last_longitude is not None:
                 _ = graphics.DrawText(
@@ -3280,33 +3345,24 @@ class Display(
                     colors.BLACK,
                     self._last_longitude
                 )
+            self._last_longitude = lon_now
         
-        # store current data for readout in the future
-        self._last_latitude = lat_now
-        self._last_longitude = lon_now
+            _ = graphics.DrawText(
+                self.canvas,
+                FONT,
+                X_POS,
+                LON_Y_POS,
+                LONGITUDE_COLOR,
+                lon_now
+            )
+            return_flag = True
 
-        # update values on display
-        _ = graphics.DrawText(
-            self.canvas,
-            FONT,
-            X_POS,
-            LAT_Y_POS,
-            LATITUDE_COLOR,
-            lat_now
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            FONT,
-            X_POS,
-            LON_Y_POS,
-            LONGITUDE_COLOR,
-            lon_now
-        )
+        return return_flag
 
     """ Static text """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def active_header(self, count):
-        if not self.active_plane_display: return
+    @Animator.KeyFrame.add(refresh_speed)
+    def n_active_header(self, count):
+        if not self.active_plane_display: return True
         HEADER_TEXT_FONT = fonts.small
         ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
         SPEED_HEADING_COLOR = colors.speed_heading_color
@@ -3348,13 +3404,13 @@ class Display(
             )
 
     """ Our active stats readout """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def active_readout(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def o_active_readout(self, count):
         if not self.active_plane_display:
             self._last_altitude = None
             self._last_speed = None
             self._last_flighttime = None
-            return
+            return True
         STATS_TEXT_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         ALTITUDE_TEXT_COLOR = colors.altitude_color
         SPEED_TEXT_COLOR = colors.speed_color
@@ -3363,6 +3419,8 @@ class Display(
         ALTITUDE_X_POS = 1
         SPEED_X_POS = 24
         # TIME_X_POS = 40
+        return_flag = False
+
         def right_align(string: str) -> int:
             """ special case to align-right the time output """
             length_s = len(string)
@@ -3370,13 +3428,11 @@ class Display(
             elif length_s == 5: return 44
             elif length_s >= 6: return 40
             
-        try:
-            altitude_now = active_data['Altitude']
-            speed_now = active_data['Speed']
-            flighttime_now = active_data['FlightTime']
-            rssi_now = active_data['RSSI']
-        except: return
-        # Undraw sections
+        altitude_now = active_data.get('Altitude', "0")
+        speed_now = active_data.get('Speed', "0")
+        flighttime_now = active_data.get('FlightTime', "---")
+        rssi_now = active_data.get('RSSI', "0")
+
         if self._last_altitude != altitude_now:
             if self._last_altitude is not None:
                 _ = graphics.DrawText(
@@ -3387,6 +3443,18 @@ class Display(
                     colors.BLACK,
                     self._last_altitude
                 )
+            self._last_altitude = altitude_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                ALTITUDE_X_POS,
+                READOUT_TEXT_Y,
+                ALTITUDE_TEXT_COLOR,
+                altitude_now
+            )
+            return_flag = True
+
         if self._last_speed != speed_now:
             if self._last_speed is not None:
                 _ = graphics.DrawText(
@@ -3397,6 +3465,18 @@ class Display(
                     colors.BLACK,
                     self._last_speed
                 )
+            self._last_speed = speed_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                STATS_TEXT_FONT,
+                SPEED_X_POS,
+                READOUT_TEXT_Y,
+                SPEED_TEXT_COLOR,
+                speed_now
+            )
+            return_flag = True
+
         if not ENHANCED_READOUT:
             if self._last_flighttime != flighttime_now:
                 if self._last_flighttime is not None:
@@ -3408,6 +3488,18 @@ class Display(
                         colors.BLACK,
                         self._last_flighttime
                     )
+                self._last_flighttime = flighttime_now
+
+                _ = graphics.DrawText(
+                    self.canvas,
+                    STATS_TEXT_FONT,
+                    right_align(flighttime_now),
+                    READOUT_TEXT_Y,
+                    TIME_TEXT_COLOR,
+                    flighttime_now
+                )
+                return_flag = True
+
         else:
             if self._last_rssi != rssi_now:
                 if self._last_rssi is not None:
@@ -3419,65 +3511,38 @@ class Display(
                         colors.BLACK,
                         self._last_rssi
                     )
+                self._last_rssi = rssi_now
 
-        # store our current data for readout in the future
-        self._last_altitude = altitude_now
-        self._last_speed = speed_now
-        self._last_flighttime = flighttime_now
-        self._last_rssi = rssi_now
+                _ = graphics.DrawText(
+                    self.canvas,
+                    STATS_TEXT_FONT,
+                    right_align(rssi_now),
+                    READOUT_TEXT_Y,
+                    TIME_TEXT_COLOR,
+                    rssi_now
+                )
+                return_flag = True
 
-        _ = graphics.DrawText(
-            self.canvas,
-            STATS_TEXT_FONT,
-            ALTITUDE_X_POS,
-            READOUT_TEXT_Y,
-            ALTITUDE_TEXT_COLOR,
-            altitude_now
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            STATS_TEXT_FONT,
-            SPEED_X_POS,
-            READOUT_TEXT_Y,
-            SPEED_TEXT_COLOR,
-            speed_now
-        )
-        if not ENHANCED_READOUT:
-            _ = graphics.DrawText(
-                self.canvas,
-                STATS_TEXT_FONT,
-                right_align(flighttime_now),
-                READOUT_TEXT_Y,
-                TIME_TEXT_COLOR,
-                flighttime_now
-            )
-        else:
-            _ = graphics.DrawText(
-                self.canvas,
-                STATS_TEXT_FONT,
-                right_align(rssi_now),
-                READOUT_TEXT_Y,
-                TIME_TEXT_COLOR,
-                rssi_now
-            )          
+        return return_flag
 
     """ Enhanced readout: Ground track and Vertical Speed """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def enhanced(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def p_enhanced(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_groundtrack = None
             self._last_vertspeed = None
-            return
+            return True
         X_POS = 39
         GT_Y_POS = 12
         VS_Y_POS = 18
         FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         GT_COLOR = colors.groundtrack_color
         VS_COLOR = colors.verticalspeed_color
-        try:
-            groundtrack_now = active_data['Track']
-            vertspeed_now = active_data['VertSpeed']
-        except: return
+        return_flag = False
+
+        groundtrack_now = active_data.get('Track', "T▲0°")
+        vertspeed_now = active_data.get('VertSpeed', "V 0")
+
         # Undraw sections
         if self._last_groundtrack != groundtrack_now:
             if self._last_groundtrack is not None:
@@ -3489,6 +3554,18 @@ class Display(
                     colors.BLACK,
                     self._last_groundtrack
                 )
+            self._last_groundtrack = groundtrack_now
+
+            _ = graphics.DrawText(
+                self.canvas,
+                FONT,
+                X_POS,
+                GT_Y_POS,
+                GT_COLOR,
+                groundtrack_now
+            )
+            return_flag = True
+
         if self._last_vertspeed != vertspeed_now:
             if self._last_vertspeed is not None:
                 _ = graphics.DrawText(
@@ -3499,36 +3576,27 @@ class Display(
                     colors.BLACK,
                     self._last_vertspeed
                 )
+            self._last_vertspeed = vertspeed_now
 
-        # store current data for readout in the future
-        self._last_groundtrack = groundtrack_now
-        self._last_vertspeed = vertspeed_now
+            _ = graphics.DrawText(
+                self.canvas,
+                FONT,
+                X_POS,
+                VS_Y_POS,
+                VS_COLOR,
+                vertspeed_now
+            )
+            return_flag = True
 
-        # update values on display
-        _ = graphics.DrawText(
-            self.canvas,
-            FONT,
-            X_POS,
-            GT_Y_POS,
-            GT_COLOR,
-            groundtrack_now
-        )
-        _ = graphics.DrawText(
-            self.canvas,
-            FONT,
-            X_POS,
-            VS_Y_POS,
-            VS_COLOR,
-            vertspeed_now
-        )
+        return return_flag
 
     """ An indicator of how many planes are in the area """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def plane_count_indicator(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def q_plane_count_indicator(self, count):
         if not self.active_plane_display:
             self._last_activeplanes = None
-            return
-        
+            return True
+
         def plane_count_indicators(canvas, x_start:int, y_start:int, color, count:int):
             """ draw a stack of pixels to indicate the amount of planes in the area """
             if count > 6: count = 6 # limit to 6
@@ -3546,7 +3614,6 @@ class Display(
         INDICATORS_Y = 17
         plane_count_now = len(relevant_planes)
 
-        # Undraw
         if self._last_activeplanes != plane_count_now:
             if self._last_activeplanes is not None:
                 plane_count_indicators(
@@ -3556,25 +3623,27 @@ class Display(
                     colors.BLACK,
                     self._last_activeplanes
                     )
-        self._last_activeplanes = plane_count_now
-        plane_count_indicators(
-            self.canvas,
-            INDICATORS_X,
-            INDICATORS_Y,
-            colors.plane_count_color,
-            self._last_activeplanes
-            )
+            self._last_activeplanes = plane_count_now
+            plane_count_indicators(
+                self.canvas,
+                INDICATORS_X,
+                INDICATORS_Y,
+                colors.plane_count_color,
+                self._last_activeplanes
+                )
+            return True
 
     """ Switch-time progress bar at the bottom """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def switch_progress(self, count):
+    @Animator.KeyFrame.add(refresh_speed)
+    def r_switch_progress(self, count):
         if not DISPLAY_SWITCH_PROGRESS_BAR or not self.active_plane_display:
             self._last_switch_progress_bar = None
-            return
+            return True
         
         plane_count_now = len(relevant_planes)
         BASELINE_Y = 31
         X_START = 0
+
         # below taken from `print_to_console()`
         select_divisor = 1
         if plane_count_now == 2:
@@ -3587,11 +3656,17 @@ class Display(
         # calculate the fill length based on the current iteration, the planned next select iteration, the associated latch time,
         # and screen width, then align the result to the nearest pixel
         # this moves the progress bar leftward as the next select iteration approaches
-        fill_length = int(round(((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * RGB_COLS, 0))
+        if plane_count_now < 2:
+            fill_length = 0
+        else:
+            fill_length = int(round(((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * RGB_COLS, 0))
 
         def draw_line(canvas, x_start:int, y_start:int, color, count:int):
             """ draw a horizontal line of given pixel length (this is not graphics.DrawLine) """
-            if count > RGB_COLS: count = RGB_COLS
+            if count is None:
+                count = 0
+            if count > RGB_COLS:
+                count = RGB_COLS
             indicator_color = color
             for i in range(count):
                 canvas.SetPixel(
@@ -3602,8 +3677,7 @@ class Display(
                     indicator_color.blue
                 )
 
-        # Undraw
-        if self._last_switch_progress_bar != plane_count_now:
+        if self._last_switch_progress_bar != fill_length:
             if self._last_activeplanes is not None:
                 draw_line(
                     self.canvas,
@@ -3612,24 +3686,22 @@ class Display(
                     colors.BLACK,
                     self._last_switch_progress_bar
                     )
-
-        if plane_count_now < 2:
-            self._last_switch_progress_bar = 0
-        else:
             self._last_switch_progress_bar = fill_length
-        draw_line(
-            self.canvas,
-            X_START,
-            BASELINE_Y,
-            colors.switch_progress_color,
-            self._last_switch_progress_bar
-            )
+
+            draw_line(
+                self.canvas,
+                X_START,
+                BASELINE_Y,
+                colors.switch_progress_color,
+                fill_length
+                )
+            return True
 
     # ========== Property Controls ===========
     # ========================================
     """ Control the screen brightness """
-    @Animator.KeyFrame.add(frames.PER_SECOND * refresh_speed)
-    def brightness_switcher(self, count):
+    @Animator.KeyFrame.add(1)
+    def aaa_brightness_switcher(self, count):
         self._last_brightness = self.matrix.brightness
         if active_plane_display and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
             self.matrix.brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
@@ -3668,7 +3740,7 @@ class Display(
 
     """ Actually show the display """        
     @Animator.KeyFrame.add(1)
-    def sync(self, count):
+    def z_sync(self, count):
         # Redraw screen every frame
         _ = self.matrix.SwapOnVSync(self.canvas)
 
@@ -3683,7 +3755,7 @@ class Display(
         except Exception as e:
             self.itbroke_count += 1
             if self.itbroke_count > 5:
-                self.clear_screen()
+                self.a_clear_screen()
                 global DISPLAY_IS_VALID
                 DISPLAY_IS_VALID = False
                 main_logger.critical("*************************************************")
@@ -3694,7 +3766,7 @@ class Display(
                 return
             main_logger.error(f"Display thread error ({e}), count {self.itbroke_count}:\n", exc_info=True)
             time.sleep(5)
-            self.clear_screen()
+            self.a_clear_screen()
             time.sleep(5)
             self.run_screen() # restart
 
