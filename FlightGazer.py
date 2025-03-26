@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.3.0 --- 2025-03-24'
+VERSION: str = 'v.3.3.1 --- 2025-03-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -831,9 +831,6 @@ def read_1090_config() -> None:
                 rlat = rlon = None
                 main_logger.warning("Location has not been set! This program will not be able to determine any nearby aircraft or calculate range!")
                 main_logger.warning(">>> Please set location in dump1090 to disable this message.")
-                if DISPLAY_SUNRISE_SUNSET:
-                    main_logger.warning("Sunrise and sunset times will not be displayed.")
-                    DISPLAY_SUNRISE_SUNSET = False
     except:
         main_logger.error("Cannot load receiver config.")
     return
@@ -1180,6 +1177,15 @@ def suntimes() -> None:
         sunset_sunrise['Sunrise'] = None
         sunset_sunrise['Sunset'] = None
     main_logger.debug(f"Sunrise: {sunset_sunrise['Sunrise']}, Sunset: {sunset_sunrise['Sunset']}")
+
+def timesentinel() -> None:
+    """ Thread that watches for time changes (eg: system time changes after a reboot, DST, etc) """
+    while True:
+        time_now = datetime.datetime.now()
+        time.sleep(1)
+        timechange = (datetime.datetime.now() - time_now).total_seconds() - 1
+        if abs(timechange) > 5:
+            main_logger.info(f"Time has been changed by {round(timechange, 1)} seconds.")
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
@@ -3772,6 +3778,9 @@ class Display(
 
 # =========== Initialization II ============
 # ==========================================
+
+timekeeper = threading.Thread(target=timesentinel, name='Clock-Tower', daemon=True)
+timekeeper.start()
 
 main_logger.info("Checking for running instances of FlightGazer before continuing...")
 matching_processes = match_commandline(Path(__file__).name, 'python')

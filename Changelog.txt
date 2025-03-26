@@ -10,6 +10,11 @@ v.3.x.0 - Planned
         - Coordinates and RSSI are now shown at the same time along with origin and destination readout
         - Can be enabled with a new setting: JOURNEY_PLUS
 
+v.3.3.1 - 2025-03-26
+    - FlightGazer will now detect if the time changes (eg from a system reboot, DST, etc)
+        - Does nothing other than write to the log
+    - Removed depreciated code that could break FlightGazer under specific environments
+
 v.3.3.0 - 2025-03-24
     - Massively improved display responsiveness to data changes when showing active aircraft info
         - Was caused by the DisplayFeeder routine reading data before the internal aircraft selector algorithm
