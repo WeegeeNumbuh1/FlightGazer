@@ -6,7 +6,7 @@ very low resolution screens such as the LED displays.
 >[!IMPORTANT]
 > The fonts in this directory are only the ones used in the FlightGazer project! Additional ones that were originally bundled can be sourced [here](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/fonts).
 
-Fonts in this directory (except [`3x5.bdf`](./3x5.bdf), [`4x5.bdf`](./4x5.bdf) and [`3x3.bdf`](./3x3.bdf)) are public domain (see the [README](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/fonts/README)).
+Fonts in this directory (except [`3x5.bdf`](./3x5.bdf), [`4x5.bdf`](./4x5.bdf), [`3x3.bdf`](./3x3.bdf), [`4x4.bdf`](./4x4.bdf)) are public domain (see the [README](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/fonts/README)).
 
 <details><summary><b>Doing things with bdf fonts (Show/Hide)</b></summary>
 

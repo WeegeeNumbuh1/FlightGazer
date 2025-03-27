@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.3.3.1 # do not modify this
+CONFIG_VERSION: v.3.4.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -97,15 +97,13 @@ ENHANCED_READOUT: false
 ENHANCED_READOUT_AS_FALLBACK: true
 # [true/false]
 # When true, switch to using ENHANCED_READOUT if the API Key fails at startup
-# or when API_DAILY_LIMIT is reached.
+# or when any API limits are reached.
 # This setting only works if ENHANCED_READOUT is false.
 
 JOURNEY_PLUS: false
 # [true/false]
-# CURRENTLY DOES NOT DO ANYTHING!
-# A future FlightGazer release will enable this setting's functionality.
 # A hybrid between ENHANCED_READOUT and the default aircraft info. 
-# Adds aircraft coordinates and RSSI to the this layout.
+# Adds aircraft track, vertical speed, and RSSI to the this layout.
 # Enable this if you prefer maximizing information overload.
 
 CLOCK_CENTER_ROW:

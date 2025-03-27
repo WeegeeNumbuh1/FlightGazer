@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.3.0.0
+VERSION: v.3.4.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -89,6 +89,11 @@ country_color = GREY
 origin_color = ORANGE
 destination_color = ORANGE
 arrow_color = ORANGE
+
+# journey plus colors
+time_header_color = PINK_DARK
+time_readout_color = PURPLE
+center_readout_color = DARK_GREY
 
 # enhanced readout colors
 latitude_color = ORANGE

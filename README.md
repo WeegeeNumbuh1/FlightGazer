@@ -72,8 +72,10 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Shows an aircraft's callsign (or registration as fallback), distance *and* direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
+  - 🆕 A total of 3 different layouts for aircraft info!
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
+  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
 - Automatically switches to other aircraft if more than one is within the area
 - Fully Python based
   - The python script has been verified to run in both Linux (Debian) and Windows
@@ -85,7 +87,6 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - Brightness based on time of day or when there's an active aircraft shown
-  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - API limiting per day or by monthly cost (those API calls can get expensive)
   - Colors 🌈
@@ -252,7 +253,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.3.2.0 Console Output ===== Time now: 2025-03-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.3.4.0 Console Output ===== Time now: 2025-04-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 

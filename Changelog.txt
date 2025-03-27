@@ -5,10 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
-v.3.x.0 - Planned
+v.3.4.0 - 2025-03-27
     - NEW: The best of both worlds: Enhanced Readout + the original journey indicators
-        - Coordinates and RSSI are now shown at the same time along with origin and destination readout
-        - Can be enabled with a new setting: JOURNEY_PLUS
+        - Aircraft track, vertical speed, and RSSI are now shown at the same time along with origin, destination, and flight time readout
+        - Can be enabled with the JOURNEY_PLUS setting
+    - Adjusted 4x4 font for better readability and with more drawing symbols
+    - Refactored and optimized formatting routines for faster performance
 
 v.3.3.1 - 2025-03-26
     - FlightGazer will now detect if the time changes (eg from a system reboot, DST, etc)

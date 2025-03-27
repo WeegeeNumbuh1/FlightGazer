@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.3.1 --- 2025-03-26'
+VERSION: str = 'v.3.4.0 --- 2025-03-27'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -297,8 +297,8 @@ FOLLOW_THIS_AIRCRAFT: str = ""
 DISPLAY_SWITCH_PROGRESS_BAR: bool = True
 CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None}
 ALTERNATIVE_FONT: bool = False
-API_COST_LIMIT: float|None = None # new setting!
-JOURNEY_PLUS: bool = False # new setting!
+API_COST_LIMIT: float|None = None
+JOURNEY_PLUS: bool = False
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -575,7 +575,7 @@ def cls() -> None:
 def timedelta_clean(timeinput: datetime) -> str:
     """ Cleans up time deltas without the microseconds. """
     delta_time = datetime.timedelta(seconds=timeinput)
-    return str(delta_time).split(".")[0]
+    return f"{delta_time}".split(".")[0]
 
 def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelta') -> str:
     """Convert a datetime.timedelta object or a regular number to a custom-
@@ -1013,8 +1013,7 @@ def configuration_check() -> None:
         main_logger.info("Using the alternative font style.")
 
     if JOURNEY_PLUS:
-        main_logger.info("JOURNEY_PLUS mode is enabled, but the functionality is not present.")
-        main_logger.info("A later version of FlightGazer will enable this. Thanks for the interest!")
+        main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
 
     main_logger.info("Settings check complete.")
 
@@ -1270,7 +1269,7 @@ def print_to_console() -> None:
     global this_process_cpu
     plane_count = len(relevant_planes)
     run_time = time.monotonic() - START_TIME
-    time_print = str(datetime.datetime.now()).split(".")[0]
+    time_print = f"{datetime.datetime.now()}".split(".")[0]
     ver_str = VERSION.split(" --- ")[0]
 
     rst = "\x1b[0m"
@@ -1353,9 +1352,9 @@ def print_to_console() -> None:
         # counter, callsign, iso, id
         print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
             a = a+1,
-            flight = str(relevant_planes[a]['Flight']).ljust(8),
+            flight = f"{relevant_planes[a]['Flight']}".ljust(8),
             iso = relevant_planes[a]['Country'],
-            id = str(relevant_planes[a]['ID']).ljust(6)
+            id = f"{relevant_planes[a]['ID']}".ljust(6)
         ))
         print_info.append(" | ")
 
@@ -1418,11 +1417,11 @@ def print_to_console() -> None:
     noise_str = "N/A"
     loud_str = "N/A"
     if receiver_stats['Gain'] is not None:
-        gain_str = str(receiver_stats['Gain']) + 'dB'
+        gain_str = f"{receiver_stats['Gain']}dB"
     if receiver_stats['Noise'] is not None:
-        noise_str = str(receiver_stats['Noise']) + 'dB'
+        noise_str = f"{receiver_stats['Noise']}dB"
     if receiver_stats['Strong'] is not None:
-        loud_str = str(round(receiver_stats['Strong'], 1)) + '%'
+        loud_str = f"{receiver_stats['Strong']:.1f}%"
 
     # collate general info 
     # (currently debating if this really needs to be shown; code is left here as the framework is already established)
@@ -2067,10 +2066,10 @@ class APIFetcher:
                 elif lat <0: lat_str = "S"
                 if lon >= 0: lon_str = "E"
                 elif lon <0: lon_str = "W"
-                origin = str(abs(round(lat, 1))) + lat_str
+                origin = f"{abs(lat):.1f}{lat_str}"
                 # Exploit the fact that since we are looking at a position-only flight there will be no known destination beforehand.
                 # We replace the destination with the longitude instead for space reasons (worst case string length: 5 lat, 6 lon)
-                destination = str(abs(round(lon, 1))) + lon_str
+                destination = f"{abs(lon):.1f}{lon_str}"
 
             api_results = {
                 'ID': focus_plane,
@@ -2095,7 +2094,8 @@ class APIFetcher:
 
 class DisplayFeeder:
     """ Parses our global variables for our display driver. The display itself should be dumb; we do the processing here
-    much like how `print_to_console()` displays its data. """
+    much like how `print_to_console()` displays its data. Additionally we control the layout switchover when `FOLLOW_THIS_AIRCRAFT`
+    is enabled. """
     def __init__(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -2139,7 +2139,7 @@ class DisplayFeeder:
         if general_stats: # should always exist but just in case
             if rlat is not None and rlon is not None:
                 if len(unique_planes_seen) >= 0 and len(unique_planes_seen) <= 9999:
-                    total_flybys = str(len(unique_planes_seen))
+                    total_flybys = f"{len(unique_planes_seen)}"
                 elif len(unique_planes_seen) > 9999:
                     total_flybys = "9999"
                 else: total_flybys = "0"
@@ -2150,19 +2150,21 @@ class DisplayFeeder:
                 if general_stats['Tracking'] > 999:
                     total_planes = ">999"
                 else:
-                    total_planes = str(general_stats['Tracking'])
+                    total_planes = f"{general_stats['Tracking']}"
             else:
                 total_planes = "N/A"
 
             if DUMP1090_IS_AVAILABLE and (rlat is not None and rlon is not None):
-                if general_stats['Range'] >= 1000:
+                if general_stats['Range'] >= 999.5:
                     current_range = ">999"
-                elif general_stats['Range'] >= 100 and general_stats['Range'] < 1000: # just get us the integer values
-                    current_range = str(int(round(general_stats['Range'], 0)))
-                elif general_stats['Range'] >=10 and general_stats['Range'] < 100:
-                    current_range = str(round(general_stats['Range'], 1))
-                elif general_stats['Range'] >= 0 and general_stats['Range'] < 10:
-                    current_range = str(round(general_stats['Range'], 2))
+                elif general_stats['Range'] >= 99.5 and general_stats['Range'] < 999.5: # just get us the integer values
+                    current_range = f"{general_stats['Range']:.0f}"
+                elif general_stats['Range'] >=9.95 and general_stats['Range'] < 99.5:
+                    current_range = f"{general_stats['Range']:.1f}"
+                elif general_stats['Range'] > 0 and general_stats['Range'] < 9.95:
+                    current_range = f"{general_stats['Range']:.2f}"
+                elif general_stats['Range'] == 0:
+                    current_range = "0"
             else:
                 current_range = "N/A"
 
@@ -2208,7 +2210,7 @@ class DisplayFeeder:
         # "G____"
         recv_str.append("G")
         if receiver_stats['Gain'] is not None:
-            recv_str.append(str(receiver_stats['Gain']).rjust(4))
+            recv_str.append(f"{receiver_stats['Gain']}".rjust(4))
         else:
             recv_str.append(filler_text.rjust(4))
         recv_str.append(" ")
@@ -2216,7 +2218,7 @@ class DisplayFeeder:
         # "N____"
         recv_str.append("N")
         if receiver_stats['Noise'] is not None:
-            recv_str.append(str(abs(receiver_stats['Noise'])).rjust(4))
+            recv_str.append(f"{abs(receiver_stats['Noise'])}".rjust(4))
         else:
             recv_str.append(filler_text.rjust(4))
         recv_str.append(" ")
@@ -2228,7 +2230,7 @@ class DisplayFeeder:
             if strong_rounded >= 100:
                 recv_str.append("99%") # cap at 99%
             else:
-                recv_str.append(str(strong_rounded).rjust(2))
+                recv_str.append(f"{strong_rounded}".rjust(2))
                 recv_str.append("%")
         else:
             recv_str.append(filler_text)
@@ -2242,34 +2244,34 @@ class DisplayFeeder:
         # active_stats
         active_stats = {}
         if focus_plane and focus_plane_stats:
-            flight_name = str(focus_plane_stats['Flight'])
+            flight_name = f"{focus_plane_stats['Flight']}"
             if focus_plane == FOLLOW_THIS_AIRCRAFT:
                 flight_name = flight_name + "*"
             # flight name readout is limited to 8 characters
             if len(flight_name) > 8: flight_name = flight_name[:8]
-            iso = str(focus_plane_stats['Country'])
+            iso = f"{focus_plane_stats['Country']}"
             # speed readout is limited to 4 characters;
             # if speed >= 100, truncate to just the integers
-            if focus_plane_stats['Speed'] >= 100 or focus_plane_stats['Speed'] == 0:
-                gs = str(int(round(focus_plane_stats['Speed'], 0)))
-            elif focus_plane_stats['Speed'] > 0 and focus_plane_stats['Speed'] < 100:
-                gs = str(round(focus_plane_stats['Speed'], 1))
+            if focus_plane_stats['Speed'] >= 99.5 or focus_plane_stats['Speed'] == 0:
+                gs = f"{focus_plane_stats['Speed']:.0f}"
+            elif focus_plane_stats['Speed'] > 0 and focus_plane_stats['Speed'] < 99.5:
+                gs = f"{focus_plane_stats['Speed']:.1f}"
             else:
                 gs = "0"
-            alt = str(int(round(focus_plane_stats['Altitude'], 0)))
+            alt = f"{focus_plane_stats['Altitude']:.0f}"
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
             if rlat is not None and rlon is not None:
-                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 10:
-                    dist = str(round(focus_plane_stats['Distance'], 1))
-                elif focus_plane_stats['Distance'] >= 10 and focus_plane_stats['Distance'] < 100:
-                    dist = str(int(round(focus_plane_stats['Distance'], 0)))
-                elif focus_plane_stats['Distance'] >= 100 and focus_plane_stats['Distance'] < 1000:
-                    dist = str(int(round(focus_plane_stats['Distance'], 0)))
-                elif focus_plane_stats['Distance'] >= 1000:
+                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 9.95:
+                    dist = f"{focus_plane_stats['Distance']:.1f}"
+                elif focus_plane_stats['Distance'] >= 9.95 and focus_plane_stats['Distance'] < 99.5:
+                    dist = f"{focus_plane_stats['Distance']:.0f}"
+                elif focus_plane_stats['Distance'] >= 99.5 and focus_plane_stats['Distance'] < 999.5:
+                    dist = f"{focus_plane_stats['Distance']:.0f}"
+                elif focus_plane_stats['Distance'] >= 999.5:
                     dist = "999"
                 else: dist = "0"
-                distance = str(focus_plane_stats['Direction']) + dist
+                distance = focus_plane_stats['Direction'] + dist
             else:
                 distance = "-----"
             # do our coordinate formatting
@@ -2284,21 +2286,21 @@ class DisplayFeeder:
             # track indicator
             trkstr = ['T']
             trkstr.append(track_arrow(focus_plane_stats['Track']))
-            trkstr.append(str(int(round(focus_plane_stats['Track'], 0))))
+            trkstr.append(f"{focus_plane_stats['Track']:.0f}")
             trkstr.append("°")
             track = "".join(trkstr)
             # vertical speed is an interesting one; we are limited to 6 characters:
             # 1 for indicator, 1 for sign, and 4 for values
             vs_i = int(round(focus_plane_stats['VertSpeed'], 0))
-            vs_str = str(vs_i)
+            vs_str = f"{vs_i}"
             if abs(vs_i) >= 10000:
-                vs_str = str(round(vs_i / 1000, 1))
+                vs_str = f"{(vs_i / 1000):.1f}"
             if vs_i > 0:
                 vs_str = "+" + vs_str
             elif vs_i == 0:
                 vs_str = " " + vs_str
             vs = "V" + vs_str
-            rssi = str(focus_plane_stats['RSSI'])
+            rssi = f"{focus_plane_stats['RSSI']}"
 
             # get us our API results from focus_plane_api_results
             api_orig = filler_text
@@ -2553,6 +2555,7 @@ class Display(
         self._last_vertspeed = None
         self._last_rssi = None
         self._last_switch_progress_bar = None
+        self._last_journey_plus_row = None
         # brightness control
         self._last_brightness = self.matrix.brightness
         # blinker variables for callsign (see `callsign_blinker()`)
@@ -3209,9 +3212,33 @@ class Display(
                 y1 += 1
                 y2 -= 1
 
-        JOURNEY_Y_BASELINE = 18
-        ORIGIN_X_POS = 3
-        DESTINATION_X_POS = 37
+        # array of constants, depending on if `JOURNEY_PLUS` is enabled
+        if not JOURNEY_PLUS:
+            CONSTANTS = {'y_baseline': 18,
+                         'origin_x_pos': 3,
+                         'destination_x_pos': 37,
+                         'arrow_x': 33,
+                         'arrow_y': 13,
+                         'arrow_w': 4,
+                         'arrow_h': 8,
+                         'bbox_x_start': 0,
+                         'bbox_x_end': 62,
+                         'bbox_y_height': 10}
+        else:
+            CONSTANTS = {'y_baseline': 16,
+                         'origin_x_pos': 1,
+                         'destination_x_pos': 24,
+                         'arrow_x': 22,
+                         'arrow_y': 11,
+                         'arrow_w': 3,
+                         'arrow_h': 7,
+                         'bbox_x_start': 0,
+                         'bbox_x_end': 41,
+                         'bbox_y_height': 9}
+
+        JOURNEY_Y_BASELINE = CONSTANTS['y_baseline']
+        ORIGIN_X_POS = CONSTANTS['origin_x_pos']
+        DESTINATION_X_POS = CONSTANTS['destination_x_pos']
         ORIGIN_COLOR = colors.origin_color
         DESTINATION_COLOR = colors.destination_color
         ARROW_COLOR = colors.arrow_color
@@ -3221,14 +3248,15 @@ class Display(
 
         # Undraw method
         # Note this is different than the other methods as we just black out the area instead
-        # of undrawing the text
+        # of undrawing the text. Additionally, we just continually draw to the canvas
+        # every time this function is run because it's simpler that way
         if self._last_origin != origin_now or self._last_destination != destination_now:
             if self._last_origin is not None or self._last_destination is not None:
                 self.draw_square(
-                    0,
-                    JOURNEY_Y_BASELINE,
-                    64,
-                    JOURNEY_Y_BASELINE - 10,
+                    CONSTANTS['bbox_x_start'],
+                    JOURNEY_Y_BASELINE - 1,
+                    CONSTANTS['bbox_x_end'],
+                    JOURNEY_Y_BASELINE - CONSTANTS['bbox_y_height'] - 1,
                     colors.BLACK
                 )
             return_flag = True
@@ -3238,69 +3266,258 @@ class Display(
         self._last_destination = destination_now
 
         # Draw our arrow
-        journey_arrow(self.canvas, 33, 13, 4, 8, ARROW_COLOR)
+        journey_arrow(self.canvas,
+                      CONSTANTS['arrow_x'],
+                      CONSTANTS['arrow_y'],
+                      CONSTANTS['arrow_w'],
+                      CONSTANTS['arrow_h'],
+                      ARROW_COLOR)
         
-        # Draw origin; adjust font for all anticipated string lengths
-        if len(origin_now) <= 3:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.large_bold,
-                ORIGIN_X_POS,
-                JOURNEY_Y_BASELINE,
-                ORIGIN_COLOR,
-                origin_now
-            )
-        elif len(origin_now) == 4:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.regularplus,
-                ORIGIN_X_POS,
-                JOURNEY_Y_BASELINE,
-                ORIGIN_COLOR,
-                origin_now
-            )
-        elif len(origin_now) > 4:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.small,
-                ORIGIN_X_POS,
-                JOURNEY_Y_BASELINE,
-                ORIGIN_COLOR,
-                origin_now
-            )
+        if not JOURNEY_PLUS:
+            # Draw origin; adjust font for all anticipated string lengths
+            if len(origin_now) <= 3:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.large_bold,
+                    ORIGIN_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    ORIGIN_COLOR,
+                    origin_now
+                )
+            elif len(origin_now) == 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.regularplus,
+                    ORIGIN_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    ORIGIN_COLOR,
+                    origin_now
+                )
+            elif len(origin_now) > 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.small,
+                    ORIGIN_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    ORIGIN_COLOR,
+                    origin_now
+                )
 
-        # Draw destination; do the same approach as above
-        if len(destination_now) <= 3:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.large_bold,
-                DESTINATION_X_POS,
-                JOURNEY_Y_BASELINE,
-                DESTINATION_COLOR,
-                destination_now
-            )
-        elif len(destination_now) == 4:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.regularplus,
-                DESTINATION_X_POS,
-                JOURNEY_Y_BASELINE,
-                DESTINATION_COLOR,
-                destination_now
-            )
-        elif len(destination_now) > 4:
-            _ = graphics.DrawText(
-                self.canvas,
-                fonts.small,
-                DESTINATION_X_POS,
-                JOURNEY_Y_BASELINE,
-                DESTINATION_COLOR,
-                destination_now
-            )
+            # Draw destination; do the same approach as above
+            if len(destination_now) <= 3:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.large_bold,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    DESTINATION_COLOR,
+                    destination_now
+                )
+            elif len(destination_now) == 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.regularplus,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    DESTINATION_COLOR,
+                    destination_now
+                )
+            elif len(destination_now) > 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.small,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    DESTINATION_COLOR,
+                    destination_now
+                )
+
+        else:
+            if len(origin_now) <= 3:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.regularplus,
+                    ORIGIN_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    ORIGIN_COLOR,
+                    origin_now
+                )
+            elif len(origin_now) == 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    ORIGIN_X_POS + 2,
+                    JOURNEY_Y_BASELINE - 2,
+                    ORIGIN_COLOR,
+                    origin_now
+                )
+            elif len(origin_now) > 4:
+                # we are able to do some jank here because we don't have to deal
+                # with the same kind of undraw routines used in other functions.
+                # This is to handle the rare edge case when the API results give us
+                # a coordinate instead of an IATA code, so we write text on two lines
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    ORIGIN_X_POS + 2,
+                    JOURNEY_Y_BASELINE - 4,
+                    ORIGIN_COLOR,
+                    origin_now[:4]
+                )
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    ORIGIN_X_POS + 2,
+                    JOURNEY_Y_BASELINE + 1,
+                    ORIGIN_COLOR,
+                    origin_now[4:8]
+                )
+
+            if len(destination_now) <= 3:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.regularplus,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE,
+                    DESTINATION_COLOR,
+                    destination_now
+                )
+            elif len(destination_now) == 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE - 2,
+                    DESTINATION_COLOR,
+                    destination_now
+                )
+            elif len(destination_now) > 4:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE - 4,
+                    DESTINATION_COLOR,
+                    destination_now[:4]
+                )
+                _ = graphics.DrawText(
+                    self.canvas,
+                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    DESTINATION_X_POS,
+                    JOURNEY_Y_BASELINE + 1,
+                    DESTINATION_COLOR,
+                    destination_now[4:8]
+                )
 
         return return_flag
 
-    """ Enhanced readout: replace journey with latitude and longitude """
+    """ Journey Plus: Relocate the flight time and add additional info like Enhanced Readout """
+    @Animator.KeyFrame.add(refresh_speed)
+    def ll_journeyplus(self, count): # Love Live?
+        """ This function is different because we go against the adage that `DisplayFeeder` should be doing 
+        most of the formatting work. Instead of having to add more functionality to it, we just
+        reuse the results to enable functionality for JOURNEY_PLUS. """
+        if not self.active_plane_display or not JOURNEY_PLUS or ENHANCED_READOUT:
+            self._last_journey_plus_row = None
+            return True
+        return_flag = False
+
+        TIME_HEADER_X = 47
+        TIME_HEADER_Y = 10
+        # TIME_READOUT_X controlled by a function that right-aligns it
+        TIME_READOUT_Y = 16
+        CENTER_READOUT_X = 2
+        CENTER_READOUT_Y = 21
+        TIME_READOUT_FONT = fonts.small
+        CENTER_READOUT_FONT = fonts.extrasmall
+        TIME_HEADER_COLOR = colors.time_header_color
+        TIME_READOUT_COLOR = colors.time_readout_color
+        CENTER_READOUT_COLOR = colors.center_readout_color
+
+        def right_align(string: str) -> int:
+            """ special case to align-right the time output """
+            length_s = len(string)
+            if length_s <= 3: return 48
+            if length_s == 4: return 46
+            elif length_s >= 5: return 41
+
+        flighttime_now: str = active_data.get('FlightTime', '---')
+        # undo the formatting done by `strfdelta()`
+        # 0h00m -> 0:00
+        if not flighttime_now.startswith("-"): # recall the filler text: "---"
+            ft_split = flighttime_now.split('h')
+            flighttime = []
+            flighttime.append(ft_split[0])
+            flighttime.append(":")
+            flighttime.append(ft_split[1][:-1])
+            flighttime_text = "".join(flighttime)
+        else:
+            flighttime_text = "---"
+
+        groundtrack_now: str = active_data.get('Track', "T▲0°")
+        vertspeed_now: str = active_data.get('VertSpeed', "V 0")
+        center_row = []
+        center_row.append(groundtrack_now.ljust(6))
+        center_row.append(vertspeed_now)
+        center_row_text = "".join(center_row).center(12)
+
+        # time header, no need to update
+        _ = graphics.DrawText(
+            self.canvas,
+            fonts.microscopic,
+            TIME_HEADER_X,
+            TIME_HEADER_Y,
+            TIME_HEADER_COLOR,
+            "TIME"
+        )
+
+        if flighttime_text != self._last_flighttime:
+            if self._last_flighttime is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    TIME_READOUT_FONT,
+                    right_align(self._last_flighttime),
+                    TIME_READOUT_Y,
+                    colors.BLACK,
+                    self._last_flighttime
+                )
+            self._last_flighttime = flighttime_text
+
+            _ = graphics.DrawText(
+                self.canvas,
+                TIME_READOUT_FONT,
+                right_align(flighttime_text),
+                TIME_READOUT_Y,
+                TIME_READOUT_COLOR,
+                flighttime_text
+            )
+            return_flag = True
+
+        if center_row_text != self._last_journey_plus_row:
+            if self._last_journey_plus_row is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    CENTER_READOUT_FONT,
+                    CENTER_READOUT_X,
+                    CENTER_READOUT_Y,
+                    colors.BLACK,
+                    self._last_journey_plus_row
+                )
+            self._last_journey_plus_row = center_row_text
+
+            _ = graphics.DrawText(
+                self.canvas,
+                CENTER_READOUT_FONT,
+                CENTER_READOUT_X,
+                CENTER_READOUT_Y,
+                CENTER_READOUT_COLOR,
+                center_row_text
+            )
+            return_flag = True
+
+        return return_flag
+
+    """ Enhanced readout part 1: replace journey with latitude and longitude """
     @Animator.KeyFrame.add(refresh_speed)
     def m_lat_lon(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
@@ -3369,7 +3586,7 @@ class Display(
     @Animator.KeyFrame.add(refresh_speed)
     def n_active_header(self, count):
         if not self.active_plane_display: return True
-        HEADER_TEXT_FONT = fonts.small
+        HEADER_TEXT_FONT = fonts.small if not JOURNEY_PLUS else fonts.microscopic
         ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
         SPEED_HEADING_COLOR = colors.speed_heading_color
         TIME_HEADING_COLOR = colors.time_rssi_heading_color
@@ -3390,7 +3607,7 @@ class Display(
             SPEED_HEADING_COLOR,
             "SPD"
         )
-        if not ENHANCED_READOUT:
+        if not JOURNEY_PLUS and not ENHANCED_READOUT:
             _ = graphics.DrawText(
                 self.canvas,
                 HEADER_TEXT_FONT,
@@ -3403,7 +3620,7 @@ class Display(
             _ = graphics.DrawText(
                 self.canvas,
                 HEADER_TEXT_FONT,
-                47,
+                47 if not JOURNEY_PLUS else 48,
                 ACTIVE_TEXT_Y,
                 TIME_HEADING_COLOR,
                 "RSSI"
@@ -3424,7 +3641,7 @@ class Display(
         READOUT_TEXT_Y = 31
         ALTITUDE_X_POS = 1
         SPEED_X_POS = 24
-        # TIME_X_POS = 40
+        # TIME_X_POS controlled by the below function
         return_flag = False
 
         def right_align(string: str) -> int:
@@ -3483,7 +3700,7 @@ class Display(
             )
             return_flag = True
 
-        if not ENHANCED_READOUT:
+        if not JOURNEY_PLUS and not ENHANCED_READOUT:
             if self._last_flighttime != flighttime_now:
                 if self._last_flighttime is not None:
                     _ = graphics.DrawText(
@@ -3531,7 +3748,7 @@ class Display(
 
         return return_flag
 
-    """ Enhanced readout: Ground track and Vertical Speed """
+    """ Enhanced readout part 2: Ground track and Vertical Speed """
     @Animator.KeyFrame.add(refresh_speed)
     def p_enhanced(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
@@ -3743,6 +3960,8 @@ class Display(
             self._last_rssi = None
             self._last_row1_data = None
             self._last_row2_data = None
+            self._last_switch_progress_bar = None
+            self._journey_plus_row = None
 
     """ Actually show the display """        
     @Animator.KeyFrame.add(1)
