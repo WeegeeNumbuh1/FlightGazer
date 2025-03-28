@@ -5,6 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.4.1 - 2025-03-28
+    - Fix long-standing workaround (implemented v.1.5.1) for RGBMatrixEmulator writing its config file outside of FlightGazer
+        - The RGBMatrixEmulator config file is now contained within the FlightGazer directory as
+          FlightGazer overrides where RGBMatrixEmulator looks for its own configuration file
+        - Updated initialization script to handle RGBMatrixEmulator 0.13.1 changes
+    - Init script now waits 3 months between checks to start updating python dependencies
+    - Improved display exception handling
+    - Updater script will now try to gracefully shutdown non-systemd instances of FlightGazer running in tmux
+
 v.3.4.0 - 2025-03-27
     - NEW: The best of both worlds: Enhanced Readout + the original journey indicators
         - Aircraft track, vertical speed, and RSSI are now shown at the same time along with origin, destination, and flight time readout

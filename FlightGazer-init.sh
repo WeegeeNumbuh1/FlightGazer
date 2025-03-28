@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.3.0
+# Version = v.3.4.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -155,8 +155,8 @@ else
 	date -r $CHECK_FILE
 	last_check_time=$(date -r $CHECK_FILE '+%s')
 	# 1 month = 2592000 seconds
-	if [ $((STARTTIME - last_check_time)) -lt 2592000 ]; then
-		echo "> Last check was less than a month ago, skipping tests 👍"
+	if [ $((STARTTIME - last_check_time)) -lt 7776000 ]; then
+		echo "> Last check was less than 3 months ago, skipping tests 👍"
 		SKIP_CHECK=1
 	fi
 	VERB_TEXT='Checking: '
@@ -251,16 +251,16 @@ then
 		echo "    > Service already exists or we are running in Live/Demo mode, skipping service creation."
 	fi
 
-	# for some reason RGBMatrixEmulator will write its config one directory up
 	# we make a config file first because by default it will output a ton of errors
-	if [ ! -f "${BASEDIR}/../emulator_config.json" ]; then
+	# plus we want to take advantage of the emulator's other rendering options
+	if [ ! -f "${BASEDIR}/emulator_config.json" ]; then
 	echo "  > Creating RGBMatrixEmulator settings..."
-	cat << EOF > ${BASEDIR}/../emulator_config.json
+	cat << EOF > ${BASEDIR}/emulator_config.json
 {
     "pixel_outline": 0,
     "pixel_size": 16,
     "pixel_style": "real",
-    "pixel_glow": 1,
+    "pixel_glow": 8,
     "display_adapter": "browser",
     "suppress_font_warnings": true,
     "suppress_adapter_load_errors": true,

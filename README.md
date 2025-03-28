@@ -439,7 +439,7 @@ Getting the RGB display to work is beyond the scope of this project if it wasn't
 
 **Q:** I restarted my system but it took longer for my display to start. What's going on?<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
-If it has been over a month since it last checked, then the next time it restarts, it will run these checks. It usually only adds another 30 seconds to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
+If it has been over three (3) months since it last checked, then the next time it restarts, it will run these checks. It usually only adds a minute or two to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
 **Q:** I see a dot on the right of the aircraft readout display. What is it?<br>
 **A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
@@ -448,7 +448,7 @@ If it has been over a month since it last checked, then the next time it restart
 **A:** [Click here](#adjusting-colors)
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
-**A:** Sure, just change some things in the script. (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
+**A:** Sure, just change some things in the script. Have fun. (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** What about showing other aircraft info like what airline or what kind of aircraft it is?<br>
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>

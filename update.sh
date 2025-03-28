@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.3.2.1
+# Last updated: v.3.4.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -76,7 +76,9 @@ if [ -f "${TEMPPATH}/version" ]; then
 fi
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
-sleep 3s
+sleep 2s
+tmux send-keys -t FlightGazer C-c >/dev/null 2>&1
+sleep 1s
 kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo "> Done."
 color_migrator () {
@@ -155,9 +157,10 @@ chown -Rf ${FG_O}:${FG_G} $TEMPDIR # need to do this as we are running as root
 echo -e "${FADE}Copying $TEMPDIR to $FGDIR..."
 cp -TR ${TEMPDIR} ${FGDIR}
 chown -f ${FG_O}:${FG_G} $FGDIR/config.yaml
-chmod -f 644 $FGDIR/config.yaml
+chmod -f 644 ${FGDIR}/config.yaml
 chown -f ${FG_O}:${FG_G} $FGDIR/flybys.csv >/dev/null 2>&1
-chmod -f 644 $FGDIR/flybys.csv >/dev/null 2>&1
+chmod -f 644 ${FGDIR}/flybys.csv >/dev/null 2>&1
+rm -f ${FGDIR}/../emulator_config.json >/dev/null 2>&1 # for older installs
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl is-enabled flightgazer.service >/dev/null 2>&1
 if [ $? -ne 0 ]; then

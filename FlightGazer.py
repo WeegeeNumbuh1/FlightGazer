@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.4.0 --- 2025-03-27'
+VERSION: str = 'v.3.4.1 --- 2025-03-28'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -221,7 +221,11 @@ if not NODISPLAY_MODE:
 
         if EMULATE_DISPLAY:
             try:
-                # this is for debugging display output outside of physical hardware
+                # monkey patch this so it loads the config file from our running directory
+                os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+                from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(f"{CURRENT_DIR}/emulator_config.json")
+
                 from RGBMatrixEmulator import graphics
                 from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
             except (ModuleNotFoundError, ImportError):
@@ -1184,7 +1188,7 @@ def timesentinel() -> None:
         time.sleep(1)
         timechange = (datetime.datetime.now() - time_now).total_seconds() - 1
         if abs(timechange) > 5:
-            main_logger.info(f"Time has been changed by {round(timechange, 1)} seconds.")
+            main_logger.info(f"Time has been changed by {timechange:.1f} seconds.")
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
@@ -3970,30 +3974,31 @@ class Display(
         _ = self.matrix.SwapOnVSync(self.canvas)
 
     def run_screen(self):
-        try:
-            # Start loop
-            self.play()
+        while True:
+            try:
+                # Start loop
+                self.play()
 
-        except (SystemExit, KeyboardInterrupt, ImportError):
-            return
-        
-        except Exception as e:
-            self.itbroke_count += 1
-            if self.itbroke_count > 5:
-                self.a_clear_screen()
-                global DISPLAY_IS_VALID
-                DISPLAY_IS_VALID = False
-                main_logger.critical("*************************************************")
-                main_logger.critical("*   Display thread has failed too many times.   *")
-                main_logger.critical("*        Display will no longer be seen!        *")
-                main_logger.critical("*  Please raise this issue with the developer.  *")
-                main_logger.critical("*************************************************")
+            except (SystemExit, KeyboardInterrupt, ImportError):
                 return
-            main_logger.error(f"Display thread error ({e}), count {self.itbroke_count}:\n", exc_info=True)
-            time.sleep(5)
-            self.a_clear_screen()
-            time.sleep(5)
-            self.run_screen() # restart
+            
+            except Exception as e:
+                self.itbroke_count += 1
+                if self.itbroke_count > 5:
+                    self.a_clear_screen()
+                    global DISPLAY_IS_VALID
+                    DISPLAY_IS_VALID = False
+                    main_logger.critical("*************************************************")
+                    main_logger.critical("*   Display thread has failed too many times.   *")
+                    main_logger.critical("*        Display will no longer be seen!        *")
+                    main_logger.critical("*  Please raise this issue with the developer.  *")
+                    main_logger.critical("*************************************************")
+                    return
+                main_logger.error(f"Display thread error ({e}), count {self.itbroke_count}:\n", exc_info=True)
+                time.sleep(5)
+                self.a_clear_screen()
+                time.sleep(5)
+                continue # restart
 
 # =========== Initialization II ============
 # ==========================================

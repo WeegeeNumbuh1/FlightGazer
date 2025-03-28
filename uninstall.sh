@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.2.7.1
+# Last updated: v.3.4.1
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -72,7 +72,7 @@ echo 'echo "Removing virtual Python environment..."
 rm -rf /etc/FlightGazer-pyvenv
 echo -e "Removing FlightGazer directory ${FGDIR}..."
 rm -rf ${FGDIR}
-rm -f ${FGDIR}/../emulator_config.json 2>&1
+rm -f ${FGDIR}/../emulator_config.json 2>&1 # for older installs
 sleep 2s
 echo -e "${NC}\nDone."
 exit 0' >> $TEMPPATH
