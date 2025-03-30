@@ -65,9 +65,9 @@ If you want one, I can also build one for you. (also Coming Soon™)
 </div>
 
 ## 💪 Features
-<details open><summary><b>Show/Hide</b></summary>
-
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
+<details><summary><b>Show/Hide</b></summary>
+
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
   - Shows an aircraft's callsign (or registration as fallback), distance *and* direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
@@ -135,10 +135,13 @@ Using this project assumes you have the following:
 - Your location set in `dump1090`
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
-- [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) (optional, installed by default when using the initialization script) for emulating the display output if you don't have the physical hardware or just want to see the output in a web browser
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>
+<br>
+
+**tl;dr** You need a running `dump1090` instance and if it's not running on the same device you need to know the URL to access its data.<br>
+You don't actually need a physical RGB display, but it's recommended.
 
 ### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
@@ -146,7 +149,7 @@ Make sure you meet the above prerequisites. To begin:
 git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
 ```
 > [!IMPORTANT]
-> Once the above command is completed, it is recommended to configure your setup now before running the initialization file. See the [Configuration](#️-configuration) section below, then return to this step.
+> Once the above command is completed, it is recommended to **configure your setup now** before running the initialization file.<br>See the [Configuration](#️-configuration) section below, then return to this step.
 
 <details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
 
@@ -181,14 +184,17 @@ Then, [read here](#-misc).
 
 ### 🎚️ Configuration
 
-The [`config.yaml`](./config.yaml) file is where settings are configured. It has descriptions/explanations for all configurable options. It is found (and needs to be) in the same directory as the main script itself. Edit it as needed before running FlightGazer. If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.
+Edit [`config.yaml`](./config.yaml) which is found in the same directory as the main script itself.<br>
+If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.
+
 
 > [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.<br>
 > (Just don't try to purposely break the script!)
 
 #### Adjusting Colors
-There is [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer that controls the color for each element shown on the display. You can configure the colors in that file.
+Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
+
 #### Tricks & Tips
 <details><summary>Configuration details for a remote dump1090 installation</summary>
 
@@ -247,7 +253,7 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
 ```
-sudo path/to/FlightGazer/FlightGazer-init.sh
+sudo /path/to/FlightGazer/FlightGazer-init.sh
 ```
 The script automatically detects that you're running interactively and will display realtime output, like so:
 <details><summary>Example output</summary>
@@ -281,7 +287,7 @@ API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 
 | Flag | Enables<br>interactive<br>mode in<br>FlightGazer? | What it does |
 |---|:---:|:---:|
-| (no flag) | ❌ | Default operating mode when not run as a service. Minimizes console output.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
+| (no flag) | ❌ | Default operating mode when not run as a service.<br>Minimizes console output when running non-interactively.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
 |`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
@@ -289,7 +295,7 @@ API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 |`-c`| ❌ | Only install/check dependencies and don't start the main script.
 |`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.
 |`-l`| ❌ | Live/Demo mode.<br>Does not install service and runs FlightGazer from dependencies in `/tmp`.
-|`-h`| ✅ | Print the help message.
+|`-h`| ❌ | Print the help message.
 
 </details>
 <br>

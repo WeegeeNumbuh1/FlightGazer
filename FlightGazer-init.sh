@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.4.1
+# Version = v.3.4.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -277,7 +277,7 @@ then
     "log_level": "info"
 }
 EOF
-	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/../emulator_config.json >/dev/null 2>&1
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/emulator_config.json >/dev/null 2>&1
 	echo "    > RGBMatrixEmulator settings created."
 	fi
 fi

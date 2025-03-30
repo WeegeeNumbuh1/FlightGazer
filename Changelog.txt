@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.4.2 - 2025-03-30
+    - Callsign now only uses the alternative font to reduce ambiguity with letters and numbers
+        - All other readouts will still obey the ALTERNATIVE_FONT setting
+    - Take advantage of additional readsb features if present when parsing ADS-B info
+
 v.3.4.1 - 2025-03-28
     - Fix long-standing workaround (implemented v.1.5.1) for RGBMatrixEmulator writing its config file outside of FlightGazer
         - The RGBMatrixEmulator config file is now contained within the FlightGazer directory as

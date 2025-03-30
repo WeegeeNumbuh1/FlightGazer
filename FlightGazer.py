@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.4.1 --- 2025-03-28'
+VERSION: str = 'v.3.4.2 --- 2025-03-30'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1524,12 +1524,18 @@ def main_loop_generator() -> None:
             add_entry()
             return
     
-    def relative_direction(lat0: float, lon0: float, lat1: float, lon1: float) -> str:
-        """ Gets us the plane's relative location in respect to our location. 
+    def relative_direction(**kwargs) -> str:
+        """ Gets us the plane's relative cardinal direction in respect to our location.
+        Supply a `rdir` angle value to skip internal calculation. If `rdir` is None, supply `lat0`, `lon0`, `lat1`, `lon1`.
         Sourced from here: https://gist.github.com/RobertSudwarts/acf8df23a16afdb5837f?permalink_comment_id=3070256#gistcomment-3070256 """
-        d = math.atan2((lon1 - lon0), (lat1 - lat0)) * (180 / math.pi)
-        dirs = ['N ', 'NE', 'E ', 'SE', 'S ', 'SW', 'W ', 'NW'] # cut down directions and add spaces for output
+        dirs = ['N ', 'NE', 'E ', 'SE', 'S ', 'SW', 'W ', 'NW'] # note the spaces for 1 letter directions
         # dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+        d = kwargs.get('rdir')
+        if d is None:
+            try:
+                d = math.atan2((kwargs['lon1'] - kwargs['lon0']), (kwargs['lat1'] - kwargs['lat0'])) * (180 / math.pi)
+            except:
+                return ""
         ix = round(d / (360. / len(dirs)))
         return dirs[ix % len(dirs)]
     
@@ -1632,7 +1638,8 @@ def main_loop_generator() -> None:
                 lat = a.get('lat')
                 lon = a.get('lon')
                 if rlat is not None and rlon is not None:
-                    distance = greatcircle(rlat, rlon, lat, lon)
+                    # readsb does this calculation already, try to use it first
+                    distance = a.get('r_dst', greatcircle(rlat, rlon, lat, lon))
                 else:
                     distance = 0
                 ranges.append(distance)
@@ -1651,7 +1658,13 @@ def main_loop_generator() -> None:
                         gs = a.get('gs', 0)
                         gs = gs * speed_multiplier
                         if rlat is not None:
-                            direc = relative_direction(rlat, rlon, lat, lon)
+                            # readsb also does this calculation, try to use it first and have the fallback ready
+                            direc = relative_direction(
+                                rdir = a.get('r_dir'),
+                                lat0 = rlat,
+                                lon0 = rlon,
+                                lat1 = lat,
+                                lon1 = lon)
                         else:
                             direc = ""
                         elevation, slant_range_dist = elevation_and_slant(distance, alt)
@@ -2895,7 +2908,6 @@ class Display(
         tracking_now = idle_data.get('Track', "N/A")
         range_now = idle_data.get('Range', "N/A")
 
-        # render only if the values have changed
         if self._last_flybys != flybys_now:
             if self._last_flybys is not None:
                 _ = graphics.DrawText(
@@ -3093,12 +3105,11 @@ class Display(
         distance_now = active_data.get('Distance', "  N/A")
         country_now = active_data.get('Country', "??")
 
-        # Undraw sections
         if self._last_callsign != callsign_now:
             if self._last_callsign is not None:
                 _ = graphics.DrawText(
                     self.canvas,
-                    TOP_HEADER_FONT,
+                    fonts.smallest_alt,
                     CALLSIGN_X_POS,
                     BASELINE_Y,
                     colors.BLACK,
@@ -3108,7 +3119,7 @@ class Display(
 
             _ = graphics.DrawText(
                 self.canvas,
-                TOP_HEADER_FONT,
+                fonts.smallest_alt,
                 CALLSIGN_X_POS,
                 BASELINE_Y,
                 CALLSIGN_COLOR,
