@@ -7,7 +7,7 @@
 #                        _/_/
                                      
 """ 
-A program to show live ADS-B info of nearby aircraft to an RGB-Matrix display.
+A program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
 Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
 Uses the FlightAware API instead of FlightRadar24 for info outside what ADS-B can provide.
 """

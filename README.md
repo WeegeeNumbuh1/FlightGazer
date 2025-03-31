@@ -4,7 +4,7 @@
     <img src="media/FlightGazer-logo.png" alt="Logo">
     </a>
     <h1 align="center">FlightGazer</h1>
-    A program to show dump1090 ADS-B info to an RGB-Matrix display.
+    A flight-tracking program that renders ADS-B aircraft info to an RGB-Matrix display.
 </div>
 <!-- end title section -->
 

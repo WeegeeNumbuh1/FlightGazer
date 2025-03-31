@@ -81,7 +81,7 @@ FOLLOW_THIS_AIRCRAFT: ''
 # If this aircraft enters the reception area for your ADS-B receiver (not the values set by HEIGHT_LIMIT or RANGE)
 # then FlightGazer will start tracking it as if it were inside your designated RANGE.
 # When tracking this aircraft, FlightGazer will use its ENHANCED_READOUT mode regardless of the setting for that option.
-# If this aircraft does enter your defined area, FlightGazer will follow the same settings
+# This does not disable API use. If this aircraft does enter your defined area, FlightGazer will follow the same settings
 # that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
 # FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
 
@@ -103,7 +103,7 @@ ENHANCED_READOUT_AS_FALLBACK: true
 JOURNEY_PLUS: false
 # [true/false]
 # A hybrid between ENHANCED_READOUT and the default aircraft info. 
-# Adds aircraft track, vertical speed, and RSSI to the this layout.
+# Adds aircraft track, vertical speed, and RSSI to this layout.
 # Enable this if you prefer maximizing information overload.
 
 CLOCK_CENTER_ROW:

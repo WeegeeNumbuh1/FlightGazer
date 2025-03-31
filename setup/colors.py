@@ -13,7 +13,7 @@ where the red, green, blue values are integers from 0 to 255.
 ->  Example:
     setting = graphics.Color(123, 123, 123)
 
-Your edits must between the # CONFIG_START and # CONFIG_END
+Your edits must be between the # CONFIG_START and # CONFIG_END
 lines as these settings are what will be copied over when using the updater.
 """
 
