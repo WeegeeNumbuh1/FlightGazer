@@ -349,7 +349,7 @@ or, you may [start it manually](#️-interactive-mode).
 
 - Checks if there is an internet connection
 - Checks if `first_run_complete` exists
-  - Checks last modified date: if greater than a month, runs updates for installed dependencies
+  - Checks last modified date: if greater than 3 months, runs updates for installed dependencies
   - If file exists and is new-ish, then this isn't an initial installation and we just run the main python script
 - Updates package list
 - Installs:
@@ -368,6 +368,7 @@ or, you may [start it manually](#️-interactive-mode).
   - ruamel.yaml
   - RGBMatrixEmulator
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
+- Runs main python script with desired flags
 
 </details>
 
@@ -454,7 +455,8 @@ If it has been over three (3) months since it last checked, then the next time i
 **A:** [Click here](#adjusting-colors)
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
-**A:** Sure, just change some things in the script. Have fun. (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
+**A:** Sure, just change some things in the script. Have fun.<br>
+(note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** What about showing other aircraft info like what airline or what kind of aircraft it is?<br>
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
@@ -463,10 +465,18 @@ You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefen
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/)?<br>
 **A:** adsbdb only has reported route information for aircraft that have predetermined origins and destinations. In my experience, it cannot handle position-only flights (i.e. general aviation, military, etc) and is lacking information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
 
+**Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
+**A:** The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
+The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.<br>
+Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
+If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.
+
 **Q:** Some of your code is not pythonic!!!1!!111 ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
 **A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)
 
 </details>
+
+<br>If your question isn't listed in the FAQ's, open an issue here on Github.
 
 ## 🐛 Known Issues, Shortcomings, and Reporting Issues
 
@@ -512,7 +522,7 @@ Faraway ideas:
 - [ ] Settings management from webpage?
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
-Suggestions and comments, however, are welcomed.<br>
+Suggestions, comments, and bug reports are always welcomed.<br>
 If you'd like to make your own edits that changes the way the project operates, please fork this project.
 
 ## 📖 Additional Related/Similar Projects

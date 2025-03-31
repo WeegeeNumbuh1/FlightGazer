@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.4.3 - 2025-03-31
+    - Fix minor UI issue where the 3x3 font would be used when both JOURNEY_PLUS and ENHANCED_READOUT is enabled
+
 v.3.4.2 - 2025-03-30
     - Callsign now only uses the alternative font to reduce ambiguity with letters and numbers
         - All other readouts will still obey the ALTERNATIVE_FONT setting

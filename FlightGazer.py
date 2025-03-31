@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.4.2 --- 2025-03-30'
+VERSION: str = 'v.3.4.3 --- 2025-03-31'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -3601,7 +3601,10 @@ class Display(
     @Animator.KeyFrame.add(refresh_speed)
     def n_active_header(self, count):
         if not self.active_plane_display: return True
-        HEADER_TEXT_FONT = fonts.small if not JOURNEY_PLUS else fonts.microscopic
+        if JOURNEY_PLUS and not ENHANCED_READOUT:
+            HEADER_TEXT_FONT = fonts.microscopic
+        else:
+            HEADER_TEXT_FONT = fonts.small
         ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
         SPEED_HEADING_COLOR = colors.speed_heading_color
         TIME_HEADING_COLOR = colors.time_rssi_heading_color
