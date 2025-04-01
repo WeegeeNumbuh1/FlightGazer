@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.4.4 - 2025-03-31
+    - Increase dump1090 timeout tolerance
+    - Another fix for the fix in v.3.4.3
+    - Very minor tweak to Interactive readout
+    - The 'V' glpyh from the alternative font matches the default font for better readability (could be misinterpreted as 'Y')
+
 v.3.4.3 - 2025-03-31
     - Fix minor UI issue where the 3x3 font would be used when both JOURNEY_PLUS and ENHANCED_READOUT is enabled
 
