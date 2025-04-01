@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.4.3 --- 2025-03-31'
+VERSION: str = 'v.3.4.4 --- 2025-03-31'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -53,6 +53,11 @@ import random
 from getpass import getuser
 import socket
 import logging
+
+if __name__ != '__main__':
+    print("FlightGazer cannot be imported as a module.")
+    sys.exit(1)
+
 # external imports
 import requests
 from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
@@ -126,10 +131,6 @@ else:
 
 # =========== Initialization I =============
 # ==========================================
-
-if __name__ != '__main__':
-    print("FlightGazer cannot be imported as a module.")
-    sys.exit(1)
 
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
@@ -1452,7 +1453,7 @@ def print_to_console() -> None:
     print(f"\n{rst}{fade}> {dump1090} response {process_time[0]:.3f} ms | \
 Processing {process_time[1]:.3f} ms | Display formatting {process_time[3]:.3f} ms | Last API response {process_time[2]:.3f} ms")
     
-    print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']}{distance_unit} | \
+    print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']:.2f}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     
     if API_KEY:
@@ -1573,12 +1574,12 @@ def main_loop_generator() -> None:
         if not DUMP1090_IS_AVAILABLE: return None
         try:
             req1090 = Request(DUMP1090_JSON, data=None, headers=USER_AGENT)
-            with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.75)) as aircraft_file:
+            with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.9)) as aircraft_file:
                 aircraft_data = json.load(aircraft_file)
             if DUMP978_JSON is not None:
                 req978 = Request(DUMP978_JSON, data=None, headers=USER_AGENT)
                 try:
-                    with closing(urlopen(req978, None, LOOP_INTERVAL * 0.75)) as aircraft_file2:
+                    with closing(urlopen(req978, None, LOOP_INTERVAL * 0.9)) as aircraft_file2:
                         aircraft_data2 = json.load(aircraft_file2)
                         aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
                 except:
@@ -2482,7 +2483,7 @@ def brightness_controller() -> None:
 # ==========================================
 
 class Display(
-    Animator,
+    Animator
 ):
     """ Our Display driver. """
     """ Programmer's notes:
@@ -3638,7 +3639,7 @@ class Display(
             _ = graphics.DrawText(
                 self.canvas,
                 HEADER_TEXT_FONT,
-                47 if not JOURNEY_PLUS else 48,
+                48 if (JOURNEY_PLUS and not ENHANCED_READOUT) else 47,
                 ACTIVE_TEXT_Y,
                 TIME_HEADING_COLOR,
                 "RSSI"
