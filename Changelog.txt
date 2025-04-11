@@ -5,6 +5,25 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.3.5.0 - 2025-04-11
+    - [sic] Gameing! There's an FPS counter for the display renderer because we love feature creep here (and I like the stats)
+        - The FPS display now takes the place of the display formatting stat in Interactive mode
+    - Handle rare edge case when the Interactive print display routine encounters a KeyError
+        - This bug has been associated when a system is heavily IO bound/thrashing (eg: Raspberry Pi Zero) and the processing
+          threads no longer are in lockstep with one another, leading to a mismatch in the data that the print display routine reads from
+        - Additionally, another sign the system is thrashing is the appearance of numerous messages from the "Clock-Tower" thread in the logs
+        - Very minor change to aircraft selection algorithm that may make it further resillent to thrashing scenarios
+    - Improved formatting for footer in Interactive mode
+        - Footer section adjusts what stats to show based on startup (eg: NO_DISPLAY_MODE, etc)
+    - More accurate stat for dump1090 response times
+        - The time taken to process the dump1090 json is now measured and the response stat is calculated to account for this
+        - When also connected to dump978, the footer text will show "dump1090+dump978" to reflect the combined response time for both
+          (it has always been this way)
+    - Improved center alignment with the center readout in JOURNEY_PLUS mode
+    - When Verbose mode is enabled, actually show verbose data in Interactive mode
+    - Adjusted logging messages
+    - Initialization script now shows how many lines the log file had before truncation
+
 v.3.4.4 - 2025-03-31
     - Increase dump1090 timeout tolerance
     - Another fix for the fix in v.3.4.3

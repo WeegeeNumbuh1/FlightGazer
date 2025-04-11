@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.3.4.1
+# Last updated: v.3.5.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -64,7 +64,7 @@ fi
 
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
 echo -e "${GREEN}>>> Downloading latest version...${NC}${FADE}"
-git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer $TEMPPATH
+git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer $TEMPPATH
 if [ $? -ne 0 ]; then
     echo -e "${RED}>>> ERROR: Failed to download from Github. Updater cannot continue.${NC}"
     exit 1

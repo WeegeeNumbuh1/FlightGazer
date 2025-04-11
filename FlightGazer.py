@@ -7,9 +7,9 @@
 #                        _/_/
                                      
 """ 
-A program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
+A flight-tracking program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
 Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
-Uses the FlightAware API instead of FlightRadar24 for info outside what ADS-B can provide.
+Uses the FlightAware API for info outside what ADS-B can provide.
 """
 """
     Copyright (C) 2025, WeegeeNumbuh1.
@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.4.4 --- 2025-03-31'
+VERSION: str = 'v.3.5.0 --- 2025-04-11'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -461,7 +461,7 @@ DUMP1090_IS_AVAILABLE: bool = False
 """ If we fail to load dump1090, set to False and continue. Set to True when connected to dump1090.
 This is also changed to False when the watchdog kicks in. """
 process_time: list = [0,0,0,0]
-""" [json parse, filter data, API response, format data] ms """
+""" [json parse, filter data, API response, frame render] ms """
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 flyby_stats_present: bool = False
@@ -500,6 +500,10 @@ estimated_api_cost: float = 0.
 """ API usage so far in the day. Resets at midnight. """
 API_cost_limit_reached: bool = False
 """ Flag to indicate we hit the defined cost limit. """
+process_time2: list = [0,0,0,0]
+""" Actual debug info: [time to print last console output, format data, json deserializing, reserved] """
+display_fps: float = 0.
+""" FPS of the display animator """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -805,7 +809,7 @@ def dump1090_check() -> None:
 
 def read_1090_config() -> None:
     """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to. """
-    global rlat, rlon, DISPLAY_SUNRISE_SUNSET, dump1090_receiver_version, is_readsb
+    global rlat, rlon, dump1090_receiver_version, is_readsb
     if not DUMP1090_IS_AVAILABLE: return
     try:
         req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
@@ -1336,67 +1340,75 @@ def print_to_console() -> None:
             print(f"{fade}Aircraft scratchpad: {{}}{rst}")
 
     # aircraft readout section
+    plane_count = len(relevant_planes) # try to mitigate edge case where this changes before looping
     for a in range(plane_count):
-        print_info = []
-        print_info.append(f"{rst}")
-        # algorithm indicators
-        if not NOFILTER_MODE:
-            if focus_plane == relevant_planes[a]['ID']:
-                print_info.append(white_highlight)
-            # else:
-            #     print_info.append("  ")
-            if focus_plane_ids_discard:
-                if relevant_planes[a]['ID'] in focus_plane_ids_discard:
-                    print_info.append(italic)
+        try:        
+            print_info = []
+            print_info.append(f"{rst}")
+            # algorithm indicators
+            if not NOFILTER_MODE:
+                if focus_plane == relevant_planes[a]['ID']:
+                    print_info.append(white_highlight)
                 # else:
                 #     print_info.append("  ")
-        
-        if FOLLOW_THIS_AIRCRAFT == relevant_planes[a]['ID']:
-            print_info.append("--> ")
-        
-        # counter, callsign, iso, id
-        print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
-            a = a+1,
-            flight = f"{relevant_planes[a]['Flight']}".ljust(8),
-            iso = relevant_planes[a]['Country'],
-            id = f"{relevant_planes[a]['ID']}".ljust(6)
-        ))
-        print_info.append(" | ")
+                if focus_plane_ids_discard:
+                    if relevant_planes[a]['ID'] in focus_plane_ids_discard:
+                        print_info.append(italic)
+                    # else:
+                    #     print_info.append("  ")
+            
+            if FOLLOW_THIS_AIRCRAFT == relevant_planes[a]['ID']:
+                print_info.append("--> ")
+            
+            # counter, callsign, iso, id
+            print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
+                a = a+1,
+                flight = f"{relevant_planes[a]['Flight']}".ljust(8),
+                iso = relevant_planes[a]['Country'],
+                id = f"{relevant_planes[a]['ID']}".ljust(6)
+            ))
+            print_info.append(" | ")
 
-        # speed section
-        print_info.append("SPD: ")
-        print_info.append("{gs:.1f}".format(gs = relevant_planes[a]['Speed']).rjust(5))
-        print_info.append(f"{speed_unit} @ ")
-        print_info.append("{track:.1f}°".format(track = relevant_planes[a]['Track']).rjust(6))
-        print_info.append(" | ")
-        # altitude section
-        print_info.append("ALT: ")
-        print_info.append("{alt:.1f}".format(alt = relevant_planes[a]['Altitude']).rjust(7))
-        print_info.append(f"{altitude_unit}, ")
-        print_info.append("{vs:.1f}".format(vs = relevant_planes[a]['VertSpeed']).rjust(7))
-        print_info.append(f"{altitude_unit}/min, ")
-        print_info.append("{elevation:.2f}°".format(elevation = relevant_planes[a]['Elevation']).rjust(6))
-        print_info.append(" | ")
-        # distance section
-        print_info.append(f"DIST: {relevant_planes[a]['Direction']}")
-        print_info.append("{distance:.2f}".format(distance=relevant_planes[a]['Distance']).rjust(6))
-        print_info.append(f"{distance_unit} ")
-        print_info.append("LOS")
-        print_info.append("{slant_range:.2f}".format(slant_range=relevant_planes[a]['SlantRange']).rjust(6))
-        print_info.append(f"{distance_unit} ")
-        print_info.append("({lat:.3f}, {lon:.3f})".format(
-            lat=relevant_planes[a]['Latitude'],
-            lon=relevant_planes[a]['Longitude'],
-        ).ljust(16))
-        print_info.append(" | ")
-        # last section
-        print_info.append("RSSI: ")
-        print_info.append("{rssi}".format(rssi = relevant_planes[a]['RSSI']).rjust(5))
-        print_info.append("dBFS")
+            # speed section
+            print_info.append("SPD: ")
+            print_info.append("{gs:.1f}".format(gs = relevant_planes[a]['Speed']).rjust(5))
+            print_info.append(f"{speed_unit} @ ")
+            print_info.append("{track:.1f}°".format(track = relevant_planes[a]['Track']).rjust(6))
+            print_info.append(" | ")
+            # altitude section
+            print_info.append("ALT: ")
+            print_info.append("{alt:.1f}".format(alt = relevant_planes[a]['Altitude']).rjust(7))
+            print_info.append(f"{altitude_unit}, ")
+            print_info.append("{vs:.1f}".format(vs = relevant_planes[a]['VertSpeed']).rjust(7))
+            print_info.append(f"{altitude_unit}/min, ")
+            print_info.append("{elevation:.2f}°".format(elevation = relevant_planes[a]['Elevation']).rjust(6))
+            print_info.append(" | ")
+            # distance section
+            print_info.append(f"DIST: {relevant_planes[a]['Direction']}")
+            print_info.append("{distance:.2f}".format(distance=relevant_planes[a]['Distance']).rjust(6))
+            print_info.append(f"{distance_unit} ")
+            print_info.append("LOS")
+            print_info.append("{slant_range:.2f}".format(slant_range=relevant_planes[a]['SlantRange']).rjust(6))
+            print_info.append(f"{distance_unit} ")
+            print_info.append("({lat:.3f}, {lon:.3f})".format(
+                lat=relevant_planes[a]['Latitude'],
+                lon=relevant_planes[a]['Longitude'],
+            ).ljust(16))
+            print_info.append(" | ")
+            # last section
+            print_info.append("RSSI: ")
+            print_info.append("{rssi}".format(rssi = relevant_planes[a]['RSSI']).rjust(5))
+            print_info.append("dBFS")
 
-        # finally, print it all
-        print_info.append(rst)
-        print("".join(print_info))
+            # finally, print it all
+            print_info.append(rst)
+            print("".join(print_info))
+
+        except KeyError: # gracefully handle where it breaks
+            main_logger.debug("Print routine ran into the pesky KeyError issue. Is the system thrashing?")
+            print("", flush=True)
+            print(f"{yellow_warning}< Could not finish reading all data >{rst}")
+            break
      
     for i in range(len(focus_plane_api_results)): # only shows if API has something to show
         try:
@@ -1429,30 +1441,53 @@ def print_to_console() -> None:
         loud_str = f"{receiver_stats['Strong']:.1f}%"
 
     # collate general info 
-    # (currently debating if this really needs to be shown; code is left here as the framework is already established)
     gen_info = []
     gen_info_str = ""
-    # if DUMP1090_IS_AVAILABLE:
-    #     gen_info.append("> ")
-    #     gen_info.append(f"dump1090: {URL}")
-    #     if DUMP978_JSON is not None:
-    #         gen_info.append(f", dump978: {DUMP978_JSON[:-19]}")
-    #     if HOSTNAME:
-    #         gen_info.append(f" | Running on {HOSTNAME}")
-    #         if CURRENT_IP:
-    #             gen_info.append(f" as {CURRENT_IP}")
-    #     gen_info_str = "".join(gen_info)
-    # else:
-        # if HOSTNAME:
-        #     gen_info.append(f"> Running on {HOSTNAME}")
-        #     if CURRENT_IP:
-        #         gen_info.append(f" as {CURRENT_IP}")
-        # gen_info_str = "".join(gen_info)
+    if VERBOSE_MODE:
+        if DUMP1090_IS_AVAILABLE:
+            gen_info.append("> ")
+            gen_info.append(f"dump1090: {URL}")
+            if DUMP978_JSON is not None:
+                gen_info.append(f", dump978: {DUMP978_JSON[:-19]}")
+            if HOSTNAME:
+                gen_info.append(f" | Running on {HOSTNAME}")
+                if CURRENT_IP:
+                    gen_info.append(f" as {CURRENT_IP}")
+            gen_info_str = "".join(gen_info)
+        else:
+            if HOSTNAME:
+                gen_info.append(f"> Running on {HOSTNAME}")
+                if CURRENT_IP:
+                    gen_info.append(f" as {CURRENT_IP}")
+            gen_info_str = "".join(gen_info)
 
     # print footer section
-    print(f"\n{rst}{fade}> {dump1090} response {process_time[0]:.3f} ms | \
-Processing {process_time[1]:.3f} ms | Display formatting {process_time[3]:.3f} ms | Last API response {process_time[2]:.3f} ms")
+    main_stat = []
+    main_stat.append(f"\n{rst}{fade}> {dump1090}")
+    if DUMP978_JSON is not None:
+        main_stat.append("+dump978")
+    main_stat.append(f" response {process_time[0]:.3f} ms | ")
+    main_stat.append(f"Processing {process_time[1]:.3f} ms | ")
+    if not NODISPLAY_MODE:
+        main_stat.append(f"Avg frame render {process_time[3]:.3f} ms, {display_fps:.1f} FPS")
+    else:
+        main_stat.append(f"Last console print {process_time2[0]:.3f} ms")
+    if API_KEY:
+        main_stat.append(f" | Last API response {process_time[2]:.3f} ms")
+    main_stat_str = "".join(main_stat)
+    print(main_stat_str)
     
+    verbose_stats = []
+    verbose_str = ""
+    if VERBOSE_MODE:
+        verbose_stats.append("> Verbose data: ")
+        if not NODISPLAY_MODE:
+            verbose_stats.append(f"Last console print {process_time2[0]:.3f} ms | ")
+        verbose_stats.append(f"Display formatting {process_time2[1]:.3f} ms | ")
+        verbose_stats.append(f"json parsing {process_time2[2]:.3f} ms")
+        verbose_str = "".join(verbose_stats)
+        print(verbose_str)
+
     print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']:.2f}{distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     
@@ -1475,11 +1510,11 @@ Estimated cost: ${estimated_api_cost:.2f}")
     else:
         print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU | {round(current_memory_usage / 1048576, 3):.3f}MiB")
 
-    if gen_info_str:
-        print(gen_info_str)
-
     if dump1090_failures > 0:
         print(f">{rst}{yellow_text} {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}{rst}{fade}")
+
+    if VERBOSE_MODE:
+        print(gen_info_str)
 
     if INSIDE_TMUX:
         print(f">{italic} Use \'Ctrl+B D\' to detach from this session. Ctrl+C to exit -and- quit FlightGazer.{rst}")
@@ -1572,16 +1607,21 @@ def main_loop_generator() -> None:
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
         if not DUMP1090_IS_AVAILABLE: return None
+        global process_time2
         try:
             req1090 = Request(DUMP1090_JSON, data=None, headers=USER_AGENT)
             with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.9)) as aircraft_file:
+                json_parse1 = time.perf_counter()
                 aircraft_data = json.load(aircraft_file)
+                process_time2[2] = round((time.perf_counter() - json_parse1) * 1000, 3)
             if DUMP978_JSON is not None:
                 req978 = Request(DUMP978_JSON, data=None, headers=USER_AGENT)
                 try:
                     with closing(urlopen(req978, None, LOOP_INTERVAL * 0.9)) as aircraft_file2:
+                        json_parse2 = time.perf_counter()
                         aircraft_data2 = json.load(aircraft_file2)
                         aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
+                        process_time2[2] = process_time2[2] + round((time.perf_counter() - json_parse2) * 1000, 3)
                 except:
                     pass
             return aircraft_data
@@ -1721,12 +1761,13 @@ def main_loop_generator() -> None:
             try:
                 loadingtime = time.perf_counter()
                 dump1090_data = dump1090_heartbeat()
-                process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3)
+                process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3) - process_time2[2]
                 if not DUMP1090_IS_AVAILABLE:
                     process_time[0] = 0 # doesn't make sense for there to be a process time in this case
                 if dump1090_data is None:
-                    general_stats = {'Tracking': 0, 'Range': 0}
-                    relevant_planes.clear()
+                    with threading.Lock():
+                        general_stats = {'Tracking': 0, 'Range': 0}
+                        relevant_planes.clear()
                     if DUMP1090_IS_AVAILABLE: raise TimeoutError
                 start_time = time.perf_counter()
                 if DUMP1090_IS_AVAILABLE:
@@ -1775,13 +1816,14 @@ class AirplaneParser:
         self._rare_occurrences: int = 0
         self._current_date: str = ""
         self.run_loop()
-   
+    
     def plane_selector(self, message):
         """ Select a plane! """
         global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard
         global process_time, selection_events
         start_time = time.perf_counter()
-        relevant_planes_local_copy = relevant_planes.copy()
+        with threading.Lock():
+            relevant_planes_local_copy = relevant_planes.copy()
         plane_count = len(relevant_planes_local_copy)
         get_plane_list: list = []
         focus_plane_i: str = ""
@@ -1802,7 +1844,7 @@ class AirplaneParser:
             self._rare_occurrences += 1
             if self._rare_occurrences <= 5:
                 main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
-                main_logger.info(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
+                main_logger.debug(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
             if self._rare_occurrences == 5 and date_now_str == self._current_date:
                 main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
                 main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day and until it is re-triggered afterwards.")
@@ -1902,7 +1944,7 @@ class AirplaneParser:
                 
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
-                    for i in range(plane_count): # find our focus plane in `relevant_planes`
+                    for i in range(min(plane_count, len(relevant_planes_local_copy))): # find our focus plane in `relevant_planes`
                         try:
                             if focus_plane == relevant_planes_local_copy[i]['ID']:
                                 focus_plane_stats = relevant_planes_local_copy[i]
@@ -1937,7 +1979,9 @@ class AirplaneParser:
         dispatcher.send(message='', signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
         
         if INTERACTIVE:
+            print_time_start = time.perf_counter()
             print_to_console()
+            process_time2[0] = round((time.perf_counter() - print_time_start)*1000, 3)
 
     def run_loop(self):
         def keep_alive():
@@ -2368,7 +2412,7 @@ class DisplayFeeder:
             idle_data = idle_stats
             active_data = active_stats
             idle_data_2 = idle_stats_2
-            process_time[3] = round((time.perf_counter() - displayfeeder_start) * 1000, 3)
+            process_time2[1] = round((time.perf_counter() - displayfeeder_start) * 1000, 3)
 
             # special handling for when we are tracking a specific aircraft under FOLLOW_THIS_AIRCRAFT
             if focus_plane_stats and focus_plane_stats['ID'] == FOLLOW_THIS_AIRCRAFT:
@@ -2477,6 +2521,20 @@ def brightness_controller() -> None:
             else:
                 current_brightness = BRIGHTNESS_2
 
+        time.sleep(1)
+
+def display_FPS_counter(display_instance) -> None:
+    """ Poll the performance of the display animator. (Needs to run in its own thread) """
+    global process_time, display_fps
+    while True:
+        render_time = [0.0, 0.0]
+        if DISPLAY_IS_VALID: # recall: this can change if the display driver breaks
+            try:
+                render_time = display_instance.render_time
+            except AttributeError:
+                render_time = [0.0, 0.0]
+        process_time[3] = render_time[0]
+        display_fps = render_time[1]
         time.sleep(1)
 
 # ========== Display Superclass ============
@@ -3474,8 +3532,8 @@ class Display(
         vertspeed_now: str = active_data.get('VertSpeed', "V 0")
         center_row = []
         center_row.append(groundtrack_now.ljust(6))
-        center_row.append(vertspeed_now)
-        center_row_text = "".join(center_row).center(12)
+        center_row.append(vertspeed_now.ljust(6))
+        center_row_text = "".join(center_row)
 
         # time header, no need to update
         _ = graphics.DrawText(
@@ -4069,9 +4127,11 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         main_logger.info("We are using 'rgbmatrix'")
     display = Display()
     display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
+    display_fps_thread = threading.Thread(target=display_FPS_counter, name='FPS-Counter', args=(display,), daemon=True)
     brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
     display_sender = threading.Thread(target=DisplayFeeder, name='Info-Parser', daemon=True)    
     display_stuff.start()
+    display_fps_thread.start()
     brightness_stuff.start()
     display_sender.start()
 

@@ -10,13 +10,15 @@
 
 ## 🚩 About
 This is a personal project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby aircraft with real-time ADS-B and UAT data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API instead of FlightRadar24 to get an aircraft's departure and destination airports.
+nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API to get an aircraft's departure and destination airports.
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
-As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24)
+As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24).<br>Fun fact: this is also the author's second-only Python project.
 
-**Table of Contents**
+<details open>
+<summary><b>Table of Contents</b></summary>
+
 - [About](#-about)
 - [What it looks like](#-what-it-looks-like)
 - [Features](#-features)
@@ -39,6 +41,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 - [License \& Warranty](#️-license--warranty)
 - [Acknowledgements](#-acknowledgements)
 
+</details>
 
 ## 👀 What it looks like
 
@@ -101,7 +104,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
-- Hard-to-break 🤞
+- Robust and hard-to-break 🤞
 - Constant development
 
 </details>
@@ -113,11 +116,11 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 Using this project assumes you have the following:
 #### MINIMUM
-- A working `dump1090` instance or similar where `/data/aircraft.json` can be read
-  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090), `piaware`/`skyaware`, `dump1090-fa`, `dump1090-mutability`, and [`readsb`](https://github.com/wiedehopf/readsb)
+- A working `dump1090` instance or similar interface where `/data/aircraft.json` can be read/accessed
+  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
-- Python 3.8 or newer
+- Python 3.9 or newer
 - A working internet connection for setup
 - *for Linux distros:*
   - Basic knowledge of how to use `bash` or similar terminal
@@ -146,7 +149,7 @@ You don't actually need a physical RGB display, but it's recommended.
 ### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
 ```
-git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer
+git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
 ```
 > [!IMPORTANT]
 > Once the above command is completed, it is recommended to **configure your setup now** before running the initialization file.<br>See the [Configuration](#️-configuration) section below, then return to this step.
@@ -259,7 +262,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.3.4.0 Console Output ===== Time now: 2025-04-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.3.5.0 Console Output ===== Time now: 2025-04-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
@@ -269,7 +272,7 @@ Aircraft scratchpad: {'aa3ae5', 'a10d75'}
 
 API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 
-> dump1090 response 28.107 ms | Processing 3.223 ms | Display formatting 0.279 ms | Last API response 349.265 ms
+> dump1090+dump978 response 28.107 ms | Processing 3.223 ms | Avg frame render 9.842 ms, 9.3 FPS | Last API response 349.265 ms
 > Detected 154 aircraft, 2 aircraft in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits | Estimated cost: $4.20
 > Total flybys today: 13 | Aircraft selections: 13
@@ -404,7 +407,7 @@ sudo systemctl disable flightgazer.service
 </details>
 
 ## ⬆️ How to Update
-Version v2.x and newer:
+Version v.2.x and newer:
 ```bash
 # recommended
 sudo bash /path/to/FlightGazer/update.sh
@@ -418,7 +421,7 @@ sudo bash update.sh
 ```
 <details><summary>Windows</summary>
 
-You can run `git clone --depth 1 https://github.com/WeegeeNumbuh1/FlightGazer \a\different\directory` and manually migrate your config.
+You can run `git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer \a\different\directory` and manually migrate your config.
 </details>
 
 <details><summary>Upgrading from v.1.x to v.2.x and newer</summary>
@@ -522,7 +525,8 @@ Faraway ideas:
 - [ ] Settings management from webpage?
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
-Suggestions, comments, and bug reports are always welcomed.<br>
+Suggestions, comments, and bug reports are always welcomed and encouraged.<br>
+Additionally, word-of-mouth helps plenty!<br>
 If you'd like to make your own edits that changes the way the project operates, please fork this project.
 
 ## 📖 Additional Related/Similar Projects

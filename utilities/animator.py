@@ -1,5 +1,5 @@
 """ Our Animator controller for our RGB display """
-from time import sleep
+from time import sleep, perf_counter
 import sys, os
 import signal
 import logging
@@ -8,7 +8,7 @@ DELAY_DEFAULT = 0.01
 animator_logger = logging.getLogger("DisplayDriver")
 
 def sigterm_handler(signum, frame):
-    # this module will steal signals from our main thread, so we cascade our exit starting from here
+    # this module can steal signals from our main thread, so we cascade our exit starting from here
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     os.write(sys.stdout.fileno(), b"\nDisplay Driver: Exit signal received, shutting down now.\n")
     animator_logger.info("Exit signal received, shutting down now.")
@@ -33,6 +33,12 @@ class Animator(object):
         self.frame = 0
         self._delay = DELAY_DEFAULT
         self._reset_scene = True
+        # render stats
+        self.render_time = [0.0, 0.0] # ms/frame, FPS
+        self._frame_times = []
+        self._render_counter = 0
+        self._polling_window_sec = 1
+        self._polling_window_start = 0.
 
         self._register_keyframes()
         
@@ -57,8 +63,10 @@ class Animator(object):
     def play(self):
         animator_logger.info("Display started!")
         print("Display Driver: Display started!\n", flush=True)
+        self._polling_window_start = perf_counter()
         try:
             while True:
+                frame_timer_start = perf_counter()
                 for keyframe in self.keyframes:
                     # If divisor == 0 then only run once on first loop
                     if self.frame == 0:
@@ -78,6 +86,17 @@ class Animator(object):
                             keyframe.properties["count"] = 0
                         else:
                             keyframe.properties["count"] += 1
+                
+                # do the frame stats
+                self._frame_times.append((perf_counter() - frame_timer_start) * 1000)
+                self._render_counter += 1
+                if (perf_counter() - self._polling_window_start) > self._polling_window_sec:
+                    if self._frame_times:
+                        self.render_time[0] = round((sum(self._frame_times) / len(self._frame_times)), 3)
+                        self.render_time[1] = round(self._render_counter / (perf_counter() - self._polling_window_start), 1)
+                        self._render_counter = 0
+                        self._frame_times.clear()
+                        self._polling_window_start = perf_counter()
 
                 self._reset_scene = False
                 self.frame += 1
