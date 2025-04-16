@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.3.5.0 # do not modify this
+CONFIG_VERSION: v.4.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -19,7 +19,7 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# [Integer: 1000 ~ 75000] (feet or meters)
+# [Integer: 1000 ~ 75000] (feet or meters based on UNITS)
 # Filter out aircraft at an altitude higher than this.
 
 RANGE: 2
@@ -62,14 +62,23 @@ LOCATION_TIMEOUT: 60
 # This setting, if low enough, will cause aircraft that are present in the area to "drop out" more readily
 # if they don't report a timely location update.
 
+PREFER_LOCAL: true
+# [true/false]
+# When set to true, FlightGazer will attempt to directly read dump1090 data from the local file system first rather than relying
+# on accessing it through a URL. When false, FlightGazer will never try to read from the file system.
+# This feature only works on Linux systems.
+# If you're trying to access dump1090 from a remote system, set this setting to false.
+# If you initially set up your ADS-B system with AirNav's rbfeeder or Flightradar24's Pi24 image, set this to true and run
+# FlightGazer on that system.
+
 CUSTOM_DUMP1090_LOCATION: ''
 # [String]
-# URL of your dump1090 install if it is in a different location or on a different network device.
+# URL of your dump1090 install if it's in a different location or on a different network device.
 # ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing /)
 
 CUSTOM_DUMP978_LOCATION: ''
 # [String]
-# URL of your dump978 install if it is in a different location or on a different network device.
+# URL of your dump978 install if it's in a different location or on a different network device.
 # If you're not using dump978, leave the value as ''.
 # ex: http://192.168.xxx.xxx:8978
 
@@ -84,6 +93,10 @@ FOLLOW_THIS_AIRCRAFT: ''
 # This does not disable API use. If this aircraft does enter your defined area, FlightGazer will follow the same settings
 # that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
 # FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
+
+FASTER_REFRESH: false
+# [true/false]
+# Decrease dump1090 polling time to 1 second versus the default 2 seconds.
 
 # ============= Screen Output settings =============
 # ==================================================

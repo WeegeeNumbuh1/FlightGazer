@@ -69,19 +69,21 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 ## 💪 Features
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
-<details><summary><b>Show/Hide</b></summary>
+<details open><summary><b>Show/Hide</b></summary>
 
+### Summary
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
-  - Shows an aircraft's callsign (or registration as fallback), distance *and* direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
+  - Shows an aircraft's callsign (or registration as fallback), distance and direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
-  - 🆕 A total of 3 different layouts for aircraft info!
+  - There are a total of 3 different layouts for aircraft info!
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
+
+### Adaptive & flexible
 - Automatically switches to other aircraft if more than one is within the area
-- Fully Python based
-  - The python script has been verified to run in both Linux (Debian) and Windows
+- Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
 - Customizable features such as:
@@ -95,17 +97,25 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Colors 🌈
   - Track a specific aircraft once it's detected by your ADS-B receiver
   - Switch between font styles
-- Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
-- Useful and detailed console output
-- Small memory footprint
+- Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
+  - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
+
+### Other good stuff
+- Highly optimized and fast
+  - Worst case takes ~15ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
+    - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99th percentile (worldwide) ADS-B+UAT receiver at peak traffic
+- Useful and detailed console output that shows the inner workings of FlightGazer
+- Small memory footprint once settled (10-40 MiB)
+- Fully Python based
+  - The python script has been verified to run in both Linux (Debian) and Windows
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
-- Can be configured to run automatically inside `tmux`
-- Tested to work with [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder) and [ADSB.im](https://adsb.im/home) setups
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
+- Can be configured to run automatically inside `tmux`
 - Robust and hard-to-break 🤞
 - Constant development
+- Adequate documentation
 
 </details>
 
@@ -143,8 +153,9 @@ Using this project assumes you have the following:
 </details>
 <br>
 
-**tl;dr** You need a running `dump1090` instance and if it's not running on the same device you need to know the URL to access its data.<br>
-You don't actually need a physical RGB display, but it's recommended.
+**tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
+You don't actually need a physical RGB display, but it's recommended.<br>
+*Note:* FlightGazer will not work with UAT-only setups.
 
 ### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
@@ -161,7 +172,7 @@ then run the following:
 sudo bash FlightGazer/FlightGazer-init.sh
 ```
 which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.<br>
-If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).<br>([Click here to view what the init.sh file does](#-misc))
+**If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).**<br>([Click here to view what the init.sh file does](#-misc))
 </details>
 <details><summary>if running Windows</summary>
 
@@ -178,6 +189,7 @@ pip install pydispatcher
 pip install schedule
 pip install RGBMatrixEmulator
 pip install suntime
+pip install orjson
 pip install ruamel.yaml
 ```
 If you don't care for running in a virtual environment, skip the `python3 -m venv` and `cd "path\to..."` lines and install the packages globally.<br>
@@ -205,6 +217,16 @@ Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.
 Example: `http://192.168.xxx.xxx:8080`
 
 </details>
+<details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
+
+`rbfeeder` and `Pi24` setups don't provide a web interface that FlightGazer can look at.<br>
+FlightGazer can only run directly on those systems (dump1090 data cannot be read remotely).<br>
+Set `PREFER_LOCAL` to `true` so that FlightGazer can read the data from these setups.<br>
+
+If you managed to install a working web interface like `tar1090` with these setups then you're an advanced user and you already know what you're doing.<br>
+
+</details>
+
 <details><summary>Turning off the screen at night</summary>
 
 `ENABLE_TWO_BRIGHTNESS: true`<br>
@@ -231,6 +253,7 @@ Go to the color config file and set whatever element you don't want to show to `
 Example: `clock_color = BLACK`
 
 </details>
+
 <details><summary>Reduce flickering on a physical RGB matrix display</summary>
 
 - [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)
@@ -262,7 +285,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.3.5.0 Console Output ===== Time now: 2025-04-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.4.0.0 Console Output ===== Time now: 2025-04-15 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
@@ -272,11 +295,11 @@ Aircraft scratchpad: {'aa3ae5', 'a10d75'}
 
 API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 
-> dump1090+dump978 response 28.107 ms | Processing 3.223 ms | Avg frame render 9.842 ms, 9.3 FPS | Last API response 349.265 ms
-> Detected 154 aircraft, 2 aircraft in range, max range: 177.2nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
+> dump1090+dump978 response 2.617 ms | Processing 3.223 ms | Avg frame render 9.842 ms, 9.3 FPS | Last API response 349.265 ms
+> Detected 154 aircraft, 2 aircraft in range, max range: 177.2 nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
 > API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits | Estimated cost: $4.20
 > Total flybys today: 13 | Aircraft selections: 13
-> CPU & memory usage: 16.9% overall CPU @ 45.3°C | 7.734MiB
+> CPU & memory usage: 16.9% overall CPU @ 45.3°C | 7.734 MiB
 > Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.
 ```
 </details>
@@ -304,7 +327,9 @@ API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 <br>
 
 > [!TIP]
-> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser: `http://localhost:8888` (on the device running FlightGazer)
+> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser:
+> - `http://IP-address-of-device-running-FlightGazer:8888`
+> - `http://localhost:8888` (on the device running FlightGazer)
 
 <details><summary>Advanced use</summary>
 
@@ -369,6 +394,7 @@ or, you may [start it manually](#️-interactive-mode).
   - psutil (usually provided in Raspberry Pi OS)
   - suntime
   - ruamel.yaml
+  - orjson
   - RGBMatrixEmulator
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 - Runs main python script with desired flags

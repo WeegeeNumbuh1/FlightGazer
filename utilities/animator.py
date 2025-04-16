@@ -62,7 +62,6 @@ class Animator(object):
 
     def play(self):
         animator_logger.info("Display started!")
-        print("Display Driver: Display started!\n", flush=True)
         self._polling_window_start = perf_counter()
         try:
             while True:

@@ -33,15 +33,13 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.3.5.0 --- 2025-04-11'
+VERSION: str = 'v.4.0.0 --- 2025-04-15'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
 import sys
 import math
 from pathlib import Path
-from contextlib import closing
-from urllib.request import urlopen, Request
 import urllib.parse
 import json
 import signal
@@ -64,6 +62,15 @@ from pydispatch import dispatcher # pip install pydispatcher *not* pip install p
 import schedule
 import psutil
 from suntime import Sun, SunTimeException
+try:
+    # faster json deserialization for the dump1090 processing loop
+    # Fun stats from testing:
+    # - orjson is 2-3x faster than the built-in json module
+    # - orjson is 1.05-1.2x faster than msgspec (even after reusing a decoder, as suggested in the msgspec docs)
+    import orjson
+    ORJSON_IMPORTED = True
+except (ModuleNotFoundError, ImportError):
+    ORJSON_IMPORTED = False # we can always fall back on the standard json library
 # utilities
 import utilities.flags as flags
 import utilities.registrations as registrations
@@ -180,6 +187,10 @@ stdout_stream.setLevel(logging.NOTSET)
 stdout_stream.setFormatter(logging_format)
 main_logger.addHandler(stdout_stream)
 
+# When logging level is set to DEBUG, the requests library will spam the log for each time dump1090 is polled.
+# While verbosity is nice, this is excessive, so we bump up the logging level
+logging.getLogger("urllib3.connectionpool").setLevel(logging.INFO)
+
 main_logger.info("==============================================================")
 main_logger.info("===                 Welcome to FlightGazer!                ===")
 main_logger.info("==============================================================")
@@ -191,22 +202,25 @@ if LOGFILE != Path(f"{CURRENT_DIR}/FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
-# Actual constants
+# Main "constants"
 FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
-USER_AGENT: dict = {'User-Agent': "Wget/1.21.3"}
+USER_AGENT: dict = {'User-Agent': "Wget/1.25.0"}
 """ Use Wget user-agent for our requests """
 LOOP_INTERVAL: float = 2
 """ in seconds. Affects how often we poll `dump1090`'s json (which itself atomically updates every second).
-Affects how often other processing threads handle data as they are triggered on every update.
-Should be left at 2 (or slower) """
+Affects how often other processing threads handle data as they are triggered on every update. """
 RGB_COLS: int = 64
 RGB_ROWS: int = 32
 API_COST_PER_CALL: float = 0.005
 """ How much it costs to do a single API call (may change in the future).
 Current as of `VERSION` """
-if VERBOSE_MODE: main_logger.debug("Verbose mode enabled.")
+if VERBOSE_MODE:
+    main_logger.debug("Verbose mode enabled.")
+    # main_logger.debug("Connected loggers:")
+    # for key in logging.Logger.manager.loggerDict:
+    #     main_logger.debug(f"{key}")
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
@@ -304,6 +318,8 @@ CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None}
 ALTERNATIVE_FONT: bool = False
 API_COST_LIMIT: float|None = None
 JOURNEY_PLUS: bool = False
+FASTER_REFRESH: bool = False # new setting!
+PREFER_LOCAL: bool = True # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -346,6 +362,8 @@ default_settings: dict = {
     "ALTERNATIVE_FONT": ALTERNATIVE_FONT,
     "API_COST_LIMIT": API_COST_LIMIT,
     "JOURNEY_PLUS": JOURNEY_PLUS,
+    "FASTER_REFRESH": FASTER_REFRESH,
+    "PREFER_LOCAL": PREFER_LOCAL,
 }
 """ Dict of default settings """
 
@@ -388,6 +406,9 @@ if not CONFIG_MISSING:
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
 if config: del config
+
+if FASTER_REFRESH:
+    LOOP_INTERVAL = 1
 
 # =========== Global Variables =============
 # ==========================================
@@ -461,7 +482,7 @@ DUMP1090_IS_AVAILABLE: bool = False
 """ If we fail to load dump1090, set to False and continue. Set to True when connected to dump1090.
 This is also changed to False when the watchdog kicks in. """
 process_time: list = [0,0,0,0]
-""" [json parse, filter data, API response, frame render] ms """
+""" [dump1090 response, filter data, API response, frame render] ms """
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 flyby_stats_present: bool = False
@@ -501,9 +522,15 @@ estimated_api_cost: float = 0.
 API_cost_limit_reached: bool = False
 """ Flag to indicate we hit the defined cost limit. """
 process_time2: list = [0,0,0,0]
-""" Actual debug info: [time to print last console output, format data, json deserializing, reserved] """
+""" Actual debug info: [time to print last console output, format data, json deserializing, reserved] ms """
+runtime_sizes: list = [0,0,0]
+""" Actual debug info: [dump1090 json size, reserved, reserved] KiB """
 display_fps: float = 0.
 """ FPS of the display animator """
+USING_FILESYSTEM: bool = False
+""" True if we are directly accessing the dump1090 json via the local file system instead of through the network """
+USING_FILESYSTEM_978: bool = False
+""" True if we are directly accessing dump978 json from the file system """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -743,8 +770,30 @@ def get_cpu_temp_sensor() -> str | None:
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
 
-def probe1090() -> tuple[str, str] | None:
-    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` """
+def probe1090() -> tuple[str | None, str | None]:
+    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` 
+    If `PREFER_LOCAL` is enabled, this function will try to see if it can access dump1090 from the local
+    file system and use that if it works first. When this happens, `USING_FILESYSTEM` flag will be set. """
+    global USING_FILESYSTEM
+    if PREFER_LOCAL and os.name=='posix':
+        # file locations sourced from https://raw.githubusercontent.com/wiedehopf/tar1090/master/install.sh
+        file_locations = [
+            "/run/readsb",
+            "/run/dump1090-fa",
+            "/run/adsb-feeder-ultrafeeder/readsb", # ultrafeeder/adsb.im setups
+            "/run/dump1090",
+            "/run/dump1090-mutability", # Pi24 uses this
+            "/run/adsbexchange-feed",
+            "/run/shm", # AirNav's rbfeeder
+            ]
+        for i, json_1090 in enumerate(file_locations):
+            if Path(f"{json_1090}/aircraft.json").is_file():
+                USING_FILESYSTEM = True
+                main_logger.info("A local working dump1090 instance was found running on this system.")
+                return json_1090 + '/aircraft.json', json_1090
+        else:
+            main_logger.debug("No local running instance of dump1090 present on the system, falling back to using the network.")
+
     locations = iter(
         [CUSTOM_DUMP1090_LOCATION,
          "http://localhost/tar1090",
@@ -765,6 +814,21 @@ def probe1090() -> tuple[str, str] | None:
 
 def probe978() -> str | None:
     """ Check if dump978 exists and returns its `URL` or None if not found. """
+    global USING_FILESYSTEM_978
+    if PREFER_LOCAL and os.name=='posix':
+        file_locations = [
+            "/run/skyaware978",
+            "/run/adsb-feeder-ultrafeeder/skyaware978",
+            "/run/adsbexchange-978",
+        ]
+        for i, json_978 in enumerate(file_locations):
+            if Path(f"{json_978}/aircraft.json").is_file():
+                USING_FILESYSTEM_978 = True
+                main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
+                return json_978 + '/aircraft.json'
+        else:
+            main_logger.debug("No local running instance of dump978 present on the system, falling back to using the network.")
+        
     locations = iter(
         ["http://localhost:8978",
          CUSTOM_DUMP978_LOCATION]
@@ -785,6 +849,8 @@ def dump1090_check() -> None:
     """ Checks what dump1090 we have available upon startup. If we can't find it, just become a clock. """
     global DUMP1090_JSON, URL, DUMP978_JSON, DUMP1090_IS_AVAILABLE
     main_logger.info("Searching for dump1090...")
+    if PREFER_LOCAL and not os.name=='posix':
+        main_logger.info(f"PREFER_LOCAL is enabled but this is not a posix system. Falling back to using the network.")
     for wait in range(3):
         tries = 3 - wait
         DUMP1090_JSON, URL = probe1090()
@@ -812,9 +878,14 @@ def read_1090_config() -> None:
     global rlat, rlon, dump1090_receiver_version, is_readsb
     if not DUMP1090_IS_AVAILABLE: return
     try:
-        req = Request(URL + '/data/receiver.json', data=None, headers=USER_AGENT)
-        with closing(urlopen(req, None, LOOP_INTERVAL * 0.75)) as receiver_file:
-            receiver = json.load(receiver_file)
+        if USING_FILESYSTEM:
+            with open(Path(URL + '/receiver.json'), 'rb') as receiver_file:
+                receiver = json.load(receiver_file)
+        else:
+            receiver_req = requests.get(URL + '/data/receiver.json', headers=USER_AGENT, timeout=5)
+            receiver_req.raise_for_status()
+            receiver = receiver_req.json()
+
         with threading.Lock():
             rlat_last = rlat
             rlon_last = rlon
@@ -835,7 +906,7 @@ def read_1090_config() -> None:
                     rlat = float(receiver['lat'])
                     rlon = float(receiver['lon'])
                     main_logger.info(f"Location updated.")
-                    main_logger.debug(f">>> ({rlat}, {rlon})") # do not write to file unless verbose mode
+                    main_logger.debug(f">>> ({rlat}, {rlon})")
             else:
                 rlat = rlon = None
                 main_logger.warning("Location has not been set! This program will not be able to determine any nearby aircraft or calculate range!")
@@ -1024,6 +1095,12 @@ def configuration_check() -> None:
     if JOURNEY_PLUS:
         main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
 
+    if FASTER_REFRESH:
+        main_logger.info("FASTER_REFRESH enabled, dump1090 polling rate is now 1 second.")
+
+    if ORJSON_IMPORTED:
+        main_logger.debug("orjson module imported and will be used for faster dump1090 json decoding.")
+
     main_logger.info("Settings check complete.")
 
 def configuration_check_api() -> None:
@@ -1114,6 +1191,7 @@ def configuration_check_api() -> None:
 def read_receiver_stats() -> None:
     """ Poll receiver stats from dump1090. Writes to `receiver_stats`.
     Needs to run on its own thread as its timing does not depend on `LOOP_INTERVAL`. """
+    # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
     if not DUMP1090_IS_AVAILABLE: return # don't start this thread if, only at startup, dump1090 is unavailable
     global receiver_stats
 
@@ -1130,9 +1208,20 @@ def read_receiver_stats() -> None:
         loud_percentage = None
         if DUMP1090_IS_AVAILABLE:
             try:
-                req = Request(URL + '/data/stats.json', data=None, headers=USER_AGENT)
-                with closing(urlopen(req, None, 3)) as stats_file:
-                    stats = json.load(stats_file)
+                if USING_FILESYSTEM:
+                    with open(Path(URL + '/stats.json'), 'rb') as stats_file:
+                        if ORJSON_IMPORTED:
+                            stats = orjson.loads(stats_file.read())
+                        else:
+                            stats = json.load(stats_file)
+                else:
+                    receiver_req = session.get(URL + '/data/stats.json', headers=USER_AGENT, timeout=5)
+                    receiver_req.raise_for_status()
+                    receiver_data = receiver_req.content
+                    if ORJSON_IMPORTED:
+                        stats = orjson.loads(receiver_data)
+                    else:
+                        stats = json.loads(receiver_data)
                     
                 if has_key(stats, 'last1min'):
                     try:
@@ -1448,17 +1537,21 @@ def print_to_console() -> None:
             gen_info.append("> ")
             gen_info.append(f"dump1090: {URL}")
             if DUMP978_JSON is not None:
-                gen_info.append(f", dump978: {DUMP978_JSON[:-19]}")
+                gen_info.append(", dump978: ")
+                if USING_FILESYSTEM_978:
+                    gen_info.append(f"{DUMP978_JSON[:-14]}")
+                else:
+                    gen_info.append(f"{DUMP978_JSON[:-19]}")
             if HOSTNAME:
-                gen_info.append(f" | Running on {HOSTNAME}")
+                gen_info.append(f" | Running on {CURRENT_IP}")
                 if CURRENT_IP:
-                    gen_info.append(f" as {CURRENT_IP}")
+                    gen_info.append(f" as {HOSTNAME}")
             gen_info_str = "".join(gen_info)
         else:
             if HOSTNAME:
-                gen_info.append(f"> Running on {HOSTNAME}")
+                gen_info.append(f"> Running on {CURRENT_IP}")
                 if CURRENT_IP:
-                    gen_info.append(f" as {CURRENT_IP}")
+                    gen_info.append(f" as {HOSTNAME}")
             gen_info_str = "".join(gen_info)
 
     # print footer section
@@ -1467,7 +1560,7 @@ def print_to_console() -> None:
     if DUMP978_JSON is not None:
         main_stat.append("+dump978")
     main_stat.append(f" response {process_time[0]:.3f} ms | ")
-    main_stat.append(f"Processing {process_time[1]:.3f} ms | ")
+    main_stat.append(f"Processing {(process_time[1]+process_time2[1]+process_time2[2]):.3f} ms | ")
     if not NODISPLAY_MODE:
         main_stat.append(f"Avg frame render {process_time[3]:.3f} ms, {display_fps:.1f} FPS")
     else:
@@ -1480,15 +1573,16 @@ def print_to_console() -> None:
     verbose_stats = []
     verbose_str = ""
     if VERBOSE_MODE:
-        verbose_stats.append("> Verbose data: ")
+        verbose_stats.append("> ")
         if not NODISPLAY_MODE:
             verbose_stats.append(f"Last console print {process_time2[0]:.3f} ms | ")
         verbose_stats.append(f"Display formatting {process_time2[1]:.3f} ms | ")
-        verbose_stats.append(f"json parsing {process_time2[2]:.3f} ms")
+        verbose_stats.append(f"json parsing {process_time2[2]:.3f} ms | ")
+        verbose_stats.append(f"Filtering+algorithm {process_time[1]:.3f} ms")
         verbose_str = "".join(verbose_stats)
         print(verbose_str)
 
-    print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']:.2f}{distance_unit} | \
+    print(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, max range: {general_stats['Range']:.2f} {distance_unit} | \
 Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
     
     if API_KEY:
@@ -1506,9 +1600,14 @@ Estimated cost: ${estimated_api_cost:.2f}")
     this_process_cpu = this_process.cpu_percent(interval=None)
     if CPU_TEMP_SENSOR is not None:
         cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
-        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU @ {cpu_temp:.1f}°C | {round(current_memory_usage / 1048576, 3):.3f}MiB")
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU @ {cpu_temp:.1f}°C | {round(current_memory_usage / 1048576, 3):.3f} MiB")
     else:
-        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU | {round(current_memory_usage / 1048576, 3):.3f}MiB")
+        print(f"> CPU & memory usage: {round(this_process_cpu / CORE_COUNT, 1)}% overall CPU | {round(current_memory_usage / 1048576, 3):.3f} MiB")
+
+    if VERBOSE_MODE:
+        print(f"> json details: {runtime_sizes[0] / 1024:.3f} KiB | \
+Transfer speed: {(runtime_sizes[0] * 1000)/(process_time[0] * 1048576):.3f} MiB/s | \
+Processing speed: {(runtime_sizes[0] * 1000)/(process_time2[2] * 1048576):.3f} MiB/s")
 
     if dump1090_failures > 0:
         print(f">{rst}{yellow_text} {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}{rst}{fade}")
@@ -1605,31 +1704,82 @@ def main_loop_generator() -> None:
         return math.degrees(math.atan2(alt_apparent, dist_nm)), slant_range * distance_multiplier
 
     def dump1090_heartbeat() -> list | None:
-        """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None. """
+        """ Checks if dump1090 service is up and returns the relevant json file(s). If service is down/times out, returns None.
+        Most of the processing time occurs here. This function is also the most vital for FlightGazer's normal operation. """
         if not DUMP1090_IS_AVAILABLE: return None
-        global process_time2
+        global process_time, process_time2, runtime_sizes
         try:
-            req1090 = Request(DUMP1090_JSON, data=None, headers=USER_AGENT)
-            with closing(urlopen(req1090, None, LOOP_INTERVAL * 0.9)) as aircraft_file:
+            dump1090_start = time.perf_counter()
+            if USING_FILESYSTEM:
+                with open(Path(DUMP1090_JSON), 'rb') as dump1090_data:
+                    # doing this is slightly slower (~5%) than just doing json.load(dump1090_data)
+                    # we do it this way just for the "response" stat
+                    s = dump1090_data.read()
+                    process_time[0] = round((time.perf_counter() - dump1090_start) * 1000, 3)
+                    if VERBOSE_MODE:
+                        runtime_sizes[0] = len(s)
+                        # runtime_sizes[1] = sys.getsizeof(s)
+                    json_parse1 = time.perf_counter()
+                    if ORJSON_IMPORTED:
+                        aircraft_data = orjson.loads(s)
+                    else:
+                        aircraft_data = json.loads(s)
+                    process_time2[2] = round((time.perf_counter() - json_parse1) * 1000, 3)
+            else:
+                dump1090_req = session.get(DUMP1090_JSON, headers=USER_AGENT, timeout=LOOP_INTERVAL * 0.9)
+                dump1090_req.raise_for_status()
+                process_time[0] = round((time.perf_counter() - dump1090_start) * 1000, 3)
+                if VERBOSE_MODE:
+                    runtime_sizes[0] = len(dump1090_req.content)
+                    # runtime_sizes[1] = sys.getsizeof(dump1090_req)
                 json_parse1 = time.perf_counter()
-                aircraft_data = json.load(aircraft_file)
+                dump1090_data = dump1090_req.content
+                if ORJSON_IMPORTED:
+                    aircraft_data = orjson.loads(dump1090_data)
+                else:
+                    aircraft_data = json.loads(dump1090_data)
                 process_time2[2] = round((time.perf_counter() - json_parse1) * 1000, 3)
+
             if DUMP978_JSON is not None:
-                req978 = Request(DUMP978_JSON, data=None, headers=USER_AGENT)
-                try:
-                    with closing(urlopen(req978, None, LOOP_INTERVAL * 0.9)) as aircraft_file2:
+                dump978_start = time.perf_counter()
+                if USING_FILESYSTEM_978:
+                    with open(Path(DUMP978_JSON), 'rb') as dump978_data:
+                        s = dump978_data.read()
+                        process_time[0] = process_time[0] + round((time.perf_counter() - dump978_start) * 1000, 3)
+                        if VERBOSE_MODE:
+                            runtime_sizes[0] += len(s)
+                            # runtime_sizes[1] += sys.getsizeof(s)
                         json_parse2 = time.perf_counter()
-                        aircraft_data2 = json.load(aircraft_file2)
-                        aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
-                        process_time2[2] = process_time2[2] + round((time.perf_counter() - json_parse2) * 1000, 3)
-                except:
-                    pass
+                        if ORJSON_IMPORTED:
+                            aircraft_data2 = orjson.loads(s)
+                        else:
+                            aircraft_data2 = json.loads(s)
+                else:
+                    dump978_req = session.get(DUMP978_JSON, headers=USER_AGENT, timeout=LOOP_INTERVAL * 0.9)
+                    process_time[0] = process_time[0] + round((time.perf_counter() - dump978_start) * 1000, 3)
+                    dump978_req.raise_for_status()
+                    if VERBOSE_MODE:    
+                        runtime_sizes[0] += len(dump978_req.content)
+                        # runtime_sizes[1] += sys.getsizeof(dump978_req)
+                    json_parse2 = time.perf_counter()
+                    dump978_data = dump978_req.content
+                    if ORJSON_IMPORTED:
+                        aircraft_data2 = orjson.loads(dump978_data)
+                    else:
+                        aircraft_data2 = json.loads(dump978_data)
+                aircraft_data['aircraft'].extend(aircraft_data2['aircraft']) # append dump978 json into dump1090 data
+                process_time2[2] = process_time2[2] + round((time.perf_counter() - json_parse2) * 1000, 3)
+                # if VERBOSE_MODE:
+                #     runtime_sizes[1] += sys.getsizeof(aircraft_data)
+
             return aircraft_data
-        except:
+        except Exception as e:
+            main_logger.debug(f"Error decoding json ({e}):", exc_info=False)
             return None
 
     def dump1090_loop(dump1090_data: list) -> tuple[dict, list]:
-        """ Our dump1090 json parser. Must be fed by a valid `dump1090_heartbeat()` response. Returns a dictionary and a list.
+        """ Our dump1090 json filter and internal formatter. Must be fed by a valid `dump1090_heartbeat()` response.
+        Returns a dictionary and a list.
         - dictionary: general stats to be updated per loop.
             - Tracking = total planes being tracked at current time
             - Range = maximum range of tracked planes from your location (in selected units)
@@ -1650,7 +1800,6 @@ def main_loop_generator() -> None:
             - Elevation: Plane's elevation angle in degrees
             - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
         """
-        # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
 
         if dump1090_data is None: return {'Tracking': 0, 'Range': 0}, []
@@ -1756,14 +1905,13 @@ def main_loop_generator() -> None:
     
     def loop():
         """ Do the loop """
-        global general_stats, relevant_planes, unique_planes_seen, process_time, dump1090_failures
+        global general_stats, relevant_planes, unique_planes_seen, process_time, dump1090_failures, process_time2
         while True:
             try:
-                loadingtime = time.perf_counter()
                 dump1090_data = dump1090_heartbeat()
-                process_time[0] = round((time.perf_counter() - loadingtime)*1000, 3) - process_time2[2]
                 if not DUMP1090_IS_AVAILABLE:
                     process_time[0] = 0 # doesn't make sense for there to be a process time in this case
+                    process_time2[2] = 0
                 if dump1090_data is None:
                     with threading.Lock():
                         general_stats = {'Tracking': 0, 'Range': 0}
@@ -2071,7 +2219,7 @@ class APIFetcher:
         
         try:
             start_time = time.perf_counter()
-            response = requests.get(query_string, headers=auth_header, timeout=5)
+            response = API_session.get(query_string, headers=auth_header, timeout=5)
             process_time[2] = round((time.perf_counter() - start_time)*1000, 3)
             response.raise_for_status()
             if response.status_code == 200: # check if service to the API call was valid
@@ -2168,7 +2316,7 @@ class DisplayFeeder:
     def data_packet(self, message):
         """ Every time `AirplaneParser.plane_selector` finishes, grab a copy of our global variables and convert them
         into a coalesed data packet for the Display. We also control scene switching here and which scene to display.
-        Outputs two dicts, `idle_stats` and `active_stats`.
+        Outputs three dicts, `idle_stats`, `idle_stats_2, and `active_stats`.
         `idle_stats` = {'Flybys', 'Track', 'Range'}
         `idle_stats_2` = {'SunriseSunset', 'ReceiverStats'}
         `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime',
@@ -4099,6 +4247,8 @@ else:
 
 configuration_check() # very important
 configuration_check_api()
+if API_KEY:
+    API_session = requests.Session()
 
 get_ip()
 CPU_TEMP_SENSOR = get_cpu_temp_sensor()
@@ -4137,6 +4287,8 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
 
 dump1090_check()
 read_1090_config()
+session = requests.Session()
+""" Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
 suntimes()
 
 def main() -> None:

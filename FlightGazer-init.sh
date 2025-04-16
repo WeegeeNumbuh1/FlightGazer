@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.3.5.0
+# Version = v.4.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -328,6 +328,8 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		${VENVPATH}/bin/pip3 install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}yaml"
 		${VENVPATH}/bin/pip3 install --upgrade ruamel.yaml >/dev/null
+		echo -e "${CHECKMARK}${VERB_TEXT}orjson"
+		${VENVPATH}/bin/pip3 install --upgrade orjson >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"
 		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
 	    echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"

@@ -5,6 +5,37 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.0.0 - 2025-04-15
+    - Refactoring for significantly faster dump1090 data processing
+        - Anywhere from 3-8x speedup versus the original processing methods used since the v.0.x days
+            - On a Raspberry Pi Zero 2W, this process would take 25-50 ms with an aircraft.json file of 250 aircraft,
+              it's now down to 8-20 ms, even with dump978 present
+        - Switch to a faster (2-3x) json processing library for dump1090 decoding
+    - FlightGazer will now try to read dump1090 data directly if it's running on the same system as the ADS-B decoder itself
+        - This feature is enabled by default with a new setting: PREFER_LOCAL
+        - Improves response times by 10-20x as we no longer are dealing with the overhead of going over the network
+        - This new ability also enables FlightGazer to work with AirNav's rbfeeder and Flightradar24's Pi24 setups,
+          which don't have a web interface or don't supply dump1090 data access over the network
+        - FlightGazer can also directly connect to Ultrafeeder as well
+            - For adsb.im users, this keeps FlightGazer from spamming the webproxy logs (System -> Logs)
+        - If FlightGazer is unable to find anything running locally, it will still try to use its default method of figuring out
+          how to access dump1090
+        - Lore drop: this feature was originally brainstormed back in v.0.1.0, but accessing over the network proved more flexible
+          at the expense of having to go through slower networking methods in order to access dump1090, especially during development.
+    - Improved dump1090 response times by ~1.25x using connection pooling offered by Requests when using the network
+    - NEW: Enable faster refresh rate with FASTER_REFRESH setting
+        - Since the start of this project, FlightGazer only polled every 2 seconds
+        - FASTER_REFRESH brings that down to 1 second when enabled
+    - Processing time stat now includes the time to parse the dump1090 json, making it more accurate
+        - Processing time is now defined as the time to process the major components of FlightGazer:
+          json parsing, filtering, aircraft selection algorithm, and formatting for the display
+          - The individual times for each of these sections can be seen when Verbose mode is enabled
+    - Additional details shown in Interactive mode when Verbose mode is enabled
+        - The original processing time stat has been relabeled "Filtering+algorithm"
+        - dump1090 json size, transfer speed, and processing speed can be now tracked as well
+    - Tweaked directional arrows in 4x4 font to be more consistent in their position
+    - Originally slated as v.3.6.0 but performance improvements and added capabilities were large enough to warrant a Version bump
+
 v.3.5.0 - 2025-04-11
     - [sic] Gameing! There's an FPS counter for the display renderer because we love feature creep here (and I like the stats)
         - The FPS display now takes the place of the display formatting stat in Interactive mode
@@ -12,7 +43,7 @@ v.3.5.0 - 2025-04-11
         - This bug has been associated when a system is heavily IO bound/thrashing (eg: Raspberry Pi Zero) and the processing
           threads no longer are in lockstep with one another, leading to a mismatch in the data that the print display routine reads from
         - Additionally, another sign the system is thrashing is the appearance of numerous messages from the "Clock-Tower" thread in the logs
-        - Very minor change to aircraft selection algorithm that may make it further resillent to thrashing scenarios
+        - Very minor change to aircraft selection algorithm that may make it further resilient to thrashing scenarios
     - Improved formatting for footer in Interactive mode
         - Footer section adjusts what stats to show based on startup (eg: NO_DISPLAY_MODE, etc)
     - More accurate stat for dump1090 response times
