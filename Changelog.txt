@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.1.0 - 2025-04-18
+    - Sharing is caring: FlightGazer now writes to a json file like how dump1090 does it for other applications to read from
+        - On linux systems the file is stored in /run/FlightGazer
+        - The keys that are output should mostly be stable as of this release and reflect almost all the data that
+          FlightGazer processes internally
+        - This functionality is enabled by default with the setting WRITE_STATE
+    - Another refactoring for the Interactive print display routine
+        - It's finally pythonic for the nerds out there
+    - The 'rare event' message counter (if you've never seen it yet, then your ADS-B site isn't that active) will reset itself 
+      at the end of the day instead of when it occurs again, which could happen anywhere between the next day and never
+        - Updated log output for this change as well
+    - FlightGazer will now no longer run if it can neither find dump1090 or load the display upon startup
+    - The feature creep has hit a milestone: the main python script is now >200 KiB in size
+        - How does this all still work? lmao
+    
 v.4.0.0 - 2025-04-15
     - Refactoring for significantly faster dump1090 data processing
         - Anywhere from 3-8x speedup versus the original processing methods used since the v.0.x days

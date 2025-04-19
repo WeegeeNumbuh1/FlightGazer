@@ -102,7 +102,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 ### Other good stuff
 - Highly optimized and fast
-  - Worst case takes ~15ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
+  - Worst case takes ~20ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
     - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99th percentile (worldwide) ADS-B+UAT receiver at peak traffic
 - Useful and detailed console output that shows the inner workings of FlightGazer
 - Small memory footprint once settled (10-40 MiB)
@@ -113,6 +113,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Can be configured to run automatically inside `tmux`
+- 🆕 Program state is available in a json file for use elsewhere
 - Robust and hard-to-break 🤞
 - Constant development
 - Adequate documentation
@@ -130,7 +131,7 @@ Using this project assumes you have the following:
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
-- Python 3.9 or newer
+- The latest Python
 - A working internet connection for setup
 - *for Linux distros:*
   - Basic knowledge of how to use `bash` or similar terminal
@@ -161,6 +162,7 @@ You don't actually need a physical RGB display, but it's recommended.<br>
 Make sure you meet the above prerequisites. To begin:
 ```
 git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
+cd FlightGazer
 ```
 > [!IMPORTANT]
 > Once the above command is completed, it is recommended to **configure your setup now** before running the initialization file.<br>See the [Configuration](#️-configuration) section below, then return to this step.
@@ -169,7 +171,7 @@ git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
 
 then run the following:
 ```
-sudo bash FlightGazer/FlightGazer-init.sh
+sudo bash FlightGazer-init.sh
 ```
 which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.<br>
 **If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).**<br>([Click here to view what the init.sh file does](#-misc))
@@ -200,8 +202,12 @@ Then, [read here](#-misc).
 ### 🎚️ Configuration
 
 Edit [`config.yaml`](./config.yaml) which is found in the same directory as the main script itself.<br>
-If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.
-
+If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.<br>
+Example:
+```bash
+nano config.yaml
+# press Ctrl+O to save, Ctrl+X to exit
+```
 
 > [!NOTE]
 > If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.<br>
@@ -472,6 +478,9 @@ Simply delete the folder (and the virtual python environment if you set that up 
 **A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
 Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 rgb panel. Other setups are not supported.<br>
 Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
+
+**Q:** I broke it 🥺<br>
+**A:** Try running the updater first. If it's still broken, uninstall then reinstall FlightGazer.
 
 **Q:** I restarted my system but it took longer for my display to start. What's going on?<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.

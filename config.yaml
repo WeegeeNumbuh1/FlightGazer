@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.4.0.0 # do not modify this
+CONFIG_VERSION: v.4.1.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -13,7 +13,7 @@ FLYBY_STATS_ENABLED: true
 # It is recommended to leave this left as true when the API is in use.
 
 UNITS: 0
-# Select which units to use. 
+# Select which units to use.
 # 0 = aeronautical (nmi, ft, kt)
 # 1 = metric (km, m, km/h)
 # 2 = imperial (mi, ft, mph)
@@ -96,7 +96,14 @@ FOLLOW_THIS_AIRCRAFT: ''
 
 FASTER_REFRESH: false
 # [true/false]
-# Decrease dump1090 polling time to 1 second versus the default 2 seconds.
+# When true, decrease dump1090 polling time to 1 second versus the default 2 seconds. Increases CPU load.
+
+WRITE_STATE: true
+# [true/false]
+# When FlightGazer is running, write a json file of its current operating state (variable values) in /run/FlightGazer/.
+# This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
+# Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
+# /run lives entirely in RAM, leading to zero disk writes. Set to false if you don't want this feature.
 
 # ============= Screen Output settings =============
 # ==================================================
