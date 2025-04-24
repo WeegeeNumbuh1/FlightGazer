@@ -5,6 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.1.1 - 2025-04-23
+    - Refactored console clear routine so that it no longer spawns new processes
+        - Running FlightGazer over time would bump system PID values to very high numbers because of this.
+          This is not a problem for the underlying OS but seeing FlightGazer do this did not sit well
+        - Only downside is that the terminal that FlightGazer runs in needs to be able to interpret ANSI escape sequences
+            - This should be fine for the majority of terminals that FlightGazer should run in. The change that occurred
+              in v.2.7.0 actually set this precedent
+        - Upside: console print times are up to 10x faster
+
 v.4.1.0 - 2025-04-18
     - Sharing is caring: FlightGazer now writes to a json file like how dump1090 does it for other applications to read from
         - On linux systems the file is stored in /run/FlightGazer

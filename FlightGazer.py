@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.1.0 --- 2025-04-18'
+VERSION: str = 'v.4.1.1 --- 2025-04-23'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -614,7 +614,9 @@ def schedule_thread() -> None:
 
 def cls() -> None:
     """ Clear the console when using a terminal """
-    os.system('cls' if os.name=='nt' else 'clear')
+    _ = sys.stdout.write("\x1b[2J\033[H")
+    sys.stdout.flush()
+    # os.system('cls' if os.name=='nt' else 'clear')
 
 def timedelta_clean(timeinput: datetime) -> str:
     """ Cleans up time deltas without the microseconds. """

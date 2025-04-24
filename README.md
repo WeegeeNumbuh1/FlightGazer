@@ -147,6 +147,7 @@ Using this project assumes you have the following:
   - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
   - Using `32x64` sized matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
+- A console that can interpret ANSI codes
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
