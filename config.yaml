@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.4.1.1 # do not modify this
+CONFIG_VERSION: v.4.2.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -104,6 +104,13 @@ WRITE_STATE: true
 # This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
 # Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
 # /run lives entirely in RAM, leading to zero disk writes. Set to false if you don't want this feature.
+
+CALLSIGN_LOOKUP: true
+# [true/false]
+# If true, FlightGazer will look up the owner and telephonic call sign for all aircraft inside your designated RANGE
+# and attempt to reference them from an internal database.
+# The results of this feature is currently limited to the Interactive display, but functionality could be extended in the future.
+# This feature does not significantly lengthen processing time, but it will increase memory usage very slightly.
 
 # ============= Screen Output settings =============
 # ==================================================

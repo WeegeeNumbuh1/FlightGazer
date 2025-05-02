@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.1.1 --- 2025-04-23'
+VERSION: str = 'v.4.2.0 --- 2025-05-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -320,7 +320,8 @@ API_COST_LIMIT: float|None = None
 JOURNEY_PLUS: bool = False
 FASTER_REFRESH: bool = False
 PREFER_LOCAL: bool = True
-WRITE_STATE: bool = True # new setting!
+WRITE_STATE: bool = True
+CALLSIGN_LOOKUP: bool = True # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -366,6 +367,7 @@ default_settings: dict = {
     "FASTER_REFRESH": FASTER_REFRESH,
     "PREFER_LOCAL": PREFER_LOCAL,
     "WRITE_STATE": WRITE_STATE,
+    "CALLSIGN_LOOKUP": CALLSIGN_LOOKUP,
 }
 """ Dict of default settings """
 
@@ -450,6 +452,9 @@ Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`, `APIAccess
 unique_planes_seen: list = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`} """
+callsign_lookup_cache = deque([None] * 50, maxlen=50)
+""" Cache of previously looked up callsigns.
+Refer to `operator_lookup()` for valid keys. """
 
 # display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
@@ -539,6 +544,8 @@ USING_FILESYSTEM_978: bool = False
 """ True if we are directly accessing dump978 json from the file system """
 algorithm_rare_events: int = 0
 """ Count of times the rare events section of the selection algorithm is used """
+operator_database_present: bool = False
+""" True if both CALLSIGN_LOOKUP is True and the database is present. Initialized to False. """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -577,6 +584,18 @@ elif UNITS == 2: # imperial
     speed_multiplier = 1.150783
     main_logger.info("Using imperial units (mi, ft, mph)")
 
+if CALLSIGN_LOOKUP:
+    try:
+        from utilities import operators as op
+        operator_database_present = True
+        main_logger.info("Callsign lookup enabled.")
+    except (ModuleNotFoundError, ImportError):
+        main_logger.warning("Failed to load required module \'operators.py\'. Callsign lookup will be disabled.")
+        operator_database_present = False
+else:
+    main_logger.info("Callsign lookup disabled.")
+    operator_database_present = False
+
 # =========== Program Setup I ==============
 # =============( Utilities )================
 
@@ -614,7 +633,13 @@ def schedule_thread() -> None:
 
 def cls() -> None:
     """ Clear the console when using a terminal """
-    _ = sys.stdout.write("\x1b[2J\033[H")
+    # recipe is as follows:
+    # \x1b - escape character
+    # c - reset the terminal (may have side-effects and may not be supported)
+    # [3J - clear screen and scrollback buffer (fallback)
+    # [H - move cursor to top left corner
+    # [2J - clear screen
+    _ = sys.stdout.write("\x1bc\x1b[3J\x1b[H\x1b[2J")
     sys.stdout.flush()
     # os.system('cls' if os.name=='nt' else 'clear')
 
@@ -1503,6 +1528,14 @@ def print_to_console() -> None:
             print_info.append("RSSI: ")
             print_info.append("{rssi}".format(rssi = aircraft['RSSI']).rjust(5))
             print_info.append("dBFS")
+            # append operator info if available
+            if operator_database_present:
+                if aircraft['Operator'] is not None:
+                    print_info.append(f" | {aircraft['Operator']}")
+                    if aircraft['Telephony']:
+                        print_info.append(f" - \"{aircraft['Telephony'].title()}\"")
+                else:
+                    print_info.append(" | Private/Military/Unknown")
 
             # finally, print it all
             print_info.append(rst)
@@ -1827,6 +1860,8 @@ def main_loop_generator() -> None:
             - RSSI: Plane's average signal power in dBFS
             - Elevation: Plane's elevation angle in degrees
             - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
+            - Operator: Plane's owner (if available)
+            - Telephony: Plane's telephonic call-sign (if available)
         """
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
 
@@ -1890,6 +1925,18 @@ def main_loop_generator() -> None:
                         # This key is sometimes present in some readsb setups (eg: adsb.im images).
                         # Because it reads from a much more updated database, we try to use it first
                         registration = a.get('r', registrations.registration_from_hexid(hex))
+                        # see if we can lookup who runs this plane
+                        if operator_database_present:
+                            operator_result = operator_lookup(flight)
+                            if operator_result is not None:
+                                operator = operator_result['Company']
+                                telephony = operator_result['Telephony']
+                            else:
+                                operator = None
+                                telephony = None
+                        else:
+                            operator = None
+                            telephony = None
                         if flight is None or flight == "        ": # when dump1090 reports an empty callsign, it will show 8 spaces
                             # fallback to registration, then ICAO hex
                             if registration is not None:
@@ -1914,6 +1961,8 @@ def main_loop_generator() -> None:
                             "RSSI": rssi,
                             "Elevation": elevation,
                             "SlantRange": slant_range_dist,
+                            "Operator": operator,
+                            "Telephony": telephony,
                             }
                         )
                         flyby_tracker(hex)
@@ -1925,7 +1974,8 @@ def main_loop_generator() -> None:
 
             current_stats = {"Tracking": total, "Range": max_range}
 
-        except: # just reuse the last data if an edge case is encountered
+        except Exception as e: # just reuse the last data if an edge case is encountered
+            main_logger.debug(f"Error processing dump1090 data ({e})", exc_info=True)
             current_stats = general_stats
             planes = relevant_planes
 
@@ -2886,6 +2936,55 @@ def export_FlightGazer_state() -> None:
             return
 
         time.sleep(LOOP_INTERVAL)
+
+def operator_lookup(callsign: str) -> dict | None:
+    """ Lookup the operator of a given callsign from our database. This will try to look at the cache first
+    from `callsign_lookup_cache` and then the lookup tables in `operators.py`. If there is a match, this function will
+    store the result in the cache for faster lookup, as it is expected this function will be called for each active plane inside
+    the given RANGE and at every LOOP_INTERVAL. Worst case scenario is when NO_FILTER is enabled + very active ADS-B site (~300 planes).
+    Dictionary keys are `3Ltr`, `Company`, `Country`, and `Telephony`. """
+    global callsign_lookup_cache
+
+    def search(dictionary: list, key: str, search_term: str) -> dict:
+        # fastest way to search a list of dictionaries for a key-value pair
+        # https://stackoverflow.com/a/48958217
+        try:
+            for dict_ in [x for x in dictionary if x[key] == search_term]:
+                return dict_
+        except:
+            return None
+        return None
+
+    def lookup(input: str) -> dict | None:
+        # pre-filtering to minimize calls and false matches
+        # examples:
+        # "AAL123" -> Yes
+        # "N123AB" -> None
+        # "TORCH23" -> None
+        # "0UTLAW75" -> None
+        if input is None or not input or len(input) < 3:
+            return None
+        if input[:4].isalpha(): # if the first 4 characters are letters, this is likely a vanity callsign or military callsign
+            return None
+        test_str = input[:3].upper()
+        if not test_str.isalpha():
+            return None
+        
+        result: dict = {}
+        # check our cache first
+        result = search(callsign_lookup_cache, '3Ltr', test_str)
+        if result is not None:
+            return result
+        else:
+            # the way operators.py is structured allows us to implement a trie
+            result = search(getattr(op, f'{test_str[0]}_TABLE'), '3Ltr', test_str)
+            if result is not None:
+                callsign_lookup_cache.append(result)
+            return result
+
+        return None
+    
+    return lookup(callsign)
 
 # ========== Display Superclass ============
 # ==========================================

@@ -11,9 +11,7 @@ Translated to Python from: https://github.com/wiedehopf/tar1090/blob/master/html
 """
 from math import floor
 def registration_from_hexid(hexid_input: str) -> str | None:
-    """
-    Hex id needs to be a string. Returns a registration or None.
-    """
+    """ Hex id needs to be a string. Returns a registration or None. """
     # input validation
     try:
         # convert to int
@@ -40,35 +38,35 @@ def registration_from_hexid(hexid_input: str) -> str | None:
         # South African stride mapping apparently no longer in use
         # { start: 0x008011, s1: 26*26, s2: 26, prefix: "ZS-" },
 
-        {"start": 0x380000, "s1": 1024, "s2": 32, "prefix": "F-B" },
-        {"start": 0x388000, "s1": 1024, "s2": 32, "prefix": "F-I" },
-        {"start": 0x390000, "s1": 1024, "s2": 32, "prefix": "F-G" },
-        {"start": 0x398000, "s1": 1024, "s2": 32, "prefix": "F-H" },
-        {"start": 0x3A0000, "s1": 1024, "s2": 32, "prefix": "F-O" },
-        {"start": 0x3C4421, "s1": 1024,  "s2": 32, "prefix": "D-A", "first": 'AAA', "last": 'OZZ' },
-        {"start": 0x3C0001, "s1": 676, "s2": 26, "prefix": "D-A", "first": 'PAA', "last": 'ZZZ' },
-        {"start": 0x3C8421, "s1": 1024,  "s2": 32, "prefix": "D-B", "first": 'AAA', "last": 'OZZ' },
-        {"start": 0x3C2001, "s1": 676, "s2": 26, "prefix": "D-B", "first": 'PAA', "last": 'ZZZ' },
-        {"start": 0x3CC000, "s1": 676, "s2": 26, "prefix": "D-C" },
-        {"start": 0x3D04A8, "s1": 676, "s2": 26, "prefix": "D-E" },
-        {"start": 0x3D4950, "s1": 676, "s2": 26, "prefix": "D-F" },
-        {"start": 0x3D8DF8, "s1": 676, "s2": 26, "prefix": "D-G" },
-        {"start": 0x3DD2A0, "s1": 676, "s2": 26, "prefix": "D-H" },
-        {"start": 0x3E1748, "s1": 676, "s2": 26, "prefix": "D-I" },
-        {"start": 0x448421, "s1": 1024,  "s2": 32, "prefix": "OO-" },
-        {"start": 0x458421, "s1": 1024,  "s2": 32, "prefix": "OY-" },
-        {"start": 0x460000, "s1": 676, "s2": 26, "prefix": "OH-" },
-        {"start": 0x468421, "s1": 1024,  "s2": 32, "prefix": "SX-" },
-        {"start": 0x490421, "s1": 1024,  "s2": 32, "prefix": "CS-" },
-        {"start": 0x4A0421, "s1": 1024,  "s2": 32, "prefix": "YR-" },
-        {"start": 0x4B8421, "s1": 1024,  "s2": 32, "prefix": "TC-" },
-        {"start": 0x740421, "s1": 1024,  "s2": 32, "prefix": "JY-" },
-        {"start": 0x760421, "s1": 1024,  "s2": 32, "prefix": "AP-" },
-        {"start": 0x768421, "s1": 1024,  "s2": 32, "prefix": "9V-" },
-        {"start": 0x778421, "s1": 1024,  "s2": 32, "prefix": "YK-" },
-        {"start": 0xC00001, "s1": 676, "s2": 26, "prefix": "C-F" },
-        {"start": 0xC044A9, "s1": 676, "s2": 26, "prefix": "C-G" },
-        {"start": 0xE01041, "s1": 4096,  "s2": 64, "prefix": "LV-" }
+        {"start": 0x380000, "s1": 1024, "s2": 32, "prefix": "F-B"},
+        {"start": 0x388000, "s1": 1024, "s2": 32, "prefix": "F-I"},
+        {"start": 0x390000, "s1": 1024, "s2": 32, "prefix": "F-G"},
+        {"start": 0x398000, "s1": 1024, "s2": 32, "prefix": "F-H"},
+        {"start": 0x3A0000, "s1": 1024, "s2": 32, "prefix": "F-O"},
+        {"start": 0x3C4421, "s1": 1024,  "s2": 32, "prefix": "D-A", "first": 'AAA', "last": 'OZZ'},
+        {"start": 0x3C0001, "s1": 676, "s2": 26, "prefix": "D-A", "first": 'PAA', "last": 'ZZZ'},
+        {"start": 0x3C8421, "s1": 1024,  "s2": 32, "prefix": "D-B", "first": 'AAA', "last": 'OZZ'},
+        {"start": 0x3C2001, "s1": 676, "s2": 26, "prefix": "D-B", "first": 'PAA', "last": 'ZZZ'},
+        {"start": 0x3CC000, "s1": 676, "s2": 26, "prefix": "D-C"},
+        {"start": 0x3D04A8, "s1": 676, "s2": 26, "prefix": "D-E"},
+        {"start": 0x3D4950, "s1": 676, "s2": 26, "prefix": "D-F"},
+        {"start": 0x3D8DF8, "s1": 676, "s2": 26, "prefix": "D-G"},
+        {"start": 0x3DD2A0, "s1": 676, "s2": 26, "prefix": "D-H"},
+        {"start": 0x3E1748, "s1": 676, "s2": 26, "prefix": "D-I"},
+        {"start": 0x448421, "s1": 1024,  "s2": 32, "prefix": "OO-"},
+        {"start": 0x458421, "s1": 1024,  "s2": 32, "prefix": "OY-"},
+        {"start": 0x460000, "s1": 676, "s2": 26, "prefix": "OH-"},
+        {"start": 0x468421, "s1": 1024,  "s2": 32, "prefix": "SX-"},
+        {"start": 0x490421, "s1": 1024,  "s2": 32, "prefix": "CS-"},
+        {"start": 0x4A0421, "s1": 1024,  "s2": 32, "prefix": "YR-"},
+        {"start": 0x4B8421, "s1": 1024,  "s2": 32, "prefix": "TC-"},
+        {"start": 0x740421, "s1": 1024,  "s2": 32, "prefix": "JY-"},
+        {"start": 0x760421, "s1": 1024,  "s2": 32, "prefix": "AP-"},
+        {"start": 0x768421, "s1": 1024,  "s2": 32, "prefix": "9V-"},
+        {"start": 0x778421, "s1": 1024,  "s2": 32, "prefix": "YK-"},
+        {"start": 0xC00001, "s1": 676, "s2": 26, "prefix": "C-F"},
+        {"start": 0xC044A9, "s1": 676, "s2": 26, "prefix": "C-G"},
+        {"start": 0xE01041, "s1": 4096,  "s2": 64, "prefix": "LV-"}
     ]
 
     ''' numeric registrations
@@ -77,8 +75,8 @@ def registration_from_hexid(hexid_input: str) -> str | None:
     count: number of numeric registrations
     template: registration template, trailing characters are replaced with the numeric registration '''
     numeric_mappings = [
-        {"start": 0x140000, "first": 0,    "count": 100000, "template": "RA-00000" },
-        {"start": 0x0B03E8, "first": 1000, "count": 1000,   "template": "CU-T0000" }
+        {"start": 0x140000, "first": 0,    "count": 100000, "template": "RA-00000"},
+        {"start": 0x0B03E8, "first": 1000, "count": 1000,   "template": "CU-T0000"}
     ]
     
     # fill in some derived data

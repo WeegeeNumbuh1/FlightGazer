@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.0 - 2025-05-01
+    - NEW: New feature - CALLSIGN_LOOKUP
+        - Only in Interactive mode: when this setting is enabled, any aircraft inside the set RANGE will display
+          the aircraft operator and associated call sign (telephony name)
+        - Relies on an internal database/lookup table with no need for using an API
+            - From testing, worst case lookup takes 2 ms. Once a result is cached, lookup takes <0.1ms. Blazing fast.
+            - The internal database is based on data from the Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3
+        - This feature may be used to build additonal features (the glorious feature creep) in the future
+        - Written as an exercise in HTML conversion into a pythonic database with corresponding lookup routines, all with the goal of maximal speed
+    - Slightly better console clear routine
+    - Minor code cleanups in some of the utilities modules that haven't been touched since the start of this project
+
 v.4.1.1 - 2025-04-23
     - Refactored console clear routine so that it no longer spawns new processes
         - Running FlightGazer over time would bump system PID values to very high numbers because of this.
