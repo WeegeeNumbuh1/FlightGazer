@@ -292,7 +292,7 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.4.2.0 Console Output ===== Time now: 2025-04-15 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.4.2.0 Console Output ===== Time now: 2025-05-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 

@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.1 - 2025-05-01
+    - Fix minor log output issue where the aircraft selection metric does not get written out at the end of day if there are no rare selection events
+    - Remove excess spaces in main python file and initialization script
+
 v.4.2.0 - 2025-05-01
     - NEW: New feature - CALLSIGN_LOOKUP
         - Only in Interactive mode: when this setting is enabled, any aircraft inside the set RANGE will display

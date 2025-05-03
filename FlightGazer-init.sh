@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.4.2.0
+# Version = v.4.2.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -112,8 +112,8 @@ fi
 echo -ne "\033]0;FlightGazer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to FlightGazer!${NC}"
 if [ -f "${BASEDIR}/version" ]; then
-    VER_STR=$(head -c 12 ${BASEDIR}/version)
-    echo -e "    Version: ${VER_STR}"
+	VER_STR=$(head -c 12 ${BASEDIR}/version)
+	echo -e "    Version: ${VER_STR}"
 fi
 if [ `id -u` -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
@@ -206,17 +206,17 @@ if [ "$DFLAG" != "-d" ]; then
 fi
 
 if [ ! -f "$CHECK_FILE" ];
-then 
-    echo "  > Updating package lists..."
+then
+	echo "  > Updating package lists..."
 	echo "    > \"apt-get update\""
 	echo "      (this may take some time if this hasn't been run in awhile)"
 	apt-get update >/dev/null
 	echo "    > \"dpkg --configure -a\""
 	dpkg --configure -a >/dev/null
 	echo ""
-    echo "  > Installing needed dependencies..."
+	echo "  > Installing needed dependencies..."
 	echo "    > \"python3-dev\""
-    apt-get install -y python3-dev >/dev/null
+	apt-get install -y python3-dev >/dev/null
 	echo "    > \"python3-venv\""
 	apt-get install -y python3-venv >/dev/null
 	echo "    > \"tmux\""
@@ -283,9 +283,9 @@ EOF
 fi
 
 if [ ! -d "$VENVPATH" ]; then
-    mkdir ${VENVPATH}
+	mkdir ${VENVPATH}
 	echo ""
-    echo "  > Making virtual environment... (this may take awhile)"
+	echo "  > Making virtual environment... (this may take awhile)"
 	python3 -m venv --system-site-packages ${VENVPATH}
 fi
 echo ""
@@ -332,7 +332,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		${VENVPATH}/bin/pip3 install --upgrade orjson >/dev/null
 		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"
 		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
-	    echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
+		echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."
 	fi
@@ -363,7 +363,7 @@ if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
 fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"
 kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
-	
+
 echo -ne "${FADE}"
 echo ""
 echo "     _/_/_/_/ _/_/    _/            _/        _/                          ";
