@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.4.2.1 # do not modify this
+CONFIG_VERSION: v.4.2.2 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -41,7 +41,7 @@ API_DAILY_LIMIT:
 API_COST_LIMIT: 5.00
 # [Float: dollar amount (no currency sign), null, or empty]
 # Limit API usage of an API key based on its running cost over the past 30 days. (ex: $10.00)
-# If the cost exceeds this value, API calls will stop and will not resume.
+# If the cost exceeds this value, API calls will stop and will not resume until there are credits available again.
 # If the cost upon startup exceeds this value, the API will not be used.
 # API_DAILY_LIMIT takes higher priority than this setting in controlling API usage, but if either limit is reached,
 # API calls will stop.

@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.2 - 2025-05-05
+    - If the rare event algorithm is triggered, its counter is now shown in Interactive mode without having to enable Verbose mode
+    - Fix edge case where the selection algorithm resets the rare event count before the daily stats is printed out
+    - Other log output tweaks
+
 v.4.2.1 - 2025-05-01
     - Fix minor log output issue where the aircraft selection metric does not get written out at the end of day if there are no rare selection events
     - Remove excess spaces in main python file and initialization script

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.2.1 --- 2025-05-01'
+VERSION: str = 'v.4.2.2 --- 2025-05-05'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -217,7 +217,7 @@ API_COST_PER_CALL: float = 0.005
 """ How much it costs to do a single API call (may change in the future).
 Current as of `VERSION` """
 if VERBOSE_MODE:
-    main_logger.debug("Verbose mode enabled.")
+    main_logger.debug(">>> Verbose mode enabled. <<<")
     # main_logger.debug("Connected loggers:")
     # for key in logging.Logger.manager.loggerDict:
     #     main_logger.debug(f"{key}")
@@ -321,7 +321,7 @@ JOURNEY_PLUS: bool = False
 FASTER_REFRESH: bool = False
 PREFER_LOCAL: bool = True
 WRITE_STATE: bool = True
-CALLSIGN_LOOKUP: bool = True # new setting!
+CALLSIGN_LOOKUP: bool = True
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -698,15 +698,16 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
 def runtime_accumulators_reset() -> None:
     """ Resets the tracked planes set and other daily accumulators.
     Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
+    algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     time.sleep(2) # wait for hourly events to complete
     global unique_planes_seen, selection_events, ENHANCED_READOUT
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
-    if algorithm_rare_events == 0:
+    if algorithm_rare_events_now == 0:
         main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events.")
     else:
         main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events \
-(of which {algorithm_rare_events} were rare selection events).")
+(of which {algorithm_rare_events_now} were rare selection events).")
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. \
 Estimated cost: ${estimated_api_cost:.2f}")
@@ -1644,7 +1645,7 @@ Estimated cost: ${estimated_api_cost:.2f}")
 
     if not VERBOSE_MODE:
         print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
-    else:
+    elif VERBOSE_MODE or algorithm_rare_events > 0:
         print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events} | \
 Rare events from algorithm: {algorithm_rare_events}")
 
@@ -2114,7 +2115,7 @@ class AirplaneParser:
             if plane_count > 0:
                 if self._date_of_last_rare_message and date_now_str != self._date_of_last_rare_message: # reset count
                     if self.rare_occurrences >= 5:
-                        main_logger.info(f"Re-enabling \'rare message\' printout.")
+                        main_logger.info(f"Re-enabling \'rare message\' printout (this marks the first flyby of the day).")
                     self.rare_occurrences = 0
 
                 with threading.Lock():
