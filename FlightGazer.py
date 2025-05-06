@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.2.2 --- 2025-05-05'
+VERSION: str = 'v.4.2.3 --- 2025-05-06'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -253,7 +253,7 @@ if not NODISPLAY_MODE:
                 main_logger.warning(">>> If you're sure you don't want to use any display output,")
                 main_logger.warning("    use the \'-d\' flag to suppress this warning.")
                 time.sleep(2)
-        
+
         # these modules depend on the above, so they should load successfully at this point,
         # but if they break somehow, we can still catch it
         from setup import colors, fonts
@@ -396,10 +396,10 @@ if not CONFIG_MISSING:
         main_logger.info(">>> Using default settings.")
         CONFIG_MISSING = True
 
-''' We do the next block to enable backward compatibility for older config versions.
+""" We do the next block to enable backward compatibility for older config versions.
 In the future, additional settings could be defined, which older config files
 will not have, so we attempt to load what we can and handle cases when the setting value is missing.
-This shouldn't be an issue when FlightGazer is updated with the update script, but we still have to import the settings. '''
+This shouldn't be an issue when FlightGazer is updated with the update script, but we still have to import the settings. """
 if not CONFIG_MISSING:
     for setting_key in default_settings:
         try:
@@ -653,7 +653,7 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     formatted string, just like the stftime() method does for datetime.datetime
     objects. Sourced from https://stackoverflow.com/a/42320260
 
-    The fmt argument allows custom formatting to be specified.  Fields can 
+    The fmt argument allows custom formatting to be specified.  Fields can
     include seconds, minutes, hours, days, and weeks.  Each field is optional.
 
     Some examples:
@@ -662,12 +662,12 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     >>> '{D:2}d {H:2}:{M:02}:{S:02}'      --> ' 5d  8:04:02'
     >>> '{H}h {S}s'                       --> '72h 800s'
 
-    The inputtype argument allows tdelta to be a regular number instead of the  
-    default, which is a datetime.timedelta object.  Valid inputtype strings: 
-        's', 'seconds', 
-        'm', 'minutes', 
-        'h', 'hours', 
-        'd', 'days', 
+    The inputtype argument allows tdelta to be a regular number instead of the
+    default, which is a datetime.timedelta object.  Valid inputtype strings:
+        's', 'seconds',
+        'm', 'minutes',
+        'h', 'hours',
+        'd', 'days',
         'w', 'weeks'
     """
 
@@ -737,7 +737,7 @@ Estimated cost: ${estimated_api_cost:.2f}")
                         main_logger.info(f"There are credits available again, API will be re-enabled.")
                         API_cost_limit_reached = False
                 else:
-                    main_logger.info(f"API usage currently exceeds the set cost limit (${API_COST_LIMIT:.2f}).")
+                    main_logger.warning(f"API usage currently exceeds the set cost limit (${API_COST_LIMIT:.2f}).")
                     if not API_cost_limit_reached:
                         API_cost_limit_reached = True
         else: # don't reset/adjust the counters
@@ -769,8 +769,8 @@ def match_commandline(command_search: str, process_name: str) -> list:
     return list_of_processes
 
 def get_ip() -> None:
-    ''' Gets us our local IP. Modified from my other project `UNRAID Status Screen`.
-    Modifies the global `CURRENT_IP` '''
+    """ Gets us our local IP. Modified from my other project `UNRAID Status Screen`.
+    Modifies the global `CURRENT_IP` """
     global CURRENT_IP
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(0)
@@ -784,8 +784,8 @@ def get_ip() -> None:
     CURRENT_IP = IP
 
 def get_cpu_temp_sensor() -> str | None:
-    ''' Determines what CPU temp sensor (if available) is present.
-    Modified from my other project, UNRAID Status Screen. '''
+    """ Determines what CPU temp sensor (if available) is present.
+    Modified from my other project, UNRAID Status Screen. """
 
     if not hasattr(psutil, "sensors_temperatures"):
         return None
@@ -795,7 +795,7 @@ def get_cpu_temp_sensor() -> str | None:
         if not temps_test:
             return None
 
-    # probe possible temperature names    
+    # probe possible temperature names
     # generic names, then Intel, then AMD
     probe_sensor_names = iter(['cpu_thermal', 'cpu_thermal_zone', 'coretemp', 'k10temp', 'k8temp',])
     # try until we hit our first success
@@ -1090,7 +1090,7 @@ def configuration_check() -> None:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
         LOCATION_TIMEOUT = 60
-    
+
     if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 1 or FLYBY_STALENESS >= 1440):
         main_logger.warning(f"Desired flyby staleness is out of bounds.")
         main_logger.info(f">>> Setting to default ({default_settings['FLYBY_STALENESS']})")
@@ -1160,7 +1160,7 @@ def configuration_check_api() -> None:
             API_KEY = ""
 
         if (API_KEY and (
-            API_DAILY_LIMIT is not None 
+            API_DAILY_LIMIT is not None
             and not isinstance(API_DAILY_LIMIT, int)
             )) or (
             isinstance(API_DAILY_LIMIT, int)
@@ -1168,9 +1168,9 @@ def configuration_check_api() -> None:
                 main_logger.warning("API_DAILY_LIMIT is invalid. Refusing to use API to prevent accidental overcharges.")
                 API_DAILY_LIMIT = None
                 API_KEY = ""
-        
+
         if (API_KEY and (
-            API_COST_LIMIT is not None 
+            API_COST_LIMIT is not None
             and not isinstance(API_COST_LIMIT, (float, int))
             )) or (
             isinstance(API_COST_LIMIT, (float, int))
@@ -1284,7 +1284,7 @@ def read_receiver_stats() -> None:
                 else:
                     noise_now = None
                     loud_percentage = None
-                    
+
                 if has_key(stats, 'gain_db'):
                     gain_now = stats['gain_db']
                 else:
@@ -1489,7 +1489,7 @@ def print_to_console() -> None:
 
             if FOLLOW_THIS_AIRCRAFT == aircraft['ID']:
                 print_info.append("--> ")
-            
+
             # counter, callsign, iso, id
             print_info.append("[{a:03d}] {flight} ({iso}, {id})".format(
                 a = a+1,
@@ -1643,11 +1643,11 @@ Estimated cost: ${estimated_api_cost:.2f}")
         elif API_cost_limit_reached:
             print(f"> {rst}{yellow_text}API cost limit (${API_COST_LIMIT:.2f}) reached. API calls have stopped.{rst}{fade}")
 
-    if not VERBOSE_MODE:
-        print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
-    elif VERBOSE_MODE or algorithm_rare_events > 0:
+    if VERBOSE_MODE or algorithm_rare_events > 0:
         print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events} | \
 Rare events from algorithm: {algorithm_rare_events}")
+    else:
+        print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
 
     current_memory_usage = psutil.Process().memory_info().rss
     this_process_cpu = this_process.cpu_percent(interval=None)
@@ -1674,7 +1674,7 @@ Rare events from algorithm: {algorithm_rare_events}")
 
     if dump1090_failures > 0:
         print(f">{rst}{yellow_text} {dump1090} communication failures since start: {dump1090_failures} | Watchdog triggers: {watchdog_triggers}{rst}{fade}")
-    
+
     if VERBOSE_MODE and display_failures > 0:
         print(f">{rst}{yellow_text} Display failures: {display_failures}{rst}{fade}")
 
@@ -1707,7 +1707,7 @@ def main_loop_generator() -> None:
         limit_count = 500
         stale_age = FLYBY_STALENESS * 60 # seconds
         if entry_count > limit_count: entry_count = limit_count
-        
+
         # special case when there aren't any entries yet
         if len(unique_planes_seen) == 0:
             add_entry()
@@ -1835,6 +1835,7 @@ def main_loop_generator() -> None:
                 #     runtime_sizes[1] += sys.getsizeof(aircraft_data)
 
             return aircraft_data
+
         except Exception as e:
             main_logger.debug(f"Error decoding json ({e})", exc_info=False)
             return None
@@ -1872,7 +1873,7 @@ def main_loop_generator() -> None:
         ranges = []
         planes = []
         unique_ids = set()
-        
+
         try:
             for a in dump1090_data['aircraft']:
                 seen_pos = a.get('seen_pos')
@@ -2015,7 +2016,7 @@ def main_loop_generator() -> None:
                     main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
                 else:
-                    main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}. Retrying...")
+                    main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}.")
                 time.sleep(5)
                 continue
 
@@ -2024,8 +2025,12 @@ def main_loop_generator() -> None:
 
             except Exception as e:
                 dump1090_failures += 1
+                cls()
+                print(f"FlightGazer: LOOP thread caught an exception. ({e}) Trying again...")
                 main_logger.error(f"LOOP thread caught an exception. ({e}) Trying again...")
-                time.sleep(LOOP_INTERVAL * 5)
+                time.sleep(LOOP_INTERVAL * 3)
+                print("If this continues, please shutdown FlightGazer and report this error to the developer.")
+                time.sleep(LOOP_INTERVAL * 2)
                 continue
 
     # Enter here
@@ -2085,7 +2090,7 @@ class AirplaneParser:
             The algorithm keeps track of already tracked planes and switches the focus to planes that haven't been tracked yet.
             `RANGE` should be relatively small giving us less possible concurrent planes to handle at a time, as the more planes are in the area,
             the higher the chance some planes will not be tracked whatsoever due to the latching time.
-            
+
             A built-in metric on tracking the overall selection "efficiency" is by watching the value of 'Aircraft selections' in Interactive Mode introduced in v.2.4.0.
             The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
             were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitialized to the last saved flyby count (more likely).
@@ -2123,13 +2128,13 @@ class AirplaneParser:
                     for a in range(plane_count):
                         get_plane_list.append(relevant_planes_local_copy[a]['ID']) # current planes in this loop 
                         focus_plane_ids_scratch.add(relevant_planes_local_copy[a]['ID']) # add the above to the global list (rebuilds each loop)
-                            
+
                 focus_plane_iter += 1
 
                 # if this block of code is awoken, get the first plane from this loop's copy and declare it our focus plane
                 if not focus_plane_i:
                     focus_plane = get_plane_list[0]
-                
+
                 # for the case when the last focus plane leaves the area and new ones appear on this refresh
                 # note this will never run if the above block executed
                 if focus_plane not in get_plane_list:
@@ -2170,7 +2175,7 @@ class AirplaneParser:
                         select()
                     if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
                         select()
-                
+
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
                     for i in range(min(plane_count, len(relevant_planes_local_copy))): # find our focus plane in `relevant_planes`
@@ -2201,7 +2206,7 @@ class AirplaneParser:
                         focus_plane_ids_scratch.clear()
                         focus_plane_ids_discard.clear()
                         self._last_plane_count = 0
-        
+
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
             algorithm_rare_events = self.rare_occurrences
@@ -2437,7 +2442,7 @@ class DisplayFeeder:
                 else: total_flybys = "0"
             else:
                 total_flybys = "N/A"
-            
+
             if DUMP1090_IS_AVAILABLE:
                 if general_stats['Tracking'] > 999:
                     total_planes = ">999"
@@ -2497,7 +2502,7 @@ class DisplayFeeder:
         rise_set.append(" ")
         rise_set.append("▼")
         rise_set.append(sunset)
-        
+
         # first section of receiver stats
         # "G____"
         recv_str.append("G")
@@ -2656,7 +2661,7 @@ class DisplayFeeder:
                     ENHANCED_READOUT = False
                 else:
                     ENHANCED_READOUT = ENHANCED_READOUT_INIT
-    
+
     def run_loop(self):
         def keep_alive():
             self.loop.call_later(1, keep_alive)
@@ -2970,7 +2975,7 @@ def operator_lookup(callsign: str) -> dict | None:
         test_str = input[:3].upper()
         if not test_str.isalpha():
             return None
-        
+
         result: dict = {}
         # check our cache first
         result = search(callsign_lookup_cache, '3Ltr', test_str)
@@ -3281,7 +3286,7 @@ class Display(
                 current_ampm,
             )
             return True
-    
+
     """ Day of the week """
     @Animator.KeyFrame.add(refresh_speed)
     def f_day(self, count):
@@ -3357,7 +3362,7 @@ class Display(
                 current_date,
             )
             return True
-    
+
     # ========= Idle Stats Elements ==========
     # ========================================
     """ Static text """
@@ -3394,7 +3399,7 @@ class Display(
             RANGE_HEADING_COLOR,
             "RNGE",
         )
-    
+
     """ Our idle stats readout """
     @Animator.KeyFrame.add(refresh_speed)
     def i_stats_readout(self, count):
@@ -3487,7 +3492,7 @@ class Display(
             return_flag = True
 
         return return_flag
-    
+
     """ Idle Stats 2: Clock center row """
     @Animator.KeyFrame.add(refresh_speed)
     def j_idle_stats_2(self, count):
@@ -3496,7 +3501,7 @@ class Display(
             self._last_row2_data = None
             return True
         return_flag = False
-        
+
         def center_align(text_len:int) -> int:
             """ Center aligns text based on its length across the screen """
             if text_len >= 16:
@@ -3506,7 +3511,7 @@ class Display(
             else:
                 # font is monospaced and each glyph is 4 pixels wide
                 return (30 - ((text_len - 1) * 2))
-        
+
         small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         ROW1_FONT = small_font_style if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
         ROW_2_FONT = fonts.microscopic
@@ -3647,7 +3652,7 @@ class Display(
                     self._last_distance
                 )
             self._last_distance = distance_now
-    
+
             _ = graphics.DrawText(
                 self.canvas,
                 TOP_HEADER_FONT,
@@ -3796,7 +3801,7 @@ class Display(
                       CONSTANTS['arrow_w'],
                       CONSTANTS['arrow_h'],
                       ARROW_COLOR)
-        
+
         if not JOURNEY_PLUS:
             # Draw origin; adjust font for all anticipated string lengths
             if len(origin_now) <= 3:
@@ -4058,7 +4063,7 @@ class Display(
 
         lat_now = active_data.get('Latitude', "0.000N")
         lon_now = active_data.get('Longitude', "0.000E")
-        
+
         # Undraw sections
         if self._last_latitude != lat_now:
             if self._last_latitude is not None:
@@ -4177,7 +4182,7 @@ class Display(
             if length_s <= 4: return 48
             elif length_s == 5: return 44
             elif length_s >= 6: return 40
-            
+
         altitude_now = active_data.get('Altitude', "0")
         speed_now = active_data.get('Speed', "0")
         flighttime_now = active_data.get('FlightTime', "---")
@@ -4359,7 +4364,7 @@ class Display(
                     indicator_color.green,
                     indicator_color.blue
                 )
-        
+
         INDICATORS_X = 63
         INDICATORS_Y = 17
         plane_count_now = len(relevant_planes)
@@ -4389,7 +4394,7 @@ class Display(
         if not DISPLAY_SWITCH_PROGRESS_BAR or not self.active_plane_display:
             self._last_switch_progress_bar = None
             return True
-        
+
         plane_count_now = len(relevant_planes)
         BASELINE_Y = 31
         X_START = 0
@@ -4490,7 +4495,7 @@ class Display(
             self._last_switch_progress_bar = None
             self._journey_plus_row = None
 
-    """ Actually show the display """        
+    """ Actually show the display """
     @Animator.KeyFrame.add(1)
     def z_sync(self, count):
         # Redraw screen every frame
@@ -4504,7 +4509,7 @@ class Display(
 
             except (SystemExit, KeyboardInterrupt, ImportError):
                 return
-            
+
             except Exception as e:
                 self.itbroke_count += 1
                 if self.itbroke_count > 5:
@@ -4638,7 +4643,7 @@ so you can read the above output before we enter the main loop.")
             interactive_wait_time -= 5
             time.sleep(5)
             print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
-            
+
         time.sleep(interactive_wait_time)
         del interactive_wait_time
 

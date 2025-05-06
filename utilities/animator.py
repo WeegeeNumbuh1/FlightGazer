@@ -1,4 +1,5 @@
-""" Our Animator controller for our RGB display """
+""" Our Animator controller for our RGB display.
+Originally designed by Colin Waddell for his its-a-plane-python project, but adapted and extended for FlightGazer. """
 from time import sleep, perf_counter
 import sys, os
 import signal

@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.3 - 2025-05-06
+    - Fix the edge case fix from the last release (it didn't actually work)
+    - More code cleanups
+
 v.4.2.2 - 2025-05-05
     - If the rare event algorithm is triggered, its counter is now shown in Interactive mode without having to enable Verbose mode
     - Fix edge case where the selection algorithm resets the rare event count before the daily stats is printed out
