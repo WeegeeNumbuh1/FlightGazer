@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.2.3 --- 2025-05-06'
+VERSION: str = 'v.4.2.4 --- 2025-05-10'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2196,6 +2196,8 @@ class AirplaneParser:
                 if focus_plane_i != focus_plane:
                     selection_events += 1
                     dispatcher.send(message=focus_plane, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
+                    if VERBOSE_MODE:
+                        print('\a', end='') # ring the bell just to drive the user crazy (if the terminal supports it)
 
             else: # when there are no planes
                 if focus_plane: # clean-up variables
@@ -4547,10 +4549,10 @@ if len(matching_processes) > 1: # when we scan for all processes, it will includ
             main_logger.warning(f"   PID {process_ID} -- [ {process_name} ] started: {process_started}")
     main_logger.warning(f"This current instance (PID {this_process.pid}) of FlightGazer will now exit.")
     time.sleep(1)
-    exit(1)
+    sys.exit(1)
 else:
     del matching_processes
-    main_logger.info("Cleared for takeoff.")
+    main_logger.info("Preflight check complete.")
 
 configuration_check() # very important
 configuration_check_api()
@@ -4621,6 +4623,7 @@ def main() -> None:
     json_writer = threading.Thread(target=export_FlightGazer_state, name='JSON-Writer', daemon=True)
     if WRITE_STATE:
         json_writer.start()
+    main_logger.info("Cleared for takeoff.")
 
     if INTERACTIVE:
         print("\nInteractive mode enabled. Pausing here for 15 seconds\n\

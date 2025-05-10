@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.4 - 2025-05-10
+    - Added message in init script explaining what to do when there is a running instance of FlightGazer
+    - Minor log output change, now there is a message when all checks have passed
+    - Added easter egg
+    
 v.4.2.3 - 2025-05-06
     - Fix the edge case fix from the last release (it didn't actually work)
     - More code cleanups
