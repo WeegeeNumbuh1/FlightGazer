@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.4.2.4
+# Version = v.4.2.5
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -129,7 +129,7 @@ if [[ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') ]]; then
 	echo "To stop the other running instance, use:"
 	echo "'sudo systemctl stop flightgazer.service' -or-"
 	echo "'sudo tmux attach -d -t FlightGazer' and press Ctrl+C -or-"
-	echo 'kill -15 $(ps aux | grep "'"[F]lightGazer.py"'" | awk "'"{print \$2}"'")'
+	echo 'kill -15 $(ps aux | grep '"'"'[F]lightGazer.py'"'"' | awk '"'"'{print \$2}'"'"')'
 	sleep 2s
 	exit 1
 fi

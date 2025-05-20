@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.2.4 --- 2025-05-10'
+VERSION: str = 'v.4.2.5 --- 2025-05-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -506,7 +506,7 @@ watchdog_triggers: int = 0
 watchdog_setpoint: int = 3
 """ How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 selection_events: int = 0
-""" Track amount of times the plane selector is triggered. (this is just a verbose stat) """
+""" Track amount of times the plane selector is triggered. """
 API_daily_limit_reached: bool = False
 """ This flag will be set to True if we reach `API_DAILY_LIMIT`.
 Currently controls the fallback for ENHANCED_READOUT. """
@@ -546,6 +546,9 @@ algorithm_rare_events: int = 0
 """ Count of times the rare events section of the selection algorithm is used """
 operator_database_present: bool = False
 """ True if both CALLSIGN_LOOKUP is True and the database is present. Initialized to False. """
+really_active_adsb_site: bool = False
+""" Indicates that the currently connected dump1090 instance encounters a lot of traffic.
+Controls the rare event log printout. """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -701,13 +704,17 @@ def runtime_accumulators_reset() -> None:
     algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     time.sleep(2) # wait for hourly events to complete
-    global unique_planes_seen, selection_events, ENHANCED_READOUT
+    global unique_planes_seen, selection_events, ENHANCED_READOUT, really_active_adsb_site
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     if algorithm_rare_events_now == 0:
         main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events.")
     else:
         main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events \
 (of which {algorithm_rare_events_now} were rare selection events).")
+    if selection_events > 1000 and not really_active_adsb_site:
+        main_logger.info("This appears to be a rather active ADS-B site. Very nice setup you have here. Hopefully you're sharing your data!")
+        main_logger.info("To prevent spamming the log any further, rare selection event logging will be disabled until FlightGazer is restarted.")
+        really_active_adsb_site = True
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. \
 Estimated cost: ${estimated_api_cost:.2f}")
@@ -1320,7 +1327,8 @@ def suntimes() -> None:
     main_logger.debug(f"Sunrise: {sunset_sunrise['Sunrise']}, Sunset: {sunset_sunrise['Sunset']}")
 
 def timesentinel() -> None:
-    """ Thread that watches for time changes (eg: system time changes after a reboot, DST, etc) """
+    """ Thread that watches for time changes (eg: system time changes after a reboot, DST, etc).
+    Also serves as a "canary in the coal mine" for systems that are thrashing significantly."""
     while True:
         time_now = datetime.datetime.now()
         time.sleep(1)
@@ -1529,6 +1537,11 @@ def print_to_console() -> None:
             print_info.append("RSSI: ")
             print_info.append("{rssi}".format(rssi = aircraft['RSSI']).rjust(5))
             print_info.append("dBFS")
+            if VERBOSE_MODE:
+                if aircraft['Registration'] is not None:
+                    print_info.append(f" | REG: {aircraft['Registration']}")
+                else:
+                    print_info.append(" | REG: Unknown")
             # append operator info if available
             if operator_database_present:
                 if aircraft['Operator'] is not None:
@@ -1864,8 +1877,10 @@ def main_loop_generator() -> None:
             - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
             - Operator: Plane's owner (if available)
             - Telephony: Plane's telephonic call-sign (if available)
+            - Registration: Plane's registration (if available)
         """
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
+        # auxiliary info: https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder?tab=readme-ov-file#tar1090-core-configuration
 
         if dump1090_data is None: return {'Tracking': 0, 'Range': 0}, []
         total: int = 0
@@ -1934,7 +1949,8 @@ def main_loop_generator() -> None:
                                 operator = operator_result['Company']
                                 telephony = operator_result['Telephony']
                             else:
-                                operator = None
+                                # try to see if the tar1090 database long type is enabled
+                                operator = a.get('ownOp', None)
                                 telephony = None
                         else:
                             operator = None
@@ -1965,6 +1981,7 @@ def main_loop_generator() -> None:
                             "SlantRange": slant_range_dist,
                             "Operator": operator,
                             "Telephony": telephony,
+                            "Registration": registration,
                             }
                         )
                         flyby_tracker(hex)
@@ -2071,13 +2088,14 @@ class AirplaneParser:
         def rare_message():
             """ Print a 'rare message' in the log. Under very specific conditions in real-world testing, this occurs up to 5% of the time. """
             self.rare_occurrences += 1
-            if self.rare_occurrences <= 5:
-                main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
-                main_logger.debug(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
-            if self.rare_occurrences == 5 and date_now_str == self._date_of_last_rare_message:
-                main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
-                main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day.")
-                main_logger.info("    (Aircraft selection is still working normally)")
+            if not really_active_adsb_site:
+                if self.rare_occurrences <= 4:
+                    main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} to {plane_count} as we were about to select another one.")
+                    main_logger.debug(f">>> Occured on loop {focus_plane_iter} (selection event {selection_events + 1}) -> selection tables: {next_select_table} {loops_to_next_select}")
+                if self.rare_occurrences == 4 and date_now_str == self._date_of_last_rare_message:
+                    main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
+                    main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day.")
+                    main_logger.info("    (Aircraft selection is still working normally)")
             self._date_of_last_rare_message = date_now_str
 
         def select():
@@ -2259,7 +2277,7 @@ class APIFetcher:
         flight_id = focus_plane_stats.get('Flight', "")
 
         # if for some reason there is no flight ID, don't bother trying to query the API
-        if not flight_id or flight_id == '?': return
+        if not flight_id or flight_id.startswith('~') or flight_id == '?': return
 
         # check if we already have results
         for i in range(len(focus_plane_api_results)):
@@ -2280,7 +2298,7 @@ class APIFetcher:
                 # send this message only once until the limit is reset
                 main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. No more API calls will occur until the next day.")
                 API_daily_limit_reached = True
-                process_time[3] = 0
+                process_time[2] = 0
                 if ENHANCED_READOUT_AS_FALLBACK:
                     main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
                     ENHANCED_READOUT = True # recall that once this is enabled, any call to this function will immediately return
@@ -2292,7 +2310,7 @@ class APIFetcher:
             main_logger.warning(f"API cost limit (${API_COST_LIMIT}) reached. Disabling API usage.")
             main_logger.info(f"Estimated cost today: ${estimated_api_cost:.2f}")
             API_cost_limit_reached = True
-            process_time[3] = 0
+            process_time[2] = 0
             if ENHANCED_READOUT_AS_FALLBACK:
                 main_logger.info(">>> Enabling ENHANCED_READOUT mode as fallback.")
                 ENHANCED_READOUT = True
@@ -2914,6 +2932,7 @@ def export_FlightGazer_state() -> None:
                 'watchdog_triggered': True if (not DUMP1090_IS_AVAILABLE and watchdog_triggers > 0) else False,
                 'dump1090_failures': dump1090_failures,
                 'watchdog_triggers': watchdog_triggers,
+                'really_active_adsb_site': really_active_adsb_site,
                 'display_failures': None if NODISPLAY_MODE else display_failures,
                 'cpu_percent': round(this_process_cpu / CORE_COUNT, 3),
                 'cpu_temp_C': round(psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current, 1) if CPU_TEMP_SENSOR else None,

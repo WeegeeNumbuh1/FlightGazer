@@ -5,6 +5,16 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.5 - 2025-05-20
+    - CALLSIGN_LOOKUP feature now takes advantage of the tar1090 database if it's enabled
+        - Increases chances that the operator can be found when the callsign isn't a normal ICAO airline code
+    - In verbose mode, the aircraft's registration is printed out in Interactive mode
+        - The aircraft registration can also be seen in the state export json regardless of verbose mode
+    - Less spam from the rare event printout
+        - If at any point the number of selection events in a day exceed 1000, all rare event messages will suppressed until FlightGazer is restarted
+        - Lowered limit for daily printouts to 4 otherwise
+    - API fetcher will no longer attempt to look up TIS-B aircraft with non-ICAO addresses
+
 v.4.2.4 - 2025-05-10
     - Added message in init script explaining what to do when there is a running instance of FlightGazer
     - Minor log output change, now there is a message when all checks have passed
