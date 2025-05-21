@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.4.2.6 - 2025-05-21
+    - API usage tweaks
+        - FlightGazer does not permanently disable API use on startup if the current usage cost exceeds the set API_COST_LIMIT
+            - This allows API usage to resume automatically once there are credits available again without having to restart FlightGazer
+        - Errors when polling API usage are now written to the log without having to set Verbose mode
+    - Additional log output tweaks
+
 v.4.2.5 - 2025-05-20
     - CALLSIGN_LOOKUP feature now takes advantage of the tar1090 database if it's enabled
         - Increases chances that the operator can be found when the callsign isn't a normal ICAO airline code

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.4.2.5 --- 2025-05-20'
+VERSION: str = 'v.4.2.6 --- 2025-05-21'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -712,8 +712,8 @@ def runtime_accumulators_reset() -> None:
         main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events \
 (of which {algorithm_rare_events_now} were rare selection events).")
     if selection_events > 1000 and not really_active_adsb_site:
-        main_logger.info("This appears to be a rather active ADS-B site. Very nice setup you have here. Hopefully you're sharing your data!")
-        main_logger.info("To prevent spamming the log any further, rare selection event logging will be disabled until FlightGazer is restarted.")
+        main_logger.info("This appears to be a rather active ADS-B site. Very nice setup you have here, hopefully you're sharing your data!")
+        main_logger.info(">>> To prevent spamming the log any further, rare selection event logging will be disabled until FlightGazer is restarted.")
         really_active_adsb_site = True
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. \
@@ -987,12 +987,13 @@ def probe_API() -> tuple[int | None, float | None]:
             api_cost: float = response_json['total_cost']
             return api_calls, api_cost
         else:
+            main_logger.warning(f"API call failed. Status code: {response.status_code}")
             return None, None
     except KeyError:
         main_logger.warning(f"API returned a response that cannot be parsed.")
         return None, None
-    except:
-        main_logger.debug(f"API call failed. Returned: {response.status_code}")
+    except Exception as e:
+        main_logger.warning(f"API call failed. Reason: {e}")
         return None, None
 
 def configuration_check() -> None:
@@ -1219,11 +1220,10 @@ def configuration_check_api() -> None:
                         main_logger.info(f"Limiting API calls to when usage is near ${API_COST_LIMIT:.2f}. (${API_COST_LIMIT - api_cost:.2f} available to use)")
                     else:
                         main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
-                        main_logger.info(">>> Disabling API.")
+                        main_logger.info(">>> Disabling API until credits are available again. (checks will occur every midnight)")
                         API_cost_limit_reached = True
-                        API_KEY = ""
 
-        else:
+        if not API_KEY:
             main_logger.info("API is unavailable. Additional API-derived info will not be available.")
             if DISPLAY_IS_VALID:
                 if ENHANCED_READOUT:
@@ -2137,7 +2137,7 @@ class AirplaneParser:
         if not NOFILTER_MODE:
             if plane_count > 0:
                 if self._date_of_last_rare_message and date_now_str != self._date_of_last_rare_message: # reset count
-                    if self.rare_occurrences >= 5:
+                    if self.rare_occurrences >= 4 and not really_active_adsb_site:
                         main_logger.info(f"Re-enabling \'rare message\' printout (this marks the first flyby of the day).")
                     self.rare_occurrences = 0
 
