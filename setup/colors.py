@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.3.4.0
+VERSION: v.5.0.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -15,6 +15,8 @@ where the red, green, blue values are integers from 0 to 255.
 
 Your edits must be between the # CONFIG_START and # CONFIG_END
 lines as these settings are what will be copied over when using the updater.
+Warning: Do not change the amount of lines in this file; this will cause the updater to
+default to the original colors.
 """
 
 try:
@@ -84,6 +86,7 @@ center_row2_color = DARK_GREY
 callsign_color = WHITE
 distance_color = WARM_WHITE
 country_color = GREY
+uat_indicator_color = SEAFOAM_GREEN
 
 # journey colors
 origin_color = ORANGE

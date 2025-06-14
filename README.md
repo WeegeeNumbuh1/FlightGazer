@@ -14,7 +14,9 @@ nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Bro
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
-As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24).<br>Fun fact: this is also the author's second-only Python project.
+As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24)<br>
+>[!NOTE]
+> Fun fact: this is also the author's second-only Python project.
 
 <details open>
 <summary><b>Table of Contents</b></summary>
@@ -49,14 +51,13 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 <details open>
 <summary><b>Show/Hide images</b></summary>
 
-| <div align="center"><img src="media/FG_NewPlane.gif" alt="FlightGazer NewPlane gif"><br><i>When an aircraft enters the area...</i></div> | <div align="center"><img src="media/FG_Return.gif" alt="FlightGazer Return gif"><br><i>...and once it leaves.</i></div> |
-|---|---|
-| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer SwitchPlane gif"><br><i>Handles multiple aircraft in the area...</i></div> | <div align="center"><img src="media/FG_API-Fetch-Long.gif" alt="FlightGazer API Wait gif"><br><i>...and moments when the API takes its time.</i></div> |
-| <div align="center"><img src="media/FG_SplashScreen.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> | <div align="center"><b>Neat 👍</b></div> |
-
-|   |
+| <div align="center"><img src="media/FG_Main.gif" alt="FlightGazer main gif"><br><i>FlightGazer is a nifty-looking flight tracking system.</i></div> |
 |---|
-| <div align="center"> <b>Additional features not shown in the above gifs</b><br><img src="media/FG-v2Features.gif" alt="FlightGazer v2 Features gif"></div><br><br><div align="left">- Clock additions:<br>&emsp;- Sunrise & sunset times (shown)<br>&emsp;- dump1090 signal statistics<br>&emsp;- Extended calendar info<br>- Aircraft display:<br>&emsp;- `Enhanced Readout` mode (shown)<br>&emsp;- Blinking callsign upon switch to active aircraft display (shown) or aircraft switch<br>- Brightness changes based on sunrise/sunset or select time-of-day<br>&emsp;- Brightness change when switching to active aircraft (shown)</div> |
+| <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer switch gif"><br><i>Gracefully handles situations when multiple aircraft enter and leave your designated area.</i></div> |
+| <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options.</i></div> |
+| <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receiver<br>while still being able to track aircraft in your area.</i></div> |
+| <div align="center"><img src="media/FG_Splash.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> |
+| <div align="center"><b>Neat 👍</b></div> |
 
 </details>
 
@@ -69,7 +70,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 ## 💪 Features
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
-<details open><summary><b>Show/Hide</b></summary>
+<details><summary><b>Show/Hide</b></summary>
 
 ### Summary
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
@@ -92,29 +93,30 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - Brightness based on time of day or when there's an active aircraft shown
+  - API limiting per day, by monthly cost, or even by the hour (those API calls can get expensive)
   - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
-  - API limiting per day or by monthly cost (those API calls can get expensive)
-  - Colors 🌈
   - Track a specific aircraft once it's detected by your ADS-B receiver
+  - Colors 🌈
   - Switch between font styles
+  - and more
 - Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
   - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 
 ### Other good stuff
 - Highly optimized and fast
-  - Worst case takes ~20ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
-    - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99th percentile (worldwide) ADS-B+UAT receiver at peak traffic
+  - Worst case takes ~25ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
+    - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99th percentile (worldwide) ADS-B+UAT receiver at peak traffic while sending data to multiple ADS-B aggregators with MLAT
 - Useful and detailed console output that shows the inner workings of FlightGazer
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
-  - The python script has been verified to run in both Linux (Debian) and Windows
+  - The python script has been verified to run in both Linux (Debian) and Windows. (MacOS untested)
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Can be configured to run automatically inside `tmux`
-- 🆕 Program state is available in a json file for use elsewhere
-- Robust and hard-to-break 🤞
+- Program state is available in a json file for use elsewhere
+- Robust and hard-to-break
 - Constant development
 - Adequate documentation
 
@@ -127,11 +129,11 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 Using this project assumes you have the following:
 #### MINIMUM
-- A working `dump1090` instance or similar interface where `/data/aircraft.json` can be read/accessed
+- A working `dump1090` instance or similar interface where `aircraft.json` can be read/accessed
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
-- The latest Python
+- The latest Python (>3.11)
 - A working internet connection for setup
 - *for Linux distros:*
   - Basic knowledge of how to use `bash` or similar terminal
@@ -145,9 +147,10 @@ Using this project assumes you have the following:
   - `rgbmatrix` does not need to be strictly installed to run this script (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
-  - Using `32x64` sized matrix display (this is the only layout this script was designed for)
+  - Using `32x64` sized, HUB75 type matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
-- A console that can interpret ANSI escape codes
+- A console that can interpret ANSI escape sequences (should be most modern ones)
+- If using a Raspberry Pi, use a model that has multiple CPU cores (Raspberry Pi 3/Raspberry Pi 2W or newer)
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
@@ -156,7 +159,7 @@ Using this project assumes you have the following:
 <br>
 
 **tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
-You don't actually need a physical RGB display, but it's recommended.<br>
+You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. You site location needs to be set for most of the functionality to work.<br>
 *Note:* FlightGazer will not work with UAT-only setups.
 
 ### 📶 Installation & Getting Started
@@ -175,7 +178,7 @@ then run the following:
 sudo bash FlightGazer-init.sh
 ```
 which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.<br>
-**If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).**<br>([Click here to view what the init.sh file does](#-misc))
+**If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).**
 </details>
 <details><summary>if running Windows</summary>
 
@@ -257,7 +260,7 @@ Note that FlightGazer will still be running *and* driving the screen even with a
 <details><summary>Hiding elements on the display</summary>
 
 Go to the color config file and set whatever element you don't want to show to `BLACK`.<br>
-Example: `clock_color = BLACK`
+Example: `seconds_color = BLACK`
 
 </details>
 
@@ -279,9 +282,9 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 > # or
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
 > # or
-> journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
+> less /path/to/FlightGazer/FlightGazer-log.log # read the log output, press 'q' to quit
 > # or
-> tail -n 50 /path/to/FlightGazer/FlightGazer-log.log # read the log output
+> journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
@@ -292,13 +295,13 @@ The script automatically detects that you're running interactively and will disp
 <details><summary>Example output</summary>
 
 ```
-===== FlightGazer v.4.2.0 Console Output ===== Time now: 2025-05-01 00:00:00 | Runtime: 98 days, 23:48:05
+===== FlightGazer v.5.0.0 Console Output ===== Time now: 2025-06-01 00:00:00 | Runtime: 98 days, 23:48:05
 Filters enabled: <60nmi, <15000ft, or 'abcdef'
 [Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
 
 Aircraft scratchpad: {'aa3ae5', 'a10d75'}
-[001] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS | UNITED AIRLINES, INC. (CHICAGO, IL) - "United"
-[002] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS | Private/Military/Unknown
+[012] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS | UNITED AIRLINES, INC. (CHICAGO, IL) - "United"
+[013] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS (UAT) | Private/Military/Unknown
 
 API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
 
@@ -483,7 +486,7 @@ Simply delete the folder (and the virtual python environment if you set that up 
 
 **Q:** My RGB display is blank when running this, what broke?<br>
 **A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
-Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 rgb panel. Other setups are not supported.<br>
+Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 HUB75-based RGB panel. Other setups are not supported.<br>
 Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
 
 **Q:** I broke it 🥺<br>
@@ -500,24 +503,26 @@ If it has been over three (3) months since it last checked, then the next time i
 **A:** [Click here](#adjusting-colors)
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
-**A:** Sure, just change some things in the script. Have fun.<br>
+**A:** Sure, just change some things in the script. Have fun. (also, just fork this project)<br>
 (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** What about showing other aircraft info like what airline or what kind of aircraft it is?<br>
 **A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
-You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.
+You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.<br>
+Note: In Interactive mode, FlightGazer can lookup the airline based on the callsign if the `CALLSIGN_LOOKUP` setting is enabled.
 
-**Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/)?<br>
-**A:** adsbdb only has reported route information for aircraft that have predetermined origins and destinations. In my experience, it cannot handle position-only flights (i.e. general aviation, military, etc) and is lacking information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
+**Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
+**A:** adsbdb/adsb.lol only has user reported route information for aircraft that have known origins and destinations. In my experience, these APIs cannot handle position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
 
 **Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
-**A:** The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
-The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.<br>
+**A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
+Reasoning: The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
+The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font. 
 Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
-If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.
 
 **Q:** Some of your code is not pythonic!!!1!!111 ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
-**A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)
+**A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)<br>
+(it should be >98% pythonic at this point)
 
 </details>
 
@@ -540,17 +545,17 @@ If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to m
   - May not ever get fixed
   
 - On rare occasions are times when there will be two entries of the same aircraft (only when using `No Filter` mode)
-  - This is an edge case that's been noted since the v.0.x days due to dump1090 listing the same aircraft twice
-  - This is further complicated if dump978 is also active and the aircraft uses a dual mode transponder
-  - Having MLAT enabled also increases the chances of this bug occurring as you can also get ATC broadcasts of the same aircraft
+  - This is an edge case that's been noted since the v.0.x days, mainly due to a dual receiver setup
+  - It has been associated with aircraft that uses a dual mode transponder or there is TIS-B contact of the same aircraft on UAT while it's present over ADS-B
   - ~~So far there is no fix planned for this as this does not break core functionality~~
     - At worst it confuses the aircraft selector algorithm but even then it still selects normally
     - ~~May be mitigated in the far future~~
-  - **This has been mitigated in v.2.6.3 and newer; FlightGazer will pick the first entry it encounters when not using `No Filter` mode**
+  - **This has been mitigated in v.2.6.3 and newer, fully fixed in v.5.0.0; FlightGazer will use the best entry it encounters when not using `No Filter` mode**
 
-- If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0
+- ~~If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0~~
   - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd
-  - May not actually get fixed (simply just code better, smh)
+  - ~~May not actually get fixed (simply just code better, smh)~~
+  - **I think it's okay now**
   
 </details>
 <br>

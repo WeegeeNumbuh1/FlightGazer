@@ -5,6 +5,74 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.5.0.0 - 2025-06-14
+    - NEW: API_SCHEDULE
+        - Why use API credits when you're asleep or at work? Set a time of day to use the API to show an aircraft's flight info
+        - Granular by the hour and by weekday for flexible API usage to stretch your credits further
+        - Another backburner idea that has finally been implemented (brainstormed around v.3.2.0 release)
+        - Disabled by default
+    - Significant enhancements when using UAT:
+        - FlightGazer is now smarter: instead of just accepting the first occurrence of an aircraft (implemented in v.2.6.3), it will pick
+          the data packet that has the best data source; tar1090 handles this in a similar manner
+            - A common situation is when an aircraft is detected both as adsb_icao on one frequency and adsr_icao/tisb_icao on the other;
+              usually, the adsr_icao/tisb_icao signal is weaker and is prone to dropping out or retaining stale data.
+              If the adsr_icao/tisb_icao signal was the first one detected, FlightGazer would latch onto this,
+              leading to the aircraft data not being updated while there's a much better info stream available
+        - In Interactive mode, the RSSI section of an aircraft will have "(UAT)" appended to it when data was received by dump978
+        - On the display, a small dot near the callsign will light up to indicate the currently tracked aircraft is received by dump978
+            - As usual, this color can be customized (upgrading to this release will return any changed colors to their defaults)
+        - Speed tweaks when accessing both ADS-B and UAT: FlightGazer will try to access them concurrently rather than sequentially,
+          shortening both response and processing times (up to 2x faster, usually 1.4-1.6x faster)
+    - Major aircraft selection algorithm improvements:
+        - When there are multiple aircraft in the area, the algorithm will try to choose an aircraft that is approaching your site location the fastest
+          rather than at random, which was how the algorithm used to work since inception
+            - A new internal framework was built to calculate this and each aircraft now has an "ApproachRate" value tied to it
+            - The approach rate can be seen in verbose mode or in the state file
+    - Rearrangement and refactoring of internal FlightGazer functions for better clarity and minimal impact on processing speed
+        - Refactor internal dump1090 processing and internal data format for less jank (hasn't been changed since the start)
+        - Print routine for Interactive mode now runs in its own separate thread
+        - Additional cleanups for the Interactive mode print routine for faster speed
+        - Other miscellaneous rewrites to make things more pythonic
+    - API processing improvements:
+        - API will not be fetched for aircraft on the ground or have non-ICAO addresses
+        - Logic improvements when handling ENHANCED_READOUT_AS_FALLBACK to accommodate the (now 3) API limiters
+        - Slightly faster internal API result cache lookup
+        - Fix issues where FlightGazer would...
+            - ... not send an API call when switching from an aircraft being tracked in FOLLOW_MODE to an aircraft inside
+              the designated RANGE
+            - ... fail to poll the API usage stats when ENHANCED_READOUT_AS_FALLBACK is enabled and an API limiter is enabled
+            - ... reuse stale API results when an API limiter is reached and an aircraft re-enters the set RANGE during this time
+        - Lore drop and fun facts:
+            - None of these API processing routines have been tested since v.1.1.0. The author actually lost API access for months (lmao)
+            - As of this release, all associated API handling routines and changes done since v.1.1.0 have now been validated (the author regained API access)
+            - Surprisingly, most of the added stuff actually worked when tested (epic)
+    - State file changes:
+        - If NO_FILTER mode is enabled, state file will not have any aircraft listed in the "relevant_planes" key
+        - When FlightGazer shuts down, the state file no longer will exist
+        - Fix bug in state file writing thread where it would fail to start when RANGE or HEIGHT_LIMIT values are floats
+    - Updater script changes:
+        - Script is now interactive, checks version numbers, and allows the user to evaluate before committing the update
+        - Script is no longer two-stage (change introduced in v.2.0.1)
+        - Script now cleans up after itself (removes what it writes in /tmp)
+        - Settings migrator updated to handle API_SCHEDULE
+        - Updater script now preserves the migration logs during an update
+    - Initialization script tweaks
+        - FlightGazer now starts with higher CPU and I/O priority for more consistent performance in data retrieval and data processing
+        - FlightGazer starts with fewer PIDs
+    - NEW: When FOLLOW_MODE is enabled, FlightGazer will log when the aircraft is first detected in the day
+    - In Interactive mode, aircraft are now numbered by their first appearance in the defined tracking area
+    - FlightGazer can detect when the connection to dump1090 continually fails (ex: lost network connection) and will trigger the watchdog faster
+    - With 24 hour mode, the clock is now more centered
+    - Rearrangement of config file sections and some settings
+    - tisb_trackfile locations are also no longer tracked (these are more common on UAT)
+    - Minor fix to operator lookup cache method
+    - Fixed FlightGazer not polling location if GPS is attached (this bug went unnoticed since v.1.1.0)
+        - This feature remains untested but should work (as long as whichever dump1090 service is in use updates its receiver.json file)
+    - Update splash screen with same fix implemented in v.3.4.1
+    - Add another easter egg
+    - Originally slated as v.4.3.0 but as usual the addons (feature creep) and changes were large enough justify another version bump
+        - This ended up being the biggest rewrite since v.2.0.0
+
 v.4.2.6 - 2025-05-21
     - API usage tweaks
         - FlightGazer does not permanently disable API use on startup if the current usage cost exceeds the set API_COST_LIMIT
@@ -42,8 +110,7 @@ v.4.2.1 - 2025-05-01
 
 v.4.2.0 - 2025-05-01
     - NEW: New feature - CALLSIGN_LOOKUP
-        - Only in Interactive mode: when this setting is enabled, any aircraft inside the set RANGE will display
-          the aircraft operator and associated call sign (telephony name)
+        - Only in Interactive mode: when this setting is enabled, any aircraft will display the aircraft operator and associated call sign (telephony name)
         - Relies on an internal database/lookup table with no need for using an API
             - From testing, worst case lookup takes 2 ms. Once a result is cached, lookup takes <0.1ms. Blazing fast.
             - The internal database is based on data from the Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3

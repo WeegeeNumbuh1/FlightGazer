@@ -2,7 +2,7 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.2.1.0
+# Last updated: v.5.0.0
 # By WeegeeNumbuh1
 
 import sys
@@ -66,6 +66,8 @@ for settings_key in new_config:
         if new_config[settings_key] != user_settings[settings_key]:
             if settings_key == "API_KEY" and user_settings['API_KEY']:
                 print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
+            elif settings_key == "API_SCHEDULE" and user_settings['API_SCHEDULE']: # this is a huge dict (heh), don't print it
+                print(f"Changing {settings_key}: <default schedule> -> <provided schedule>")
             else:
                 print(f"Changing {settings_key}: {new_config[settings_key]} -> {user_settings[settings_key]}")
             new_config[settings_key] = user_settings[settings_key]

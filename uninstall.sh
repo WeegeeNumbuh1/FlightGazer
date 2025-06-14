@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.3.4.1
+# Last updated: v.5.0.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -74,10 +74,11 @@ echo -e "Removing FlightGazer directory ${FGDIR}..."
 rm -rf ${FGDIR}
 rm -f ${FGDIR}/../emulator_config.json 2>&1 # for older installs
 sleep 2s
-echo -e "${NC}\nDone."
+echo -e "${NC}\nDone. FlightGazer has been fully removed from your system."
 exit 0' >> $TEMPPATH
 chmod +x $TEMPPATH
 echo -e "${GREEN}>>> Thanks for using FlightGazer!${NC}"
 bash $TEMPPATH
+rm -f $TEMPPATH
 exit 0
 }

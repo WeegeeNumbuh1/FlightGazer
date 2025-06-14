@@ -1,16 +1,9 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.4.2.6 # do not modify this
+CONFIG_VERSION: v.5.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
-
-FLYBY_STATS_ENABLED: true
-# [true/false]
-# Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
-# Note that if FlightGazer is restarted at some point in the day and this setting is false,
-# FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
-# It is recommended to leave this left as true when the API is in use.
 
 UNITS: 0
 # Select which units to use.
@@ -32,8 +25,9 @@ RANGE: 2
 API_KEY: ''
 # [String]
 # Put your FlightAware API key here. Leave as '' to not use the API.
+# Don't have one? https://www.flightaware.com/aeroapi/signup/personal
 
-API_DAILY_LIMIT:
+API_DAILY_LIMIT: 
 # [Integer: > 0, null, or empty]
 # Set this to an integer value if you want to limit calls.
 # If you want to have unlimited API calls, set this to null or an empty value.
@@ -46,6 +40,119 @@ API_COST_LIMIT: 5.00
 # API_DAILY_LIMIT takes higher priority than this setting in controlling API usage, but if either limit is reached,
 # API calls will stop.
 # If you want to have unlimited API calls, set this to null or an empty value.
+
+API_SCHEDULE:
+  ENABLED: false
+  SUNDAY:
+    0-11:  '------xxxxxx' # use the API from 06:00 thru 12:00
+    12-23: 'xxxxxxxxxxx-' # 12:00 thru 23:00
+  MONDAY:
+    0-11:  '-------xxx--' # use the API from 07:00 thru 09:00
+    12-23: '-----xxxxxx-' # 17:00 thru 23:00
+  TUESDAY:
+    0-11:  '-------xxx--'
+    12-23: '-----xxxxxx-'
+  WEDNESDAY:
+    0-11:  '-------xxx--'
+    12-23: '-----xxxxxx-'
+  THURSDAY:
+    0-11:  '-------xxx--'
+    12-23: '-----xxxxxx-'
+  FRIDAY:
+    0-11:  '-------xxx--'
+    12-23: '-----xxxxxx-'
+  SATURDAY:
+    0-11:  '------xxxxxx'
+    12-23: 'xxxxxxxxxxx-'
+# Set a time during the day when to use the API.
+# An 'x' marks the hour when the API can be used. A '-' indicates an hour to not use the API.
+# For the ENABLED key, if this value is set to false, the API can be used at all times.
+# If any time slot is left blank, does not use exactly 12 characters, or uses characters other than
+# 'x' or '-', the API will not be used for that entire time slot.
+# Hint: use the Insert key for ease of input for this setting.
+
+# ============= Screen Output settings =============
+# ==================================================
+
+ENHANCED_READOUT: false
+# [true/false]
+# If true, show more details on aircraft info screen and replaces origin and destination readout.
+# Will not use API or show an aircraft's journey (origin/destination) even if a key is provided.
+# Useful if API is not in use.
+# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI.
+
+ENHANCED_READOUT_AS_FALLBACK: true
+# [true/false]
+# When true, switch to using ENHANCED_READOUT if the API Key fails at startup or when any API limits are reached.
+# This setting only works if ENHANCED_READOUT is false.
+
+JOURNEY_PLUS: false
+# [true/false]
+# A hybrid between ENHANCED_READOUT and the default aircraft info.
+# Adds aircraft track, vertical speed, and RSSI to this layout.
+# Enable this if you prefer maximizing information density.
+
+CLOCK_CENTER_ROW:
+  ROW1: 1
+  ROW2: 0
+# Choose what to display on the Clock screen center row.
+# Leave only ROW1 filled with a non-zero number to show just one row of data.
+# When ROW1 and ROW2 are filled, the Clock display will use a smaller font to maximize space.
+# Having ROW1 equal to zero or blank, but ROW2 filled will force using the smaller font on the Clock display.
+# Options:
+# 0, null, or blank = Don't use this option
+# 1 = Sunset/Sunrise
+# 2 = ADS-B receiver stats (gain, noise, % loud signals)
+# 3 = Extended calendar info (month, week number, day of the year)
+
+CLOCK_24HR: false
+# [true/false]
+# If true, use 24 hour clock. If false, 12 hour clock will be used.
+
+ALTERNATIVE_FONT: false
+# [true/false]
+# When true, use a less squared-off font for the majority of the display's output.
+# This alternative font also maximizes the difference between homoglyphs (ex: '5' vs 'S', '0' vs 'O', etc.)
+
+DISPLAY_SWITCH_PROGRESS_BAR: true
+# [true/false]
+# When true, display a progress bar at the bottom of the aircraft info screen to indicate how long
+# the current aircraft will remain on display. This progress bar will only appear if two (2) or more
+# aircraft are in the area.
+
+# ============== Brightness settings ===============
+# ==================================================
+
+BRIGHTNESS: 75
+# [Integer: 0 ~ 100]
+# Set the default LED brightness.
+
+ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
+# [Integer: 0 ~ 100, null, or empty]
+# When there is an active aircraft, use a different brightness level. Useful for grabbing attention.
+# Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
+# ENABLE_TWO_BRIGHTNESS is enabled.
+# If you do not want the brightness to change, set this to null or an empty value.
+
+ENABLE_TWO_BRIGHTNESS: true
+# [true/false]
+# If true, enables dynamically switching brightness based on time of day. If false, only BRIGHTNESS will be used.
+
+BRIGHTNESS_2: 40
+# [Integer: 0 ~ 100]
+# Secondary LED brightness.
+# BRIGHTNESS_2 will be used from sunset to sunrise ("night") and BRIGHTNESS will be used for all other times.
+
+USE_SUNRISE_SUNSET: true
+# [true/false]
+# If true, use sunrise and sunset times to adjust brightness.
+# If sunrise or sunset times are not available, will fall back to BRIGHTNESS_SWITCH_TIME values.
+
+BRIGHTNESS_SWITCH_TIME:
+  Sunrise: 06:00
+  Sunset: 18:00
+# [Time]
+# Set the time of day (in 24-hr format) to switch brightness levels.
 
 # ============== Advanced settings =================
 # ==================================================
@@ -91,16 +198,23 @@ FOLLOW_THIS_AIRCRAFT: ''
 # then FlightGazer will start tracking it as if it were inside your designated RANGE.
 # When tracking this aircraft, FlightGazer will use its ENHANCED_READOUT mode regardless of the setting for that option.
 # This does not disable API use. If this aircraft does enter your defined area, FlightGazer will follow the same settings
-# that would apply to other aircraft in that area. Additionally, if there are multiple aircraft in the area and
-# FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for it.
+# that would apply to other aircraft inside of that area. Additionally, when there are multiple aircraft in the area and
+# FlightGazer switches to this specific aircraft which is outside of the area, FlightGazer will still use ENHANCED_READOUT for that aircraft.
 
 FASTER_REFRESH: false
 # [true/false]
 # When true, decrease dump1090 polling time to 1 second versus the default 2 seconds. Increases CPU load.
 
+FLYBY_STATS_ENABLED: true
+# [true/false]
+# Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
+# It is recommended to leave this left as true when the API is in use.
+# Note that if FlightGazer is restarted at some point in the day and this setting is false,
+# FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
+
 WRITE_STATE: true
 # [true/false]
-# When FlightGazer is running, write a json file of its current operating state (variable values) in /run/FlightGazer/.
+# (Linux only) When FlightGazer is running, write a json file of its current operating state (variable values) in /run/FlightGazer/.
 # This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
 # Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
 # /run lives entirely in RAM, leading to zero disk writes. Set to false if you don't want this feature.
@@ -112,95 +226,12 @@ CALLSIGN_LOOKUP: true
 # The results of this feature is currently limited to the Interactive display, but functionality could be extended in the future.
 # This feature does not significantly lengthen processing time, but it will increase memory usage very slightly.
 
-# ============= Screen Output settings =============
-# ==================================================
-
-ENHANCED_READOUT: false
-# [true/false]
-# If true, show more details on aircraft info screen and replaces origin and destination readout.
-# Will not use API even if a key is provided. Useful if API is not in use.
-# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI.
-
-ENHANCED_READOUT_AS_FALLBACK: true
-# [true/false]
-# When true, switch to using ENHANCED_READOUT if the API Key fails at startup
-# or when any API limits are reached.
-# This setting only works if ENHANCED_READOUT is false.
-
-JOURNEY_PLUS: false
-# [true/false]
-# A hybrid between ENHANCED_READOUT and the default aircraft info. 
-# Adds aircraft track, vertical speed, and RSSI to this layout.
-# Enable this if you prefer maximizing information overload.
-
-CLOCK_CENTER_ROW:
-  ROW1: 1
-  ROW2: 0
-# Choose what to display on the Clock screen center row.
-# Leave only ROW1 filled with a non-zero number to show just one row of data.
-# When ROW1 and ROW2 are filled, the Clock display will use a smaller font to maximize space.
-# Having ROW1 equal to zero or blank, but ROW2 filled will force using the smaller font on the Clock display.
-# Options:
-# 0, null, or blank = Don't use this option
-# 1 = Sunset/Sunrise
-# 2 = ADS-B receiver stats (gain, noise, % loud signals)
-# 3 = Extended calendar info (month, week number, day of the year)
-
-CLOCK_24HR: false
-# [true/false]
-# If true, use 24 hour clock. If false, 12 hour clock will be used.
-
-ALTERNATIVE_FONT: false
-# [true/false]
-# When true, use a less squared-off font for the majority of the display's output.
-# This alternative font also maximizes the difference between homoglyphs (ex: '5' vs 'S', '0' vs 'O', etc.)
-
-DISPLAY_SWITCH_PROGRESS_BAR: true
-# [true/false]
-# When true, display a progress bar at the bottom of the aircraft info screen to indicate how long
-# the current aircraft will remain on display. This progress bar will only appear if two (2) or more
-# aircraft are in the area.
-
-# ============== Brightness settings ===============
-# ==================================================
-
-BRIGHTNESS: 75
-# [Integer: 0 ~ 100]
-# Set the LED brightness.
-
-ENABLE_TWO_BRIGHTNESS: true
-# [true/false]
-# If true, enables dynamically switching brightness. If false, only BRIGHTNESS will be used.
-
-BRIGHTNESS_2: 40
-# [Integer: 0 ~ 100]
-# Secondary LED brightness.
-# BRIGHTNESS_2 will be used from sunset to sunrise ("night") and BRIGHTNESS will be used for all other times.
-
-BRIGHTNESS_SWITCH_TIME:
-  Sunrise: 06:00
-  Sunset: 18:00
-# [Time]
-# Set the time of day (in 24-hr format) to switch brightness levels.
-
-USE_SUNRISE_SUNSET: true
-# [true/false]
-# If true, use sunrise and sunset times to adjust brightness.
-# If sunrise or sunset times are not available, will fall back to BRIGHTNESS_SWITCH_TIME values.
-
-ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
-# [Integer: 0 ~ 100, null, or empty]
-# When there is an active aircraft, use a different brightness level. Useful for grabbing attention.
-# Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
-# ENABLE_TWO_BRIGHTNESS is enabled.
-# If you do not want the brightness to change, set this to null or an empty value.
-
 # ============== RGB-Matrix settings ===============
 # ==================================================
 
 GPIO_SLOWDOWN: 2
 # [Integer: 0 ~ 4]
-# Set this to the specific value that works for your setup. 
+# Set this to the specific value that works for your setup.
 # Higher values are more suited for faster/more modern Raspberry Pi's.
 
 HAT_PWM_ENABLED: true

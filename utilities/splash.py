@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.3.0.0
+# Last updated: v.5.0.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -14,11 +14,16 @@ from time import sleep
 import signal
 import argparse
 from pathlib import Path
+import os
+CURRENT_DIR = Path(__file__).resolve().parent
 try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
     except:
+        os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+        from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+        RGBMatrixEmulatorConfig.CONFIG_PATH = Path(f"{CURRENT_DIR}/../emulator_config.json")
         from RGBMatrixEmulator import graphics
         from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 except: # if display can't be loaded, don't bother showing the splash screen
@@ -28,7 +33,6 @@ try:
 except:
     sys.exit(1)
 
-CURRENT_DIR = Path(__file__).resolve().parent
 try:
     with open(Path(f"{CURRENT_DIR}/../version"), 'rb') as f:
         VER_STR = f.read(12).decode('utf-8').strip()

@@ -5,3 +5,4 @@ test
 /emulator_config.json
 *.7z
 *.csv
+.vscode
