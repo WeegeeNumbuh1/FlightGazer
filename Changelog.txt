@@ -5,6 +5,24 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.5.1.0 - 2025-06-20
+    - NEW: More selection algorithm tweaks
+        - FlightGazer now has the concept of a "high priority" aircraft wherein if an aircraft is within 0.4nmi line-of-sight of your site
+          (eg: a low flying plane or helicopter) while there are other aircraft in the area, FlightGazer will temporarily override
+          whatever aircraft is currently being tracked and will switch to this one and continue tracking it until it leaves this tracking "dome"
+          - If there happens to be multiple aircraft within this dome, FlightGazer will simply pick whichever is closest
+    - FIX: Bug in registration lookup module (added in v.0.2.0) that went undetected since it was added that would cause it to fail with specific
+           ICAO hexes
+    - Refactored registration lookup module to be 7x faster
+    - Raised some settings minimums to be more realistic:
+        - RANGE value to 0.5 from 0.2
+        - HEIGHT_LIMIT to 2500 from 1000
+        - FLYBY_STALENESS to 2 from 1
+    - Slight refactoring to the API call routines for less jank and less module imports
+    - Minor fix to API call tracking for the API_DAILY_LIMIT setting to include calls that did not return usable results
+    - Depreciate CALLSIGN_LOOKUP setting
+        - This feature is stable and performant enough to be left enabled at all times
+
 v.5.0.0 - 2025-06-14
     - NEW: API_SCHEDULE
         - Why use API credits when you're asleep or at work? Set a time of day to use the API to show an aircraft's flight info

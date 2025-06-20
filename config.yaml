@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.5.0.0 # do not modify this
+CONFIG_VERSION: v.5.1.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -12,11 +12,11 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# [Integer: 1000 ~ 75000] (feet or meters based on UNITS)
+# [Integer: 2500 ~ 75000] (feet or meters based on UNITS)
 # Filter out aircraft at an altitude higher than this.
 
 RANGE: 2
-# [Float: 0.2 ~ 20] (nautical miles, kilometers, or miles based on UNITS)
+# [Float: 0.5 ~ 20] (nautical miles, kilometers, or miles based on UNITS)
 # Radius of which aircraft need to be in for detailed tracking.
 
 # ================ API settings ====================
@@ -27,7 +27,7 @@ API_KEY: ''
 # Put your FlightAware API key here. Leave as '' to not use the API.
 # Don't have one? https://www.flightaware.com/aeroapi/signup/personal
 
-API_DAILY_LIMIT: 
+API_DAILY_LIMIT:
 # [Integer: > 0, null, or empty]
 # Set this to an integer value if you want to limit calls.
 # If you want to have unlimited API calls, set this to null or an empty value.
@@ -47,10 +47,10 @@ API_SCHEDULE:
     0-11:  '------xxxxxx' # use the API from 06:00 thru 12:00
     12-23: 'xxxxxxxxxxx-' # 12:00 thru 23:00
   MONDAY:
-    0-11:  '-------xxx--' # use the API from 07:00 thru 09:00
+    0-11:  '-------xxx--' # use the API from 07:00 up to 10:00
     12-23: '-----xxxxxx-' # 17:00 thru 23:00
   TUESDAY:
-    0-11:  '-------xxx--'
+    0-11:  '-------xxx--' # important: if there are leading '-', encapsulate the row with quotes
     12-23: '-----xxxxxx-'
   WEDNESDAY:
     0-11:  '-------xxx--'
@@ -63,7 +63,7 @@ API_SCHEDULE:
     12-23: '-----xxxxxx-'
   SATURDAY:
     0-11:  '------xxxxxx'
-    12-23: 'xxxxxxxxxxx-'
+    12-23: 'xxxxxxxxxxx-' # this is fine to leave unquoted (the updater leaves it like this)
 # Set a time during the day when to use the API.
 # An 'x' marks the hour when the API can be used. A '-' indicates an hour to not use the API.
 # For the ENABLED key, if this value is set to false, the API can be used at all times.
@@ -158,7 +158,7 @@ BRIGHTNESS_SWITCH_TIME:
 # ==================================================
 
 FLYBY_STALENESS: 60
-# [Integer: 1 ~ 1440] (minutes)
+# [Integer: 2 ~ 1440] (minutes)
 # If the same aircraft appears again before this time, do not consider it as a flyby
 # and reuse the same API results (when enabled).
 
@@ -218,13 +218,6 @@ WRITE_STATE: true
 # This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
 # Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
 # /run lives entirely in RAM, leading to zero disk writes. Set to false if you don't want this feature.
-
-CALLSIGN_LOOKUP: true
-# [true/false]
-# If true, FlightGazer will look up the owner and telephonic call sign for all aircraft inside your designated RANGE
-# and attempt to reference them from an internal database.
-# The results of this feature is currently limited to the Interactive display, but functionality could be extended in the future.
-# This feature does not significantly lengthen processing time, but it will increase memory usage very slightly.
 
 # ============== RGB-Matrix settings ===============
 # ==================================================

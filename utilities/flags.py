@@ -230,9 +230,9 @@ def getICAO(icao: str) -> str:
     try:
         if icao.startswith("~"): return "??"
         hexa = int(icao, 16)
-        for i in range(len(ICAO_Ranges)):
-            if hexa >= ICAO_Ranges[i]['start'] and hexa <= ICAO_Ranges[i]['end']:
-                return ICAO_Ranges[i]['country_code']
+        for entry in ICAO_Ranges:
+            if hexa >= entry['start'] and hexa <= entry['end']:
+                return entry['country_code']
         return "??"
     except:
         return "??"

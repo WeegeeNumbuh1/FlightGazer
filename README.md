@@ -37,6 +37,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 - [Uninstall](#-uninstall)
 - [FAQ's](#-frequently-asked-questions-not-really-but-they-could-pop-up)
 - [Known Issues](#-known-issues-shortcomings-and-reporting-issues)
+- [Support \& Discussion](#-support--discussion)
 - [Changelog \& Contributing](#️-changelog-planned-features-and-contributing)
 - [Additional Related/Similar Projects](#-additional-relatedsimilar-projects)
 - [Highlights Across Media](#️-highlights-across-media)
@@ -159,7 +160,7 @@ Using this project assumes you have the following:
 <br>
 
 **tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
-You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. You site location needs to be set for most of the functionality to work.<br>
+You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
 *Note:* FlightGazer will not work with UAT-only setups.
 
 ### 📶 Installation & Getting Started
@@ -563,6 +564,9 @@ Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `settings_migrate.log` if present) which can be found in the FlightGazer directory.
 
+## 💬 Support & Discussion
+\* (dust) \*
+
 ## ✏️ Changelog, Planned Features, and Contributing
 Read: [`Changelog.txt`](./Changelog.txt).
 
@@ -574,7 +578,8 @@ Faraway ideas:
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
 Suggestions, comments, and bug reports are always welcomed and encouraged.<br>
 Additionally, word-of-mouth helps plenty!<br>
-If you'd like to make your own edits that changes the way the project operates, please fork this project.
+If you'd like to make your own edits that changes the way the project operates, please fork this project.<br>
+If there's something not addressed here, please reach out to me directly.
 
 ## 📖 Additional Related/Similar Projects
 
@@ -586,7 +591,7 @@ If you'd like to make your own edits that changes the way the project operates, 
   - Inspired the functionality of the stats file FlightGazer writes out
 
 ## 🎖️ Highlights Across Media
-\* (dust) \* 
+\* (dust) \*
 
 ## ⚖️ License & Warranty
 FlightGazer is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.<br>
