@@ -5,6 +5,46 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.6.0.0 - 2025-06-29
+    - NEW: FlightGazer x tar1090
+        - FlightGazer now uses the same database that tar1090 uses, enabling lookups for aircraft info such as type and owner, all without
+          having to use an API
+          - This is the same info that can be seen when visiting ADS-B aggregator sites like adsb.lol, adsb.fi, airplanes.live, or adsbexchange
+            and selecting an aircraft
+        - This project does not bundle the database by default, rather, it downloads the latest version available online and converts it into
+          a sqlite3 database arranged for FlightGazer's use
+          - This only occurs during initial setup and when updating FlightGazer with the initialization script
+        - There are now additional keys available in the state file for database stats
+        - Another significant rewrite to handle accessing the database, arbitrating the info, and formatting the output
+    - NEW: Scrolling info (for the above add-in), enabled by default with new setting: SHOW_EVEN_MORE_INFO
+        - Shows aircraft info, airline or owner, along with a more detailed explanation of the origin and destination
+            - Example: "2025 Boeing 787-9 Dreamliner | United Airlines --- San Francisco to Singapore (San Francisco Intl to Singapore Changi)"
+        - Available in JOURNEY_PLUS or ENHANCED_READOUT mode
+            - Supplants the center readout for JOURNEY_PLUS mode (aircraft track and vertical speed)
+        - To accommodate this change, the refresh rate of the screen has been bumped up to 24 FPS from 10 for smooth scrolling
+        - An adage from the start of this project was to not include scrolling, but since FlightGazer has evolved into a very comprehensive
+          flight tracking program, this feature is now justified
+          - The forward-facing creation of the 4x4 font (added in v.3.1.0) is now fully realized
+          - FlightGazer is now closer to its roots of being inspired by the original 'its-a-plane-python' project while still offering way more functionality
+        - This is essentially end-game layout for FlightGazer; at this point there will likely be no more feature add-ins for the display layouts
+    - Slightly modified existing fonts:
+        - Modified 'e', 'i', 'W', and '|' with other minor changes in 4x4 font for better readability for scrolling; 4x4 font is no longer strictly monospace
+        - Fixed some spacing issues with the alternative 3x5 font
+        - Minor tweaks to arrows in the 3x3 font
+    - When calling the API, FlightGazer also retrieves the airport names and city from the result
+    - Updated operators_generator.py to now pull data from Wikipedia to supplement friendly names for airline operators
+        - The operators.py file now has new keys to facilitate this additional information
+    - Splash screen improvements:
+        - Added neat fade animation to the top text and added a spinner as well
+        - Splash says "now updating" instead of the more generic "now loading" following an update or when checking for updates
+    - Minor tweaks to the Interactive mode printout for all the above changes
+    - The colors config file as additional color presets, along with some slight tweaks to existing presets for better readability
+    - Refactored internal CPU and memory usage monitoring
+    - Display now starts even earlier in the startup process
+    - As a processing optimization, the state file thread waits to write out once all the main threads are finished
+    - Adjusted some docstrings in the config file
+    - Updated the registration lookup module to handle more South Korean ICAO addresses
+
 v.5.1.0 - 2025-06-20
     - NEW: More selection algorithm tweaks
         - FlightGazer now has the concept of a "high priority" aircraft wherein if an aircraft is within 0.4nmi line-of-sight of your site

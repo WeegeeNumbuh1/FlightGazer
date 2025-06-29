@@ -218,13 +218,17 @@ def registration_from_hexid(hexid_input: str) -> str | None:
 
     # South Korea
     def hl_reg(hexid) -> str | None:
-        if (hexid >= 0x71BA00 and hexid <= 0x71bf99):
+        if (hexid >= 0x71BA00 and hexid <= 0x71BF99):
             return "HL" + hex(hexid - 0x71BA00 + 0x7200)[2:]
 
         if (hexid >= 0x71C000 and hexid <= 0x71C099):
             return "HL" + hex(hexid - 0x71C000 + 0x8000)[2:]
 
-        if (hexid >= 0x71C200 and hexid <= 0x71C299):
+        if ((hexid >= 0x71C200 and hexid <= 0x71C399)
+            or (hexid >= 0x71500 and hexid <= 0x71599)
+            or (hexid >= 0x71700 and hexid <= 0x71799)
+        ):
+            # note: 71C400 - 71C499 and 71C600 - 71C699 are unallocated
             return "HL" + hex(hexid - 0x71C200 + 0x8200)[2:]
 
         return None

@@ -1,0 +1,254 @@
+""" This script imports the `aircraft.csv.gz` file that's kept up-to-date from wiedehopf's `tar1090-db` repository
+(https://github.com/wiedehopf/tar1090-db/tree/csv) and converts it into a sqlite3 database.
+Additional credit goes to Mictronics (https://github.com/Mictronics) for maintaining the actual database.
+This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer)
+and is intended to be used in conjunction with FlightGazer's `FlightGazer-init.sh` script.
+If you use the generated database in your own project, please credit the original authors. """
+# by WeegeeNumbuh1
+# Last updated: June 2025
+
+import csv
+from pathlib import Path
+import sqlite3
+import gzip
+import sys
+from io import BytesIO
+import ast
+from time import perf_counter
+from datetime import datetime, timezone
+from getpass import getuser
+from platform import uname
+CURRENT_DIR = Path(__file__).resolve().parent
+OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.db")
+URL = 'https://raw.githubusercontent.com/wiedehopf/tar1090-db/csv/aircraft.csv.gz'
+TYPES_URL = "https://github.com/wiedehopf/tar1090-db/raw/refs/heads/master/db/icao_aircraft_types2.js"
+leading_icao_chars = '0123456789ABCDEF'
+
+if __name__ != '__main__':
+    print("This script cannot be imported as a module.")
+    print("Run this directly from the command line.")
+    raise sys.exit(1)
+
+try:
+    import requests
+except (ImportError, ModuleNotFoundError):
+    print("This script requires the 'requests' module.")
+    print("You can install it using 'pip install requests'.")
+    raise sys.exit(1)
+
+current_db_ver = None
+print("********** FlightGazer Aircraft Database Importer **********\n")
+if OUTPUT_FILE.exists():
+    _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}?mode=ro", uri=True)
+    _connection.row_factory = sqlite3.Row
+    _cursor = _connection.execute("SELECT * FROM DB_INFO ORDER BY ROWID ASC LIMIT 1")
+    _result = _cursor.fetchone()
+    _cursor.close()
+    _connection.close()
+    if _result is not None:
+        current_db_ver = dict(_result).get('version', 'unknown')
+    else:
+        current_db_ver = "unknown"
+    print(f"Database already exists, current version: {current_db_ver}")
+
+try:
+    get_db_ver = requests.get("https://raw.githubusercontent.com/wiedehopf/tar1090-db/refs/heads/csv/version", timeout=5)
+    get_db_ver.raise_for_status()
+    if get_db_ver.status_code == 200:
+        db_ver = get_db_ver.text.strip()
+    else:
+        db_ver = "unknown"
+        raise requests.HTTPError(f"Got status code {get_db_ver.status_code}")
+except requests.RequestException as e:
+    print(f"Failed to fetch the database version from online: {e}")
+    print(f"Unable to continue.")
+    sys.exit(1)
+
+if current_db_ver is not None:
+    print(f"Database version available online:        {db_ver}")
+    if current_db_ver == db_ver:
+        print("Database versions are the same, no need to update.")
+        print("\n***** Done. *****")
+        sys.exit(0)
+    else:
+        print("Database online is different than the one present; will update to latest data.")
+
+print("Downloading aircraft data from the tar1090-db repository...")
+download_start = perf_counter()
+try:
+    response = requests.get(URL, timeout=10)
+    download_end = (perf_counter() - download_start)
+    response.raise_for_status()
+    if response.status_code != 200:
+        print(f"Failed to download the CSV file. Status code: {response.status_code}")
+        raise sys.exit(1)
+except requests.RequestException as e:
+    print(f"Failed to download the CSV file: {e}")
+    raise sys.exit(1)
+download_size = len(response.content)
+print(f"Successfully downloaded {(download_size / (1024 * 1024)):.2f} MiB of data in {download_end:.2f} seconds.")
+
+print("Decompressing...")
+decompress_start = perf_counter()
+compressed_data = BytesIO(response.content)
+del response
+with gzip.GzipFile(fileobj=compressed_data, mode='rb') as f:
+    csv_data = f.read().decode('utf-8')
+del compressed_data
+decompress_end = (perf_counter() - decompress_start)
+csv_size = len(csv_data)
+print(f"Decompressed {(csv_size / (1024 * 1024)):.3f} MiB in {decompress_end:.2f} seconds. "
+      f"({(download_size / csv_size)*100:.1f}% ratio)")
+
+print("Loading CSV file...")
+# Read in the csv file (no header row)
+# fieldnames: ['icao', 'reg', 'type', 'flags', 'desc', 'year', 'ownop', 'blank']
+# The last field is a blank field that should be ignored (it was designed for readsb)
+read_start = perf_counter()
+parsed = []
+reader = csv.DictReader(
+    csv_data.splitlines(),
+    fieldnames=['icao', 'reg', 'type', 'flags', 'desc', 'year', 'ownop', 'blank'],
+    delimiter=';'
+    )
+try:
+    for row in reader:
+        parsed.append(row)
+    print(f"CSV file loaded in {perf_counter() - read_start:.2f} seconds with {len(parsed)} rows.")
+    del csv_data
+except csv.Error as e:
+    print(f"Failed to parse the CSV file ({e}).")
+    print(f"Unable to continue.")
+    sys.exit(1)
+
+print("Fetching aircraft types data...")
+types_data_available = False
+try:
+    types_response = requests.get(TYPES_URL, timeout=10)
+    types_response.raise_for_status()
+    if types_response.status_code != 200:
+        print(f"Failed to download the aircraft types data. Status code: {types_response.status_code}")
+        raise requests.HTTPError
+    print(f"Successfully downloaded aircraft types.")
+    types_data_available = True
+except requests.RequestException as e:
+    print(f"Failed to download the aircraft types data: {e}")
+    print("Continuing without aircraft types data.\n"
+          "This may affect the accuracy of aircraft type descriptions for some ICAO addresses.")
+if types_data_available:
+    compressed_data = BytesIO(types_response.content)
+    with gzip.GzipFile(fileobj=compressed_data, mode='rb') as f:
+        js_data = f.read().decode('utf-8')
+    js_data_cleaned = js_data.replace("\\", "") # remove escaped slashes
+    del compressed_data, types_response, js_data
+    # lucky us, the data is a valid python dict
+    newTypes = ast.literal_eval(js_data_cleaned)
+    del js_data_cleaned
+    print("Filling missing aircraft descriptions in database...")
+    fill_start = perf_counter()
+    empty_desc = 0
+    entry_updates = 0
+    for index, row in enumerate(parsed):
+        if row['type'] and not row['desc']:
+            empty_desc += 1
+            parsed[index]['desc'] = newTypes.get(row['type'], [''])[0]
+            if parsed[index]['desc']:
+                entry_updates += 1
+    print(f"Filled {entry_updates} out of {empty_desc} "
+          f"({(entry_updates / empty_desc) * 100:.1f}%) empty aircraft descriptions "
+          f"in {perf_counter() - fill_start:.2f} seconds.")
+    del newTypes
+
+print(f"Writing to \'{OUTPUT_FILE}\'...")
+date_now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+try:
+    username = getuser()
+except OSError:
+    username = "< Unknown >"
+machine = uname()
+machine_name = f"\'{machine.node}\', running {machine.system} {machine.release} [ {machine.version} on {machine.machine} ]"
+
+write_start = perf_counter()
+# Write to a sqlite database
+# Each table will be named after the first character of the ICAO code
+with sqlite3.connect(OUTPUT_FILE) as conn:
+    cursor = conn.cursor()
+    # Create a table for each leading character
+    for char in leading_icao_chars:
+        cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS ICAO_{char} (
+                icao TEXT PRIMARY KEY,
+                reg TEXT,
+                type TEXT,
+                flags INTEGER,
+                desc TEXT,
+                year INTEGER,
+                ownop TEXT
+            );
+        """)
+        # cursor.execute(f"DELETE FROM ICAO_{char}") # uncomment if you want to fully rebuild the tables
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS DB_INFO (
+            version TEXT PRIMARY KEY,
+            created_date TEXT,
+            created_by TEXT,
+            machine TEXT
+        );
+    """)
+    
+    # Insert the data into the respective tables
+    for row in parsed:
+        icao = row['icao']
+        if icao[0] in leading_icao_chars:
+            cursor.execute(f"""
+                INSERT OR REPLACE INTO ICAO_{icao[0]} (icao, reg, type, flags, desc, year, ownop)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (row['icao'], row['reg'], row['type'], row['flags'], row['desc'], row['year'], row['ownop']))
+
+    cursor.execute("DELETE FROM DB_INFO")
+    cursor.execute("""
+        INSERT INTO DB_INFO (version, created_date, created_by, machine)
+        VALUES (?, ?, ?, ?)
+        """, (db_ver, date_now, username, machine_name))
+    
+    conn.commit()
+conn.close()
+
+""" This section is left here if you're a madman and want to write the data to a python module instead of a sqlite database. """
+# header_str = """\"\"\" Importable python module of aircraft data used by tar1090/readsb.
+# Designed for the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
+# Loading in this module will increase memory usage by at least 90MB.
+# Graciously kept up to date by Mictronics and wiedehopf from: https://github.com/wiedehopf/tar1090-db/tree/csv """
+# import datetime
+# INPUT = Path(f"{CURRENT_DIR}/aircraft.csv")
+# OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.py")
+# with open(INPUT, 'r', encoding='utf-8') as csvfile:
+#     reader = csv.DictReader(csvfile,
+#                             fieldnames=['icao', 'reg', 'type', 'flags', 'desc', 'year', 'ownop', 'blank'],
+#                             delimiter=';')
+#     for row in reader:
+#         parsed.append(row)
+# with open(OUTPUT_FILE, 'w', encoding='utf-8') as pyfile:
+#     pyfile.write(header_str)
+#     pyfile.write(f"# Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+#     pyfile.write(f"\n# Total rows: {total_rows}\n\n")
+#     pyfile.write("from typing import Dict, Any\n\n")
+#     for char in leading_icao_chars:
+#         pyfile.write(f"{char}_ICAO: Dict[str, Dict[str, Any]] = {{\n")
+#         section_count = 0
+#         for row in parsed:
+#             if row['icao'].startswith(char):
+#                 # Remove the blank field
+#                 del row['blank']
+#                 # Write the ICAO code and the rest of the fields as a dict
+#                 pyfile.write(f"    '{row['icao']}': {row},\n")
+#                 section_count += 1
+#         pyfile.write(f"}} # {section_count} entries.\n\n")
+#         print(f"Wrote section '{char}_ICAO' with {section_count} entries.")
+#         # Reset the reader for the next character
+#     pyfile.write(f"\n# {total_rows} entries in total.")
+
+print(f"{(OUTPUT_FILE.stat().st_size) / (1024 * 1024):.3f} MiB of records "
+      f"written to database in {perf_counter() - write_start:.2f} seconds.")
+print("\n***** Done. *****")
+sys.exit(0)

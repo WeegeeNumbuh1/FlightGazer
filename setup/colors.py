@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.5.0.0
+VERSION: v.6.0.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -29,14 +29,15 @@ BLACK = graphics.Color(0, 0, 0)
 WARM_WHITE = graphics.Color(255, 230, 160)
 COOL_WHITE = graphics.Color(168, 196, 255)
 WHITE = graphics.Color(255, 255, 255)
-GREY = graphics.Color(192, 192, 192)
+GREY = graphics.Color(160, 160, 160)
 DARK_GREY = graphics.Color(64, 64, 64)
 FAINT = graphics.Color(30, 30, 30)
 RED = graphics.Color(255, 0, 0)
 RED_LIGHT = graphics.Color(255, 195, 195)
 RED_DARK = graphics.Color(150, 12, 12)
 ORANGE = graphics.Color(227, 110, 0)
-ORANGE_DARK = graphics.Color(113, 55, 0)
+ORANGE_DARK = graphics.Color(135, 52, 0)
+BROWN = graphics.Color(160, 75, 10)
 YELLOW_ORANGE = graphics.Color(245, 193, 7)
 YELLOW = graphics.Color(255, 255, 0)
 YELLOW_DARK = graphics.Color(128, 128, 0)
@@ -49,14 +50,16 @@ GREEN_PURE = graphics.Color(0, 255, 0)
 SEAFOAM_GREEN = graphics.Color(16, 227, 114)
 CYAN = graphics.Color(60, 245, 255)
 CYAN_DARK = graphics.Color(8, 131, 138)
-BLUE = graphics.Color(0, 72, 255)
+BLUE = graphics.Color(0, 80, 255)
 BLUE_LIGHT = graphics.Color(110, 182, 255)
-BLUE_DARK = graphics.Color(0, 30, 156)
+BLUE_DARK = graphics.Color(0, 40, 170)
 BLUE_DARKER = graphics.Color(18, 20, 105)
 BLUE_PURE = graphics.Color(0, 0, 255)
+SAKURA_PINK = graphics.Color(255, 138, 170)
 PINK = graphics.Color(200, 0, 200)
 PINK_DARK = graphics.Color(112, 0, 145)
 PURPLE = graphics.Color(68, 0, 145)
+PURPLE_LIGHT = graphics.Color(100, 32, 160)
 
 # CONFIG_START
 # ============ Clock Colors =============
@@ -94,8 +97,8 @@ destination_color = ORANGE
 arrow_color = ORANGE
 
 # journey plus colors
-time_header_color = PINK_DARK
-time_readout_color = PURPLE
+time_header_color = PURPLE
+time_readout_color = PINK_DARK
 center_readout_color = DARK_GREY
 
 # enhanced readout colors
@@ -103,6 +106,12 @@ latitude_color = ORANGE
 longitude_color = ORANGE
 groundtrack_color = PINK_DARK
 verticalspeed_color = PURPLE
+
+# scrolling info line
+# (overrides journey plus "center_readout_color" when
+# SHOW_EVEN_MORE_INFO setting is enabled)
+marquee_color_journey_plus = RED_LIGHT
+marquee_color_enhanced_readout = RED_LIGHT
 
 # stats at the bottom
 altitude_heading_color = BLUE_DARK

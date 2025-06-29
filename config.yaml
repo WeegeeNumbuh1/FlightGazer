@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.5.1.0 # do not modify this
+CONFIG_VERSION: v.6.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -25,7 +25,8 @@ RANGE: 2
 API_KEY: ''
 # [String]
 # Put your FlightAware API key here. Leave as '' to not use the API.
-# Don't have one? https://www.flightaware.com/aeroapi/signup/personal
+# Don't have one?
+# https://www.flightaware.com/commercial/aeroapi/#compare-plans-section
 
 API_DAILY_LIMIT:
 # [Integer: > 0, null, or empty]
@@ -44,13 +45,13 @@ API_COST_LIMIT: 5.00
 API_SCHEDULE:
   ENABLED: false
   SUNDAY:
-    0-11:  '------xxxxxx' # use the API from 06:00 thru 12:00
-    12-23: 'xxxxxxxxxxx-' # 12:00 thru 23:00
+    0-11:  '------xxxxxx'
+    12-23: 'xxxxxxxxxxx-'
   MONDAY:
-    0-11:  '-------xxx--' # use the API from 07:00 up to 10:00
-    12-23: '-----xxxxxx-' # 17:00 thru 23:00
+    0-11:  '-------xxx--'
+    12-23: '-----xxxxxx-'
   TUESDAY:
-    0-11:  '-------xxx--' # important: if there are leading '-', encapsulate the row with quotes
+    0-11:  '-------xxx--'
     12-23: '-----xxxxxx-'
   WEDNESDAY:
     0-11:  '-------xxx--'
@@ -63,34 +64,46 @@ API_SCHEDULE:
     12-23: '-----xxxxxx-'
   SATURDAY:
     0-11:  '------xxxxxx'
-    12-23: 'xxxxxxxxxxx-' # this is fine to leave unquoted (the updater leaves it like this)
+    12-23: 'xxxxxxxxxxx-'
 # Set a time during the day when to use the API.
 # An 'x' marks the hour when the API can be used. A '-' indicates an hour to not use the API.
 # For the ENABLED key, if this value is set to false, the API can be used at all times.
 # If any time slot is left blank, does not use exactly 12 characters, or uses characters other than
 # 'x' or '-', the API will not be used for that entire time slot.
 # Hint: use the Insert key for ease of input for this setting.
+# Other notes / examples:
+# 0-11:  '------xxxxxx' means "use the API from 06:00 thru 12:00"
+# 12-23: 'xxxxxxxxxxx-' means "use the API from 12:00 up to 23:00"
+# 0-11:  '-x--xx-xxx-x' means "use the API from 1:00-2:00, 4:00-6:00, 7:00-9:00, 11:00-12:00"
+# If the string starts with a '-', you must encapsulate it in quotes.
+# (Don't worry if quotes go missing for other time slots when upgrading FlightGazer)
 
 # ============= Screen Output settings =============
 # ==================================================
-
-ENHANCED_READOUT: false
-# [true/false]
-# If true, show more details on aircraft info screen and replaces origin and destination readout.
-# Will not use API or show an aircraft's journey (origin/destination) even if a key is provided.
-# Useful if API is not in use.
-# Additional details include aircraft coordinates, ground track, vertical rate, and RSSI.
-
-ENHANCED_READOUT_AS_FALLBACK: true
-# [true/false]
-# When true, switch to using ENHANCED_READOUT if the API Key fails at startup or when any API limits are reached.
-# This setting only works if ENHANCED_READOUT is false.
 
 JOURNEY_PLUS: false
 # [true/false]
 # A hybrid between ENHANCED_READOUT and the default aircraft info.
 # Adds aircraft track, vertical speed, and RSSI to this layout.
 # Enable this if you prefer maximizing information density.
+
+ENHANCED_READOUT: false
+# [true/false]
+# If true, show more details on aircraft info screen and replaces origin and destination readout.
+# Will not use API or show an aircraft's journey (origin/destination) even if a key is provided.
+# Useful if API is not in use.
+# Additional details include aircraft coordinates, ground track, vertical speed, and RSSI.
+
+ENHANCED_READOUT_AS_FALLBACK: true
+# [true/false]
+# When true, switch to using ENHANCED_READOUT if the API Key fails at startup or when any API limits are reached.
+# This setting only works if ENHANCED_READOUT is false. Recommended to be left as true.
+
+SHOW_EVEN_MORE_INFO: true
+# [true/false]
+# Display additional information like aircraft type and airline/owner as a scrolling marquee.
+# This option only works with the JOURNEY_PLUS or EHNANCED_READOUT display types.
+# If using JOURNEY_PLUS, this information will replace the track and vertical speed readout.
 
 CLOCK_CENTER_ROW:
   ROW1: 1
@@ -208,7 +221,7 @@ FASTER_REFRESH: false
 FLYBY_STATS_ENABLED: true
 # [true/false]
 # Save general stats of aircraft flybys and API usage to a CSV file in the directory this is stored in.
-# It is recommended to leave this left as true when the API is in use.
+# It is recommended to leave this left as true in many cases.
 # Note that if FlightGazer is restarted at some point in the day and this setting is false,
 # FlightGazer will not be able to recall the amount of aircraft tracked so far for that day before it was restarted.
 
@@ -217,7 +230,7 @@ WRITE_STATE: true
 # (Linux only) When FlightGazer is running, write a json file of its current operating state (variable values) in /run/FlightGazer/.
 # This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
 # Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
-# /run lives entirely in RAM, leading to zero disk writes. Set to false if you don't want this feature.
+# /run lives entirely in RAM, leading to zero disk writes. It is recommended to leave this enabled.
 
 # ============== RGB-Matrix settings ===============
 # ==================================================
@@ -233,4 +246,4 @@ HAT_PWM_ENABLED: true
 
 LED_PWM_BITS: 8
 # [Integer: 1 ~ 11]
-# Lower decreases color depth but increases refresh rate. Adjust to taste.
+# Lower decreases color depth but increases refresh rate. Adjust to taste. '8' works well in most cases.

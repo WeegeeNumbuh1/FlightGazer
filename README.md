@@ -4,13 +4,15 @@
     <img src="media/FlightGazer-logo.png" alt="Logo">
     </a>
     <h1 align="center">FlightGazer</h1>
-    A flight-tracking program that renders ADS-B aircraft info to an RGB-Matrix display.
+    A comprehensive flight-tracking program that renders ADS-B aircraft info to an RGB-Matrix display.
 </div>
 <!-- end title section -->
 
 ## 🚩 About
 This is a personal project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978. Uses the FlightAware API to get an aircraft's departure and destination airports.
+nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
+Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
+Uses the FlightAware API to get an aircraft's departure and destination airports.
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
@@ -50,12 +52,12 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 
 <div align="center">
 <details open>
-<summary><b>Show/Hide images</b></summary>
+<summary><b>Show/Hide images (animated gifs)</b></summary>
 
-| <div align="center"><img src="media/FG_Main.gif" alt="FlightGazer main gif"><br><i>FlightGazer is a nifty-looking flight tracking system.</i></div> |
+| <div align="center"><img src="media/FG_Main.gif" alt="FlightGazer main gif"><br><i>FlightGazer is a nifty-looking flight tracking system (and clock!).</i></div> |
 |---|
 | <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer switch gif"><br><i>Gracefully handles situations when multiple aircraft enter and leave your designated area.</i></div> |
-| <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options.</i></div> |
+| <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options<br>to show all the information you could need.</i></div> |
 | <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receiver<br>while still being able to track aircraft in your area.</i></div> |
 | <div align="center"><img src="media/FG_Splash.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> |
 | <div align="center"><b>Neat 👍</b></div> |
@@ -78,6 +80,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Shows an aircraft's callsign (or registration as fallback), distance and direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
+  - With v.6.0.0 and newer, you can see additional info like aircraft type, airline, and owner, all without needing API access
   - There are a total of 3 different layouts for aircraft info!
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
@@ -100,13 +103,13 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Colors 🌈
   - Switch between font styles
   - and more
-- Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
+- Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
   - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 
 ### Other good stuff
 - Highly optimized and fast
   - Worst case takes ~25ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
-    - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99th percentile (worldwide) ADS-B+UAT receiver at peak traffic while sending data to multiple ADS-B aggregators with MLAT
+    - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99.9th percentile (worldwide) ADS-B+UAT receiver at peak traffic while sending data to multiple ADS-B aggregators with MLAT
 - Useful and detailed console output that shows the inner workings of FlightGazer
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
@@ -118,6 +121,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Can be configured to run automatically inside `tmux`
 - Program state is available in a json file for use elsewhere
 - Robust and hard-to-break
+- Unique tools and fonts that can be used in other projects (don't forget to credit me)
 - Constant development
 - Adequate documentation
 
@@ -135,6 +139,7 @@ Using this project assumes you have the following:
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
 - The latest Python (>3.11)
+- At least 100 MB of available disk space
 - A working internet connection for setup
 - *for Linux distros:*
   - Basic knowledge of how to use `bash` or similar terminal
@@ -222,7 +227,7 @@ nano config.yaml
 Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 
 #### Tricks & Tips
-<details><summary>Configuration details for a remote dump1090 installation</summary>
+<details><summary>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</summary>
 
 Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
 Example: `http://192.168.xxx.xxx:8080`
@@ -231,7 +236,7 @@ Example: `http://192.168.xxx.xxx:8080`
 <details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
 
 `rbfeeder` and `Pi24` setups don't provide a web interface that FlightGazer can look at.<br>
-FlightGazer can only run directly on those systems (dump1090 data cannot be read remotely).<br>
+FlightGazer can only run directly on those systems and must be installed on those devices (dump1090 data cannot be read remotely).<br>
 Set `PREFER_LOCAL` to `true` so that FlightGazer can read the data from these setups.<br>
 
 If you managed to install a working web interface like `tar1090` with these setups then you're an advanced user and you already know what you're doing.<br>
@@ -279,11 +284,13 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 > [!IMPORTANT]
 > By default, the script is designed to run at boot (via systemd with `flightgazer.service`). You can check its status with:
 > ```bash
-> systemctl status flightgazer # press 'q' to exit
-> # or
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
 > # or
+> systemctl status flightgazer # press 'q' to exit
+> # or
 > less /path/to/FlightGazer/FlightGazer-log.log # read the log output, press 'q' to quit
+> # or
+> less /run/FlightGazer/current_state.json
 > # or
 > journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
@@ -293,26 +300,12 @@ However, the script and python file are also designed to run interactively in a 
 sudo /path/to/FlightGazer/FlightGazer-init.sh
 ```
 The script automatically detects that you're running interactively and will display realtime output, like so:
-<details><summary>Example output</summary>
+<details open><summary>Example output</summary>
 
-```
-===== FlightGazer v.5.0.0 Console Output ===== Time now: 2025-06-01 00:00:00 | Runtime: 98 days, 23:48:05
-Filters enabled: <60nmi, <15000ft, or 'abcdef'
-[Inside focus loop 64, next switch on loop 75, watching: 'aa3ae5']
+<img src="media/FG_ConsoleOutput.gif" alt="FlightGazer console gif">
 
-Aircraft scratchpad: {'aa3ae5', 'a10d75'}
-[012] UAL343   (US, aa3ae5) | SPD: 263.1kt @ 288.8° | ALT:  8225.0ft,  3520.0ft/min,  4.69° | DIST: NW 22.42nmi LOS 22.67nmi (4x.005, -8x.192) | RSSI:  -8.2dBFS | UNITED AIRLINES, INC. (CHICAGO, IL) - "United"
-[013] N167UD   (US, a10d75) | SPD:  58.7kt @ 283.8° | ALT:  1100.0ft,     0.0ft/min,  1.78° | DIST: E  53.28nmi LOS 53.35nmi (4x.985, -8x.078) | RSSI: -23.2dBFS (UAT) | Private/Military/Unknown
+*Note: In the above gif, FlightGazer is operating in verbose mode. When normally running, there's way less information overload.*
 
-API results for UAL343: [ ORD ] --> [ SFO ], 0h24m flight time
-
-> dump1090+dump978 response 2.617 ms | Processing 3.223 ms | Avg frame render 9.842 ms, 9.3 FPS | Last API response 349.265 ms
-> Detected 154 aircraft, 2 aircraft in range, max range: 177.2 nmi | Gain: 40.2dB, Noise: -34.6dB, Strong signals: 3.4%
-> API stats for today: 13 success, 0 fail, 0 no data, 0 cache hits | Estimated cost: $4.20
-> Total flybys today: 13 | Aircraft selections: 13
-> CPU & memory usage: 16.9% overall CPU @ 45.3°C | 7.734 MiB
-> Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.
-```
 </details>
 
 ### 🔡 Optional Behaviors
@@ -407,6 +400,7 @@ or, you may [start it manually](#️-interactive-mode).
   - ruamel.yaml
   - orjson
   - RGBMatrixEmulator
+- Downloads the `tar1090-db` aircraft database and generates a sqlite3 database that can be used by FlightGazer
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 - Runs main python script with desired flags
 
@@ -507,11 +501,6 @@ If it has been over three (3) months since it last checked, then the next time i
 **A:** Sure, just change some things in the script. Have fun. (also, just fork this project)<br>
 (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
-**Q:** What about showing other aircraft info like what airline or what kind of aircraft it is?<br>
-**A:** That requires additional API calls or another API entirely. Plus, to put all possible text would require scrolling which would complicate things further (I did not feel like I needed this info).<br>
-You can also use [Planefence](https://github.com/sdr-enthusiasts/docker-planefence) for this functionality.<br>
-Note: In Interactive mode, FlightGazer can lookup the airline based on the callsign if the `CALLSIGN_LOOKUP` setting is enabled.
-
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
 **A:** adsbdb/adsb.lol only has user reported route information for aircraft that have known origins and destinations. In my experience, these APIs cannot handle position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
 
@@ -571,7 +560,6 @@ If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `sett
 Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
-- [x] Brightness changing
 - [ ] Docker image?
 - [ ] Settings management from webpage?
 

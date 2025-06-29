@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.5.1.0
+# Version = v.6.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -18,6 +18,7 @@ FADE='\033[2m'
 CHECK_FILE=${VENVPATH}/first_run_complete
 THIS_FILE=${BASEDIR}/FlightGazer-init.sh
 LOGFILE=${BASEDIR}/FlightGazer-log.log
+DB_DOWNLOADER=${BASEDIR}/utilities/aircraft_db_fetcher.py
 INTERNET_STAT=0 # think return codes
 SKIP_CHECK=0 # 0 = do not skip dependency checks, 1 = skip
 
@@ -206,7 +207,11 @@ fi
 # start the splash screen
 # note that if this is a fresh install and the rgbmatrix software framework doesn't exist, the splash screen won't run
 if [ "$DFLAG" != "-d" ]; then
-	nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+	if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
+		nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+	else
+		nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+	fi
 fi
 
 if [ ! -f "$CHECK_FILE" ];
@@ -251,8 +256,9 @@ then
 		systemctl enable flightgazer.service 2>&1
 		systemctl status flightgazer.service
 		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
-		echo -e "${RED}    > Do not move the FlightGazer directory (${BASEDIR})! Doing so will cause the service to fail!${FADE}"
-		sleep 3s
+		echo -e "${RED}    > Do not move the FlightGazer directory (${BASEDIR})!"
+		echo -e "      Doing so will cause the service to fail!${FADE}"
+		sleep 5s
 	else
 		echo "    > Service already exists or we are running in Live/Demo mode, skipping service creation."
 	fi
@@ -273,9 +279,9 @@ then
     "browser": {
         "_comment": "For use with the browser adapter only.",
         "port": 8888,
-        "target_fps": 10,
+        "target_fps": 24,
         "fps_display": true,
-        "quality": 70,
+        "quality": 50,
         "image_border": true,
         "debug_text": false,
         "image_format": "JPEG"
@@ -341,6 +347,25 @@ if [ $SKIP_CHECK -eq 0 ]; then
 	touch $LOGFILE
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
 	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
+	# start the database updater/generator
+	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
+	if [ $INTERNET_STAT -eq 0 ] && [ -f $DB_DOWNLOADER ]; then
+		${VENVPATH}/bin/python3 ${DB_DOWNLOADER}
+		if [ $? -ne 0 ]; then
+			echo -e "${NC}${ORANGE}> Failed to generate database.${NC}"
+			echo "You can try again at a later time by running"
+			echo -e "${VENVPATH}/bin/python3 ${DB_DOWNLOADER}"
+			echo "in your console."
+		else
+			echo -e "${NC}> Success."
+			if [ -f "${BASEDIR}/utilities/database.db" ]; then
+				chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/utilities/database.db >/dev/null 2>&1
+			fi
+		fi
+	else
+		echo "> Unable to check or generate aircraft database"
+		echo "  either due to no internet or downloader script is missing."
+	fi
 fi
 
 if [ -f "$LOGFILE" ]; then

@@ -7,7 +7,7 @@
 #                        _/_/
 
 """
-A flight-tracking program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
+A comprehensive flight-tracking program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
 Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
 Uses the FlightAware API for info outside what ADS-B can provide.
 """
@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.5.1.0 --- 2025-06-20'
+VERSION: str = 'v.6.0.0 --- 2025-06-29'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -50,6 +50,7 @@ import random
 from getpass import getuser
 import socket
 import logging
+import unicodedata
 
 if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
@@ -142,7 +143,10 @@ else:
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
-CURRENT_USER = getuser()
+try:
+    CURRENT_USER = getuser()
+except OSError:
+    CURRENT_USER = "< Unknown >"
 LOGFILE = Path(f"{CURRENT_DIR}/FlightGazer-log.log")
 try: # should basically work all the time since we're running as root, but this costs nothing
     LOGFILE.touch(mode=0o777, exist_ok=True)
@@ -203,8 +207,9 @@ if LOGFILE != Path(f"{CURRENT_DIR}/FlightGazer-log.log"):
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
 # Main "constants"
-FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
 CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
+FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
+DATABASE_FILE = Path(f"{CURRENT_DIR}/utilities/database.db")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
 USER_AGENT: dict = {'User-Agent': "Wget/1.25.0"}
 """ Use Wget user-agent for our requests """
@@ -286,7 +291,7 @@ this_process = psutil.Process()
 CORE_COUNT = os.cpu_count()
 if CORE_COUNT is None: CORE_COUNT = 1
 if psutil.LINUX:
-    main_logger.debug(f"FlightGazer has been assigned to CPU{this_process.cpu_num()}")
+    main_logger.debug(f"FlightGazer has been assigned to CPU {this_process.cpu_num()}")
 
 # =========== Settings Load-in =============
 # ==========================================
@@ -353,7 +358,8 @@ API_SCHEDULE: dict = {
         '0-11':  '------xxxxxx',
         '12-23': 'xxxxxxxxxxx-',
     }
-} # new setting!
+}
+SHOW_EVEN_MORE_INFO: bool = True # new setting!
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
@@ -400,6 +406,7 @@ default_settings: dict = {
     "PREFER_LOCAL": PREFER_LOCAL,
     "WRITE_STATE": WRITE_STATE,
     "API_SCHEDULE": API_SCHEDULE,
+    "SHOW_EVEN_MORE_INFO": SHOW_EVEN_MORE_INFO,
 }
 """ Dict of default settings """
 
@@ -439,7 +446,7 @@ if not CONFIG_MISSING:
         except:
             # ensure we can always revert to default values
             globals()[f"{setting_key}"] = default_settings[setting_key]
-            main_logger.warning(f"{setting_key} missing, using default value")
+            main_logger.warning(f"{setting_key} missing or failed to parse, using default value")
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
         del setting_key
@@ -483,13 +490,16 @@ plane_latch_times: list = [
 """ Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
 focus_plane_api_results = deque([None] * 100, maxlen=100)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
-Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `Departure`, `APIAccessed`} """
+Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `APIAccessed`}.
+`OriginInfo` and `DestinationInfo` are lists in the order of [name, city] either as strings or None. """
 unique_planes_seen: list = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`, `Flyby`} """
 callsign_lookup_cache = deque([{}] * 50, maxlen=50)
 """ Cache of previously looked up callsigns.
 Refer to `operator_lookup()` for valid keys. """
+database_lookup_cache = deque([{}] * 1000, maxlen=1000)
+""" Cache of aircraft data sourced from the database. """
 selection_override: bool = False
 """ When an aircraft is within the 'high-priority' dome (0.4 nmi LOS)
 this will be set to True and override the normal `focus_plane` until it leaves this area. """
@@ -502,11 +512,12 @@ idle_data_2: dict = {'SunriseSunset': "", 'ReceiverStats': ""}
 """ Additional formatted dict for our Display driver.
 `idle_data_2` = {`SunriseSunset`, `ReceiverStats`} """
 active_data: dict = {}
-""" Formatted dict for our Display driver.
+""" Formatted dict for our Display driver. All strings unless noted.
 `active_data` = {
 `Callsign`, `Origin`, `Destination`, `FlightTime`,
 `Altitude`, `Speed`, `Distance`, `Country`,
 `Latitude`, `Longitude`, `Track`, `VertSpeed`, `RSSI`
+`AircraftInfo`, `is_UAT` (bool)
 } or {} """
 active_plane_display: bool = False
 """ Which scene to put on the display. False = clock/idle, True = active plane """
@@ -564,6 +575,8 @@ FOLLOW_THIS_AIRCRAFT_SPOTTED: bool = False
 This latches to True for the rest of the day. """
 state_json: str | None = None
 """ Path to the state file as a `Path` object. None if `export_FlightGazer_state()` thread is not running. """
+DATABASE_CONNECTED: bool = False
+""" True if the connection to the database is valid, False otherwise. """
 #--- API stuff
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
@@ -584,6 +597,8 @@ selection_events: int = 0
 """ Track amount of times the plane selector is triggered. """
 algorithm_rare_events: int = 0
 """ Count of times the rare events section of the selection algorithm is used """
+high_priority_events: int = 0
+""" Count of how many selection overrides were triggered """
 process_time2: list = [0.,0.,0.,0.]
 """ Actual debug info: [time to print last console output, format data, json deserializing, json serializing] ms """
 runtime_sizes: list = [0,0,0]
@@ -592,6 +607,11 @@ display_fps: float = 0.
 """ FPS of the display animator """
 achievement_time: str | None = None
 """ Gameing. """
+database_stats: list = [0, 0, 0, 0., 0.]
+""" Info about how the database is performing. 
+[Total queries, queries with no result, failed queries, average response time (ms), last response time (ms)] """
+resource_usage: list = [0., 0., None]
+""" [CPU (normalized) and memory usage (MiB) of this running process, along with CPU temp (None if not available)] """
 #--- watchdog control and counters
 dump1090_failures: int = 0
 """ Track amount of times we fail to read dump1090 data. """
@@ -609,7 +629,7 @@ display_failures: int = 0
 DATA_UPDATED: str = "updated-data"
 PLANE_SELECTED: str = "plane-in-range"
 PLANE_SELECTOR_DONE: str = "there-is-plane-data"
-DISPLAY_SWITCH: str = "reset-scene"
+LOOP_WORK_COMPLETE: str = "loop-done"
 END_THREADS: str = "terminate"
 KICK_DUMP1090_WATCHDOG: str = "kick-watchdog"
 
@@ -656,8 +676,9 @@ def sigterm_handler(signum, frame):
     exit_time = datetime.datetime.now()
     end_time = round(time.monotonic() - START_TIME, 3)
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
+    if DATABASE_CONNECTED: db.close()
     if state_json: state_json.unlink(missing_ok=True)
-    if USING_THREADPOOL: data_threadpool.shutdown(cancel_futures=True)
+    if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
     os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"Shutting down... "))
@@ -786,36 +807,24 @@ def get_ip() -> None:
         s.close()
     CURRENT_IP = IP
 
-def get_cpu_temp_sensor() -> str | None:
-    """ Determines what CPU temp sensor (if available) is present.
-    Modified from my other project, UNRAID Status Screen. """
-
-    if not hasattr(psutil, "sensors_temperatures"):
-        return None
-    else:
-        # check if there are any temperature sensors on the system
-        temps_test = psutil.sensors_temperatures()
-        if not temps_test:
-            return None
-
-    # probe possible temperature names
-    # generic names, then Intel, then AMD
-    probe_sensor_names = iter(['cpu_thermal', 'cpu_thermal_zone', 'coretemp', 'k10temp', 'k8temp',])
-    # try until we hit our first success
-    while True:
-        sensor_entry = next(probe_sensor_names, "nothing")
-        if sensor_entry == "nothing":
-            return None
-        try:
-            test1 = psutil.sensors_temperatures()[sensor_entry][0].current
-            return sensor_entry
-        except:
-            pass
-
 def api_limiter_reached() -> bool:
-    """ Convienence function that returns True if *any* of the API limiters (`API_daily_limit_reached`, 
+    """ Convenience function that returns True if *any* of the API limiters (`API_daily_limit_reached`, 
     `API_cost_limit_reached`, `API_schedule_triggered`) are reached. """
     return (API_daily_limit_reached or API_cost_limit_reached or API_schedule_triggered)
+
+def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
+    """ Fastest way to search a list of dictionaries for a key-value pair and extracting the dictionary.
+    Returns first result.
+    Slightly modified for better resilience in exchange for a bit of performance.
+    Source: https://stackoverflow.com/a/48958217 """
+    if not search_term: return None
+    try:
+        for dict_ in [x for x in list_of_dicts if x.get(key) == search_term]:
+            return dict_
+        else:
+            return None
+    except:
+        return None
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -1164,7 +1173,10 @@ def configuration_check() -> None:
         main_logger.info("Using the alternative font style.")
 
     if JOURNEY_PLUS:
-        main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
+        if SHOW_EVEN_MORE_INFO:
+            main_logger.info("JOURNEY_PLUS and SHOW_EVEN_MORE_INFO enabled, behold peak FlightGazer form!")
+        else:
+            main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
 
     if FASTER_REFRESH:
         main_logger.info("FASTER_REFRESH enabled, dump1090 polling rate is now 1 second.")
@@ -1178,7 +1190,7 @@ def configuration_check() -> None:
     main_logger.info("Settings check complete.")
 
 def configuration_check_api() -> None:
-    """ Check the API configuration. """
+    """ Check the API configuration. Handles `EHNANCED_READOUT` and `ENHANCED_READOUT_INIT` as well. """
     global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT, API_cost_limit_reached
     global ENHANCED_READOUT, ENHANCED_READOUT_INIT
 
@@ -1350,7 +1362,7 @@ def suntimes() -> None:
 
 def timesentinel() -> None:
     """ Thread that watches for time changes (eg: system time changes after a reboot, DST, etc).
-    Also serves as a "canary in the coal mine" for systems that are thrashing significantly."""
+    Also serves as a "canary in the coal mine" for systems that are thrashing significantly. """
     while True:
         time_now = datetime.datetime.now()
         time.sleep(1)
@@ -1358,8 +1370,76 @@ def timesentinel() -> None:
         if abs(timechange) > 5:
             main_logger.info(f"Time has been changed by {timechange:.1f} seconds. (was {time_now})")
 
+def perf_monitoring() -> None:
+    """ Monitor average CPU and memory usage for this process as a separate polling thread. """
+    global resource_usage
+
+    def get_cpu_temp_sensor() -> str | None:
+        """ Determines what CPU temp sensor (if available) is present.
+        Modified from my other project, UNRAID Status Screen. """
+
+        if not hasattr(psutil, "sensors_temperatures"):
+            return None
+        else:
+            # check if there are any temperature sensors on the system
+            temps_test = psutil.sensors_temperatures()
+            if not temps_test:
+                return None
+
+        # probe possible temperature names
+        # generic names, then Intel, then AMD
+        probe_sensor_names = iter(['cpu_thermal', 'cpu_thermal_zone', 'coretemp', 'k10temp', 'k8temp',])
+        # try until we hit our first success
+        while True:
+            sensor_entry = next(probe_sensor_names, "nothing")
+            if sensor_entry == "nothing":
+                return None
+            try:
+                test1 = psutil.sensors_temperatures()[sensor_entry][0].current
+                return sensor_entry
+            except:
+                pass
+
+    CPU_TEMP_SENSOR = get_cpu_temp_sensor()
+    if CPU_TEMP_SENSOR is not None:
+        main_logger.debug(f"CPU temperature sensor: {CPU_TEMP_SENSOR}")
+    else:
+        main_logger.debug("No CPU temperature sensor found or temp readout not supported on this system.")
+    if this_process:
+        while True:
+            if CPU_TEMP_SENSOR is not None:
+                cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
+            else:
+                cpu_temp = None
+            with this_process.oneshot():
+                current_memory_usage = round(this_process.memory_info().rss / 1048576, 3)
+                this_process_cpu = this_process.cpu_percent(interval=None) / CORE_COUNT
+            with threading.Lock():
+                resource_usage[0] = this_process_cpu
+                resource_usage[1] = current_memory_usage
+                resource_usage[2] = cpu_temp
+            time.sleep(5)
+
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
+""" ----- Thread Signaling Layout -----
+
+    main_loop_generator()
+        loop()
+          +-> dump1090_hearbeat() -> dump1090_loop() -> -+
+          +-+--<----<----<----<----<----<----<----<----<-+-> watchdog trigger
+            |                                                       |
+            v                                                       v
+    [AirplaneParser]                                        [dump1090Watchdog]
+            +----------------+------------------+
+            |                |                  |
+            v                v                  v
+      [APIFetcher]    [DisplayFeeder]    [PrintToConsole]
+                             |
+                             v
+                        [WriteState]
+
+"""
 
 def runtime_accumulators_reset() -> None:
     """ Resets `unique_planes_seen` and other daily accumulators.
@@ -1369,11 +1449,16 @@ def runtime_accumulators_reset() -> None:
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time
-    if algorithm_rare_events_now == 0:
-        main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events.")
+    daily_stats_str = []
+    daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys.")
+    if high_priority_events > 0:
+        daily_stats_str.append(f" {high_priority_events} high priority overrides occurred.")
+    daily_stats_str.append(f" {selection_events} selection events")
+    if algorithm_rare_events_now > 0:
+        daily_stats_str.append(f", of which {algorithm_rare_events_now} were rare selection events.")
     else:
-        main_logger.info(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys. {selection_events} selection events \
-(of which {algorithm_rare_events_now} were rare selection events).")
+        daily_stats_str.append(".")
+    main_logger.info(f"{''.join(daily_stats_str)}")
         
     if (
         (selection_events > 1000
@@ -1407,8 +1492,9 @@ def runtime_accumulators_reset() -> None:
         main_logger.info(f"{len(unique_planes_seen)} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
 
     if sum(api_hits) > 0: # if we used the API at all
-        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} successful API calls, of which {api_hits[2]} returned no data. \
-Estimated cost: ${estimated_api_cost:.2f}")
+        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} "
+                         f"successful API calls, of which {api_hits[2]} returned no data. "
+                         f"Estimated cost: ${estimated_api_cost:.2f}")
     
     # do the actual reset
     with threading.Lock():
@@ -1436,11 +1522,13 @@ Estimated cost: ${estimated_api_cost:.2f}")
             else:
                 cost_delta = 0.
             api_usage_cost_baseline = api_cost + cost_delta
-            main_logger.info(f"Difference between calculated (${api_usage_cost_sofar:.3f}) and actual cost: ${abs(cost_delta):.3f}")
+            main_logger.info(f"Difference between calculated (${api_usage_cost_sofar:.3f}) "
+                             f"and actual cost: ${abs(api_usage_cost_sofar - api_cost):.3f}")
             if API_COST_LIMIT is not None:
                 estimated_api_cost = 0.
                 if api_cost < API_COST_LIMIT:
-                    main_logger.info(f"${API_COST_LIMIT - api_cost:.2f} of API credit remains before reaching cost limit (${API_COST_LIMIT:.2f}).")
+                    main_logger.info(f"${API_COST_LIMIT - api_cost:.2f} of API credit "
+                                     f"remains before reaching cost limit (${API_COST_LIMIT:.2f}).")
                     if API_cost_limit_reached:
                         main_logger.info(f"There are credits available again, API will be re-enabled.")
                         API_cost_limit_reached = False
@@ -1576,6 +1664,8 @@ class PrintToConsole:
 
         if not DISPLAY_IS_VALID and not NODISPLAY_MODE:
             print(f"{red_warning}**********       Display output is unavailable.     **********{rst}")
+        elif NODISPLAY_MODE:
+            print(f"{white_highlight}**********      Console-only mode      **********{rst}")
 
         # filters status
         if DUMP1090_IS_AVAILABLE:
@@ -1601,9 +1691,9 @@ class PrintToConsole:
                 select_divisor = plane_latch_times[2]
             next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
             # algorithm state
-            if plane_count == 1:
+            if plane_count == 1 and not selection_override:
                 print(f"{fade}[Inside focus loop {focus_plane_iter}]{rst}\n")
-            elif selection_override:
+            elif selection_override and plane_count > 0:
                 print(f"{fade}[Inside focus loop {focus_plane_iter}, watching: {yellow_warning}\'{focus_plane}\'{rst} (High priority)\n")
             else:
                 print(f"{fade}[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, watching: {white_highlight}\'{focus_plane}\'{rst}\n")
@@ -1679,13 +1769,33 @@ class PrintToConsole:
                         print_info.append(f" | REG: {aircraft['Registration'].ljust(10)}")
                     else:
                         print_info.append(" | REG: Unknown   ")
-                # append operator info
-                if aircraft['Operator'] is not None:
+                # append operator info and aircraft type
+                if aircraft['Operator']:
                     print_info.append(f" | {aircraft['Operator']}")
+                    if aircraft['OperatorAKA']:
+                        print_info.append(f" (a.k.a. \'{aircraft['OperatorAKA']}\')")
                     if aircraft['Telephony']:
-                        print_info.append(f" - \"{aircraft['Telephony'].title()}\"")
+                        print_info.append(f" - \"{aircraft['Telephony']}\"")
+                    if aircraft['TrackingFlag'] != "None":
+                        print_info.append(f" ({aircraft['TrackingFlag']} aircraft)")
                 else:
-                    print_info.append(" | Private/Military/Unknown")
+                    if aircraft['Owner']:
+                        print_info.append(f" | {aircraft['Owner']}")
+                        if aircraft['TrackingFlag'] != "None":
+                            print_info.append(f" ({aircraft['TrackingFlag']} aircraft)")
+                    else:
+                        if aircraft['TrackingFlag'] == "None":
+                            print_info.append(" | Private/Unknown")
+                        elif aircraft['TrackingFlag'] == "LADD":
+                            print_info.append(" | Private (LADD aircraft)")
+                        elif aircraft['TrackingFlag'] == "Military":
+                            print_info.append(" | Military aircraft")
+                        else: # note, PIA aircraft are not handled here because they always have an Operator (callsign)
+                            print_info.append(" | Other kind of aircraft")
+                if aircraft['AircraftDesc']:
+                    print_info.append(f" | {aircraft['AircraftDesc']} (Type: {aircraft['ICAOType']})")
+                elif not aircraft['AircraftDesc'] and aircraft['ICAOType'] != "None":
+                    print_info.append(f" | Aircraft type: {aircraft['ICAOType']}")
 
                 # finally, print it all
                 print_info.append(rst)
@@ -1701,6 +1811,7 @@ class PrintToConsole:
             try:
                 if result is not None and focus_plane == result['ID']:
                     if (time.monotonic() - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
+                        api_str = []
                         api_flight = result['Flight']
                         api_orig = result['Origin']
                         if api_orig is None: api_orig = "?"
@@ -1711,9 +1822,21 @@ class PrintToConsole:
                             api_dpart_delta = strfdelta((datetime.datetime.now(datetime.timezone.utc) - api_dpart_time), "{H}h{M:02}m")
                         else:
                             api_dpart_delta = "?"
-                        print((f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: "
-                            f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
-                        )
+                        api_orig_name = result['OriginInfo'][0]
+                        api_orig_city = result['OriginInfo'][1]
+                        api_dest_name = result['DestinationInfo'][0]
+                        api_dest_city = result['DestinationInfo'][1]
+                        api_str.append(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: ")
+                        api_str.append(f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
+                        if api_orig_name is not None: # known airport reported
+                            if api_dest_name is not None:
+                                api_str.append(f" | {italic}{api_orig_name} ({api_orig_city}) to {api_dest_name} ({api_dest_city})")
+                            else: # position-only, no given destination
+                                api_str.append(f" | {italic}Departed from {api_orig_name} ({api_orig_city})")
+                            api_str.append(f"{rst}")
+                        else: # coordinate-based origin, always has a nearby city as a result
+                            api_str.append(f"{italic}First seen near {api_orig_city}{rst}")
+                        print("".join(api_str))
                         break
                     else: # don't use stale API results
                         break
@@ -1802,25 +1925,22 @@ class PrintToConsole:
                 print(f"> API daily limit ({API_DAILY_LIMIT}) reached. No more API calls for the rest of today.")
 
         # flyby stats line
+        flyby_str = []
+        flyby_str.append(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
         if VERBOSE_MODE or algorithm_rare_events > 0:
-            print((f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events} | "
-                   f"Rare events from algorithm: {algorithm_rare_events}")
-            )
-        else:
-            print(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
+            flyby_str.append(f" | Rare events from algorithm: {algorithm_rare_events}")
+        if VERBOSE_MODE:
+            flyby_str.append(f" | High-Priority events: {high_priority_events}")
+        elif not VERBOSE_MODE and high_priority_events > 0:
+            flyby_str.append(f" | High-Priority overrides: {high_priority_events}")
+        print("".join(flyby_str))
 
         # process info line
-        with this_process.oneshot():
-            current_memory_usage = round(this_process.memory_info().rss / 1048576, 3)
-            this_process_cpu = this_process.cpu_percent(interval=None) / CORE_COUNT
-        cpu_temp = None
-        if CPU_TEMP_SENSOR is not None:
-            cpu_temp = psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current
         process_str = []
-        process_str.append(f"> CPU & memory usage: {this_process_cpu:.1f}% overall CPU")
-        if cpu_temp:
-            process_str.append(f" @ {cpu_temp:.1f}°C")
-        process_str.append(f" | {current_memory_usage:.3f} MiB")
+        process_str.append(f"> CPU & memory usage: {resource_usage[0]:.1f}% overall CPU")
+        if resource_usage[2]:
+            process_str.append(f" @ {resource_usage[2]:.1f}°C")
+        process_str.append(f" | {resource_usage[1]:.3f} MiB")
         if VERBOSE_MODE:
             process_str.append(f" | Data processed since start: {(runtime_sizes[1] / 1073741824):.3f} GiB")
         print("".join(process_str))
@@ -1840,6 +1960,15 @@ class PrintToConsole:
             if WRITE_STATE:
                 json_details.append(f" | Export processing: {process_time2[3]:.3f} ms")
             print("".join(json_details))
+
+        # verbose stats line 3 (database stuff)
+        db_stuff = []
+        if VERBOSE_MODE and DATABASE_CONNECTED:
+            db_stuff.append("> Database stats since start: ")
+            db_stuff.append(f"Total queries: {database_stats[0]}, empty results: {database_stats[1]},")
+            db_stuff.append(f" errors: {database_stats[2]} | Retrieval times:")
+            db_stuff.append(f" {database_stats[3]:.3f} ms avg, {database_stats[4]:.3f} ms last")
+            print("".join(db_stuff))
 
         # error stats line(s)
         if dump1090_failures > 0:
@@ -2036,6 +2165,14 @@ def main_loop_generator() -> None:
                 aircraft_data = aircraft_data_1090
 
             return aircraft_data
+        
+        # cover the rare instance the loop tries to run again
+        # during the main cleanup process after shutting down the threadpool
+        except (RuntimeError, CF.CancelledError):
+            time.sleep(5) # should be long enough for the cleanup to complete and the main thread to exit
+            main_logger.critical("You shouldn't be able to see this. Lucky you.") # you cooked...
+            # ...if you reach this point, this isn't just well done, it's congratulations
+            raise SystemExit("FlightGazer: How are you seeing this? lmao")
 
         except Exception as e:
             main_logger.debug(f"Error fetching or decoding json ({e})", exc_info=False)
@@ -2064,10 +2201,15 @@ def main_loop_generator() -> None:
             - RSSI: Plane's average signal power in dBFS
             - Elevation: Plane's elevation angle in degrees
             - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
-            - Operator: Plane's owner (if available)
-            - Telephony: Plane's telephonic call-sign (if available)
-            - Registration: Plane's registration (if available)
-            - Priority: Value representing how "good" the data is. Closer to 0 = best
+            - Operator: Plane's associated airline (if available), defaults None
+            - Telephony: Plane's telephonic call-sign (if available), defaults None
+            - OperatorAKA: Plane's airline as more commonly known (if available), defaults None
+            - Owner: Plane's owner (usually different than Operator), defaults None
+            - ICAOType: ICAO type code for the plane (eg. A380), defaults to string "None"
+            - AircraftDesc: The type of plane (if available, includes year if available), defaults None
+            - TrackingFlag: What the plane is operating as (eg: LADD, military), represented as a string, defaults as string "None"
+            - Registration: Plane's registration (if available), defaults None
+            - Priority: Value representing how "good" the data is. Closer to 0 = best, defaults to 0
             - Source: Source of the data, either 'ADS-B' or 'UAT'
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
             - Flyby: The cardinal index of this plane we saw today (ex: 'abcdef' is the 98th plane that flew by today)
@@ -2097,7 +2239,7 @@ def main_loop_generator() -> None:
             return list(seen.values())
         
         def priority_lookup(input: str) -> int:
-            """ Map the broadcast type to a priority table """
+            """ Map the broadcast type to a priority table, returns an int. """
             broadcast_type_priority = [ # this is ordered based on the readsb docs
                 'None', # this is for compatibility reasons as not all dump1090 decoders embed a 'type'
                 'adsb_icao',
@@ -2118,6 +2260,48 @@ def main_loop_generator() -> None:
                 return broadcast_type_priority.index(input)
             except ValueError:
                 return len(broadcast_type_priority)
+            
+        def data_arbitrator(loop_packet_dict: dict, database_result: dict) -> dict:
+            """ Compares the data from database to the current data of the loop's data and
+            updates values to the database's result if applicable. Returns the loop data dictionary with these values. """
+            if loop_packet_dict['Registration'] is None and database_result['reg']:
+                loop_packet_dict['Registration'] = database_result['reg']
+            # eliminate false positive result when an aircraft has a callsign that corresponds to an airline
+            # see: comments in `operator_lookup()`
+            if loop_packet_dict['Flight'] == database_result['reg'].replace("-", ""):
+                loop_packet_dict['Operator'] = None
+                loop_packet_dict['Telephony'] = None
+            # if callsign fell back to the ICAO hex, try to replace it with the registration
+            if ((loop_packet_dict['Flight'] == database_result['icao'].lower())
+                 and database_result['reg']):
+                loop_packet_dict['Flight'] = database_result['reg']
+            if loop_packet_dict['Owner'] is None and database_result['ownop']:
+                loop_packet_dict['Owner'] = database_result['ownop']
+            if loop_packet_dict['AircraftDesc'] is None and database_result['desc']:
+                adesc = database_result['desc']
+                ayear = database_result['year']
+                if adesc and ayear:
+                    loop_packet_dict['AircraftDesc'] = f"{ayear} {adesc}"
+                else:
+                    loop_packet_dict['AircraftDesc'] = adesc
+            if loop_packet_dict['ICAOType'] == 'None' and database_result['type']:
+                    loop_packet_dict['ICAOType'] = database_result['type']
+            if database_result['flags'] != 0:
+                if database_result['flags'] == 1:
+                    loop_packet_dict['TrackingFlag'] = "LADD"
+                elif database_result['flags'] == 10:
+                    if ( # heuristic for determining if a plane is operating under PIA (the cross-checked ICAOs have '10' as their flag in the database)
+                        loop_packet_dict['ID'].startswith('a') # PIA only operates in the United States
+                        # PIA aircraft operate under one of these companies' callsigns (DCM, FFL, FWR, XAA)
+                        and loop_packet_dict['Flight'].upper().startswith(('DCM', 'FFL', 'FWR', 'XAA'))
+                    ):
+                        loop_packet_dict['TrackingFlag'] = "PIA"
+                    else:
+                        loop_packet_dict['TrackingFlag'] = "Military"
+                else:
+                    loop_packet_dict['TrackingFlag'] = "Other"
+            
+            return loop_packet_dict
 
         if dump1090_data is None: return {'Tracking': 0, 'Range': 0}, []
         total: int = 0
@@ -2166,6 +2350,9 @@ def main_loop_generator() -> None:
                         and (distance < RANGE and distance > 0)
                        )
                 ):
+                    database_data: dict
+                    if DATABASE_CONNECTED:
+                        database_data = database_lookup(hex)
                     alt = a.get('alt_geom', a.get('alt_baro'))
                     if alt is None or alt == "ground": alt = 0
                     alt = alt * altitude_multiplier
@@ -2194,15 +2381,30 @@ def main_loop_generator() -> None:
                         # Because it reads from a much more updated database, we try to use it first
                         registration = a.get('r', reg_lookup(hex))
                         # see if we can lookup who runs this plane
-                        operator_result = operator_lookup(flight)
-                        if operator_result is not None:
-                            operator = operator_result['Company']
-                            telephony = operator_result['Telephony']
+                        if (operator_result := operator_lookup(flight)) is not None:
+                            if not (operator := operator_result['Company']):
+                                operator = None
+                            if not (telephony := operator_result['Telephony']):
+                                telephony = None
+                            if not (op_friend := operator_result['FriendlyName']):
+                                op_friend = None
                         else:
-                            # try to see if the tar1090 database long type is enabled
-                            operator = a.get('ownOp', None)
+                            operator = None
                             telephony = None
-                        if flight is None or flight == "        ": # when dump1090 reports an empty callsign, it will show 8 spaces
+                            op_friend = None
+                        # if tar1090 long database is enabled, grab some of the info
+                        owner = a.get('ownOp')
+                        adesc = a.get('desc')
+                        atype = a.get('t')
+                        if not atype:
+                            atype = "None"
+                        ayear = a.get('year')
+                        if adesc and ayear:
+                            adesc = f"{ayear} {adesc}"
+                        if (flight is None
+                            or flight == "        " # when dump1090 reports an empty callsign, it's 8 spaces
+                            or (flight.strip() == "VFR" and priority_value < 4) # this usually occurs over UAT
+                            ):
                             # fallback to registration, then ICAO hex
                             if registration is not None:
                                 flight = registration
@@ -2218,8 +2420,7 @@ def main_loop_generator() -> None:
                         flyby_tracker(hex)
                         flyby = flyby_extractor(hex)
 
-                        planes.append(
-                            {
+                        loop_packet = {
                             "ID": hex,
                             "Flight": flight,
                             "Country": iso_code,
@@ -2236,6 +2437,11 @@ def main_loop_generator() -> None:
                             "SlantRange": slant_range_dist,
                             "Operator": operator,
                             "Telephony": telephony,
+                            "OperatorAKA": op_friend,
+                            "Owner": owner,
+                            "AircraftDesc": adesc,
+                            "ICAOType": atype,
+                            "TrackingFlag": "None",
                             "Registration": registration,
                             "Priority": priority_value,
                             "Source": source,
@@ -2243,7 +2449,11 @@ def main_loop_generator() -> None:
                             "Flyby": flyby,
                             "Timestamp": time.monotonic(),
                             }
-                        )
+                        
+                        if DATABASE_CONNECTED:
+                            planes.append(data_arbitrator(loop_packet, database_data))
+                        else:
+                            planes.append(loop_packet)
 
             if not NOFILTER_MODE:
                 if relevant_planes_last:
@@ -2299,13 +2509,14 @@ def main_loop_generator() -> None:
                 if DUMP1090_IS_AVAILABLE:
                     with threading.Lock():
                         if not NOFILTER_MODE and relevant_planes:
-                            relevant_planes_last = relevant_planes.copy()
+                            relevant_planes_last = relevant_planes.copy() # required for the selection algorithm
                         else: # keep `relevant_planes_last` empty otherwise
                             relevant_planes_last.clear()
                         general_stats, relevant_planes = dump1090_loop(dump1090_data)
                         sequential_failures = 0 # reset to 0 when there is data
                 process_time[1] = round((time.perf_counter() - start_time)*1000, 3)
 
+                # Wake up `AirplaneParser` to continue the work chain
                 dispatcher.send(message='', signal=DATA_UPDATED, sender=main_loop_generator)
 
                 """ Our main loop polling time with adjustment based on how long it took to do the work
@@ -2382,7 +2593,7 @@ class AirplaneParser:
     def plane_selector(self, message):
         """ Select a plane! """
         global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
-        global process_time, selection_events, algorithm_rare_events, selection_override
+        global process_time, selection_events, algorithm_rare_events, selection_override, high_priority_events
         start_time = time.perf_counter()
         with threading.Lock():
             relevant_planes_local_copy = relevant_planes.copy()
@@ -2441,7 +2652,7 @@ class AirplaneParser:
                     if (plane['ID'] not in focus_plane_ids_discard
                         and plane['ApproachRate'] != 0 # skip any plane that has an undetermined speed or just entered the area
                         ):
-                            return plane['ID'] # first result
+                        return plane['ID'] # first result
                 else:
                     # if we can't find a plane with a non-zero approach rate, just return a random one
                     return random.choice(list(available_ids))
@@ -2477,7 +2688,10 @@ class AirplaneParser:
                     for entry in relevant_planes_local_copy:
                         get_plane_list.append(entry['ID']) # current planes in this loop
                         focus_plane_ids_scratch.add(entry['ID']) # add the above to the global list (rebuilds each loop)
-                        if entry['SlantRange'] <= high_priority_dome and entry['Altitude'] != 0: # there is a plane inside this dome
+                        if (entry['SlantRange'] <= high_priority_dome
+                            and entry['SlantRange'] > 0
+                            and entry['Altitude'] != 0
+                            ): # there is a plane inside this dome
                             override_plane = True # no need for an else statement, `override_plane` is reset to False every loop
                         if (FOLLOW_THIS_AIRCRAFT
                             and not FOLLOW_THIS_AIRCRAFT_SPOTTED
@@ -2547,13 +2761,25 @@ class AirplaneParser:
                             focus_plane_stats = entry
                             selection_override = override_plane
                             break
+                    else:
+                        main_logger.error("Failed to extract aircraft info!")
+                        
                 self._last_plane_count = plane_count
                 if override_plane != override_init:
                     if not override_init:
-                        main_logger.debug("High priority aircraft override triggered."
-                                        f" Focus shifted to \'{focus_plane_stats['Flight']}\' ({focus_plane})")
+                        if VERBOSE_MODE:
+                            main_logger.debug("High-priority aircraft flyby triggered by"
+                                            f" \'{focus_plane_stats['Flight']}\' ({focus_plane})")
+                            high_priority_events += 1
+                        elif plane_count > 1:
+                            main_logger.info("High-priority aircraft override triggered by"
+                                            f" \'{focus_plane_stats['Flight']}\' ({focus_plane})")
+                            high_priority_events += 1
                     else:
-                        main_logger.debug("High priority aircraft override event completed.")
+                        if VERBOSE_MODE:
+                            main_logger.debug("High-priority aircraft override event completed.")
+                        else:
+                            main_logger.info("High-priority aircraft override event completed.")
 
                 # if this thread changed the focus plane, fire up the API fetcher
                 if focus_plane_i != focus_plane and focus_plane:
@@ -2597,6 +2823,11 @@ class APIFetcher:
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_loop()
+
+    def strip_accents(self, s: str) -> str:
+        """ https://stackoverflow.com/a/518232 """
+        return ''.join(c for c in unicodedata.normalize('NFD', s)
+                        if unicodedata.category(c) != 'Mn')
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
@@ -2681,6 +2912,11 @@ class APIFetcher:
             origin: str | None = None
             destination: str | None = None
             depart_iso: str | None = None
+            origin_city: str | None = None
+            origin_name: str | None = None
+            destination_city: str | None = None
+            destination_name: str | None = None
+
             start_time = time.perf_counter()
             response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
             process_time[2] = round((time.perf_counter() - start_time)*1000, 3)
@@ -2693,19 +2929,33 @@ class APIFetcher:
                     main_logger.debug(f"API call for \'{flight_id}\' successful. Took {process_time[2]}ms")
                     for flight in response_json['flights']:
                         if "En Route" in flight.get('status', ''): # check we're reading current flight information
-                            # we optimally want the 3 letter airport codes
-                            # cascade through these keys until we have something
-                            origin = flight['origin'].get('code_lid')
-                            if origin is None:
-                                origin = flight['origin'].get('code_iata')
-                            if origin is None:
-                                origin = flight['origin'].get('code')
+                            if flight['origin']:
+                                # we optimally want the 3 letter airport codes
+                                # cascade through these keys until we have something
+                                origin = flight['origin'].get('code_lid')
+                                if origin is None:
+                                    origin = flight['origin'].get('code_iata')
+                                if origin is None:
+                                    origin = flight['origin'].get('code')
+                                # airport name, not always present if coordinate-based origin
+                                if (_origin_name := flight['origin'].get('name')):
+                                    origin_name = self.strip_accents(_origin_name)
+                                    # origin city, always present even with coordinate-based origin
+                                if (_origin_city := flight['origin'].get('city')):
+                                    origin_city = self.strip_accents(_origin_city)
 
-                            destination = flight['destination'].get('code_lid')
-                            if destination is None:
-                                destination = flight['destination'].get('code_iata')
-                            if destination is None:
-                                destination = flight['destination'].get('code')
+                            # with position-only flights, the `destination` key will be None
+                            if flight['destination']:
+                                destination = flight['destination'].get('code_lid')
+                                if destination is None:
+                                    destination = flight['destination'].get('code_iata')
+                                if destination is None:
+                                    destination = flight['destination'].get('code')
+                                
+                                if (_destination_name := flight['destination'].get('name')):
+                                    destination_name = self.strip_accents(_destination_name)
+                                if (_destination_city := flight['destination'].get('city')):
+                                    destination_city = self.strip_accents(_destination_city)
 
                             depart_iso = flight.get('actual_off')
                             if depart_iso is None:
@@ -2726,7 +2976,7 @@ class APIFetcher:
             # special case when the API returns a coordinate instead of an airport
             # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
             if origin is not None and origin.startswith("L "):
-                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}) for \'{flight_id}\'.")
+                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}, near {origin_city}) for \'{flight_id}\'.")
                 orig_coord = origin[2:].split(" ")
                 lat = float(orig_coord[0])
                 lon = float(orig_coord[1])
@@ -2744,6 +2994,8 @@ class APIFetcher:
                 'Flight': flight_id,
                 'Origin': origin,
                 'Destination': destination,
+                'OriginInfo': [origin_name, origin_city],
+                'DestinationInfo': [destination_name, destination_city],
                 'Departure': departure_time,
                 'APIAccessed': time.monotonic()
                 }
@@ -2779,7 +3031,7 @@ class DisplayFeeder:
         `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime',
                           'Altitude', 'Speed', 'Distance', 'Country',
                           'Latitude', 'Longitude', 'Track', 'VertSpeed', 'RSSI',
-                          'is_UAT'}
+                          'AircraftInfo', 'is_UAT'}
                        or {}.
         All values are formatted as strings, except for `is_UAT` which is a boolean. """
         global idle_data, idle_data_2, active_data, active_plane_display
@@ -2789,16 +3041,11 @@ class DisplayFeeder:
 
         def track_arrow(trk: int | float) -> str:
             """ Same routine as `main_loop_generator.relative_direction()`, just spits out arrows this time.
-            (This runs under the assumption we're using the `fonts.smallest` or `fonts.microscopic` fonts;
-            don't use with other fonts!) """
+            (This runs under the assumption we're using the `fonts.extrasmall`, `fonts.smallest`, or
+            `fonts.microscopic` fonts; don't use with other fonts!) """
             dirs = ['▲', '◥', '▶', '◢', '▼', '◣', '◀', '◤']
             ix = round(trk / (360. / len(dirs)))
             return dirs[ix % len(dirs)]
-
-        if active_data: # check if active_data exists and do a comparison after we're done
-            active_data_i = True
-        else:
-            active_data_i = False
 
         # idle_stats
         total_flybys = "0"
@@ -2853,14 +3100,12 @@ class DisplayFeeder:
                 sunrise = sunset_sunrise['Sunrise'].strftime("%H:%M")
                 sunset = sunset_sunrise['Sunset'].strftime("%H:%M")
             else:
-                sunrise_1 = sunset_sunrise['Sunrise'].strftime("%I:%M%p")
-                sunset_1 = sunset_sunrise['Sunset'].strftime("%I:%M%p")
                 # end goal example: 06:00AM -> 6:00a
-                if sunrise_1.startswith("0"):
+                if (sunrise_1 := sunset_sunrise['Sunrise'].strftime("%I:%M%p")).startswith("0"):
                     sunrise = sunrise_1[1:-2] + sunrise_1[-2].lower()
                 else:
                     sunrise = sunrise_1[:-2] + sunrise_1[-2].lower()
-                if sunset_1.startswith("0"):
+                if (sunset_1 := sunset_sunrise['Sunset'].strftime("%I:%M%p")).startswith("0"):
                     sunset = sunset_1[1:-2] + sunset_1[-2].lower()
                 else:  
                     sunset = sunset_1[:-2] + sunset_1[-2].lower()
@@ -2930,7 +3175,9 @@ class DisplayFeeder:
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
             if rlat is not None and rlon is not None:
-                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 9.95:
+                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 0.095:
+                    dist = f"{focus_plane_stats['Distance']:.2f}"[1:]
+                elif focus_plane_stats['Distance'] >= 0.095 and focus_plane_stats['Distance'] < 9.95:
                     dist = f"{focus_plane_stats['Distance']:.1f}"
                 elif focus_plane_stats['Distance'] >= 9.95 and focus_plane_stats['Distance'] < 99.5:
                     dist = f"{focus_plane_stats['Distance']:.0f}"
@@ -2943,14 +3190,16 @@ class DisplayFeeder:
             else:
                 distance = "-----"
             # do our coordinate formatting
-            lat_i = focus_plane_stats['Latitude']
-            lon_i = focus_plane_stats['Longitude']
-            if lat_i >= 0: lat_str = "N"
-            elif lat_i <0: lat_str = "S"
-            if lon_i >= 0: lon_str = "E"
-            elif lon_i <0: lon_str = "W"
-            lat = "{0:.3f}".format(abs(lat_i)) + lat_str
-            lon = "{0:.3f}".format(abs(lon_i)) + lon_str
+            if (lat_i := focus_plane_stats['Latitude']) >= 0:
+                lat_str = "N"
+            elif lat_i < 0:
+                lat_str = "S"
+            if (lon_i := focus_plane_stats['Longitude']) >= 0:
+                lon_str = "E"
+            elif lon_i < 0:
+                lon_str = "W"
+            lat = f"{abs(lat_i):.3f}{lat_str}"
+            lon = f"{abs(lon_i):.3f}{lon_str}"
             # track indicator
             trkstr = ['T']
             trkstr.append(track_arrow(focus_plane_stats['Track']))
@@ -2970,10 +3219,15 @@ class DisplayFeeder:
             vs = "V" + vs_str
             rssi = f"{focus_plane_stats['RSSI']}"
 
-            # get us our API results from focus_plane_api_results
+            # Get us our API results from focus_plane_api_results
+            # If there's no matching API result, we just use the below initialized values
             api_orig = filler_text
             api_dest = filler_text
             api_dpart_delta = filler_text
+            api_orig_name = None
+            api_orig_city = None
+            api_dest_name = None
+            api_dest_city = None
             for result in reversed(focus_plane_api_results):
                 try:
                     if result is not None and focus_plane == result['ID']:
@@ -2987,6 +3241,10 @@ class DisplayFeeder:
                                 api_dpart_delta = strfdelta((datetime.datetime.now(datetime.timezone.utc) - api_dpart_time), "{H}h{M:02}m")
                             else:
                                 api_dpart_delta = filler_text
+                            api_orig_name = result['OriginInfo'][0]
+                            api_orig_city = result['OriginInfo'][1]
+                            api_dest_name = result['DestinationInfo'][0]
+                            api_dest_city = result['DestinationInfo'][1]
                             break
                         else: # don't use stale API results
                             break
@@ -2994,6 +3252,73 @@ class DisplayFeeder:
                         break
                 except: # if we bump something else
                     break
+
+            # Get all the other info from the focus plane provided by the database (if available)
+            # Example outputs:
+            # "2025 BOEING 787-8 Dreamliner | United Airlines"
+            # "1998 CESSNA T182 Turbo Skylane | DOE JOHN"
+            # "2024 BELL 429 GlobalRanger (LADD aircraft) | CITY OF CHICAGO DEPARTMENT OF POLICE"
+            # "BOEING-VERTOL CH-47 Chinook (Military aircraft) | AIR MOBILITY COMMAND (AMC)"
+            # "BOEING KC-135R/T Stratotanker (Military aircraft)"
+            # "FlightAware (PIA aircraft)"
+            aircraft_str_ = []
+            if focus_plane_stats['AircraftDesc']:
+                aircraft_str_.append(focus_plane_stats['AircraftDesc'])
+            elif focus_plane_stats['ICAOType'] != "None":
+                aircraft_str_.append(f"Aircraft type: {focus_plane_stats['ICAOType']}")
+            if (part1 := "".join(aircraft_str_)): # if any of the above proved true
+                if focus_plane_stats['TrackingFlag'] != "None":
+                    # recall: PIA aircraft will not have an aircraft description and will never show up here
+                    aircraft_str_.append(f" ({focus_plane_stats['TrackingFlag']} aircraft)")
+            if focus_plane_stats['Operator']: # airline
+                if part1: aircraft_str_.append(" | ")
+                if focus_plane_stats['OperatorAKA']:
+                    aircraft_str_.append(f"{focus_plane_stats['OperatorAKA']}")
+                else:
+                    if len(focus_plane_stats['Operator']) <= 60:
+                        aircraft_str_.append(f"{focus_plane_stats['Operator']}")
+                    else: # cut-off really long names
+                        aircraft_str_.append(f"{focus_plane_stats['Operator'][:60]}")
+                        aircraft_str_.append("...")
+                if focus_plane_stats['TrackingFlag'] != "None" and not part1:
+                    aircraft_str_.append(f" ({focus_plane_stats['TrackingFlag']} aircraft)")
+            else: # use the owner
+                if focus_plane_stats['Owner']:
+                    if part1: aircraft_str_.append(" | ")
+                    if len(focus_plane_stats['Owner']) <= 60:
+                        aircraft_str_.append(f"{focus_plane_stats['Owner']}")
+                    else:
+                        aircraft_str_.append(f"{focus_plane_stats['Owner'][:60]}")
+                        aircraft_str_.append("...")
+                    if focus_plane_stats['TrackingFlag'] != "None" and not part1:
+                        aircraft_str_.append(f" ({focus_plane_stats['TrackingFlag']} aircraft)")
+                else: # no aircraft details nor owner/operator available
+                    pass # don't do anything
+
+            # Generate more detailed journey detail
+            # Examples:
+            # "San Francisco to Singapore (San Francisco Intl to Singapore Changi)"
+            # "Departed from Hollywood Burbank Airport (Burbank)"
+            # "First seen near Broadus"
+            journey_str = ""
+            if api_orig_name and api_dest_name:
+                journey_str = (f"{api_orig_city} to {api_dest_city} "
+                               f"({api_orig_name} to {api_dest_name})")
+            elif api_orig_name and not api_dest_name: # position-only flight
+                journey_str = f"Departed from {api_orig_name} ({api_orig_city})"
+            elif api_orig_city and not api_orig_name: # instance where an origin airport is unknown
+                journey_str = f"First seen near {api_orig_city}"
+
+            # Finally, concatenate it all
+            aircraft_str = ""
+            if (aircraft_deets := "".join(aircraft_str_)) and journey_str:
+                aircraft_str = aircraft_deets + " --- " + journey_str
+            elif not aircraft_deets and journey_str:
+                aircraft_str = journey_str
+            elif aircraft_deets and not journey_str:
+                aircraft_str = aircraft_deets
+            else:
+                aircraft_str = "NO ADD'L INFO"
 
             active_stats = {
                 'Callsign': flight_name,
@@ -3009,6 +3334,7 @@ class DisplayFeeder:
                 'Track': track,
                 'VertSpeed': vs,
                 'RSSI': rssi,
+                'AircraftInfo': aircraft_str,
                 'is_UAT': True if focus_plane_stats['Source'] == 'UAT' else False,
             }
         with threading.Lock():
@@ -3017,9 +3343,6 @@ class DisplayFeeder:
                 else: active_plane_display = False
             else:
                 active_plane_display = False
-
-            if (active_stats == {}) != active_data_i:
-                dispatcher.send(message='', signal=DISPLAY_SWITCH, sender=DisplayFeeder.data_packet) # as of now this isn't in use
 
             idle_data = idle_stats
             active_data = active_stats
@@ -3046,6 +3369,8 @@ class DisplayFeeder:
         if 'enhanced_readout_wait_condition' in globals():
             with enhanced_readout_wait_condition: # tell the API Fetcher this thread is done
                 enhanced_readout_wait_condition.notify()
+        
+        dispatcher.send(message='', signal=LOOP_WORK_COMPLETE, sender=DisplayFeeder.data_packet)
 
     def run_loop(self):
         def keep_alive():
@@ -3143,7 +3468,7 @@ def brightness_controller() -> None:
         if current_brightness != brightness_now:
             main_logger.debug(f"Brightness changed from {brightness_now} to {current_brightness}")
 
-        time.sleep(10)
+        time.sleep(5)
 
 def display_FPS_counter(display_instance) -> None:
     """ Poll the performance of the display animator (and other attributes). (Needs to run in its own thread) """
@@ -3166,40 +3491,59 @@ def display_FPS_counter(display_instance) -> None:
                 write_out()
                 return
         else:
-            main_logger.debug("Display is no longer valid. (Did it crash?). Stopping polling thread.")
+            main_logger.info("Display is no longer valid. (Did it crash?). Stopping polling thread.")
             write_out()
             return
 
         write_out()
         time.sleep(1)
 
-def export_FlightGazer_state() -> None:
+class WriteState:
     """ Write to a json in `/run/FlightGazer` every `LOOP_INTERVAL` that dumps almost
     all the values stored in the globals. Essentially what `print_to_console()` does but now
-    accessible outside of FlightGazer. Could be useful for other programs. (needs to run in its own thread) """
-    global process_time2, state_json
-    stats_dir = Path("/run/FlightGazer")
-    # stats_dir = CURRENT_DIR # debug on Windows and comment out the OS check block below
-    json_file = Path(f"{stats_dir}/current_state.json")
-    if not os.name == 'posix' or not Path('/run').exists():
-        main_logger.info("FlightGazer state will not be written. (Not running on Linux or /run does not exist.)")
-        return
-    if not stats_dir.exists():
-        try:
-            stats_dir.mkdir(parents=True, exist_ok=True)
-            main_logger.debug(f"Creating directory {stats_dir} for FlightGazer state.")
-        except:
-            main_logger.warning(f"Could not create directory {stats_dir} for FlightGazer state.")
-            return
-    if not json_file.exists():
-        try:
-            json_file.touch(exist_ok=True)
-        except:
-            main_logger.warning(f"Could not create file {json_file} for FlightGazer state.")
-            return
+    accessible outside of FlightGazer. Could be useful for other programs. Runs when all data processing threads 
+    are done working as to not interrupt their processing. """
 
-    state_json = json_file
-    while True:
+    def __init__(self):
+        global state_json
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        register_signal_handler(self.loop, self.export_FlightGazer_state, signal=LOOP_WORK_COMPLETE, sender=DisplayFeeder.data_packet)
+        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self.run_dir = Path("/run/FlightGazer")
+        self.can_run_flag: bool = True
+        # self.run_dir = CURRENT_DIR # debug on Windows and comment out the OS check block below
+        self.json_file = Path(f"{self.run_dir}/current_state.json")
+        if (
+            not WRITE_STATE
+            or not os.name == 'posix'
+            or not Path('/run').exists()
+        ):
+            main_logger.info("FlightGazer state will not be written. (Not running on Linux or /run does not exist.)")
+            self.can_run_flag = False
+            return
+        if not self.run_dir.exists():
+            try:
+                self.run_dir.mkdir(parents=True, exist_ok=True)
+                main_logger.debug(f"Creating directory {self.run_dir} for FlightGazer state.")
+            except:
+                main_logger.warning(f"Could not create directory {self.run_dir} for FlightGazer state.")
+                self.can_run_flag = False
+                return
+        if not self.json_file.exists():
+            try:
+                self.json_file.touch(exist_ok=True)
+            except:
+                main_logger.warning(f"Could not create file {self.json_file} for FlightGazer state.")
+                self.can_run_flag = False
+                return
+
+        state_json = self.json_file
+        self.run_loop()
+
+    def export_FlightGazer_state(self, message) -> None:
+        global process_time2
+        if not self.can_run_flag: return
         try:
             export_start = time.perf_counter()
             time_now = datetime.datetime.now()
@@ -3251,6 +3595,7 @@ def export_FlightGazer_state() -> None:
                 'last_unique_plane': unique_planes_seen[-1] if unique_planes_seen else None,
                 'aircraft_selections': selection_events,
                 'rare_selection_events': algorithm_rare_events,
+                'high_priority_events': high_priority_events,
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
                 'focus_plane_ids_discard': list(focus_plane_ids_discard),
@@ -3278,14 +3623,23 @@ def export_FlightGazer_state() -> None:
                 'last_api_result': focus_plane_api_results[-1],
             }
 
+            database_info = {
+                'database_connected': DATABASE_CONNECTED,
+                'total_queries': database_stats[0],
+                'empty_results': database_stats[1],
+                'errors': database_stats[2],
+                'average_response_times_ms': round(database_stats[3], 3),
+                'last_response_time_ms': round(database_stats[4], 3)
+            }
+
             display_status = {
                 'no_display_mode': NODISPLAY_MODE,
                 'display_is_valid': DISPLAY_IS_VALID,
                 'driver': None if not DISPLAY_IS_VALID else ('rgbmatrix' if not EMULATE_DISPLAY else 'RGBMatrixEmulator'),
-                'current_mode': None if not DISPLAY_IS_VALID else ('active (plane display)' if active_plane_display else 'idle (clock)'),
                 'journey_plus_enabled': JOURNEY_PLUS,
                 'enhanced_readout_enabled': ENHANCED_READOUT,
                 'enhanced_readout_fallback_running': True if (ENHANCED_READOUT != ENHANCED_READOUT_INIT) else False,
+                'show_even_more_info': SHOW_EVEN_MORE_INFO,
                 'display_formatting_time_ms': process_time2[1],
                 'fps': display_fps,
                 'render_time_ms': process_time[3],
@@ -3293,6 +3647,8 @@ def export_FlightGazer_state() -> None:
                                       (active_plane_display and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None)
                                       else current_brightness 
                                       ) if DISPLAY_IS_VALID else None,
+                'current_mode': None if not DISPLAY_IS_VALID else ('active (plane display)' if active_plane_display else 'idle (clock)'),
+                'data_for_screen': None if not DISPLAY_IS_VALID else (active_data if active_plane_display else idle_data),
             }
 
             runtime_status = {
@@ -3309,9 +3665,9 @@ def export_FlightGazer_state() -> None:
                 'really_active_adsb_site': really_active_adsb_site,
                 'really_really_active_adsb_site': really_really_active_adsb_site,
                 'display_failures': None if NODISPLAY_MODE else display_failures,
-                'cpu_percent': round(this_process.cpu_percent(interval=None) / CORE_COUNT, 3),
-                'cpu_temp_C': round(psutil.sensors_temperatures()[CPU_TEMP_SENSOR][0].current, 1) if CPU_TEMP_SENSOR else None,
-                'memory_MiB': round(this_process.memory_info().rss / 1048576, 3),
+                'cpu_percent': resource_usage[0],
+                'cpu_temp_C': resource_usage[2],
+                'memory_MiB': resource_usage[1],
                 'pid': this_process.pid,
             }
 
@@ -3321,11 +3677,12 @@ def export_FlightGazer_state() -> None:
                 'receivers': receivers,
                 'plane_stats': plane_stats,
                 'api_stats': api_stats,
+                'database_stats': database_info,
                 'display_status': display_status,
                 'runtime_status': runtime_status,
             }
 
-            with open(json_file, 'w') as f:
+            with open(self.json_file, 'w') as f:
                 if ORJSON_IMPORTED:
                     f.write(orjson.dumps(output, option=orjson.OPT_INDENT_2).decode())
                 else:
@@ -3333,31 +3690,29 @@ def export_FlightGazer_state() -> None:
             process_time2[3] = round((time.perf_counter() - export_start) * 1000, 3)
 
         except Exception as e:
-            main_logger.error(f"Could not write to {json_file}. Error: {e}", exc_info=True, stack_info=True, stacklevel=100)
+            main_logger.error(f"Could not write to {self.json_file}. Error: {e}", exc_info=True)
             main_logger.error("Writing state to json has stopped.")
+            process_time2[3] = 0.
+            self.json_file.unlink(missing_ok=True)
+            self.can_run_flag = False
             return
+        
+    def run_loop(self):
+        def keep_alive():
+            self.loop.call_later(1, keep_alive)
+        keep_alive()
+        self.loop.run_forever()
 
-        time.sleep(LOOP_INTERVAL)
+    def end_thread(self, message):
+        self.loop.stop()
 
 def operator_lookup(callsign: str) -> dict | None:
     """ Lookup the operator of a given callsign from our database. This will try to look at the cache first
     from `callsign_lookup_cache` and then the lookup tables in `operators.py`. If there is a match, this function will
     store the result in the cache for faster lookup, as it is expected this function will be called for each active plane inside
     the given RANGE and at every `LOOP_INTERVAL`. Worst case scenario is when `NO_FILTER` is enabled + very active ADS-B site (~300 planes).
-    Dictionary keys are `3Ltr`, `Company`, `Country`, and `Telephony`. """
+    Dictionary keys are `3Ltr`, `Company`, `Country`, `Telephony`, `FriendlyName` and `Comments`. """
     global callsign_lookup_cache
-
-    def search(list_of_dicts: list, key: str, search_term: str) -> dict | None:
-        # fastest way to search a list of dictionaries for a key-value pair, and extracting the dictionary
-        # slightly modified for better resilience in exchange for a bit of performance
-        # https://stackoverflow.com/a/48958217
-        try:
-            for dict_ in [x for x in list_of_dicts if x.get(key) == search_term]:
-                return dict_
-            else:
-                return None
-        except:
-            return None
 
     def lookup(input: str) -> dict | None:
         # pre-filtering to minimize lookups (note this shouldn't be given an ICAO hex)
@@ -3371,18 +3726,19 @@ def operator_lookup(callsign: str) -> dict | None:
             return None
         if input[:4].isalpha(): # if the first 4 characters are letters, this is likely a vanity callsign or military callsign
             return None
-        test_str = input[:3].upper()
-        if not test_str.isalpha():
+        if not (test_str := input[:3].upper()).isalpha():
             return None
 
-        result: dict = {}
         # check our cache first
-        result = search(callsign_lookup_cache, '3Ltr', test_str)
-        if result is not None:
+        if (result := dict_lookup(callsign_lookup_cache, '3Ltr', test_str)) is not None:
             return result
         else:
             # the way operators.py is structured allows us to implement a trie
-            result = search(getattr(op, f'{test_str[0]}_TABLE'), '3Ltr', test_str)
+            try:
+                result = dict_lookup(getattr(op, f'{test_str[0]}_TABLE'), '3Ltr', test_str)
+            except AttributeError:
+                main_logger.debug(f"Attempt to look up a non-valid input: \'{input}\' evaluated as \'{test_str}\'")
+                return None
             if result is not None:
                 callsign_lookup_cache.appendleft(result)
             return result
@@ -3390,6 +3746,44 @@ def operator_lookup(callsign: str) -> dict | None:
         return None
 
     return lookup(callsign)
+
+def database_lookup(input: str) -> dict:
+    """ Functions exactly like `operator_lookup` but with tweaks to handle the database output.
+    Given an input ICAO hex, looks at the `database_lookup_cache` first, then uses the database module
+    to get a result and appends the result to the cache. Always returns a valid dictionary. """
+    global database_lookup_cache, database_stats
+
+    def lookup(icao: str) -> dict:
+        default = {'icao': icao.upper(),
+                    'reg': '',
+                    'type': '',
+                    'flags': 0, # 0 basically means 'none'
+                    'desc': '',
+                    'year': '',
+                    'ownop': ''
+                    }
+        if icao.startswith('~'):
+            return default
+        if (result := dict_lookup(database_lookup_cache, 'icao', icao.upper())) is not None:
+            return result
+        else:
+            error_check_init = db.query_errors
+            result = db.fetch(icao) # note: no need to use `.upper()` as that's handled by `fetch()` internally
+            error_check = db.query_errors
+            if result is None: # always return a valid dict of the same structure
+                result = default
+            if error_check_init == error_check:
+                # database query was successful, but found nothing for the provided icao
+                # thus, it is safe to append to the cache.
+                # If the query errored out, the result from the query is meaningless
+                database_lookup_cache.appendleft(result)
+            database_stats[0] = db.queries
+            database_stats[1] = db.query_misses
+            database_stats[2] = error_check
+            database_stats[3] = db.average_speed
+            database_stats[4] = db.last_access_speed
+        return result
+    return lookup(input)
 
 def API_Scheduler() -> None:
     """ Thread that compares the current time to `API_SCHEDULE`. Controls the `API_schedule_triggered` global.
@@ -3521,7 +3915,7 @@ class Display(
         options.disable_hardware_pulsing = False if HAT_PWM_ENABLED else True
         # setting the next option to True affects our ability to write to our stats file if set and present
         # this bug took awhile to figure out, lmao
-        options.drop_privileges = False if flyby_stats_present else True
+        options.drop_privileges = False if (flyby_stats_present or WRITE_STATE) else True
         self.matrix = RGBMatrix(options=options)
 
         # Setup canvas
@@ -3572,6 +3966,12 @@ class Display(
         self._callsign_blinker_cache = None
         self._callsign_blinker_cache_last = None
         self._callsign_frame_decrement = None
+        # marquee control
+        self._last_hexID = None
+        self._last_marquee_str = None
+        self._last_marquee_pos = None
+        self._marquee_pos = 1
+        self._marquee_init_decrement = None
         # switch between ENHANCED_READOUT and normal readout
         self._enhanced_readout_last = ENHANCED_READOUT_INIT
 
@@ -3585,13 +3985,14 @@ class Display(
         self.itbroke_count = 0
 
     # Control display "responsiveness" (how often each function should update, in frames)
-    refresh_speed = math.ceil(frames.PER_SECOND * 0.1)
+    base_refresh_speed = 1 # math.ceil(frames.PER_SECOND * 0.1)
 
     def draw_square(self, x0:int, y0:int, x1:int, y1:int, color):
         for x in range(x0, x1):
             _ = graphics.DrawLine(self.canvas, x, y0, x, y1, color)
 
     def reinit(self):
+        """ Note: this does not reset all attributes """
         self._last_time = None
         self._last_date = None
         self._last_day = None
@@ -3644,7 +4045,7 @@ class Display(
         return True
 
     """ Blink the callsign upon plane change or if active plane display starts """
-    @Animator.KeyFrame.add(1)
+    @Animator.KeyFrame.add(1) # animation is tied to the refresh rate
     def b_callsign_blinker(self, count):
         half_cycle_time: float = 0.5 # in seconds
         frame_count_per_sec = frames.PER_SECOND
@@ -3657,16 +4058,18 @@ class Display(
             self._callsign_frame_decrement = frame_decrement_init
             self._callsign_is_blanked = False
 
-        if self._callsign_frame_decrement is None or\
-            (not self.active_plane_display or not focus_plane):
-            # reset the decrementer if we haven't initialized it yet or plane display is off 
+        if (self._callsign_frame_decrement is None
+            or (not self.active_plane_display or not focus_plane)
+            ):
+            # reset the decrementer if we haven't initialized it yet or plane display is off
             reinit()
             self._callsign_blinker_cache_last = None
             return True
         self._callsign_blinker_cache = focus_plane_stats['ID'] # get current hex ID at this loop
         # if the callsign changed after we're done blinking (decrement == 0) and active plane display is still true
-        if self._callsign_blinker_cache_last is not None and\
-            self._callsign_blinker_cache_last != self._callsign_blinker_cache:
+        if (self._callsign_blinker_cache_last is not None
+            and self._callsign_blinker_cache_last != self._callsign_blinker_cache
+            ):
             reinit()
         if self._callsign_frame_decrement == 0: # stop the blinking
             self._callsign_is_blanked = False
@@ -3675,12 +4078,13 @@ class Display(
             self._callsign_is_blanked = not self._callsign_is_blanked # the actual "blink"
         self._callsign_frame_decrement -= 1
         self._callsign_blinker_cache_last = self._callsign_blinker_cache # move this loop's cache to another cache to check at a later time
+        return False
 
     # =========== Clock Elements =============
     # ========================================
 
     """ Seconds """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def c_second(self, count):
         if self.active_plane_display:
             self._last_seconds = None
@@ -3719,7 +4123,7 @@ class Display(
             return True
 
     """ Hour and minute """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def d_clock(self, count):
         if self.active_plane_display:
             self._last_time = None
@@ -3762,7 +4166,7 @@ class Display(
             return True
 
     """ AM/PM Indicator """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def e_ampm(self, count):
         if self.active_plane_display or CLOCK_24HR:
             self._last_ampm = None
@@ -3800,7 +4204,7 @@ class Display(
             return True
 
     """ Day of the week """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def f_day(self, count):
         if self.active_plane_display:
             self._last_day = None
@@ -3838,7 +4242,7 @@ class Display(
             return True
 
     """ Date """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def g_date(self, count):
         if self.active_plane_display:
             self._last_date = None
@@ -3878,7 +4282,7 @@ class Display(
     # ========= Idle Stats Elements ==========
     # ========================================
     """ Static text """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def h_idle_header(self, count):
         if self.active_plane_display: return True
         small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
@@ -3913,7 +4317,7 @@ class Display(
         )
 
     """ Our idle stats readout """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def i_stats_readout(self, count):
         if self.active_plane_display:
             self._last_flybys = None
@@ -4006,7 +4410,7 @@ class Display(
         return return_flag
 
     """ Idle Stats 2: Clock center row """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def j_idle_stats_2(self, count):
         if self.active_plane_display or not CLOCK_CENTER_ENABLED:
             self._last_row1_data = None
@@ -4106,7 +4510,7 @@ class Display(
     # ======== Active Plane Readout ==========
     # ========================================
     """ Header information: Callsign, Distance, Country, UAT indicator """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def k_top_header(self, count):
         if not self.active_plane_display:
             self._last_callsign = None
@@ -4240,7 +4644,7 @@ class Display(
         return return_flag
 
     """ Our journey indicator (origin and destination) """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def l_journey(self, count):
         if not self.active_plane_display or ENHANCED_READOUT:
             self._last_origin = None
@@ -4494,7 +4898,7 @@ class Display(
         return return_flag
 
     """ Journey Plus: Relocate the flight time and add additional info like Enhanced Readout """
-    @Animator.KeyFrame.add(refresh_speed)
+    @Animator.KeyFrame.add(base_refresh_speed)
     def ll_journeyplus(self, count): # Love Live?
         """ This function is different because we go against the adage that `DisplayFeeder` should be doing 
         most of the formatting work. Instead of having to add more functionality to it, we just
@@ -4573,43 +4977,130 @@ class Display(
             )
             return_flag = True
 
-        if center_row_text != self._last_journey_plus_row:
-            if self._last_journey_plus_row is not None:
+        if not SHOW_EVEN_MORE_INFO: # if the marquee is enabled, these elements won't be drawn
+            if center_row_text != self._last_journey_plus_row:
+                if self._last_journey_plus_row is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        CENTER_READOUT_FONT,
+                        CENTER_READOUT_POS[0],
+                        CENTER_READOUT_POS[1],
+                        colors.BLACK,
+                        self._last_journey_plus_row
+                    )
+                self._last_journey_plus_row = center_row_text
+
                 _ = graphics.DrawText(
                     self.canvas,
                     CENTER_READOUT_FONT,
                     CENTER_READOUT_POS[0],
                     CENTER_READOUT_POS[1],
-                    colors.BLACK,
-                    self._last_journey_plus_row
+                    CENTER_READOUT_COLOR,
+                    center_row_text
                 )
-            self._last_journey_plus_row = center_row_text
+                return_flag = True
 
+        return return_flag
+
+    """ Draw extended aircraft info and journey info as a scrolling marquee """
+    @Animator.KeyFrame.add(1) # animation is tied to the frame rate
+    def m_marquee(self, count):
+        pause_length_sec = 2
+        pause_frames = int(pause_length_sec * frames.PER_SECOND)
+
+        def reinit():
+            self._marquee_pos = 1
+            self._marquee_init_decrement = pause_frames
+
+        if (not self.active_plane_display
+            or not SHOW_EVEN_MORE_INFO
+            or not (ENHANCED_READOUT or JOURNEY_PLUS)
+            or not focus_plane_stats
+        ):
+            self._last_marquee_str = None
+            self._last_marquee_pos = None
+            self._last_hexID = None
+            reinit()
+            return True
+        
+        Y_POS = 21
+        COLOR = (
+                colors.marquee_color_enhanced_readout 
+                 if ENHANCED_READOUT 
+                 else colors.marquee_color_journey_plus
+        )
+        FONT = fonts.extrasmall
+        return_flag = False
+
+        # if the focus plane changes, restart the animation
+        if (
+            self._last_hexID is not None
+            and focus_plane_stats
+            and self._last_hexID != focus_plane_stats.get('ID')
+            ):
+            reinit()
+
+        marquee_str_now = active_data.get('AircraftInfo', "NO ADD'L INFO")
+
+        # undraw the last frame
+        # note this even works when the string changes
+        # (eg: the API returns a result, extending the string length on the next loop)
+        if self._last_marquee_pos is not None:
             _ = graphics.DrawText(
                 self.canvas,
-                CENTER_READOUT_FONT,
-                CENTER_READOUT_POS[0],
-                CENTER_READOUT_POS[1],
-                CENTER_READOUT_COLOR,
-                center_row_text
+                FONT,
+                self._last_marquee_pos,
+                Y_POS,
+                colors.BLACK,
+                self._last_marquee_str
             )
+
+        self._last_marquee_str = marquee_str_now
+
+        marquee_length = graphics.DrawText(
+            self.canvas,
+            FONT,
+            self._marquee_pos,
+            Y_POS,
+            COLOR,
+            marquee_str_now
+        )
+
+        self._last_marquee_pos = self._marquee_pos
+        # once we start scrolling, we keep scrolling until the focus plane changes
+        if self._marquee_init_decrement <= 0:
+            # shift the text left this many pixels per frame (this will apply on the next loop)
+            self._marquee_pos -= 1
+            self._marquee_init_decrement = 0
+        else: # pause the scrolling until the decrement hits 0
+            self._marquee_init_decrement -= 1
+
+        # once the whole string has been scrolled through,
+        # place the text at the right edge of the screen
+        if (self._last_marquee_pos + marquee_length < 0):
+            self._marquee_pos = self.canvas.width
             return_flag = True
+        
+        if focus_plane_stats:
+            self._last_hexID = focus_plane_stats.get('ID')
+        else:
+            self._last_hexID = None
 
         return return_flag
 
     """ Enhanced readout part 1: replace journey with latitude and longitude """
-    @Animator.KeyFrame.add(refresh_speed)
-    def m_lat_lon(self, count):
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def n_lat_lon(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_latitude = None
             self._last_longitude = None
             return True
         X_POS = 1
-        LAT_Y_POS = 12
-        LON_Y_POS = 18
+        LAT_Y_POS = 12 if not SHOW_EVEN_MORE_INFO else 11
+        LON_Y_POS = 18 if not SHOW_EVEN_MORE_INFO else 16
         LATITUDE_COLOR = colors.latitude_color
         LONGITUDE_COLOR = colors.longitude_color
-        FONT = fonts.small
+        FONT = fonts.small if not SHOW_EVEN_MORE_INFO else fonts.extrasmall
         return_flag = False
 
         lat_now = active_data.get('Latitude', "0.000N")
@@ -4662,11 +5153,13 @@ class Display(
 
         return return_flag
 
-    """ Static text """
-    @Animator.KeyFrame.add(refresh_speed)
-    def n_active_header(self, count):
+    """ Static text (altitude, speed, time/rssi headers) """
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def o_active_header(self, count):
         if not self.active_plane_display: return True
-        if JOURNEY_PLUS and not ENHANCED_READOUT:
+        if ((JOURNEY_PLUS and not ENHANCED_READOUT)
+            or (SHOW_EVEN_MORE_INFO and (JOURNEY_PLUS or ENHANCED_READOUT))
+        ):
             HEADER_TEXT_FONT = fonts.microscopic
         else:
             HEADER_TEXT_FONT = fonts.small
@@ -4710,8 +5203,8 @@ class Display(
             )
 
     """ Our active stats readout """
-    @Animator.KeyFrame.add(refresh_speed)
-    def o_active_readout(self, count):
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def p_active_readout(self, count):
         if not self.active_plane_display:
             self._last_altitude = None
             self._last_speed = None
@@ -4832,16 +5325,17 @@ class Display(
         return return_flag
 
     """ Enhanced readout part 2: Ground track and Vertical Speed """
-    @Animator.KeyFrame.add(refresh_speed)
-    def p_enhanced(self, count):
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def q_enhanced(self, count):
         if not self.active_plane_display or not ENHANCED_READOUT:
             self._last_groundtrack = None
             self._last_vertspeed = None
             return True
         X_POS = 39
         GT_Y_POS = 12
-        VS_Y_POS = 18
+        VS_Y_POS = 18 if not SHOW_EVEN_MORE_INFO else 16
         FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
+        VS_FONT = FONT if not SHOW_EVEN_MORE_INFO else fonts.microscopic
         GT_COLOR = colors.groundtrack_color
         VS_COLOR = colors.verticalspeed_color
         return_flag = False
@@ -4876,7 +5370,7 @@ class Display(
             if self._last_vertspeed is not None:
                 _ = graphics.DrawText(
                     self.canvas,
-                    FONT,
+                    VS_FONT,
                     X_POS,
                     VS_Y_POS,
                     colors.BLACK,
@@ -4886,7 +5380,7 @@ class Display(
 
             _ = graphics.DrawText(
                 self.canvas,
-                FONT,
+                VS_FONT,
                 X_POS,
                 VS_Y_POS,
                 VS_COLOR,
@@ -4897,8 +5391,8 @@ class Display(
         return return_flag
 
     """ An indicator of how many planes are in the area """
-    @Animator.KeyFrame.add(refresh_speed)
-    def q_plane_count_indicator(self, count):
+    @Animator.KeyFrame.add(1) # if the marquee is visible, this draws over it
+    def r_plane_count_indicator(self, count):
         if not self.active_plane_display:
             self._last_activeplanes = None
             return True
@@ -4930,18 +5424,18 @@ class Display(
                     self._last_activeplanes
                     )
             self._last_activeplanes = plane_count_now
-            plane_count_indicators(
-                self.canvas,
-                INDICATORS_X,
-                INDICATORS_Y,
-                colors.plane_count_color,
-                self._last_activeplanes
-                )
-            return True
+        plane_count_indicators(
+            self.canvas,
+            INDICATORS_X,
+            INDICATORS_Y,
+            colors.plane_count_color,
+            plane_count_now
+            )
+        return True
 
     """ Switch-time progress bar at the bottom """
-    @Animator.KeyFrame.add(refresh_speed)
-    def r_switch_progress(self, count):
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def s_switch_progress(self, count):
         if not DISPLAY_SWITCH_PROGRESS_BAR or not self.active_plane_display:
             self._last_switch_progress_bar = None
             return True
@@ -4965,14 +5459,17 @@ class Display(
         if plane_count_now < 2 or selection_override:
             fill_length = 0
         else:
-            fill_length = int(round(((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * RGB_COLS, 0))
+            fill_length = int(round(
+                ((next_select - focus_plane_iter) % (select_divisor + 1)) / select_divisor * self.matrix.width,
+                  0)
+                  )
 
         def draw_line(canvas, x_start:int, y_start:int, color, count:int):
             """ draw a horizontal line of given pixel length (this is not graphics.DrawLine) """
             if count is None:
                 count = 0
-            if count > RGB_COLS:
-                count = RGB_COLS
+            if count > self.matrix.width:
+                count = self.matrix.width
             indicator_color = color
             for i in range(count):
                 canvas.SetPixel(
@@ -5024,10 +5521,11 @@ class Display(
     """ Actually show the display """
     @Animator.KeyFrame.add(1)
     def z_sync(self, count):
-        # Redraw screen every frame
+        # Redraw screen every frame (do not set equal to self.canvas)
         _ = self.matrix.SwapOnVSync(self.canvas)
 
     def run_screen(self):
+        global DISPLAY_IS_VALID
         while True:
             try:
                 # Start loop
@@ -5035,12 +5533,24 @@ class Display(
 
             except (SystemExit, KeyboardInterrupt, ImportError):
                 return
+            
+            except AttributeError as e:
+                self.itbroke_count += 1
+                self.a_clear_screen()
+                msg = str(e)
+                main_logger.critical("*************************************************")
+                main_logger.critical("*    The colors.py file is missing an entry.    *")
+                main_logger.critical(f"{msg}")
+                main_logger.critical("*                                               *")
+                main_logger.critical("*          The display will not start.          *")
+                main_logger.critical("*************************************************")
+                DISPLAY_IS_VALID = False
+                return
 
             except Exception as e:
                 self.itbroke_count += 1
                 if self.itbroke_count > 5:
                     self.a_clear_screen()
-                    global DISPLAY_IS_VALID
                     DISPLAY_IS_VALID = False
                     main_logger.critical("*************************************************")
                     main_logger.critical("*   Display thread has failed too many times.   *")
@@ -5079,32 +5589,12 @@ else:
     del matching_processes
     main_logger.info("Preflight check complete.")
 
+procmon = threading.Thread(target=perf_monitoring, name='Resource-Monitor', daemon=True)
+procmon.start()
 configuration_check() # very important
-configuration_check_api()
-if API_KEY:
-    API_session = requests.Session()
-api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)
-api_scheduling_thread.start()
 
-get_ip()
-CPU_TEMP_SENSOR = get_cpu_temp_sensor()
-if CPU_TEMP_SENSOR is not None:
-    main_logger.debug(f"CPU temperature sensor: {CPU_TEMP_SENSOR}")
-else:
-    main_logger.debug("No CPU temperature sensor found or temp readout not supported on this system.")
-HOSTNAME = socket.gethostname()
-main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
-flyby_stats() # initialize first
-
-# define our scheduled tasks (our "one-shot" functions)
-# NB: order matters in the way they're defined as these run sequentially when run at the same time
-schedule.every().day.at("00:00").do(suntimes)
-schedule.every().day.at("00:00").do(runtime_accumulators_reset)
-schedule.every().hour.at(":00").do(flyby_stats)
-schedule.every().day.at("23:59:58").do(flyby_stats) # get us the day's total count before reset
-schedule.every().hour.do(get_ip) # in case the IP changes
-
-if DISPLAY_IS_VALID and not NODISPLAY_MODE: # start all the display-related threads
+# start all the display-related threads before the API check and dump1090 load-in
+if DISPLAY_IS_VALID and not NODISPLAY_MODE: 
     main_logger.info("Initializing display...")
     if 'RGBMatrixEmulator' in sys.modules:
         main_logger.info("We are using 'RGBMatrixEmulator'")
@@ -5112,8 +5602,8 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE: # start all the display-related thre
         main_logger.info("We are using 'rgbmatrix'")
     if ENHANCED_READOUT_AS_FALLBACK and API_KEY: 
         enhanced_readout_wait_condition = threading.Condition()
-        """ create a way to synchronize the API caller and Display Feeder when the Display Feeder switches
-        the display output type. This is needed only for the above condition for this block """
+        """ Create a way to synchronize the API caller and Display Feeder when the Display Feeder switches
+        the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled. """
     try:
         display = Display()
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
@@ -5128,6 +5618,25 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE: # start all the display-related thre
         DISPLAY_IS_VALID = False
         main_logger.error(f"RGBMatrixEmulator failed to start. No display will be available!", exc_info=True, stacklevel=1)
         time.sleep(5)
+
+configuration_check_api()
+if API_KEY:
+    API_session = requests.Session()
+api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)
+api_scheduling_thread.start()
+
+get_ip()
+HOSTNAME = socket.gethostname()
+main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
+flyby_stats() # initialize first
+
+# define our scheduled tasks (our "one-shot" functions)
+# NB: order matters in the way they're defined as these run sequentially when run at the same time
+schedule.every().day.at("00:00").do(suntimes)
+schedule.every().day.at("00:00").do(runtime_accumulators_reset)
+schedule.every().hour.at(":00").do(flyby_stats)
+schedule.every().day.at("23:59:58").do(flyby_stats) # get us the day's total count before reset
+schedule.every().hour.do(get_ip) # in case the IP changes
 
 dump1090_check()
 if DUMP1090_JSON and DUMP978_JSON:
@@ -5148,6 +5657,22 @@ if rlat is not None or rlon is not None:
     schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 session = requests.Session()
 """ Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
+
+if DATABASE_FILE.exists():
+    main_logger.info("Aircraft database is present.")
+    try:
+        from utilities.database_lookup import DatabaseHandler
+        db = DatabaseHandler(database_location=DATABASE_FILE, timeout=LOOP_INTERVAL)
+        DATABASE_CONNECTED = db.connect()
+        if db.is_connected():
+            main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
+        else:
+            main_logger.error("Could not connect to the database.")
+    except (ModuleNotFoundError, ImportError):
+        main_logger.warning("Failed to load required database handler. Some additional aircraft info may not be available.")
+else:
+    main_logger.info("Aircraft database is unavailable.")
+
 suntimes()
 
 def main() -> None:
@@ -5163,29 +5688,33 @@ def main() -> None:
     api_getter = threading.Thread(target=APIFetcher, name='API-Fetch-Thread', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
     watchdog_stuff = threading.Thread(target=dump1090Watchdog, name='Dump1090-Watchdog', daemon=True)
-    json_writer = threading.Thread(target=export_FlightGazer_state, name='JSON-Writer', daemon=True)
+    json_writer = threading.Thread(target=WriteState, name='JSON-Writer', daemon=True)
     console_stuff = threading.Thread(target=PrintToConsole, name='Console-Printer', daemon=True)
     if WRITE_STATE:
         json_writer.start()
     main_logger.info("Cleared for takeoff.")
 
     if INTERACTIVE:
-        print("\nInteractive mode enabled. Pausing here for 15 seconds\n\
-so you can read the above output before we enter the main loop.")
-        print(f"If you need to review the output again, review the log file at:\n\
-\'{LOGFILE}\'\n")
+        print("\nInteractive mode enabled. Pausing here for 15 seconds\n"
+              "so you can read the above output before we enter the main loop.")
+        print("If you need to review the output again, review the log file at:\n"
+              f"     \'{LOGFILE}\'")
+        print("Or, you can press the \'Pause/Break\' key at any time to pause the output.\n")
         interactive_wait_time = 15
         # silly random distractions while you wait 
         if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
             interactive_wait_time -= 5
             time.sleep(5)
-            print("Protip: If you're not using a physical RBG-Matrix display,\n\
-        use RGBMatrixEmulator to see the display on a webpage instead!")
+            print("Protip: If you're not using a physical RBG-Matrix display,\n"
+                  "        use RGBMatrixEmulator to see the display on a webpage instead!")
         if random.randint(0,1) == 1:
             interactive_wait_time -= 5
             time.sleep(5)
-            print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n\
-              color scale used on the dump1090 map that corresponds to plane altitude.")
+            if random.randint(0,1) == 1:
+                print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n"
+                      "              color scale used on the dump1090 map that corresponds to plane altitude.")
+            else:
+                print("\nCheck the FlightGazer logo closely. Notice something?")
         if random.randint(0,1) == 1:
             interactive_wait_time -= 5
             time.sleep(5)
@@ -5195,10 +5724,10 @@ so you can read the above output before we enter the main loop.")
         del interactive_wait_time
 
     if not INTERACTIVE and FORGOT_TO_SET_INTERACTIVE:
-        print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n\
-Normally, outputs shown here are not usually seen and are written to the log.\n\
-\x1b[0;30;43mIf you want to see data, use Ctrl+C to quit and pass the interactive flag (-i) instead.\x1b[0m\n\
-If you close this window now, FlightGazer will exit uncleanly.\a\n")
+        print("\nNotice: It seems that this script was run directly instead of through the initalization script.\n"
+              "Normally, outputs shown here are not usually seen and are written to the log.\n"
+              "\x1b[0;30;43mIf you want to see data, use Ctrl+C to quit and pass the interactive flag (-i) instead.\x1b[0m\n"
+              "If you close this window now, FlightGazer will exit uncleanly.\a\n")
 
     global dump1090
     dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary

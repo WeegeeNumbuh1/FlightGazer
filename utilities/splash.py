@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.5.0.0
+# Last updated: v.6.0.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -54,8 +54,22 @@ class ImageScroller():
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
         self.parser.add_argument("image", help="The image to display", default="FG-Splash.ppm")
+        self.parser.add_argument('-u', '--update',
+                      action='store_true',
+                      help="Changes text to 'Now Updating' instead of the default 'Now Loading'."
+                      )
         self.args = self.parser.parse_args()
         signal.signal(signal.SIGTERM, sigterm_handler) # register signal handler
+        if self.args.update:
+            self.top_text = "NOW UPDATING"
+        else:
+            self.top_text = "NOW LOADING"
+        self.top_text_len = 0
+        self.top_text_color_control = 0 # do a nifty fade effect
+        self.top_text_color_dir = True # true = fade in, false = fade out
+        # self.spinner = ['|', '/', '-', '\\'] # spinner for the text
+        self.spinner = ['◥', '◢', '◣', '◤',]
+        self.spinner_index = 0
 
         # Run with the following rgbmatrix options.
         # `options.hardware_mapping` is missing as we let the
@@ -92,10 +106,30 @@ class ImageScroller():
 
         # let's scroll
         xpos = 0
+        _skip_frames = 0
         while True:
             xpos += 1
             if (xpos >= img_width):
                 xpos = 0
+            
+            # the fade effect
+            if self.top_text_color_dir:
+                self.top_text_color_control += 10
+                if self.top_text_color_control >= 255:
+                    self.top_text_color_control = 255
+                    self.top_text_color_dir = False
+            else:
+                self.top_text_color_control -= 10
+                if self.top_text_color_control <= 0:
+                    self.top_text_color_control = 0
+                    self.top_text_color_dir = True
+            # spinner effect
+            _skip_frames += 1
+            if _skip_frames % 3 == 0:
+                self.spinner_index += 1
+                if self.spinner_index >= len(self.spinner):
+                    self.spinner_index = 0
+                _skip_frames = 0
             
             # scrolls to the right
             self.double_buffer.SetImage(self.image, xpos)
@@ -111,13 +145,30 @@ class ImageScroller():
                     f"VER:{VER_STR}",
                 )
 
+                self.top_text_len = graphics.DrawText(
+                    self.double_buffer,
+                    loaded_font,
+                    (self.double_buffer.width - self.top_text_len),
+                    4,
+                    graphics.Color(
+                        self.top_text_color_control,
+                        self.top_text_color_control,
+                        self.top_text_color_control
+                    ),
+                    self.top_text,
+                )
+
                 _ = graphics.DrawText(
                     self.double_buffer,
                     loaded_font,
-                    20,
+                    1,
                     4,
-                    graphics.Color(60, 60, 60),
-                    "NOW LOADING",
+                    graphics.Color(
+                        self.top_text_color_control,
+                        self.top_text_color_control,
+                        self.top_text_color_control
+                    ),
+                    self.spinner[self.spinner_index],
                 )
 
             self.double_buffer = self.matrix.SwapOnVSync(self.double_buffer)
