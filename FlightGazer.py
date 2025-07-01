@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.6.0.1 --- 2025-07-01'
+VERSION: str = 'v.6.0.2 --- 2025-07-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2118,17 +2118,21 @@ def main_loop_generator() -> None:
             and file size (bytes) """
             load_start = time.perf_counter()
             if is_using_local:
-                with open(Path(source), 'rb') as _data:
-                    # doing this is slightly slower (~5%) than just doing json.load(_data)
-                    # we do it this way just for the "response" stat and to get the file size
-                    s = _data.read()
-                    load_end = round((time.perf_counter() - load_start) * 1000, 3)
-                    filesize = len(s)
-                json_parse = time.perf_counter()
-                if ORJSON_IMPORTED:
-                    aircraft_data_tmp = orjson.loads(s)
-                else:
-                    aircraft_data_tmp = json.loads(s)
+                try:
+                    with open(Path(source), 'rb') as _data:
+                        # doing this is slightly slower (~5%) than just doing json.load(_data)
+                        # we do it this way just for the "response" stat and to get the file size
+                        s = _data.read()
+                        load_end = round((time.perf_counter() - load_start) * 1000, 3)
+                        filesize = len(s)
+                    json_parse = time.perf_counter()
+                    if ORJSON_IMPORTED:
+                        aircraft_data_tmp = orjson.loads(s)
+                    else:
+                        aircraft_data_tmp = json.loads(s)
+                except FileNotFoundError as e: # case when the dump1090 service is down or being updated
+                    main_logger.debug(f"{e}")
+                    raise
             else:
                 _req = session.get(source, headers=USER_AGENT, timeout=LOOP_INTERVAL * 0.9)
                 load_end = round((time.perf_counter() - load_start) * 1000, 3)
@@ -2182,7 +2186,7 @@ def main_loop_generator() -> None:
         
         # cover the rare instance the loop tries to run again
         # during the main cleanup process after shutting down the threadpool
-        except (RuntimeError, CF.CancelledError):
+        except RuntimeError:
             time.sleep(5) # should be long enough for the cleanup to complete and the main thread to exit
             main_logger.critical("You shouldn't be able to see this. Lucky you.") # you cooked...
             # ...if you reach this point, this isn't just well done, it's congratulations

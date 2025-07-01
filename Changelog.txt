@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.6.0.2 - 2025-07-01
+    - Improved handling when operating on a local instance and the dump1090 service isn't available
+    - Aircraft database downloader changes:
+        - The script now fully rebuilds the database instead of updating entries for better accuracy and consistency
+        - The script also handles instances when it fails to commit to the database (eg, terminates when writing out)
+          and forces a complete rebuild of the database itself
+
 v.6.0.1 - 2025-07-01
     - FIX: Display crashing when the rgbmatrix library is installed but emulation is enabled
         - This bug went unnoticed since at least v.1.0.0

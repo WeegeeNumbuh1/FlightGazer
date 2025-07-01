@@ -85,7 +85,7 @@ class DatabaseHandler:
             # database_logger.debug(f"Database hit for {icao}, lookup took {self.last_access_speed:.3f} ms")
             return dict(result)
         else:
-            database_logger.info(f"Very rare event! Could not find database entry for \'{icao}\'")
+            database_logger.info(f"Rare event! Could not find database entry for \'{icao}\'")
             self.query_misses += 1
             return None
 

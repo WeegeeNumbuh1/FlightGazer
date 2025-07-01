@@ -56,6 +56,12 @@ def still_alive():
     
 current_db_ver = None
 threading.Thread(target=still_alive, daemon=True).start()
+if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
+    print("Warning: It appears this script was terminated before it could write\n"
+    "out the database. To maintain a consistent state, the database will be fully rebuilt.\n")
+    jrnl.unlink(missing_ok=True)
+    OUTPUT_FILE.unlink(missing_ok=True)
+    
 if OUTPUT_FILE.exists():
     _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}?mode=ro", uri=True)
     _connection.row_factory = sqlite3.Row
@@ -238,7 +244,7 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
                 ownop TEXT
             );
         """)
-        # cursor.execute(f"DELETE FROM ICAO_{char}") # uncomment if you want to fully rebuild the tables
+        cursor.execute(f"DELETE FROM ICAO_{char}")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS DB_INFO (
             version TEXT PRIMARY KEY,
