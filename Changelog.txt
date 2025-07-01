@@ -5,6 +5,17 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.6.0.1 - 2025-07-01
+    - FIX: Display crashing when the rgbmatrix library is installed but emulation is enabled
+        - This bug went unnoticed since at least v.1.0.0
+    - FIX: Fix state file thread not running when operating in both console-only and NO_FILTER mode
+    - Initialization script improvements:
+        - When using the "check" flag, the init script forces a check of dependencies rather than obeying the existence of the first run complete flag
+        - Writes out the first run complete flag after the database downloader completes
+        - Install libjpeg-dev to help mitigate RGBMatrixEmulator installation failures
+    - Minor tweaks for update script to handle permissions better when upgrading
+    - Add memory control fixes for database downloader script to handle very low memory devices (eg: Raspberry Pi Zero)
+
 v.6.0.0 - 2025-06-29
     - NEW: FlightGazer x tar1090
         - FlightGazer now uses the same database that tar1090 uses, enabling lookups for aircraft info such as type and owner, all without

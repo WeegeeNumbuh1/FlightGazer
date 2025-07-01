@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.6.0.0 --- 2025-06-29'
+VERSION: str = 'v.6.0.1 --- 2025-07-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -241,6 +241,7 @@ if not NODISPLAY_MODE:
                 EMULATE_DISPLAY = True
 
         if EMULATE_DISPLAY:
+            import types
             try:
                 # monkey patch this so it loads the config file from our running directory
                 os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
@@ -248,6 +249,8 @@ if not NODISPLAY_MODE:
                 RGBMatrixEmulatorConfig.CONFIG_PATH = Path(f"{CURRENT_DIR}/emulator_config.json")
 
                 from RGBMatrixEmulator import graphics
+                # the below line monkey patches imports to use the emulator even if rgbmatrix is installed
+                sys.modules['rgbmatrix'] = types.SimpleNamespace(graphics=graphics)
                 from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
             except (ModuleNotFoundError, ImportError):
                 DISPLAY_IS_VALID = False
@@ -1434,10 +1437,20 @@ def perf_monitoring() -> None:
             +----------------+------------------+
             |                |                  |
             v                v                  v
-      [APIFetcher]    [DisplayFeeder]    [PrintToConsole]
-                             |
-                             v
-                        [WriteState]
+      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]
+                                                |
+                                                v
+                                           [WriteState]
+
+1 = Only executes completely when the following are true:
+    - API_KEY exists                 | set only on startup
+    - NOFILTER_MODE is False         | set only on startup
+    - api_limiter_reached() is False | can change during runtime
+    - ENHANCED_READOUT is False      | can change during runtime
+
+2 = Always runs, unless: NODISPLAY_MODE is True or DISPLAY_IS_VALID is False
+    - NODISPLAY_MODE   | set only on startup
+    - DISPLAY_IS_VALID | can change during runtime
 
 """
 
@@ -1986,6 +1999,7 @@ class PrintToConsole:
             print(f">{italic} Ctrl+C to exit -and- quit FlightGazer. Closing this window will uncleanly terminate FlightGazer.{rst}")
 
         process_time2[0] = round((time.perf_counter() - print_time_start)*1000, 3)
+        dispatcher.send(message='', signal=LOOP_WORK_COMPLETE, sender=PrintToConsole.print_to_console)
 
     def run_loop(self):
         def keep_alive():
@@ -3369,8 +3383,6 @@ class DisplayFeeder:
         if 'enhanced_readout_wait_condition' in globals():
             with enhanced_readout_wait_condition: # tell the API Fetcher this thread is done
                 enhanced_readout_wait_condition.notify()
-        
-        dispatcher.send(message='', signal=LOOP_WORK_COMPLETE, sender=DisplayFeeder.data_packet)
 
     def run_loop(self):
         def keep_alive():
@@ -3508,7 +3520,7 @@ class WriteState:
         global state_json
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        register_signal_handler(self.loop, self.export_FlightGazer_state, signal=LOOP_WORK_COMPLETE, sender=DisplayFeeder.data_packet)
+        register_signal_handler(self.loop, self.export_FlightGazer_state, signal=LOOP_WORK_COMPLETE, sender=PrintToConsole.print_to_console)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_dir = Path("/run/FlightGazer")
         self.can_run_flag: bool = True

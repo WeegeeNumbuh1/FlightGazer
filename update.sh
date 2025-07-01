@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.5.0.0
+# Last updated: v.6.0.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -183,10 +183,9 @@ rm -f ${VENVPATH}/first_run_complete >/dev/null 2>&1 # force the init script to 
 # simply leave them be in the install directory (they could be user files)
 chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${TEMPPATH} # need to do this as we are running as root
 echo -e "${FADE}Copying ${TEMPPATH} to ${BASEDIR}..."
-cp -TR ${TEMPPATH} ${BASEDIR}
-chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/config.yaml
+cp -afT ${TEMPPATH} ${BASEDIR}
 chmod -f 644 ${BASEDIR}/config.yaml
-chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/flybys.csv >/dev/null 2>&1
+# chown -fR ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR} >/dev/null 2>&1
 chmod -f 644 ${BASEDIR}/flybys.csv >/dev/null 2>&1
 rm -f ${BASEDIR}/../emulator_config.json >/dev/null 2>&1 # for older installs
 echo "> Copy complete."

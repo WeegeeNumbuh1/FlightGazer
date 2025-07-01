@@ -231,6 +231,7 @@ Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 
 Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
 Example: `http://192.168.xxx.xxx:8080`
+<br>And then set `PREFER_LOCAL` to `false`.
 
 </details>
 <details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
@@ -322,7 +323,7 @@ The script automatically detects that you're running interactively and will disp
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
-|`-c`| ❌ | Only install/check dependencies and don't start the main script.
+|`-c`| ❌ | Only install/force-check dependencies and don't start the main script.
 |`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.
 |`-l`| ❌ | Live/Demo mode.<br>Does not install service and runs FlightGazer from dependencies in `/tmp`.
 |`-h`| ❌ | Print the help message.
@@ -331,9 +332,14 @@ The script automatically detects that you're running interactively and will disp
 <br>
 
 > [!TIP]
-> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.<br> By default, `RGBMatrixEmulator` can be viewed through a web browser:
+> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.
+> <br><b>Note: Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
+> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect less than 7 FPS on a Raspberry Pi 3/Zero 2W)
+> <br>
+> <br>By default, `RGBMatrixEmulator` can be viewed through a web browser:
 > - `http://IP-address-of-device-running-FlightGazer:8888`
 > - `http://localhost:8888` (on the device running FlightGazer)
+
 
 <details><summary>Advanced use</summary>
 
@@ -386,6 +392,7 @@ or, you may [start it manually](#️-interactive-mode).
 - Updates package list
 - Installs:
   - python3-dev
+  - libjpeg-dev
   - python3-venv
   - tmux
 - Create a new systemd service `flightgazer.service` if not present

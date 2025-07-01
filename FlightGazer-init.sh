@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.6.0.0
+# Version = v.6.0.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -53,7 +53,7 @@ help_str(){
 	echo ""
 	echo " *****    Setup options    *****"
 	echo "[-t]     Run in tmux, if available."
-	echo "[-c]     Install/check dependencies only. Do not start main script."
+	echo "[-c]     Install/force-check dependencies only. Do not start main script."
 	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
 	echo ""
 	echo "Report bugs to WeegeeNumbuh1 <https://github.com/WeegeeNumbuh1/FlightGazer>"
@@ -160,13 +160,13 @@ else
 	last_check_time=$(date -r $CHECK_FILE '+%s')
 	# 1 month = 2592000 seconds
 	if [ $((STARTTIME - last_check_time)) -lt 7776000 ]; then
-		echo "> Last check was less than 3 months ago, skipping tests 👍"
+		echo "> Last check was less than 3 months ago, skipping tests."
 		SKIP_CHECK=1
 	fi
 	VERB_TEXT='Checking: '
 fi
 
-if [ $SKIP_CHECK -eq 0 ]; then
+if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo "> Checking system image..."
 
 	# check if this system uses apt
@@ -214,7 +214,7 @@ if [ "$DFLAG" != "-d" ]; then
 	fi
 fi
 
-if [ ! -f "$CHECK_FILE" ];
+if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ];
 then
 	echo "  > Updating package lists..."
 	echo "    > \"apt-get update\""
@@ -226,6 +226,8 @@ then
 	echo "  > Installing needed dependencies..."
 	echo "    > \"python3-dev\""
 	apt-get install -y python3-dev >/dev/null
+	echo "    > \"libjpeg-dev\""
+	apt-get install -y libjpeg-dev >/dev/null # for RGBMatrixEmulator
 	echo "    > \"python3-venv\""
 	apt-get install -y python3-venv >/dev/null
 	echo "    > \"tmux\""
@@ -257,7 +259,7 @@ then
 		systemctl status flightgazer.service
 		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
 		echo -e "${RED}    > Do not move the FlightGazer directory (${BASEDIR})!"
-		echo -e "      Doing so will cause the service to fail!${FADE}"
+		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
 		sleep 5s
 	else
 		echo "    > Service already exists or we are running in Live/Demo mode, skipping service creation."
@@ -315,35 +317,40 @@ echo "> System image ready."
 echo -n "> We have: "
 ${VENVPATH}/bin/python3 -VV
 
-CHECKMARK='\e[1F\e[30C✅\n' # move cursor up to the beginning one line up then move 30 spaces right
+CHECKMARK='\e[1F\e[30C[ Done ]\n' # move cursor up to the beginning one line up then move 30 spaces right
 # install dependencies
-if [ $SKIP_CHECK -eq 0 ]; then
+if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo ""
 	echo "> Packages check:"
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo -e "${VERB_TEXT}pip"
 		${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}requests"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}requests"
 		${VENVPATH}/bin/pip3 install --upgrade requests >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}pydispatcher"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}pydispatcher"
 		${VENVPATH}/bin/pip3 install --upgrade pydispatcher >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}schedule"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}schedule"
 		${VENVPATH}/bin/pip3 install --upgrade schedule >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}suntime"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}suntime"
 		${VENVPATH}/bin/pip3 install --upgrade suntime >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}psutil"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}psutil"
 		${VENVPATH}/bin/pip3 install --upgrade psutil >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}yaml"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}yaml"
 		${VENVPATH}/bin/pip3 install --upgrade ruamel.yaml >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}orjson"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}orjson"
 		${VENVPATH}/bin/pip3 install --upgrade orjson >/dev/null
-		echo -e "${CHECKMARK}${VERB_TEXT}RGBMatrixEmulator"
+		if [ "$VERB_TEXT" == "Installing: " ]; then
+			echo -e "${CHECKMARK}${FADE}"
+			echo "(The next install may take some time, please be patient.)"
+			echo -e "${VERB_TEXT}RGBMatrixEmulator"
+		else
+			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}RGBMatrixEmulator"
+		fi
 		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
 		echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."
 	fi
-	touch $CHECK_FILE
 	touch $LOGFILE
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
 	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
@@ -366,6 +373,7 @@ if [ $SKIP_CHECK -eq 0 ]; then
 		echo "> Unable to check or generate aircraft database"
 		echo "  either due to no internet or downloader script is missing."
 	fi
+	touch $CHECK_FILE
 fi
 
 if [ -f "$LOGFILE" ]; then
