@@ -5,6 +5,17 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.6.0.3 - 2025-07-02
+    - Display sub-modules now don't error out following the fix implemented in v.6.0.1
+        - This change will reset the color config
+    - Fix state file not being written out when running in non-interactive mode
+    - Slight tweak in how the flight override logging is handled
+    - Init script now also installs numpy if it's not installed on the system (this is also a dependency of RGBMatrixEmulator)
+        - Lore drop: FlightGazer should now be able to fully run on i686 systems (tested with a Northwood Pentium 4 running Linux Mint LMDE6)
+            - v.1.3.0 was the first version to undergo i686 testing but RGBMatrixEmulator failed to build and thus FlightGazer
+              only ran in console-only mode
+    - Minor interactive text output tweaks for API results
+
 v.6.0.2 - 2025-07-01
     - Improved handling when operating on a local instance and the dump1090 service isn't available
     - Aircraft database downloader changes:

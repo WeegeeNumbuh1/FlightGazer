@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.6.0.2 --- 2025-07-01'
+VERSION: str = 'v.6.0.3 --- 2025-07-02'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -267,6 +267,13 @@ if not NODISPLAY_MODE:
         # but if they break somehow, we can still catch it
         from setup import colors, fonts
 
+    # Catch case when rgbmatrix is present but we're forced to use emulation mode and RGBMatrixEmulator doesn't load
+    # (thus the submodules also fail to load)
+    except NotImplementedError:
+        DISPLAY_IS_VALID = False
+        main_logger.debug("Display submodules could not be loaded when using Emulate Mode")
+
+    # Most likely case at this point would be the font files missing
     except Exception as e:
         DISPLAY_IS_VALID = False
         main_logger.error("Display modules failed to load. There will be no display output!")
@@ -1427,19 +1434,19 @@ def perf_monitoring() -> None:
 # ===========( Core Functions )=============
 """ ----- Thread Signaling Layout -----
 
-    main_loop_generator()
-        loop()
-          +-> dump1090_hearbeat() -> dump1090_loop() -> -+
-          +-+--<----<----<----<----<----<----<----<----<-+-> watchdog trigger
-            |                                                       |
-            v                                                       v
-    [AirplaneParser]                                        [dump1090Watchdog]
-            +----------------+------------------+
-            |                |                  |
-            v                v                  v
-      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]
-                                                |
-                                                v
+░░░ main_loop_generator() ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░       loop()                                                                              ░
+░         ├- -<- - - -<- - - -<- - - -<- - - -<- - - -<- - - -<- - - ┐                      ░
+░         ├───► dump1090_hearbeat() ► dump1090_loop() ► ─┐           ▲ (transient event)    ░
+░         └───< sleep for LOOP_INTERVAL <────<─┬──<────◄─┴─► Exception Handling             ░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ | ░░░░░░░░░           ▼ (if too many errors) ░
+            ┌──────────────────────────────────┘         ░           |                      ░
+            ▼                                            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
+    [AirplaneParser]                                         [dump1090Watchdog]
+            ├────────────────┬──────────────────┐
+            ▼                ▼                  ▼
+      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
+                                                ▼
                                            [WriteState]
 
 1 = Only executes completely when the following are true:
@@ -1451,6 +1458,9 @@ def perf_monitoring() -> None:
 2 = Always runs, unless: NODISPLAY_MODE is True or DISPLAY_IS_VALID is False
     - NODISPLAY_MODE   | set only on startup
     - DISPLAY_IS_VALID | can change during runtime
+
+3 = Only executes completely when INTERACTIVE is True, always sends a signal
+    to WriteState
 
 """
 
@@ -1639,7 +1649,10 @@ class PrintToConsole:
 
     def print_to_console(self, message) -> None:
         """ Do the printing """
-        if not INTERACTIVE: return
+        if not INTERACTIVE:
+            # trigger `WriteState`
+            dispatcher.send(message='', signal=LOOP_WORK_COMPLETE, sender=PrintToConsole.print_to_console)
+            return
         global process_time2
         print_time_start = time.perf_counter()
         plane_count = len(relevant_planes)
@@ -1841,14 +1854,18 @@ class PrintToConsole:
                         api_dest_city = result['DestinationInfo'][1]
                         api_str.append(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: ")
                         api_str.append(f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
+                        api_str.append(f" | {italic}")
                         if api_orig_name is not None: # known airport reported
                             if api_dest_name is not None:
-                                api_str.append(f" | {italic}{api_orig_name} ({api_orig_city}) to {api_dest_name} ({api_dest_city})")
+                                api_str.append(f"{api_orig_name} ({api_orig_city}) to {api_dest_name} ({api_dest_city})")
                             else: # position-only, no given destination
-                                api_str.append(f" | {italic}Departed from {api_orig_name} ({api_orig_city})")
-                            api_str.append(f"{rst}")
+                                api_str.append(f"Departed from {api_orig_name} ({api_orig_city})")
                         else: # coordinate-based origin, always has a nearby city as a result
-                            api_str.append(f"{italic}First seen near {api_orig_city}{rst}")
+                            if api_orig_city:
+                                api_str.append(f"First seen near {api_orig_city}")
+                            else:
+                                api_str.append(f"(No API result)")
+                        api_str.append(f"{rst}")
                         print("".join(api_str))
                         break
                     else: # don't use stale API results
@@ -2789,15 +2806,12 @@ class AirplaneParser:
                             main_logger.debug("High-priority aircraft flyby triggered by"
                                             f" \'{focus_plane_stats['Flight']}\' ({focus_plane})")
                             high_priority_events += 1
-                        elif plane_count > 1:
+                        elif not VERBOSE_MODE and plane_count > 1:
                             main_logger.info("High-priority aircraft override triggered by"
                                             f" \'{focus_plane_stats['Flight']}\' ({focus_plane})")
                             high_priority_events += 1
                     else:
-                        if VERBOSE_MODE:
-                            main_logger.debug("High-priority aircraft override event completed.")
-                        else:
-                            main_logger.info("High-priority aircraft override event completed.")
+                        main_logger.debug("High-priority aircraft override event completed.")
 
                 # if this thread changed the focus plane, fire up the API fetcher
                 if focus_plane_i != focus_plane and focus_plane:

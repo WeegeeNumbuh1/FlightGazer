@@ -2,9 +2,12 @@
 
 import os
 try:
-    from rgbmatrix import graphics
-except:
-    from RGBMatrixEmulator import graphics
+    try:
+        from rgbmatrix import graphics
+    except (ModuleNotFoundError, ImportError):
+        from RGBMatrixEmulator import graphics
+except (ModuleNotFoundError, ImportError):
+    raise NotImplementedError
 
 # Fonts
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))

@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.6.0.0
+VERSION: v.6.0.3
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -15,14 +15,20 @@ where the red, green, blue values are integers from 0 to 255.
 
 Your edits must be between the # CONFIG_START and # CONFIG_END
 lines as these settings are what will be copied over when using the updater.
-Warning: Do not change the amount of lines in this file; this will cause the updater to
+
+Warnings:
+- Do not remove settings as this will cause the display to not load.
+- Do not change the amount of lines in this file; this will cause the updater to
 default to the original colors.
 """
 
 try:
-    from rgbmatrix import graphics
-except:
-    from RGBMatrixEmulator import graphics
+    try:
+        from rgbmatrix import graphics
+    except (ModuleNotFoundError, ImportError):
+        from RGBMatrixEmulator import graphics
+except (ModuleNotFoundError, ImportError):
+    raise NotImplementedError
 
 # Color helpers
 BLACK = graphics.Color(0, 0, 0)

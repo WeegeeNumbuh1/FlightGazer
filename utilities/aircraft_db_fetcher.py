@@ -121,7 +121,7 @@ try:
     # the more important thing is to not have this script lock up the system when running
     # these operations that need to allocate a (relatively) sizable chunk of memory.
     # From the author's experience, running this script would inevitably freeze a Raspberry Pi Zero
-    # system before implementing this check.
+    # system before implementing this check if it's already running a lot of stuff in memory.
     # It's assumed that if the system memory is already this small, we're dealing with
     # a potato and it'll take more than a minute for this script to complete anyway.
     # As reference, a modern AMD Zen 5 system completes this script in about 5 seconds.

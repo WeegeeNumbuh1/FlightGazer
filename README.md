@@ -114,6 +114,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
   - The python script has been verified to run in both Linux (Debian) and Windows. (MacOS untested)
+- All installed components confirmed to run on `ARMv7`, `ARMv8`, `x86_64`, `i686`
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
 - Easily update to latest builds here on Github
@@ -230,8 +231,8 @@ Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 <details><summary>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</summary>
 
 Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
-Example: `http://192.168.xxx.xxx:8080`
-<br>And then set `PREFER_LOCAL` to `false`.
+Example: `http://192.168.xxx.xxx:8080`<br>
+And then set `PREFER_LOCAL` to `false`.
 
 </details>
 <details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
@@ -241,6 +242,17 @@ FlightGazer can only run directly on those systems and must be installed on thos
 Set `PREFER_LOCAL` to `true` so that FlightGazer can read the data from these setups.<br>
 
 If you managed to install a working web interface like `tar1090` with these setups then you're an advanced user and you already know what you're doing.<br>
+
+</details>
+
+<details><summary>Connecting to a separate dump978 feeder (over the network)</summary>
+
+Set `CUSTOM_DUMP978_LOCATION` to the IP address of the dump978 system.<br>
+Example: `http://192.168.xxx.xxx:8978`<br>
+If dump1090 is running on the same system FlightGazer is running off of, leave `PREFER_LOCAL` to `true`.<br>
+FlightGazer was designed to handle reading from both a local dump1090 instance and a remote dump978 system at the same time.<br>
+However, if your network goes down or the dump978 system disconnects, this will cause FlightGazer to pause its processing as if dump1090 failed as well.<br>
+Also important to note, if your dump978 instance uses a different set location than your dump1090 one, the distance data for UAT aircraft will be overridden by your dump1090 location.
 
 </details>
 
@@ -393,6 +405,7 @@ or, you may [start it manually](#️-interactive-mode).
 - Installs:
   - python3-dev
   - libjpeg-dev
+  - python3-numpy
   - python3-venv
   - tmux
 - Create a new systemd service `flightgazer.service` if not present

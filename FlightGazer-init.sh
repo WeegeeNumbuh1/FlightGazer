@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.6.0.2
+# Version = v.6.0.3
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -228,6 +228,8 @@ then
 	apt-get install -y python3-dev >/dev/null
 	echo "    > \"libjpeg-dev\""
 	apt-get install -y libjpeg-dev >/dev/null # for RGBMatrixEmulator
+	echo "    > \"python3-numpy\""
+	apt-get install -y python3-numpy >/dev/null # also for RGBMatrixEmulator
 	echo "    > \"python3-venv\""
 	apt-get install -y python3-venv >/dev/null
 	echo "    > \"tmux\""
