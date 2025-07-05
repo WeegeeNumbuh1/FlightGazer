@@ -139,7 +139,7 @@ Using this project assumes you have the following:
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
-- The latest Python (>3.11)
+- The latest Python (>=3.9)
 - At least 100 MB of available disk space
 - A working internet connection for setup
 - *for Linux distros:*
@@ -154,7 +154,7 @@ Using this project assumes you have the following:
   - `rgbmatrix` does not need to be strictly installed to run this script (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
-  - Using `32x64` sized, HUB75 type matrix display (this is the only layout this script was designed for)
+  - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)
 - Your location set in `dump1090`
 - A console that can interpret ANSI escape sequences (should be most modern ones)
 - If using a Raspberry Pi, use a model that has multiple CPU cores (Raspberry Pi 3/Raspberry Pi 2W or newer)

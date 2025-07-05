@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.6.0.3
+# Version = v.6.0.4
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -145,8 +145,8 @@ fi
 
 if [ ! -f "$CHECK_FILE" ];
 then 
-	echo "> First run detected, installing needed dependencies.
-  This may take some time depending on your internet connection."
+	echo "> First run or upgrade detected, installing needed dependencies.
+  This may take some time, depending on how fast your system is."
 	if [ "$LFLAG" = true ]; then
 		echo "****************************************************************************"
 		echo "> We are currently running in Live/Demo mode; no permanent changes to"
@@ -207,10 +207,19 @@ fi
 # start the splash screen
 # note that if this is a fresh install and the rgbmatrix software framework doesn't exist, the splash screen won't run
 if [ "$DFLAG" != "-d" ]; then
-	if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
-		nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+	if [ ! -d "$VENVPATH" ]; then
+		# if the rgbmatrix library is already installed on first install, this may run
+		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
+			nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+		else
+			nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+		fi
 	else
-		nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
+			nohup ${VENVPATH}/bin/python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+		else
+			nohup ${VENVPATH}/bin/python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+		fi
 	fi
 fi
 
@@ -224,17 +233,27 @@ then
 	dpkg --configure -a >/dev/null
 	echo ""
 	echo "  > Installing needed dependencies..."
-	echo "    > \"python3-dev\""
-	apt-get install -y python3-dev >/dev/null
-	echo "    > \"libjpeg-dev\""
-	apt-get install -y libjpeg-dev >/dev/null # for RGBMatrixEmulator
-	echo "    > \"python3-numpy\""
-	apt-get install -y python3-numpy >/dev/null # also for RGBMatrixEmulator
-	echo "    > \"python3-venv\""
-	apt-get install -y python3-venv >/dev/null
-	echo "    > \"tmux\""
-	apt-get install -y tmux >/dev/null
-	echo ""
+	# should speed up things
+	# https://askubuntu.com/a/1333505
+	apt-cache --generate pkgnames | \
+	grep --line-regexp --fixed-strings \
+	-e python3-dev \
+	-e python3-venv \
+	-e python3-numpy \
+	-e libjpeg-dev \
+	-e tmux \
+	| xargs apt-get install -y >/dev/null
+	# echo "    > \"python3-dev\""
+	# apt-get install -y python3-dev >/dev/null
+	# echo "    > \"libjpeg-dev\""
+	# apt-get install -y libjpeg-dev >/dev/null # for RGBMatrixEmulator
+	# echo "    > \"python3-numpy\""
+	# apt-get install -y python3-numpy >/dev/null # also for RGBMatrixEmulator
+	# echo "    > \"python3-venv\""
+	# apt-get install -y python3-venv >/dev/null
+	# echo "    > \"tmux\""
+	# apt-get install -y tmux >/dev/null
+	echo -e "${FADE}"
 	echo "  > Creating systemd service..."
 	if [ ! -f "/etc/systemd/system/flightgazer.service" ] && [ "$LFLAG" = false ]; then
 		cat <<- EOF > /etc/systemd/system/flightgazer.service
@@ -264,7 +283,8 @@ then
 		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
 		sleep 5s
 	else
-		echo "    > Service already exists or we are running in Live/Demo mode, skipping service creation."
+		echo "    > Service already exists or we are running"
+		echo "      in Live/Demo mode, skipping service creation."
 	fi
 
 	# make a config file for the emulator to prevent harmless error spam and to
@@ -303,6 +323,18 @@ if [ ! -d "$VENVPATH" ]; then
 	echo ""
 	echo "  > Making virtual environment... (this may take awhile)"
 	python3 -m venv --system-site-packages ${VENVPATH}
+	echo "  > Initializing the virtual environment..."
+	${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
+	# Note: `uv` does python package installs much faster, but as of now
+	# it doesn't support the use of --system-site-packages.
+	# See: https://github.com/astral-sh/uv/issues/4466
+	# The framework in this script exists to switch to using `uv` once that happens.
+	# It's as simple as uncommenting the below.
+	# ${VENVPATH}/bin/pip3 install --upgrade uv >/dev/null
+	# if [ -f "${VENVPATH}/bin/activate" ];then
+	# 	export VIRTUAL_ENV=$VENVPATH
+	# 	source .${VENVPATH}/bin/activate >/dev/null
+	# fi
 fi
 echo ""
 
@@ -324,23 +356,26 @@ CHECKMARK='\e[1F\e[30C[ Done ]\n' # move cursor up to the beginning one line up 
 if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo ""
 	echo "> Packages check:"
+	if [ -f "${VENVPATH}/bin/uv" ]; then
+		VENVCMD="${VENVPATH}/bin/uv pip"
+	else
+		VENVCMD="${VENVPATH}/bin/pip3"
+	fi
 	if [ $INTERNET_STAT -eq 0 ]; then
-		echo -e "${VERB_TEXT}pip"
-		${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
-		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}requests"
-		${VENVPATH}/bin/pip3 install --upgrade requests >/dev/null
+		echo -e "${FADE}${VERB_TEXT}requests"
+		${VENVCMD} install --upgrade requests >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}pydispatcher"
-		${VENVPATH}/bin/pip3 install --upgrade pydispatcher >/dev/null
+		${VENVCMD} install --upgrade pydispatcher >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}schedule"
-		${VENVPATH}/bin/pip3 install --upgrade schedule >/dev/null
+		${VENVCMD} install --upgrade schedule >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}suntime"
-		${VENVPATH}/bin/pip3 install --upgrade suntime >/dev/null
+		${VENVCMD} install --upgrade suntime >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}psutil"
-		${VENVPATH}/bin/pip3 install --upgrade psutil >/dev/null
+		${VENVCMD} install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}yaml"
-		${VENVPATH}/bin/pip3 install --upgrade ruamel.yaml >/dev/null
+		${VENVCMD} install --upgrade ruamel.yaml >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}orjson"
-		${VENVPATH}/bin/pip3 install --upgrade orjson >/dev/null
+		${VENVCMD} install --upgrade orjson >/dev/null
 		if [ "$VERB_TEXT" == "Installing: " ]; then
 			echo -e "${CHECKMARK}${FADE}"
 			echo "(The next install may take some time, please be patient.)"
@@ -348,7 +383,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		else
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}RGBMatrixEmulator"
 		fi
-		${VENVPATH}/bin/pip3 install --upgrade RGBMatrixEmulator >/dev/null
+		${VENVCMD} install --upgrade RGBMatrixEmulator >/dev/null
 		echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."

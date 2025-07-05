@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.6.0.4 - 2025-07-05
+    - Init script improvements:
+        - Dependency installation and checks are now faster when doing an upgrade or fresh install
+        - Fix splash screen not starting if rgbmatrix is not installed but RGBMatrixEmulator is available
+
 v.6.0.3 - 2025-07-02
     - Display sub-modules now don't error out following the fix implemented in v.6.0.1
         - This change will reset the color config
