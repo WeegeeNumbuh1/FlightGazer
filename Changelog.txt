@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.0.1 - 2025-07-14
+    - Minor changes to the update and web app install scripts
+
 v.7.0.0 - 2025-07-14
     - FlightGazer now has a web interface!
         - This web app can be installed with a new script: `install-FlightGazer-webapp.sh`

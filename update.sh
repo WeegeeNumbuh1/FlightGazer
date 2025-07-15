@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.7.0.0
+# Last updated: v.7.0.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -116,6 +116,7 @@ if [ $WEB_INF -eq 1 ]; then
 fi
 
 echo ""
+# do not touch the below line, the web interface looks for this to send 'y\n' to the script
 echo "Would you like to update?"
 while read -t 30 -p "[yY|nN]: " do_it; do
 	case "$do_it" in
@@ -240,6 +241,7 @@ if [ $WEB_UPDATE -eq 1 ]; then
 	echo "*   Updating the web interface in the background.  *"
 	echo "* If you're viewing this log in the web interface, *"
 	echo "*          please wait about 15 seconds.           *"
+	echo "*     The Back to Home button may not appear.      *"
 	echo "****************************************************"
 	nohup bash $BASEDIR/web-app/update-webapp.sh & >/dev/null
 fi

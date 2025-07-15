@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.0.0
+# Last updated: v.7.0.1
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -267,7 +267,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	echo "Starting service..."
 	systemctl start flightgazer-webapp.service
 	echo "Service status:"
-	systemctl status flightgazer-webapp.service
+	systemctl status flightgazer-webapp.service --no-pager
 	echo ""
 	echo -e "${NC}${FADE}> Service installed. The FlightGazer web interface will run at boot via systemd."
 	echo -e "${RED}> Do not move the FlightGazer directory (${BASEDIR})!"
