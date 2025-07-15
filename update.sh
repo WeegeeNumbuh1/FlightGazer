@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.6.0.1
+# Last updated: v.7.0.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -62,6 +62,15 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "${GREEN}>>> Checking for updates...${NC}"
+WEB_INF=0
+WEB_UPDATE=0
+systemctl list-unit-files flightgazer-webapp.service >/dev/null
+if [ $? -eq 0 ]; then
+	echo "> The web interface is present; will check for updates for that as well."
+	WEB_INF=1
+fi
+echo ""
+echo "===== FlightGazer info ====="
 if [ -f "${BASEDIR}/version" ]; then
 	VER_STR=$(head -c 12 ${BASEDIR}/version)
 	echo -e "> Currently installed version:        ${VER_STR}"
@@ -77,12 +86,38 @@ else
 fi
 if [ "$VER_STR" == "$LATEST_VER" ]; then
 	echo "> The currently installed version is the same as what is available online."
+	echo "  Choosing to continue the update will cause FlightGazer to automatically check its dependencies on restart."
 else
-	echo "> An update is available!"
+	echo -e "> ${GREEN}An update is available!${NC}"
+fi
+if [ $WEB_INF -eq 1 ]; then
+	echo "===== Web Interface info ====="
+	if [ -f "${BASEDIR}/web-app/version-webapp" ]; then
+		VER_STR=$(head -c 12 ${BASEDIR}/web-app/version-webapp)
+		echo -e "> Currently installed version:        ${VER_STR}"
+	else
+		VER_STR=""
+		echo -e "> ${ORANGE}Could not determine installed version!${NC}"
+	fi
+	LATEST_VER="$(wget -q -O - "https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer-webapp/refs/heads/master/version-webapp")"
+	if [ -z $LATEST_VER ]; then
+		echo -e "> ${ORANGE}Could not determine latest version!${NC}"
+	else
+		echo -e "> Latest version available on GitHub: ${LATEST_VER}"
+	fi
+	if [ "$VER_STR" == "$LATEST_VER" ]; then
+		echo "> The currently installed version is the same as what is available online."
+		echo "  No update to the web interface will occur."
+	else
+		echo -e "> ${GREEN}An update is available!${NC} If you continue the update, the web interface will be updated as well."
+		WEB_UPDATE=1
+	fi
+	echo ""
 fi
 
 echo ""
-while read -t 30 -p "Would you like to update? [yY|nN]: " do_it; do
+echo "Would you like to update?"
+while read -t 30 -p "[yY|nN]: " do_it; do
 	case "$do_it" in
 		"y" | "Y" | "yes" | "Yes" | "YES")
 			break
@@ -111,6 +146,7 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
+find "${TEMPPATH}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
 if [ -f "${TEMPPATH}/version" ]; then
 	VER_STR=$(head -c 12 ${TEMPPATH}/version)
 	echo -e "${NC}> Downloaded FlightGazer version: ${VER_STR}"
@@ -120,7 +156,7 @@ systemctl stop flightgazer.service
 sleep 2s
 tmux send-keys -t FlightGazer C-c >/dev/null 2>&1
 sleep 1s
-kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
+kill -15 $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') >/dev/null 2>&1 # ensure nothing remains running
 echo "> Done."
 color_migrator () {
 	file=$1 # new file
@@ -199,6 +235,14 @@ else
 	echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
 fi
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
+if [ $WEB_UPDATE -eq 1 ]; then
+	echo "*************** Web Interface info *****************"
+	echo "*   Updating the web interface in the background.  *"
+	echo "* If you're viewing this log in the web interface, *"
+	echo "*          please wait about 15 seconds.           *"
+	echo "****************************************************"
+	nohup bash $BASEDIR/web-app/update-webapp.sh & >/dev/null
+fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 echo ""
 if [ $MIGRATE_FLAG -eq 1 ]; then

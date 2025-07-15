@@ -30,6 +30,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - [Prerequisites (Important)](#️-prerequisites-important)
   - [Installation \& Getting Started](#-installation--getting-started)
   - [Configuration](#️-configuration)
+  - [Making Things Easier](#-making-things-easier)
 - [Usage](#️-usage)
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
@@ -119,6 +120,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Set up to automatically start on boot via `systemd`
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
+- 🆕 A web interface that makes it easier to configure, check, and update FlightGazer (as a separate project)
 - Can be configured to run automatically inside `tmux`
 - Program state is available in a json file for use elsewhere
 - Robust and hard-to-break
@@ -291,6 +293,18 @@ Example: `seconds_color = BLACK`
  
 </details>
 
+### 💻 Making Things Easier
+
+Want to make dealing with FlightGazer easier without having to use terminal commands all the time?<br>
+Install the web interface that manages basically everything to do with FlightGazer.<br>
+The web interface can be installed using:<br>
+```bash
+sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh
+```
+The web interface can be accessed via<br>
+`http://<IP-address-of-device-running-FlightGazer>/flightgazer`<br>
+or on port `9898` if there's no web server present on the device running FlightGazer.
+
 ## 🏃‍♂️ Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
 
@@ -349,7 +363,7 @@ The script automatically detects that you're running interactively and will disp
 > <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect less than 7 FPS on a Raspberry Pi 3/Zero 2W)
 > <br>
 > <br>By default, `RGBMatrixEmulator` can be viewed through a web browser:
-> - `http://IP-address-of-device-running-FlightGazer:8888`
+> - `http://<IP-address-of-device-running-FlightGazer>:8888`
 > - `http://localhost:8888` (on the device running FlightGazer)
 
 
@@ -581,7 +595,7 @@ Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [ ] Docker image?
-- [ ] Settings management from webpage?
+- [x] Settings management from webpage 🆕 [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
 Suggestions, comments, and bug reports are always welcomed and encouraged.<br>

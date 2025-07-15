@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.5.0.0
+# Last updated: v.7.0.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -68,6 +68,10 @@ rm -f /etc/systemd/system/flightgazer.service 2>&1
 systemctl daemon-reload 2>&1
 systemctl reset-failed 2>&1
 ' >> $TEMPPATH
+echo 'echo "Uninstalling web interface (if present)..."' >> $TEMPPATH
+echo 'if [ -f ${FGDIR}/web-app/uninstall-webapp.sh ]; then
+	bash ${FGDIR}/web-app/uninstall-webapp.sh
+fi' >> $TEMPPATH
 echo 'echo "Removing virtual Python environment..."
 rm -rf /etc/FlightGazer-pyvenv
 echo -e "Removing FlightGazer directory ${FGDIR}..."

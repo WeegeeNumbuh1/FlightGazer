@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.6.0.4 --- 2025-07-05'
+VERSION: str = 'v.7.0.0 --- 2025-07-14'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -986,7 +986,7 @@ def read_1090_config() -> None:
 def probe_API() -> tuple[int | None, float | None]:
     """ Checks if the provided API Key is valid, and if it is, pulls stats from the last 30 days.
     This specific query doesn't use API credits according to the API reference. It does however increment
-    the call amount. If the call fails, returns None. """
+    the call amount. Returns a tuple: (api_calls, api_cost). If the call fails, returns None. """
     if API_KEY is None or not API_KEY: return None, None
     if NOFILTER_MODE: return None, None
     if (ENHANCED_READOUT
@@ -1514,6 +1514,17 @@ def runtime_accumulators_reset() -> None:
         ]
         main_logger.info(f"{len(unique_planes_seen)} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
 
+    if really_really_active_adsb_site and len(unique_planes_seen) <= 300:
+        # opposite direction of congrats (https://i.kym-cdn.com/photos/images/original/002/573/423/ced.jpg)
+        mythical = [
+            "Quiet day, huh?",
+            "There are places quieter than here, crazy to think.",
+            "The airports gave you a break this time. Hope you enjoyed the day.",
+            "Serenity and sonorous silence -- stillness suffuses the sky as the machines of air slumber.",
+            "Hopefully this isn't affecting your rankings on some leaderboards (if you're into that).",
+        ]
+        main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(congrats) - 1)]}")
+
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} "
                          f"successful API calls, of which {api_hits[2]} returned no data. "
@@ -1544,7 +1555,7 @@ def runtime_accumulators_reset() -> None:
                 cost_delta = api_usage_cost_sofar - api_cost
             else:
                 cost_delta = 0.
-            api_usage_cost_baseline = api_cost + cost_delta
+            api_usage_cost_baseline = api_cost + cost_delta # keep a buffer that makes hitting the cost limit faster
             main_logger.info(f"Difference between calculated (${api_usage_cost_sofar:.3f}) "
                              f"and actual cost: ${abs(api_usage_cost_sofar - api_cost):.3f}")
             if API_COST_LIMIT is not None:
@@ -1554,6 +1565,11 @@ def runtime_accumulators_reset() -> None:
                                      f"remains before reaching cost limit (${API_COST_LIMIT:.2f}).")
                     if API_cost_limit_reached:
                         main_logger.info(f"There are credits available again, API will be re-enabled.")
+                        # from real-world testing, the cost limit is usually reached many hours before the midnight API check,
+                        # so, if the cost limiter is enabled and it turns out there's more credits available, it's safe to
+                        # assume what the API reports is accurate at this point; we override the whole
+                        # api_usage_cost_baseline = api_cost + cost_delta line above.
+                        api_usage_cost_baseline = api_cost
                         API_cost_limit_reached = False
                 else:
                     main_logger.warning(f"API usage currently exceeds the set cost limit (${API_COST_LIMIT:.2f}).")
@@ -5628,6 +5644,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
     main_logger.info("Initializing display...")
     if 'RGBMatrixEmulator' in sys.modules:
         main_logger.info("We are using 'RGBMatrixEmulator'")
+        main_logger.info("Heads up: Running the emulator is slow! Animations may be laggy.")
     else:
         main_logger.info("We are using 'rgbmatrix'")
     if ENHANCED_READOUT_AS_FALLBACK and API_KEY: 

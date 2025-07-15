@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.6.0.4 # do not modify this
+CONFIG_VERSION: v.7.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -76,7 +76,6 @@ API_SCHEDULE:
 # 12-23: 'xxxxxxxxxxx-' means "use the API from 12:00 up to 23:00"
 # 0-11:  '-x--xx-xxx-x' means "use the API from 1:00-2:00, 4:00-6:00, 7:00-9:00, 11:00-12:00"
 # If the string starts with a '-', you must encapsulate it in quotes.
-# (Don't worry if quotes go missing for other time slots when upgrading FlightGazer)
 
 # ============= Screen Output settings =============
 # ==================================================

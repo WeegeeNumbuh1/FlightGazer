@@ -5,6 +5,31 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.0.0 - 2025-07-14
+    - FlightGazer now has a web interface!
+        - This web app can be installed with a new script: `install-FlightGazer-webapp.sh`
+            - It is not automatically installed and requires FlightGazer to be installed on the system first
+        - Accessible via the page /flightgazer on the device running FlightGazer (eg: http://192.168.xxx.xxx/flightgazer)
+          or via port 9898 if no web server is available
+        - It's now easier and more intuitive to change the configuration and colors instead of going to the files themselves
+        - Logs and current state are now easily accessible rather than having to query them via a command line
+        - Updates can be done directly though a web browser
+        - Startup options can be changed
+        - Restart, stop, or start the FlightGazer service directly as well
+        - Supports light and dark themes
+        - Full disclosure: This web app (besides the setup/uninstall/update scripts) was vibe coded, but has been tested to mostly work
+          and has some manual corrections the LLM couldn't figure out exactly (web design hard, respect to full stack devs)
+    - Fix issue where API fails to be re-enabled when there are credits available again due to the reset mechanism not actually
+      resetting the baseline cost tracker
+    - Numerous integrations to handle the web interface:
+        - Update initialization script to handle when the web interface is running
+        - Update updater script to also check for updates for the web interface
+            - Modify the interactive routine slightly so that the web app can interface with it as well
+        - Update uninstall script to also handle uninstalling the web interface service
+        - Settings migrator now preserves quotes in settings
+    - Add another color preset and change default color for the marquee (I think the peach color looks nicer)
+    - Add another easter egg for one of the existing easter eggs
+
 v.6.0.4 - 2025-07-05
     - Init script improvements:
         - Dependency installation and checks are now faster when doing an upgrade or fresh install

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.6.0.4
+# Version = v.7.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -121,7 +121,7 @@ if [ `id -u` -ne 0 ]; then
 	exit 1
 fi
 
-if [[ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') ]]; then
+if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
 	echo -e "\n${NC}${RED}>>> ERROR: FlightGazer is already running.${NC}"
 	echo "These are the process IDs detected:"
 	ps aux | grep '[F]lightGazer.py' | awk '{print $2}'
@@ -129,7 +129,7 @@ if [[ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}') ]]; then
 	echo "To stop the other running instance, use:"
 	echo "'sudo systemctl stop flightgazer.service' -or-"
 	echo "'sudo tmux attach -d -t FlightGazer' and press Ctrl+C -or-"
-	echo 'kill -15 $(ps aux | grep '"'"'[F]lightGazer.py'"'"' | awk '"'"'{print $2}'"'"')'
+	echo 'kill -15 $(ps aux | grep '"'"'[F]lightGazer\.py'"'"' | awk '"'"'{print $2}'"'"')'
 	sleep 2s
 	exit 1
 fi
@@ -152,6 +152,11 @@ then
 		echo "> We are currently running in Live/Demo mode; no permanent changes to"
 		echo "  the system will occur. FlightGazer will run using dependencies in '/tmp'."
 		echo "****************************************************************************"
+	else
+		echo ""
+		echo "Protip: Install the web interface to make dealing with FlightGazer more convenient!"
+		echo "It can be installed with the 'install-FlightGazer-webapp.sh' script in this directory."
+		echo ""
 	fi
 	VERB_TEXT='Installing: '
 else
@@ -168,6 +173,9 @@ fi
 
 if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo "> Checking system image..."
+	# get rid of git tracking stuff
+	rm -rf ${BASEDIR}/.git >/dev/null 2>&1
+	find "${BASEDIR}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
 
 	# check if this system uses apt
 	command -v apt 2>&1 >/dev/null

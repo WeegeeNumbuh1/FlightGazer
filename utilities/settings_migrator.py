@@ -2,7 +2,7 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.5.0.0
+# Last updated: v.7.0.0
 # By WeegeeNumbuh1
 
 import sys
@@ -31,6 +31,7 @@ PATH2 = Path(args.new_settings_file)
 print(f"Current configuration file: {PATH1}\nNew configuration file:     {PATH2}")
 
 yaml=YAML()
+yaml.preserve_quotes = True
 
 try:
     user_settings = yaml.load(open(PATH1, 'r'))
