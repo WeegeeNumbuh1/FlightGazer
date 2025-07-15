@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.7.0.1
+# Last updated: v.7.0.2
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -109,7 +109,8 @@ if [ $WEB_INF -eq 1 ]; then
 		echo "> The currently installed version is the same as what is available online."
 		echo "  No update to the web interface will occur."
 	else
-		echo -e "> ${GREEN}An update is available!${NC} If you continue the update, the web interface will be updated as well."
+		echo -e "> ${GREEN}An update is available!${NC}"
+		echo "If you continue the update, the web interface will be updated as well."
 		WEB_UPDATE=1
 	fi
 	echo ""
@@ -243,7 +244,7 @@ if [ $WEB_UPDATE -eq 1 ]; then
 	echo "*          please wait about 15 seconds.           *"
 	echo "*     The Back to Home button may not appear.      *"
 	echo "****************************************************"
-	nohup bash $BASEDIR/web-app/update-webapp.sh & >/dev/null
+	nohup bash $BASEDIR/web-app/update-webapp.sh >/dev/null 2>&1 &
 fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 echo ""

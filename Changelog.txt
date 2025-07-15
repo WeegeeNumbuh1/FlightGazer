@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.0.2 - 2025-07-15
+    - Fix issue with web interface failing to restart if an update to the web interface is installed
+        - Caused by the service file settings, which kills the update script that initiates the restart, therefore
+          never starting the service
+    - Additional tweaks to the update script
+
 v.7.0.1 - 2025-07-14
     - Minor changes to the update and web app install scripts
 
