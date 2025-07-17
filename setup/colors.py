@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.7.0.0
+VERSION: v.7.1.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -63,10 +63,11 @@ BLUE_DARK = graphics.Color(0, 40, 170)
 BLUE_DARKER = graphics.Color(18, 20, 105)
 BLUE_PURE = graphics.Color(0, 0, 255)
 SAKURA_PINK = graphics.Color(255, 138, 170)
-PINK = graphics.Color(200, 0, 200)
-PINK_DARK = graphics.Color(112, 0, 145)
-PURPLE = graphics.Color(68, 0, 145)
-PURPLE_LIGHT = graphics.Color(100, 32, 160)
+PINK = graphics.Color(251, 83, 114)
+MAGENTA = graphics.Color(200, 0, 200)
+PURPLE_DARK = graphics.Color(68, 0, 145)
+PURPLE = graphics.Color(128, 0, 255)
+GRAPE_PURPLE = graphics.Color(112, 0, 145)
 
 # CONFIG_START
 # ============ Clock Colors =============
@@ -74,7 +75,7 @@ PURPLE_LIGHT = graphics.Color(100, 32, 160)
 clock_color = WARM_WHITE
 seconds_color = WARM_WHITE
 am_pm_color = ORANGE_DARK
-day_of_week_color = PINK_DARK
+day_of_week_color = GRAPE_PURPLE
 date_color = PURPLE
 
 # stats at the bottom
@@ -104,15 +105,15 @@ destination_color = ORANGE
 arrow_color = ORANGE
 
 # journey plus colors
-time_header_color = PURPLE
-time_readout_color = PINK_DARK
+time_header_color = GRAPE_PURPLE
+time_readout_color = PURPLE
 center_readout_color = DARK_GREY
 
 # enhanced readout colors
 latitude_color = ORANGE
 longitude_color = ORANGE
-groundtrack_color = PINK_DARK
-verticalspeed_color = PURPLE
+groundtrack_color = GRAPE_PURPLE
+verticalspeed_color = PURPLE_DARK
 
 # scrolling info line
 # (overrides journey plus "center_readout_color" when

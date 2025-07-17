@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.0.2
+# Last updated: v.7.1.0
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -60,6 +60,16 @@ if [ $? -ne 0 ]; then
 	>&2 echo -e "${NC}${RED}>>> ERROR: Failed to connect to internet. Try again when there is internet connectivity.${NC}"
 	exit 1
 fi
+
+venv_install() {
+	VENVCMD="${VENVPATH}/bin/pip3"
+	echo -e "${FADE}> Flask..."
+	${VENVCMD} install --upgrade Flask >/dev/null
+	echo "Done."
+	echo -e "${FADE}> gunicorn..."
+	${VENVCMD} install --upgrade gunicorn >/dev/null
+	echo -e "Done.${NC}"
+}
 
 systemctl list-unit-files flightgazer-webapp.service >/dev/null
 if [ $? -ne 0 ] && [ ! -d "${BASEDIR}/web-app" ]; then
@@ -127,6 +137,9 @@ else
 	fi
 	# fire up the bundled updater
 	if [ -f "${BASEDIR}/web-app/update-webapp.sh" ]; then
+		echo "Checking venv dependencies first..."
+		systemctl stop flightgazer-webapp >/dev/null 2>&1
+		venv_install
 		bash ${BASEDIR}/web-app/update-webapp.sh
 		if [ $? -ne 0 ]; then
 			>&2 echo -e "${NC}${RED}>>> ERROR: Update failed.${NC}"
@@ -163,15 +176,8 @@ cp -afT ${TEMPPATH} ${BASEDIR}/web-app
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
 echo -e "${FADE}"
 
-# Install requirements
-VENVCMD="${VENVPATH}/bin/pip3"
 echo "Installing dependencies in existing FlightGazer venv..."
-echo "Installing Flask..."
-${VENVCMD} install --upgrade Flask >/dev/null
-echo "Done."
-echo -e "${FADE}Installing gunicorn..."
-${VENVCMD} install --upgrade gunicorn >/dev/null
-echo -e "Done.${FADE}"
+venv_install
 
 # https://stackoverflow.com/a/33550399
 NET_IF=`netstat -rn | awk '/^0.0.0.0/ {thif=substr($0,74,10); print thif;} /^default.*UG/ {thif=substr($0,65,10); print thif;}'`
@@ -248,7 +254,6 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	cat <<- EOF > /etc/systemd/system/flightgazer-webapp.service
 	[Unit]
 	Description=FlightGazer Web Interface
-	Wants=flightgazer.service
 
 	[Service]
 	# yeah we use root for this, but this web app isn't something you expose to the rest of the internet anyway (if you do, then gg)

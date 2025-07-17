@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.6.0.0
+# Last updated: v.7.1.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -20,24 +20,69 @@ try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    except:
-        os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
-        from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-        RGBMatrixEmulatorConfig.CONFIG_PATH = Path(f"{CURRENT_DIR}/../emulator_config.json")
-        from RGBMatrixEmulator import graphics
-        from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+    except (ModuleNotFoundError, ImportError):
+        # handle case when rgbmatrix is not installed and maybe is present in the home directory
+        if (RGBMATRIX_DIR := Path(Path.home(), "rpi-rgb-led-matrix")).exists:
+            sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
+            try:
+                from rgbmatrix import graphics
+                from rgbmatrix import RGBMatrix, RGBMatrixOptions
+            except (ModuleNotFoundError, ImportError):
+                os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+                from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
+                from RGBMatrixEmulator import graphics
+                from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+        else:
+            os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+            from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+            RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
+            from RGBMatrixEmulator import graphics
+            from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 except: # if display can't be loaded, don't bother showing the splash screen
+    print("FG-Splash: Error: No display driver found. Splash screen is not available.")
     sys.exit(1)
 try:
     from PIL import Image
 except:
+    print("FG-Splash: Error: PIL (Pillow) library not found. Splash screen is not available.")
     sys.exit(1)
 
 try:
-    with open(Path(f"{CURRENT_DIR}/../version"), 'rb') as f:
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    can_load_config = True
+except (ModuleNotFoundError, ImportError):
+    can_load_config = False
+
+try:
+    with open(Path(CURRENT_DIR, '..', 'version'), 'rb') as f:
         VER_STR = f.read(12).decode('utf-8').strip()
 except:
     VER_STR = "UNKNOWN"
+
+config_default = {
+    'GPIO_SLOWDOWN': 2,
+    'HAT_PWM_ENABLED': True,
+    'LED_PWM_BITS': 8,
+}
+if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load_config:
+    try:
+        config = yaml.load(open(CONFIG_FILE, 'r'))
+    except:
+        config = None
+
+    if config:
+        for key in config_default:
+            if (key not in config
+                or type(config[key]) != type(config_default[key])
+                or config[key] is None
+            ):
+                config[key] = config_default[key]
+    else:
+        config = config_default
+else:
+    config = config_default
 
 def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
@@ -53,7 +98,10 @@ except FileNotFoundError:
 class ImageScroller():
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
-        self.parser.add_argument("image", help="The image to display", default="FG-Splash.ppm")
+        self.parser.add_argument("image", 
+                      help="The image to display",
+                      default=f"{Path(CURRENT_DIR, '..', 'FG-Splash.ppm')}"
+                      )
         self.parser.add_argument('-u', '--update',
                       action='store_true',
                       help="Changes text to 'Now Updating' instead of the default 'Now Loading'."
@@ -72,8 +120,6 @@ class ImageScroller():
         self.spinner_index = 0
 
         # Run with the following rgbmatrix options.
-        # `options.hardware_mapping` is missing as we let the
-        # local build of rgbmatrix use its defaults.
         # nb: If these settings end up not working, then we simply won't have a splash screen
         #     which is not a huge issue.
         options = RGBMatrixOptions()
@@ -87,9 +133,12 @@ class ImageScroller():
         options.led_rgb_sequence = "RGB"
         options.pixel_mapper_config = ""
         options.show_refresh_rate = 0
-        options.pwm_bits = 8
-        options.gpio_slowdown = 2
+        options.pwm_bits = config['LED_PWM_BITS']
+        options.gpio_slowdown = config['GPIO_SLOWDOWN']
+        options.brightness = 100
         options.drop_privileges = False
+        options.hardware_mapping = "adafruit-hat-pwm" if config['HAT_PWM_ENABLED'] else "adafruit-hat"
+        options.disable_hardware_pulsing = False if config['HAT_PWM_ENABLED'] else True
         self.matrix = RGBMatrix(options=options)
 
     def run(self):
@@ -98,6 +147,7 @@ class ImageScroller():
                 self.image = Image.open(Path(self.args.image)).convert('RGB')
             except:
                 # if we can't open the image, just exit
+                print(f"FG-Splash: Error: Could not open image '{self.args.image}'. Please check the file path and format.")
                 sys.exit(1)
         self.image = self.image.resize([self.matrix.width, self.matrix.height])
 

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.7.0.2
+# Version = v.7.1.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -21,6 +21,7 @@ LOGFILE=${BASEDIR}/FlightGazer-log.log
 DB_DOWNLOADER=${BASEDIR}/utilities/aircraft_db_fetcher.py
 INTERNET_STAT=0 # think return codes
 SKIP_CHECK=0 # 0 = do not skip dependency checks, 1 = skip
+WEB_INT=0 # 1 = web interface is present
 
 # Function to send SIGTERM to python when our exit signals are detected
 terminate() {
@@ -57,6 +58,26 @@ help_str(){
 	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
 	echo ""
 	echo "Report bugs to WeegeeNumbuh1 <https://github.com/WeegeeNumbuh1/FlightGazer>"
+}
+
+cleanup() {
+	echo -e "${RED}\n>>> Ctrl+C pressed. Setup or startup canceled.${NC}"
+	# kill splash screen if started
+	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') >/dev/null 2>&1
+	if [ $SKIP_CHECK -eq 0 ]; then
+		# remove check file (install might be in an inconsistent state)
+		rm $CHECK_FILE > /dev/null 2>&1
+	fi
+	# https://old.reddit.com/r/bash/comments/1e8plnu/leddyee/
+	if [ $WEB_INT -eq 1 ]; then
+		systemctl is-active flightgazer-webapp >/dev/null 2>&1
+		# if we stopped the web interface
+		if [ $? -eq 3 ]; then
+			systemctl start flightgazer-webapp >/dev/null 2>&1
+		fi
+	fi
+	trap - INT
+	kill -INT "$$"
 }
 
 DFLAG=""
@@ -129,7 +150,7 @@ if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
 	echo "To stop the other running instance, use:"
 	echo "'sudo systemctl stop flightgazer.service' -or-"
 	echo "'sudo tmux attach -d -t FlightGazer' and press Ctrl+C -or-"
-	echo 'kill -15 $(ps aux | grep '"'"'[F]lightGazer\.py'"'"' | awk '"'"'{print $2}'"'"')'
+	echo 'sudo kill -15 $(ps aux | grep '"'"'[F]lightGazer\.py'"'"' | awk '"'"'{print $2}'"'"')'
 	sleep 2s
 	exit 1
 fi
@@ -143,6 +164,10 @@ if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	exit 1
 fi
 
+systemctl list-unit-files flightgazer-webapp.service >/dev/null
+if [ $? -eq 0 ]; then
+	WEB_INT=1
+fi
 if [ ! -f "$CHECK_FILE" ];
 then 
 	echo "> First run or upgrade detected, installing needed dependencies.
@@ -152,10 +177,16 @@ then
 		echo "> We are currently running in Live/Demo mode; no permanent changes to"
 		echo "  the system will occur. FlightGazer will run using dependencies in '/tmp'."
 		echo "****************************************************************************"
-	else
+	fi
+	if [ $WEB_INT -ne 1 ]; then
 		echo ""
 		echo "Protip: Install the web interface to make dealing with FlightGazer more convenient!"
 		echo "It can be installed with the 'install-FlightGazer-webapp.sh' script in this directory."
+		echo ""
+	else
+		echo ""
+		echo "The FlightGazer web interface is present."
+		echo "This script will also check the dependencies for it as well."
 		echo ""
 	fi
 	VERB_TEXT='Installing: '
@@ -171,6 +202,7 @@ else
 	VERB_TEXT='Checking: '
 fi
 
+trap cleanup SIGINT
 if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo "> Checking system image..."
 	# get rid of git tracking stuff
@@ -392,6 +424,14 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}RGBMatrixEmulator"
 		fi
 		${VENVCMD} install --upgrade RGBMatrixEmulator >/dev/null
+		if [ $WEB_INT -eq 1 ]; then
+			systemctl stop flightgazer-webapp >/dev/null 2>&1
+			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}Flask"
+			${VENVCMD} install --upgrade Flask >/dev/null
+			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}gunicorn"
+			${VENVCMD} install --upgrade gunicorn >/dev/null
+			systemctl start flightgazer-webapp >/dev/null 2>&1
+		fi
 		echo -e "${CHECKMARK}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n"
 	else
 		echo "  Skipping due to no internet."
@@ -442,6 +482,7 @@ if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
 fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"
 kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
+trap - INT # reset the signal handler
 
 echo -ne "${FADE}"
 echo ""

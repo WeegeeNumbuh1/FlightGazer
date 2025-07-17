@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.0.1 --- 2025-07-14'
+VERSION: str = 'v.7.1.0 --- 2025-07-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -147,7 +147,7 @@ try:
     CURRENT_USER = getuser()
 except OSError:
     CURRENT_USER = "< Unknown >"
-LOGFILE = Path(f"{CURRENT_DIR}/FlightGazer-log.log")
+LOGFILE = Path(CURRENT_DIR, "FlightGazer-log.log")
 try: # should basically work all the time since we're running as root, but this costs nothing
     LOGFILE.touch(mode=0o777, exist_ok=True)
     with open(LOGFILE, 'a') as f:
@@ -157,13 +157,13 @@ except PermissionError:
     import tempfile
     workingtempdir = tempfile.gettempdir()
     if os.name == 'posix':
-        LOGFILE = Path(f"{workingtempdir}/FlightGazer-log.log")
+        LOGFILE = Path(workingtempdir, "FlightGazer-log.log")
         LOGFILE.touch(mode=0o777, exist_ok=True)
         with open(LOGFILE, 'a') as f:
             f.write("\n")
         del f
     if os.name == 'nt':
-        LOGFILE = Path(f"{workingtempdir}/FlightGazer-log.log")
+        LOGFILE = Path(workingtempdir, "FlightGazer-log.log")
         LOGFILE.touch(mode=0o777, exist_ok=True)
         with open(LOGFILE, 'a') as f:
             f.write("\n")
@@ -202,14 +202,14 @@ main_logger.info(f"FlightGazer Version: {VERSION}")
 main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
 main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
-if LOGFILE != Path(f"{CURRENT_DIR}/FlightGazer-log.log"):
+if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
 
 # Main "constants"
-CONFIG_FILE = Path(f"{CURRENT_DIR}/config.yaml")
-FLYBY_STATS_FILE = Path(f"{CURRENT_DIR}/flybys.csv")
-DATABASE_FILE = Path(f"{CURRENT_DIR}/utilities/database.db")
+CONFIG_FILE = Path(CURRENT_DIR, "config.yaml")
+FLYBY_STATS_FILE = Path(CURRENT_DIR, "flybys.csv")
+DATABASE_FILE = Path(CURRENT_DIR, "utilities", "database.db")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
 USER_AGENT: dict = {'User-Agent': "Wget/1.25.0"}
 """ Use Wget user-agent for our requests """
@@ -236,9 +236,26 @@ if not NODISPLAY_MODE:
             try:
                 from rgbmatrix import graphics
                 from rgbmatrix import RGBMatrix, RGBMatrixOptions
+                main_logger.debug("rgbmatrix successfully loaded")
             except (ModuleNotFoundError, ImportError):
-                main_logger.warning("rgbmatrix software framework not found. Switching to display emulation mode.")
-                EMULATE_DISPLAY = True
+                # check if the rgbmatrix library is in the user home directory
+                # In some environments, the system-wide bindings don't work
+                if (RGBMATRIX_DIR := Path(Path.home(), "rpi-rgb-led-matrix")).exists:
+                    sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
+                    try:
+                        from rgbmatrix import graphics
+                        from rgbmatrix import RGBMatrix, RGBMatrixOptions
+                        if VERBOSE_MODE:
+                            main_logger.warning("rgbmatrix software framework was found, but does not appear to be installed.")
+                            main_logger.info(">>> Please check your rgbmatrix install and correct this issue.")
+                        else:
+                            main_logger.info(f"Using rgbmatrix library found at \'{RGBMATRIX_DIR}\' (was it installed correctly?)")
+                    except (ModuleNotFoundError, ImportError):
+                        main_logger.warning("rgbmatrix software framework not found. Switching to display emulation mode.")
+                        EMULATE_DISPLAY = True
+                else:
+                    main_logger.warning("rgbmatrix software framework not found. Switching to display emulation mode.")
+                    EMULATE_DISPLAY = True
 
         if EMULATE_DISPLAY:
             import types
@@ -246,7 +263,7 @@ if not NODISPLAY_MODE:
                 # monkey patch this so it loads the config file from our running directory
                 os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
                 from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(f"{CURRENT_DIR}/emulator_config.json")
+                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, "emulator_config.json")
 
                 from RGBMatrixEmulator import graphics
                 # the below line monkey patches imports to use the emulator even if rgbmatrix is installed
@@ -856,7 +873,7 @@ def probe1090() -> tuple[str | None, str | None]:
             "/run/shm", # AirNav's rbfeeder
             ]
         for i, json_1090 in enumerate(file_locations):
-            if Path(f"{json_1090}/aircraft.json").is_file():
+            if Path(json_1090, "aircraft.json").is_file():
                 USING_FILESYSTEM = True
                 main_logger.info("A local working dump1090 instance was found running on this system.")
                 return json_1090 + '/aircraft.json', json_1090
@@ -891,7 +908,7 @@ def probe978() -> str | None:
             "/run/adsbexchange-978",
         ]
         for i, json_978 in enumerate(file_locations):
-            if Path(f"{json_978}/aircraft.json").is_file():
+            if Path(json_978, "aircraft.json").is_file():
                 USING_FILESYSTEM_978 = True
                 main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
                 return json_978 + '/aircraft.json'
@@ -947,7 +964,7 @@ def read_1090_config() -> None:
     if not DUMP1090_IS_AVAILABLE: return
     try:
         if USING_FILESYSTEM:
-            with open(Path(URL + '/receiver.json'), 'rb') as receiver_file:
+            with open(Path(URL, "receiver.json"), 'rb') as receiver_file:
                 receiver = json.load(receiver_file)
         else:
             receiver_req = requests.get(URL + '/data/receiver.json', headers=USER_AGENT, timeout=5)
@@ -1304,7 +1321,7 @@ def read_receiver_stats() -> None:
         if DUMP1090_IS_AVAILABLE:
             try:
                 if USING_FILESYSTEM:
-                    with open(Path(URL + '/stats.json'), 'rb') as stats_file:
+                    with open(Path(URL, "stats.json"), 'rb') as stats_file:
                         if ORJSON_IMPORTED:
                             stats = orjson.loads(stats_file.read())
                         else:
@@ -3559,7 +3576,7 @@ class WriteState:
         self.run_dir = Path("/run/FlightGazer")
         self.can_run_flag: bool = True
         # self.run_dir = CURRENT_DIR # debug on Windows and comment out the OS check block below
-        self.json_file = Path(f"{self.run_dir}/current_state.json")
+        self.json_file = Path(self.run_dir, "current_state.json")
         if (
             not WRITE_STATE
             or not os.name == 'posix'
@@ -4878,7 +4895,7 @@ class Display(
                 _ = graphics.DrawText(
                     self.canvas,
                     fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
-                    ORIGIN_X_POS + 2,
+                    ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE - 2,
                     ORIGIN_COLOR,
                     origin_now
@@ -4891,7 +4908,7 @@ class Display(
                 _ = graphics.DrawText(
                     self.canvas,
                     fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
-                    ORIGIN_X_POS + 2,
+                    ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE - 4,
                     ORIGIN_COLOR,
                     origin_now[:4]
@@ -4899,7 +4916,7 @@ class Display(
                 _ = graphics.DrawText(
                     self.canvas,
                     fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
-                    ORIGIN_X_POS + 2,
+                    ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE + 1,
                     ORIGIN_COLOR,
                     origin_now[4:8]

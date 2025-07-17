@@ -456,9 +456,12 @@ Pass `-h` to see all operating modes.
 
 <details><summary>Useful commands</summary>
 
-Terminating all FlightGazer-related processes (Linux):
+Terminating FlightGazer-related processes manually (Linux):
 ```bash
-kill -15 $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}')
+# Just the main FlightGazer process
+kill -15 $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}')
+# The web interface (using systemctl is recommended over this)
+kill -15 $(ps aux | grep 'FG-webapp.py' | awk '{print $2}')
 ```
 Changing `systemd` startup command
 ```bash
@@ -468,6 +471,13 @@ systemctl daemon-reload
 Disabling startup at boot
 ```bash
 sudo systemctl disable flightgazer.service
+```
+Deploy the full FlightGazer package in one go:
+```bash
+sudo bash /path/to/FlightGazer/FlightGazer-init.sh -c \
+&& echo y | sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh \
+&& sudo systemctl start flightgazer
+# :D
 ```
 </details>
 

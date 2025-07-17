@@ -5,6 +5,23 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.1.0 - 2025-07-17
+    - FlightGazer now handles the case where the rgbmatrix library is present but is not actually installed
+    - Refactored path handling in main python script
+    - Splash screen now inherits the RGB matrix settings present in the config file
+    - Initialization script now handles cases when the install/dependency check is interrupted or stopped
+    - Improvements with script files for the web interface:
+        - Initialization script will also check dependencies for the web interface if it's installed
+        - Web app install script now checks the dependencies in the virtual environment when running an update
+        - Adjusted web interface systemd service file to not start FlightGazer upon restarting the service itself
+        - Tweak update script to work better with the web interface
+    - Add additional color presets and fix the long-standing incorrect color names for PINK and PINK_DARK
+      (this update will reset your color preferences)
+      - This naming convention was a remnant of when FlightGazer was borrowing the layout for the 'its-a-plane' project
+      - PINK -> MAGENTA, PINK_DARK -> GRAPE_PURPLE (PINK_DARK removed), PURPLE -> PURPLE_DARK, PURPLE has been updated to be brighter
+        - Some default colors have been changed, mostly those that referenced the old purple colors
+    - Shift origin airport code leftwards one pixel in JOURNEY_PLUS mode when it uses 4 characters
+
 v.7.0.2 - 2025-07-15
     - Fix issue with web interface failing to restart if an update to the web interface is installed
         - Caused by the service file settings, which kills the update script that initiates the restart, therefore

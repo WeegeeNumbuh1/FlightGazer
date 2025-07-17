@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.7.0.2
+# Last updated: v.7.1.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -233,11 +233,13 @@ if [ $? -ne 0 ]; then
 	echo "> Service does not exist or is disabled!"
 	echo -e "${ORANGE}> You must restart FlightGazer manually."
 else
-	systemctl start flightgazer.service &
+	nohup systemctl start flightgazer.service &
+	disown # orphan the above process once the script exits so that the web interface knows this script is actually done
 	echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
 fi
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
 if [ $WEB_UPDATE -eq 1 ]; then
+	echo -e "${FADE}"
 	echo "*************** Web Interface info *****************"
 	echo "*   Updating the web interface in the background.  *"
 	echo "* If you're viewing this log in the web interface, *"
@@ -245,6 +247,7 @@ if [ $WEB_UPDATE -eq 1 ]; then
 	echo "*     The Back to Home button may not appear.      *"
 	echo "****************************************************"
 	nohup bash $BASEDIR/web-app/update-webapp.sh >/dev/null 2>&1 &
+	disown
 fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 echo ""
