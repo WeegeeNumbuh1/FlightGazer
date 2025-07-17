@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.7.1.0
+# Last updated: v.7.1.1
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -21,6 +21,40 @@ MIGRATE_FLAG=0
 OLDER_BUILD=0
 OWNER_OF_FGDIR='nobody'
 GROUP_OF_FGDIR='nogroup'
+RESET_FLAG=0 # 1 = reset settings when updating
+
+help_str(){
+	echo ""
+	echo "Usage: sudo bash $BASEDIR/$(basename $0) [options]"
+	echo "[-h]     Print this help message."
+	echo "[-r]     Reset existing configuration to default when updating."
+	echo "Default (no options) updates to the latest version and migrates settings."
+	echo ""
+	echo "Report bugs to WeegeeNumbuh1 <https://github.com/WeegeeNumbuh1/FlightGazer>"
+}
+
+while getopts ':hr' opt; do
+	case "$opt" in
+		r)
+		RESET_FLAG=1
+		;;
+		h)
+		echo "This is the FlightGazer updater script."
+		help_str
+		exit 1
+		;;
+		\?)
+		INVALID_FLAG=true
+		echo -e "${RED}Invalid option: -$OPTARG${NC}" >&2
+		;;
+	esac
+done
+# getopts block will loop as many times as invalid flags are given,
+# if this variable exists, let it loop, then print the help string and exit
+if [ "$INVALID_FLAG" = true ]; then
+	help_str
+	exit 1
+fi
 
 echo -ne "\033]0;FlightGazer Updater\007" # set window title
 echo -e "${FADE}"
@@ -86,7 +120,8 @@ else
 fi
 if [ "$VER_STR" == "$LATEST_VER" ]; then
 	echo "> The currently installed version is the same as what is available online."
-	echo "  Choosing to continue the update will cause FlightGazer to automatically check its dependencies on restart."
+	echo "  Choosing to continue the update will cause FlightGazer"
+	echo "  to automatically check its dependencies on restart."
 else
 	echo -e "> ${GREEN}An update is available!${NC}"
 fi
@@ -116,6 +151,9 @@ if [ $WEB_INF -eq 1 ]; then
 	echo ""
 fi
 
+if [ $RESET_FLAG -eq 1 ]; then
+	echo -e "${ORANGE}>>> Your settings will be reset to default if you continue.${NC}"
+fi
 echo ""
 # do not touch the below line, the web interface looks for this to send 'y\n' to the script
 echo "Would you like to update?"
@@ -188,30 +226,37 @@ if [ -f "$BASEDIR/config.py" ] && [ ! -f "$BASEDIR/config.yaml" ]; then
 	OLDER_BUILD=1
 else
 	time_now=$(date '+%Y-%m-%d %H:%M')
-	echo -e "--- FlightGazer settings migration log. ${time_now} ---" >> $MIGRATE_LOG
-	${VENVPATH}/bin/python3 ${BASEDIR}/utilities/settings_migrator.py ${BASEDIR}/config.yaml ${TEMPPATH}/config.yaml | tee -a $MIGRATE_LOG
-	if [ $? -ne 0 ]; then
-		MIGRATE_FLAG=1
+	echo -e "\n--- FlightGazer settings migration log. ${time_now} ---" >> $MIGRATE_LOG
+	if [ $RESET_FLAG -eq 0 ]; then
+		${VENVPATH}/bin/python3 ${BASEDIR}/utilities/settings_migrator.py ${BASEDIR}/config.yaml ${TEMPPATH}/config.yaml | tee -a $MIGRATE_LOG
+		if [ $? -ne 0 ]; then
+			MIGRATE_FLAG=1
+		fi
+	else
+		echo "> Settings have been reset to default during this update." | tee -a $MIGRATE_LOG 
+		echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
 	fi
 fi
-echo -n "> Migrating color configuration... " | tee -a $MIGRATE_LOG
-grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
-if [ $? -eq 0 ]; then
-	if [ $(wc -l < ${TEMPPATH}/setup/colors.py) -eq $(wc -l < ${BASEDIR}/setup/colors.py) ]; then
-		color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
-		mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
-		echo "Done." | tee -a $MIGRATE_LOG
+if [ $RESET_FLAG -eq 0 ]; then
+	echo -n "> Migrating color configuration... " | tee -a $MIGRATE_LOG
+	grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
+	if [ $? -eq 0 ]; then
+		if [ $(wc -l < ${TEMPPATH}/setup/colors.py) -eq $(wc -l < ${BASEDIR}/setup/colors.py) ]; then
+			color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
+			mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
+			echo "Done." | tee -a $MIGRATE_LOG
+		else
+			mv ${BASEDIR}/setup/colors.py ${BASEDIR}/setup/colors.bak >/dev/null 2>&1
+			echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
+			echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
+			echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
+			echo -e "> Your previous color configuration has been backed up as: ${BASEDIR}/setup/colors.bak${NC}" | tee -a $MIGRATE_LOG
+			# no need to do any fancy interim migration here, we just overwrite the file
+			sleep 2s
+		fi
 	else
-		mv ${BASEDIR}/setup/colors.py ${BASEDIR}/setup/colors.bak >/dev/null 2>&1
-		echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
-		echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
-		echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
-		echo -e "> Your previous color configuration has been backed up as: ${BASEDIR}/setup/colors.bak${NC}" | tee -a $MIGRATE_LOG
-		# no need to do any fancy interim migration here, we just overwrite the file
-		sleep 2s
+		echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 	fi
-else
-	echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 fi
 cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
 cp -f ${BASEDIR}/config.yaml ${TEMPPATH}/config_old.yaml >/dev/null 2>&1 # create backup of old config file

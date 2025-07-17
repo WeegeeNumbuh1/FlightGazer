@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.1.0
+# Last updated: v.7.1.1
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -174,11 +174,20 @@ chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${TEMPPATH} # need to do this as w
 echo -e "${FADE}Copying ${TEMPPATH} to ${BASEDIR}/web-app..."
 cp -afT ${TEMPPATH} ${BASEDIR}/web-app
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
-echo -e "${FADE}"
+echo -e "Done.${NC}"
 
-echo "Installing dependencies in existing FlightGazer venv..."
+echo -e "${GREEN}>>> Installing dependencies in existing FlightGazer venv...${NC}"
 venv_install
 
+echo -e "${GREEN}>>> Checking networking capabilities...${NC}"
+command -v netstat >/dev/null && command -v ifconfig >/dev/null
+if [ $? -eq 1 ]; then
+	apt-cache --generate pkgnames | \
+	grep --line-regexp --fixed-strings \
+	-e netstat \
+	-e ifconfig \
+	| xargs apt-get install -y >/dev/null
+fi
 # https://stackoverflow.com/a/33550399
 NET_IF=`netstat -rn | awk '/^0.0.0.0/ {thif=substr($0,74,10); print thif;} /^default.*UG/ {thif=substr($0,65,10); print thif;}'`
 NET_IP=`ifconfig ${NET_IF} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1'`
@@ -186,7 +195,7 @@ NET_IP=`ifconfig ${NET_IF} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep 
 # Programatically install entries for nginx, Apache, or lighttpd that redirects
 # port 9898 to the directory '/flightgazer'
 if command -v nginx >/dev/null 2>&1; then
-	echo "> Detected nginx. Configuring reverse proxy for FlightGazer webapp..."
+	echo -e "> Detected nginx. Configuring reverse proxy for FlightGazer webapp...${FADE}"
 	NGINX_CONF_PATH="/etc/nginx/sites-available/flightgazer-webapp"
 	cat <<- 'EOF' > $NGINX_CONF_PATH
 server {
@@ -203,10 +212,10 @@ server {
 EOF
 	ln -sf $NGINX_CONF_PATH /etc/nginx/sites-enabled/flightgazer-webapp
 	nginx -t && systemctl reload nginx
-	echo -e "> nginx configured. Access via http://$NET_IP/flightgazer"
+	echo -e "${NC}> nginx configured. Access via http://$NET_IP/flightgazer"
 	echo -e "  or via http://$HOSTNAME.local/flightgazer"
 elif command -v apache2 >/dev/null 2>&1; then
-	echo "> Detected Apache. Configuring reverse proxy for FlightGazer webapp..."
+	echo -e "> Detected Apache. Configuring reverse proxy for FlightGazer webapp...${FADE}"
 	APACHE_CONF_PATH="/etc/apache2/sites-available/flightgazer-webapp.conf"
 	cat <<- 'EOF' > $APACHE_CONF_PATH
 <VirtualHost *:80>
@@ -219,10 +228,10 @@ EOF
 	a2enmod proxy proxy_http
 	a2ensite flightgazer-webapp
 	systemctl reload apache2
-	echo -e "> Apache configured. Access via http://$NET_IP/flightgazer"
+	echo -e "${NC}> Apache configured. Access via http://$NET_IP/flightgazer"
 	echo -e "  or via http://$HOSTNAME.local/flightgazer"
 elif command -v lighttpd >/dev/null 2>&1; then
-	echo "> Detected Lighttpd. Configuring reverse proxy for FlightGazer webapp..."
+	echo -e "> Detected Lighttpd. Configuring reverse proxy for FlightGazer webapp...${FADE}"
 	LIGHTTPD_CONF_PATH="/etc/lighttpd/conf-available/98-flightgazer-webapp.conf"
 	cat <<- 'EOF' > $LIGHTTPD_CONF_PATH
 server.modules += ( "mod_proxy" )
@@ -242,14 +251,15 @@ EOF
 	lighttpd-enable-mod proxy
 	lighttpd-enable-mod flightgazer-webapp
 	systemctl restart lighttpd
-	echo -e "> Lighttpd configured. Access via http://$NET_IP/flightgazer"
+	echo -e "${NC}> Lighttpd configured. Access via http://$NET_IP/flightgazer"
 	echo -e "  or via http://$HOSTNAME.local/flightgazer"
 else
-	echo "> Neither nginx, Apache, nor Lighttpd detected. Please configure your web server manually to proxy /flightgazer/ to 127.0.0.1:9898."
-	echo -e "  You can still access the web interface with http://$NET_IP:9898 or http://$HOSTNAME:9898"
+	echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
+	echo "Please configure your web server manually to proxy /flightgazer to 127.0.0.1:9898."
+	echo -e "You can still access the web interface with http://$NET_IP:9898/flightgazer or http://$HOSTNAME.local:9898/flightgazer"
 fi
 
-echo "> Creating systemd service..."
+echo -e "${GREEN}>>> Creating systemd service...${FADE}"
 if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	cat <<- EOF > /etc/systemd/system/flightgazer-webapp.service
 	[Unit]
@@ -270,7 +280,6 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	WantedBy=multi-user.target
 	EOF
 	
-	echo -e "${FADE}"
 	systemctl daemon-reload 2>&1
 	systemctl enable flightgazer-webapp.service 2>&1
 	echo "Starting service..."
@@ -278,12 +287,12 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	echo "Service status:"
 	systemctl status flightgazer-webapp.service --no-pager
 	echo ""
-	echo -e "${NC}${FADE}> Service installed. The FlightGazer web interface will run at boot via systemd."
-	echo -e "${RED}> Do not move the FlightGazer directory (${BASEDIR})!"
+	echo -e "${NC}> Service installed. The FlightGazer web interface will run at boot via systemd.\n"
+	echo -e "${RED}> Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
 	echo -e "  Doing so will cause the service to fail!${NC}"
 	sleep 5s
 else
 echo "> Service already exists."
 fi
 
-echo -e "${NC}Done."
+echo -e "${GREEN}>>> Install complete.${NC}"

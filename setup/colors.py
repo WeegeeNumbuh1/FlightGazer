@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.7.1.0
+VERSION: v.7.1.1
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -62,7 +62,7 @@ BLUE_LIGHT = graphics.Color(110, 182, 255)
 BLUE_DARK = graphics.Color(0, 40, 170)
 BLUE_DARKER = graphics.Color(18, 20, 105)
 BLUE_PURE = graphics.Color(0, 0, 255)
-SAKURA_PINK = graphics.Color(255, 138, 170)
+SAKURA_PINK = graphics.Color(255, 145, 176)
 PINK = graphics.Color(251, 83, 114)
 MAGENTA = graphics.Color(200, 0, 200)
 PURPLE_DARK = graphics.Color(68, 0, 145)
@@ -118,8 +118,8 @@ verticalspeed_color = PURPLE_DARK
 # scrolling info line
 # (overrides journey plus "center_readout_color" when
 # SHOW_EVEN_MORE_INFO setting is enabled)
-marquee_color_journey_plus = PEACH_ORANGE
-marquee_color_enhanced_readout = PEACH_ORANGE
+marquee_color_journey_plus = SAKURA_PINK
+marquee_color_enhanced_readout = SAKURA_PINK
 
 # stats at the bottom
 altitude_heading_color = BLUE_DARK

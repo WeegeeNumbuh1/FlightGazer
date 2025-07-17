@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.1.1 - 2025-07-17
+    - Add functionality to the update script to reset the configuration if desired
+    - Minor improvements with the web interface install script
+    - Revert default marquee color change (adds back more color variety [less orange])
+    - Make the SAKURA_PINK color preset a little brighter
+
 v.7.1.0 - 2025-07-17
     - FlightGazer now handles the case where the rgbmatrix library is present but is not actually installed
     - Refactored path handling in main python script

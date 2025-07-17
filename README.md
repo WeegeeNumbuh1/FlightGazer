@@ -303,7 +303,7 @@ sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh
 ```
 The web interface can be accessed via<br>
 `http://<IP-address-of-device-running-FlightGazer>/flightgazer`<br>
-or on port `9898` if there's no web server present on the device running FlightGazer.
+or on port `9898/flightgazer` if there's no web server present on the device running FlightGazer.
 
 ## 🏃‍♂️ Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
