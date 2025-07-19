@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.1.1 --- 2025-07-17'
+VERSION: str = 'v.7.1.2 --- 2025-07-18'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1277,10 +1277,11 @@ def configuration_check_api() -> None:
                 if API_COST_LIMIT is None:
                     main_logger.info("No cost limit set for API calls.")
                 else:
+                    API_COST_LIMIT = round(API_COST_LIMIT, 2)
                     if api_cost < API_COST_LIMIT:
                         main_logger.info(f"Limiting API calls to when usage is near ${API_COST_LIMIT:.2f}. (${(API_COST_LIMIT - api_cost):.2f} available to use)")
                     else:
-                        main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.3f}).")
+                        main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
                         main_logger.info(">>> Disabling API until credits are available again. (checks will occur every midnight)")
                         API_cost_limit_reached = True
 
@@ -2607,6 +2608,15 @@ def main_loop_generator() -> None:
                     else:
                         print("Is the network connection stable?")
 
+                if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
+                    sequential_failures = 0
+                    main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
+                    dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
+                else:
+                    main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}.")
+                    time.sleep(5)
+                    continue
+
                 if sequential_failures > (dump1090_failures_to_watchdog_trigger // 2):
                     if USING_FILESYSTEM:
                         main_logger.error(f"{dump1090} keeps failing to connect. The local service may be down.")
@@ -2615,12 +2625,6 @@ def main_loop_generator() -> None:
                     sequential_failures = 0
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
 
-                if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
-                    main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
-                    dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
-                else:
-                    main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}.")
-                time.sleep(5)
                 continue
 
             except (SystemExit, KeyboardInterrupt):

@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.1.1
+# Last updated: v.7.1.2
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -137,8 +137,9 @@ else
 	fi
 	# fire up the bundled updater
 	if [ -f "${BASEDIR}/web-app/update-webapp.sh" ]; then
-		echo "Checking venv dependencies first..."
+		echo "Checking venv dependencies first (please wait)..."
 		systemctl stop flightgazer-webapp >/dev/null 2>&1
+		echo -e "${FADE}The web interface has been shut down."
 		venv_install
 		bash ${BASEDIR}/web-app/update-webapp.sh
 		if [ $? -ne 0 ]; then

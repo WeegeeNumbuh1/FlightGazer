@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.1.2 - 2025-07-18
+    - Tweaks in how the watchdog is triggered when there are sequential failures connecting to dump1090
+    - Very minor text tweaks to the web app install script
+    - Very slight tweak to how some numerical values for settings are handled
+
 v.7.1.1 - 2025-07-17
     - Add functionality to the update script to reset the configuration if desired
     - Minor improvements with the web interface install script
