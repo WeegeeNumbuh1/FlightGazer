@@ -58,8 +58,8 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 | <div align="center"><img src="media/FG_Main.gif" alt="FlightGazer main gif"><br><i>FlightGazer is a nifty-looking flight tracking system (and clock!).</i></div> |
 |---|
 | <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer switch gif"><br><i>Gracefully handles situations when multiple aircraft enter and leave your designated area.</i></div> |
-| <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options<br>to show all the information you could need.</i></div> |
-| <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receiver<br>while still being able to track aircraft in your area.</i></div> |
+| <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options to show all the information you could need.</i></div> |
+| <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receive while still being able to track aircraft in your area.</i></div> |
 | <div align="center"><img src="media/FG_Splash.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> |
 | <div align="center"><b>Neat 👍</b></div> |
 
@@ -290,12 +290,13 @@ Example: `seconds_color = BLACK`
 - [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)
 - [Reserve a CPU core solely for the display](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#cpu-use)
 - Lower the value for `LED_PWM_BITS` (though `8` seems good enough)
+- Switch CPU governor to `performance` or add `force_turbo=1` to a Raspberry Pi's `config.txt` file
  
 </details>
 
 ### 💻 Making Things Easier
 
-Want to make dealing with FlightGazer easier without having to use terminal commands all the time?<br>
+Want to make dealing with FlightGazer easier without having to use terminal commands all the time? (the author sure did)<br>
 Install the web interface that manages basically everything to do with FlightGazer.<br>
 The web interface can be installed using:<br>
 ```bash
@@ -423,6 +424,7 @@ or, you may [start it manually](#️-interactive-mode).
   - python3-venv
   - tmux
 - Create a new systemd service `flightgazer.service` if not present
+  - Also creates a systemd service for the boot splash screen `flightgazer-bootsplash.service` as well
 - Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
@@ -433,7 +435,10 @@ or, you may [start it manually](#️-interactive-mode).
   - suntime
   - ruamel.yaml
   - orjson
-  - RGBMatrixEmulator
+  - RGBMatrixEmulator<br>
+  *if the web app is installed as well:*
+  - Flask
+  - gunicorn
 - Downloads the `tar1090-db` aircraft database and generates a sqlite3 database that can be used by FlightGazer
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 - Runs main python script with desired flags

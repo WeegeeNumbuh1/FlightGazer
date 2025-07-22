@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.1.2
+# Last updated: v.7.2.0
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -260,7 +260,7 @@ else
 	echo -e "You can still access the web interface with http://$NET_IP:9898/flightgazer or http://$HOSTNAME.local:9898/flightgazer"
 fi
 
-echo -e "${GREEN}>>> Creating systemd service...${FADE}"
+echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
 if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	cat <<- EOF > /etc/systemd/system/flightgazer-webapp.service
 	[Unit]

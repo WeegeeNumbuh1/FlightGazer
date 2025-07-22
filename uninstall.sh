@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.7.0.0
+# Last updated: v.7.2.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -63,8 +63,10 @@ echo 'echo "Removing any startup entries..."' >> $TEMPPATH
 # sed -i -e '/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/' /etc/rc.local
 echo -e 'sed -i -e \047/^[^#]/ s/\(^.*FlightGazer.*$\)/#\ \1/\047 /etc/rc.local 2>&1' >> $TEMPPATH
 echo 'systemctl stop flightgazer.service 2>&1
-systemctl disable flightgazer.service 2>&1
-rm -f /etc/systemd/system/flightgazer.service 2>&1
+systemctl disable flightgazer.service >/dev/null 2>&1
+systemctl disable flightgazer-bootsplash.service >/dev/null 2>&1
+rm -f /etc/systemd/system/flightgazer.service >/dev/null 2>&1
+rm -f /etc/systemd/system/flightgazer-bootsplash.service >/dev/null 2>&1
 systemctl daemon-reload 2>&1
 systemctl reset-failed 2>&1
 ' >> $TEMPPATH

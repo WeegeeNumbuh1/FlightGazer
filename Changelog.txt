@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.2.0 - 2025-07-22
+    - FlightGazer now has a second splash screen that starts as early as possible in the boot sequence
+        - Used to fill in the gap between when the system is started and FlightGazer service starts (usually a few seconds up to a minute)
+        - Useful as an indicator when the system hasn't fully booted yet and there's something preventing it from doing so
+          (the FlightGazer service doesn't start until the everything is up)
+        - This feature only affects new installs moving forward. If you already have FlightGazer installed, you must
+          manually remove the service file at '/etc/systemd/system/flightgazer.service' and run the FlightGazer initialization
+          script with the '-c' flag to enable this new feature added in this version
+        - Extended FlightGazer service startup timeout to 12 minutes from 10
+    - Optimizations for the data processing loop
+    - Further improve API cost tracking calculations
+    - Initialization script now does some rudimentary hardware checking to alert the user if it's suitable to run FlightGazer
+    - If the initialization script needs to check the dependencies and isn't able to connect to the internet, it will do the checks
+      the next time the script runs
+
 v.7.1.2 - 2025-07-18
     - Tweaks in how the watchdog is triggered when there are sequential failures connecting to dump1090
     - Very minor text tweaks to the web app install script

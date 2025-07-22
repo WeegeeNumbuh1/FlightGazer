@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.7.1.2
+# Version = v.7.2.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -142,6 +142,10 @@ if [ `id -u` -ne 0 ]; then
 	exit 1
 fi
 
+# kill the boot splash screen (if present)
+# better than using systemd to control the service itself
+kill -15 $(ps aux | grep 'splash-sysinit.py' | awk '{print $2}') >/dev/null 2>&1
+
 if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
 	echo -e "\n${NC}${RED}>>> ERROR: FlightGazer is already running.${NC}"
 	echo "These are the process IDs detected:"
@@ -168,10 +172,37 @@ systemctl list-unit-files flightgazer-webapp.service >/dev/null
 if [ $? -eq 0 ]; then
 	WEB_INT=1
 fi
+if [ -f '/proc/device-tree/model' ]; then # probably a Raspberry Pi
+	DEV_TYPE=$(tr -d '\0' < /proc/device-tree/model) >/dev/null 2>&1
+	# https://stackoverflow.com/a/46163928
+else
+	DEV_TYPE=''
+fi
+CORECOUNT=$(grep -c ^processor /proc/cpuinfo)
+
 if [ ! -f "$CHECK_FILE" ];
 then 
 	echo "> First run or upgrade detected, installing needed dependencies.
   This may take some time, depending on how fast your system is."
+
+	echo "================== System Info ===================="
+	if [ ! -z "${DEV_TYPE}" ]; then
+		echo -e "> Running on a ${DEV_TYPE}"
+	else
+		echo -e "> Running on $(uname -a)"
+	fi
+	if [ $CORECOUNT -eq 1 ] && [ -z "${DEV_TYPE}" ]; then
+		echo "> WARNING: Only one CPU core detected!"
+		echo "  Installation might take a very long time!"
+		if [ "$DFLAG" != "-d" ]; then
+			echo "> WARNING: It is highly recommended to *NOT* run the rgb-matrix display or its emulator on this system!"
+			echo "  Performance may be extremely poor due to only having a single core."
+		fi
+	else
+		echo "> Running with ${CORECOUNT} CPU(s)"
+	fi
+	echo "==================================================="
+
 	if [ "$LFLAG" = true ]; then
 		echo "****************************************************************************"
 		echo "> We are currently running in Live/Demo mode; no permanent changes to"
@@ -200,6 +231,10 @@ else
 		SKIP_CHECK=1
 	fi
 	VERB_TEXT='Checking: '
+	if [ $CORECOUNT -eq 1 ] && [ -z "${DEV_TYPE}" ] && [ "$DFLAG" != "-d" ]; then
+		echo "> WARNING: It is highly recommended to *NOT* run the rgb-matrix display or its emulator on this system!"
+		echo "  Performance may be extremely poor. Please re-run this script with the '-d' flag."
+	fi
 fi
 
 trap cleanup SIGINT
@@ -210,7 +245,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	find "${BASEDIR}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
 
 	# check if this system uses apt
-	command -v apt 2>&1 >/dev/null
+	command -v apt >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use apt.${NC}"
 		sleep 2s
@@ -218,7 +253,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 
 	# check if this is a systemd system
-	command -v systemctl --version 2>&1 >/dev/null
+	command -v systemctl --version >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use systemd.${NC}"
 		sleep 2s
@@ -283,23 +318,14 @@ then
 	-e libjpeg-dev \
 	-e tmux \
 	| xargs apt-get install -y >/dev/null
-	# echo "    > \"python3-dev\""
-	# apt-get install -y python3-dev >/dev/null
-	# echo "    > \"libjpeg-dev\""
-	# apt-get install -y libjpeg-dev >/dev/null # for RGBMatrixEmulator
-	# echo "    > \"python3-numpy\""
-	# apt-get install -y python3-numpy >/dev/null # also for RGBMatrixEmulator
-	# echo "    > \"python3-venv\""
-	# apt-get install -y python3-venv >/dev/null
-	# echo "    > \"tmux\""
-	# apt-get install -y tmux >/dev/null
 	echo -e "${FADE}"
-	echo "  > Creating systemd service..."
+	echo "  > Creating systemd services..."
 	if [ ! -f "/etc/systemd/system/flightgazer.service" ] && [ "$LFLAG" = false ]; then
 		cat <<- EOF > /etc/systemd/system/flightgazer.service
 		[Unit]
 		Description=FlightGazer service
 		After=multi-user.target
+		Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
 
 		[Service]
 		User=root
@@ -308,18 +334,46 @@ then
 		ExecStop=-tmux send-keys -t FlightGazer C-c || true
 		ExecStop=sleep 1s
 		Type=forking
-		TimeoutStartSec=600
+		TimeoutStartSec=720
 		TimeoutStopSec=5
 		
 		[Install]
 		WantedBy=multi-user.target
+		Also=flightgazer-bootsplash.service
+		EOF
+
+		cat <<- EOF > /etc/systemd/system/flightgazer-bootsplash.service
+		[Unit]
+		Description=FlightGazer boot splash screen
+		DefaultDependencies=no
+		After=local-fs.target
+		Before=network.target
+		RefuseManualStart=true
+		Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
+
+		[Service]
+		User=root
+		ExecStart=$VENVPATH/bin/python3 $BASEDIR/utilities/splash-sysinit.py
+		Type=simple
+		Restart=no
+		
+		[Install]
+		# start real early
+		WantedBy=sysinit.target
 		EOF
 		echo -e "${FADE}"
-		systemctl daemon-reload 2>&1
+		systemctl daemon-reload >/dev/null 2>&1
 		systemctl enable flightgazer.service 2>&1
-		systemctl status flightgazer.service
-		echo -e "${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
-		echo -e "${RED}    > Do not move the FlightGazer directory (${BASEDIR})!"
+		if [ -d "$HOME/rpi-rgb-led-matrix" ]; then # only enable the boot splash if the rgb-matrix library is present
+			echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
+			systemctl enable flightgazer-bootsplash.service 2>&1
+		else
+			echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
+			systemctl disable flightgazer-bootsplash.service 2>&1
+		fi
+		systemctl status flightgazer.service --no-pager
+		echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
+		echo -e "${RED}    > Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
 		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
 		sleep 5s
 	else
@@ -458,7 +512,9 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo "> Unable to check or generate aircraft database"
 		echo "  either due to no internet or downloader script is missing."
 	fi
-	touch $CHECK_FILE
+	if [ $INTERNET_STAT -eq 0 ]; then
+		touch $CHECK_FILE
+	fi
 fi
 
 if [ -f "$LOGFILE" ]; then

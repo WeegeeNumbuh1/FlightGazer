@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.1.2 --- 2025-07-18'
+VERSION: str = 'v.7.2.0 --- 2025-07-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -522,7 +522,7 @@ Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `Destinat
 unique_planes_seen: list = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`, `Flyby`} """
-callsign_lookup_cache = deque([{}] * 50, maxlen=50)
+callsign_lookup_cache = deque([{}] * 100, maxlen=100)
 """ Cache of previously looked up callsigns.
 Refer to `operator_lookup()` for valid keys. """
 database_lookup_cache = deque([{}] * 1000, maxlen=1000)
@@ -1563,6 +1563,7 @@ def runtime_accumulators_reset() -> None:
     # update current API usage to what's reported on FlightAware's side
     if API_KEY:
         api_calls, api_cost = probe_API()
+        # this is our internal cost tracking
         api_usage_cost_sofar = api_usage_cost_baseline + estimated_api_cost
         if api_cost is not None:
             main_logger.info(f"Queried API, actual usage is ${api_cost:.2f}, with {api_calls} total calls over the past 30 days.")
@@ -1571,9 +1572,10 @@ def runtime_accumulators_reset() -> None:
             # We update the baseline with the delta of what we estimated so far in the day and what the API says we used (which should be more accurate)
             if api_usage_cost_sofar > api_cost:
                 cost_delta = api_usage_cost_sofar - api_cost
-            else:
+            else: # we under-estimated, the API has the correct number here
                 cost_delta = 0.
-            api_usage_cost_baseline = api_cost + cost_delta # keep a buffer that makes hitting the cost limit faster
+            if cost_delta > 0.1: cost_delta = 0.1 # limit how far off we are in our internal running calculations over time
+            api_usage_cost_baseline = api_cost + cost_delta # keep a buffer that makes hitting the cost limit faster based on what the API returned
             main_logger.info(f"Difference between calculated (${api_usage_cost_sofar:.3f}) "
                              f"and actual cost: ${abs(api_usage_cost_sofar - api_cost):.3f}")
             if API_COST_LIMIT is not None:
@@ -1766,7 +1768,7 @@ class PrintToConsole:
         for aircraft in relevant_planes:
             try:
                 print_info = []
-                print_info.append(f"{rst}")
+                print_info.append(rst)
                 # algorithm indicators
                 if not NOFILTER_MODE:
                     if focus_plane == aircraft['ID']:
@@ -2157,6 +2159,24 @@ def main_loop_generator() -> None:
         slant_range = math.sqrt(dist_nm**2 + alt_nm**2)
         return round(math.degrees(math.atan2(alt_apparent, dist_nm)), 6), round(slant_range * distance_multiplier, 6)
 
+    priority_lookup: dict = { # this is ordered based on the readsb docs
+    'None': 0, # this is for compatibility reasons as not all dump1090 decoders embed a 'type'
+    'adsb_icao': 1,
+    'adsb_icao_nt': 2,
+    'adsr_icao': 3,
+    'tisb_icao': 4,
+    'adsc': 5,
+    'mlat': 6,
+    'other': 7,
+    'mode_s': 8,
+    'adsb_other': 9,
+    'adsr_other': 10,
+    'tisb_other': 11,
+    'tisb_trackfile': 12,
+    'unknown': 13
+    }
+    """ Map the broadcast type to a priority table, returns an int. """
+    
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the parsed json file(s) as a list of nested dictionaries. 
         If service is down/times out, returns None. Returned list can be empty (still valid). Most of the processing time occurs here.
@@ -2306,30 +2326,7 @@ def main_loop_generator() -> None:
                 except KeyError:
                     continue
             return list(seen.values())
-        
-        def priority_lookup(input: str) -> int:
-            """ Map the broadcast type to a priority table, returns an int. """
-            broadcast_type_priority = [ # this is ordered based on the readsb docs
-                'None', # this is for compatibility reasons as not all dump1090 decoders embed a 'type'
-                'adsb_icao',
-                'adsb_icao_nt',
-                'adsr_icao',
-                'tisb_icao',
-                'adsc',
-                'mlat',
-                'other',
-                'mode_s',
-                'adsb_other',
-                'adsr_other',
-                'tisb_other',
-                'tisb_trackfile',
-                'unknown'
-            ]
-            try:
-                return broadcast_type_priority.index(input)
-            except ValueError:
-                return len(broadcast_type_priority)
-            
+
         def data_arbitrator(loop_packet_dict: dict, database_result: dict) -> dict:
             """ Compares the data from database to the current data of the loop's data and
             updates values to the database's result if applicable. Returns the loop data dictionary with these values. """
@@ -2380,7 +2377,7 @@ def main_loop_generator() -> None:
 
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
-                dump1090_data[i]['priority'] = priority_lookup(
+                dump1090_data[i]['priority'] = priority_lookup.get(
                 dict_.get('type', 'None')
                 )
             dump1090data_ = ensure_unique(dump1090_data, 'hex', 'priority')
@@ -2393,7 +2390,7 @@ def main_loop_generator() -> None:
                 broadcast_type = a.get('type', 'None')
                 hex = a.get('hex', "?")
                 priority_value = a.get('priority',
-                                        priority_lookup(broadcast_type)
+                                        priority_lookup.get(broadcast_type)
                 )
                 # filter planes that have valid tracking data and were seen recently
                 if (seen_pos is None
@@ -2419,9 +2416,6 @@ def main_loop_generator() -> None:
                         and (distance < RANGE and distance > 0)
                        )
                 ):
-                    database_data: dict
-                    if DATABASE_CONNECTED:
-                        database_data = database_lookup(hex)
                     alt = a.get('alt_geom', a.get('alt_baro'))
                     if alt is None or alt == "ground": alt = 0
                     alt = alt * altitude_multiplier
@@ -2520,6 +2514,7 @@ def main_loop_generator() -> None:
                             }
                         
                         if DATABASE_CONNECTED:
+                            database_data = database_lookup(hex)
                             planes.append(data_arbitrator(loop_packet, database_data))
                         else:
                             planes.append(loop_packet)
