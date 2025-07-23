@@ -28,8 +28,12 @@ import subprocess
 os.environ["PYTHONUNBUFFERED"] = "1"
 CURRENT_DIR = Path(__file__).resolve().parent
 if os.name != 'nt':
-    PATH_OWNER = CURRENT_DIR.owner(follow_symlinks=False)
-    OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+    try:
+        PATH_OWNER = CURRENT_DIR.owner()
+        OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+    except:
+        PATH_OWNER = None
+        OWNER_HOME = Path.home()
 else:
     PATH_OWNER = None
     OWNER_HOME = Path.home()

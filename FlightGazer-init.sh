@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.7.2.1
+# Version = v.7.2.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -278,7 +278,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 fi
 read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
-USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME')
+USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME') >/dev/null 2>&1
 # https://superuser.com/a/1613980
 
 # start the splash screen

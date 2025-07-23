@@ -494,6 +494,9 @@ Check the [`utilities`](./utilities/) directory.
 </details>
 
 ## ⬆️ How to Update
+
+It is recommended to use the most up-to-date versions!
+
 Version v.2.x and newer:
 ```bash
 # recommended

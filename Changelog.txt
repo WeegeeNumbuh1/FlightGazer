@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.2.2 - 2025-07-23
+    - HOTFIX: Fix critical issue caused by v.7.2.1 that would cause FlightGazer to fail to start (lmao)
+    - Quieted initialization script output for the change done in v.7.2.1
+
 v.7.2.1 - 2025-07-23
     - Improved home directory lookup for some setup routines based on where FlightGazer is installed instead of
       relying on which user is running the actual script
@@ -13,7 +17,7 @@ v.7.2.0 - 2025-07-22
     - FlightGazer now has a second splash screen that starts as early as possible in the boot sequence
         - Used to fill in the gap between when the system is started and FlightGazer service starts (usually a few seconds up to a minute)
         - Useful as an indicator when the system hasn't fully booted yet and there's something preventing it from doing so
-          (the FlightGazer service doesn't start until the everything is up)
+          (the FlightGazer service doesn't start until everything is up)
         - This feature only affects new installs moving forward. If you already have FlightGazer installed, you must
           manually remove the service file at '/etc/systemd/system/flightgazer.service' and run the FlightGazer initialization
           script with the '-c' flag to enable this new feature added in this version

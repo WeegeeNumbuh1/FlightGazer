@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.2.1 --- 2025-07-23'
+VERSION: str = 'v.7.2.2 --- 2025-07-23'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -144,8 +144,12 @@ else:
 main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
 if os.name != 'nt':
-    PATH_OWNER = CURRENT_DIR.owner(follow_symlinks=False)
-    OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+    try:
+        PATH_OWNER = CURRENT_DIR.owner()
+        OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+    except:
+        PATH_OWNER = None
+        OWNER_HOME = Path.home()
 else:
     PATH_OWNER = None
     OWNER_HOME = Path.home()
