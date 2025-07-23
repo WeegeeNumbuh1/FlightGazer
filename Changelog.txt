@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.2.1 - 2025-07-23
+    - Improved home directory lookup for some setup routines based on where FlightGazer is installed instead of
+      relying on which user is running the actual script
+
 v.7.2.0 - 2025-07-22
     - FlightGazer now has a second splash screen that starts as early as possible in the boot sequence
         - Used to fill in the gap between when the system is started and FlightGazer service starts (usually a few seconds up to a minute)

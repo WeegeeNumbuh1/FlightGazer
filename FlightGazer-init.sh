@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.7.2.0
+# Version = v.7.2.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -275,9 +275,11 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo "  > Internet connectivity available, initial setup can continue."
-		read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
 	fi
 fi
+read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
+USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME')
+# https://superuser.com/a/1613980
 
 # start the splash screen
 # note that if this is a fresh install and the rgbmatrix software framework doesn't exist, the splash screen won't run
@@ -364,7 +366,7 @@ then
 		echo -e "${FADE}"
 		systemctl daemon-reload >/dev/null 2>&1
 		systemctl enable flightgazer.service 2>&1
-		if [ -d "$HOME/rpi-rgb-led-matrix" ]; then # only enable the boot splash if the rgb-matrix library is present
+		if [ -d "$USER_HOME" ]; then # only enable the boot splash if the rgb-matrix library is present
 			echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
 			systemctl enable flightgazer-bootsplash.service 2>&1
 		else

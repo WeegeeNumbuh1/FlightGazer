@@ -4,7 +4,7 @@
 # is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.7.2.0
+# Last updated: v.7.2.1
 # By: WeegeeNumbuh1
 
 import sys
@@ -27,13 +27,19 @@ import threading
 import subprocess
 os.environ["PYTHONUNBUFFERED"] = "1"
 CURRENT_DIR = Path(__file__).resolve().parent
+if os.name != 'nt':
+    PATH_OWNER = CURRENT_DIR.owner(follow_symlinks=False)
+    OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+else:
+    PATH_OWNER = None
+    OWNER_HOME = Path.home()
 try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
     except (ModuleNotFoundError, ImportError):
         # handle case when rgbmatrix is not installed and maybe is present in the home directory
-        if (RGBMATRIX_DIR := Path(Path.home(), "rpi-rgb-led-matrix")).exists:
+        if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
             sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
             from rgbmatrix import graphics
             from rgbmatrix import RGBMatrix, RGBMatrixOptions

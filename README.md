@@ -153,7 +153,8 @@ Using this project assumes you have the following:
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
-  - `rgbmatrix` does not need to be strictly installed to run this script (see [Usage](#️-usage) section)
+  - If the `rgbmatrix` library is installed, it needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
+  - `rgbmatrix` does not need to be installed to run this script, however. (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
   - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)

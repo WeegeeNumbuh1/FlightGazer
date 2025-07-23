@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.2.0 --- 2025-07-22'
+VERSION: str = 'v.7.2.1 --- 2025-07-23'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -143,6 +143,13 @@ else:
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
+if os.name != 'nt':
+    PATH_OWNER = CURRENT_DIR.owner(follow_symlinks=False)
+    OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+else:
+    PATH_OWNER = None
+    OWNER_HOME = Path.home()
+
 try:
     CURRENT_USER = getuser()
 except OSError:
@@ -200,7 +207,10 @@ main_logger.info("===                 Welcome to FlightGazer!                ===
 main_logger.info("==============================================================")
 main_logger.info(f"FlightGazer Version: {VERSION}")
 main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
-main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
+if PATH_OWNER:
+    main_logger.info(f"We are running in \'{CURRENT_DIR}\' (owned by \'{PATH_OWNER}\')")
+else:
+    main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
@@ -240,7 +250,7 @@ if not NODISPLAY_MODE:
             except (ModuleNotFoundError, ImportError):
                 # check if the rgbmatrix library is in the user home directory
                 # In some environments, the system-wide bindings don't work
-                if (RGBMATRIX_DIR := Path(Path.home(), "rpi-rgb-led-matrix")).exists:
+                if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
                     sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
                     try:
                         from rgbmatrix import graphics
