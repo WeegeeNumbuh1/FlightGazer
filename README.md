@@ -59,7 +59,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 |---|
 | <div align="center"><img src="media/FG_Switch.gif" alt="FlightGazer switch gif"><br><i>Gracefully handles situations when multiple aircraft enter and leave your designated area.</i></div> |
 | <div align="center"><img src="media/FG_JourneyPlus.gif" alt="FlightGazer journey-plus gif"><br><i>Highly configurable with different layouts and numerous other options to show all the information you could need.</i></div> |
-| <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receive while still being able to track aircraft in your area.</i></div> |
+| <div align="center"><img src="media/FG_EnhancedReadout.gif" alt="FlightGazer API Wait gif"><br><i>Track a specific aircraft once it's detected by your receiver while still being able to track aircraft in your area.</i></div> |
 | <div align="center"><img src="media/FG_Splash.gif" alt="FlightGazer SplashScreen gif"><br><i>Shows a cool splash screen on startup.</i></div> |
 | <div align="center"><b>Neat 👍</b></div> |
 

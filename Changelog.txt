@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.2.3 - 2025-07-28
+    - Minor tweak to 4x4 font for better consistency
+
 v.7.2.2 - 2025-07-23
     - HOTFIX: Fix critical issue caused by v.7.2.1 that would cause FlightGazer to fail to start (lmao)
     - Quieted initialization script output for the change done in v.7.2.1

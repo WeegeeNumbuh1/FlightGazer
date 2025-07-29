@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.2.2 --- 2025-07-23'
+VERSION: str = 'v.7.2.3 --- 2025-07-28'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -400,7 +400,7 @@ API_SCHEDULE: dict = {
         '12-23': 'xxxxxxxxxxx-',
     }
 }
-SHOW_EVEN_MORE_INFO: bool = True # new setting!
+SHOW_EVEN_MORE_INFO: bool = True
 
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
