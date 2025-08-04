@@ -484,11 +484,13 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		VENVCMD="${VENVPATH}/bin/pip3"
 	fi
 	if [ $INTERNET_STAT -eq 0 ]; then
+		echo -e "${FADE}${VERB_TEXT}pip"
+		${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
 		if [ $RGBMATRIX_PRESENT -eq 3 ]; then
-			echo -e "${FADE}${VERB_TEXT}rgbmatrix"
+			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}rgbmatrix"
 			${VENVCMD} install -e ${USER_HOME}/rpi-rgb-led-matrix/bindings/python --use-pep517 >/dev/null
 		fi
-		echo -e "${FADE}${VERB_TEXT}requests"
+		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}requests"
 		${VENVCMD} install --upgrade requests >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}pydispatcher"
 		${VENVCMD} install --upgrade pydispatcher >/dev/null
