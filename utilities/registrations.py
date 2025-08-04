@@ -10,6 +10,7 @@ Translated to Python from:
 https://github.com/wiedehopf/tar1090/blob/master/html/registrations.js by WeegeeNumbuh1 """
 
 from math import floor
+from functools import lru_cache
 
 limited_alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ" # 24 chars; no I, O
 full_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 chars
@@ -104,6 +105,7 @@ for mapping in stride_mappings:
 for i, entry in enumerate(numeric_mappings):
     numeric_mappings[i]['end'] = entry['start'] + entry['count'] - 1
 
+@lru_cache(maxsize=500)
 def registration_from_hexid(hexid_input: str) -> str | None:
     """ Hex id needs to be a string. Returns a registration or None. """
     # input validation

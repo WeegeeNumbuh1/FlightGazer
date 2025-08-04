@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.2.3 --- 2025-07-28'
+VERSION: str = 'v.7.3.0 --- 2025-08-04'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -45,6 +45,7 @@ import signal
 import threading
 import asyncio
 from collections import deque
+from functools import lru_cache
 from string import Formatter
 import random
 from getpass import getuser
@@ -1501,7 +1502,7 @@ def runtime_accumulators_reset() -> None:
     Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
     algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
-    global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED
+    global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time
     daily_stats_str = []
@@ -1514,10 +1515,10 @@ def runtime_accumulators_reset() -> None:
     else:
         daily_stats_str.append(".")
     main_logger.info(f"{''.join(daily_stats_str)}")
-        
+
     if (
-        (selection_events > 1000
-         or (len(unique_planes_seen) > 800
+        (selection_events >= 1000
+         or (len(unique_planes_seen) >= 700
              and not NOFILTER_MODE
              )
         )
@@ -1530,6 +1531,8 @@ def runtime_accumulators_reset() -> None:
     if (len(unique_planes_seen) >= 1300
         and not NOFILTER_MODE
         and (RANGE <= 2 and HEIGHT_LIMIT <= 15000)
+        and FLYBY_STALENESS >= 60
+        and (time.monotonic() - START_TIME) > 72000
         ): # little easter egg only very few will see in the logs (if you're reading this from the source then lmao)
         if not really_really_active_adsb_site:
             achievement_time = date_now_str
@@ -1561,7 +1564,7 @@ def runtime_accumulators_reset() -> None:
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} "
                          f"successful API calls, of which {api_hits[2]} returned no data. "
                          f"Estimated cost: ${estimated_api_cost:.2f}")
-    
+
     # do the actual reset
     with threading.Lock():
         unique_planes_seen.clear()
@@ -1569,8 +1572,9 @@ def runtime_accumulators_reset() -> None:
             api_hits[i] = 0
         if API_daily_limit_reached:
             API_daily_limit_reached = False
-            main_logger.info("API calls for the day have been reset.")
+            main_logger.debug("API calls for the day have been reset.")
         selection_events = 0
+        high_priority_events = 0
         if FOLLOW_THIS_AIRCRAFT_SPOTTED:
             FOLLOW_THIS_AIRCRAFT_SPOTTED = False
 
@@ -2095,6 +2099,7 @@ def main_loop_generator() -> None:
                     }
                 )
         stale_age = FLYBY_STALENESS * 60 # seconds
+        time_now = time.monotonic()
 
         # special case when there aren't any entries yet
         if len(unique_planes_seen) == 0:
@@ -2104,7 +2109,7 @@ def main_loop_generator() -> None:
         for entry in reversed(unique_planes_seen):
             # search backwards through list
             if entry['ID'] == input_ID:
-                if (time.monotonic() - entry['Time']) < stale_age:
+                if (time_now - entry['Time']) < stale_age:
                     return # if we recently have seen this plane
                 else:
                     add_entry()
@@ -2112,7 +2117,7 @@ def main_loop_generator() -> None:
         else: # finally, if we don't find the entry, add a new one
             add_entry()
             return
-        
+
     def flyby_extractor(input_ID: str) -> int:
         """ Find the "flyby" number associated with a plane's ID. """
         for entry in reversed(unique_planes_seen):
@@ -2190,7 +2195,7 @@ def main_loop_generator() -> None:
     'unknown': 13
     }
     """ Map the broadcast type to a priority table, returns an int. """
-    
+
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the parsed json file(s) as a list of nested dictionaries. 
         If service is down/times out, returns None. Returned list can be empty (still valid). Most of the processing time occurs here.
@@ -2268,7 +2273,7 @@ def main_loop_generator() -> None:
                 aircraft_data = aircraft_data_1090
 
             return aircraft_data
-        
+
         # cover the rare instance the loop tries to run again
         # during the main cleanup process after shutting down the threadpool
         except RuntimeError:
@@ -2380,7 +2385,7 @@ def main_loop_generator() -> None:
                         loop_packet_dict['TrackingFlag'] = "Military"
                 else:
                     loop_packet_dict['TrackingFlag'] = "Other"
-            
+
             return loop_packet_dict
 
         if dump1090_data is None: return {'Tracking': 0, 'Range': 0}, []
@@ -2394,7 +2399,10 @@ def main_loop_generator() -> None:
                 dump1090_data[i]['priority'] = priority_lookup.get(
                 dict_.get('type', 'None')
                 )
-            dump1090data_ = ensure_unique(dump1090_data, 'hex', 'priority')
+            if len(dump1090_data) > 1:
+                dump1090data_ = ensure_unique(dump1090_data, 'hex', 'priority')
+            else:
+                dump1090data_ = dump1090_data
         else:
             dump1090data_ = dump1090_data
 
@@ -2419,7 +2427,14 @@ def main_loop_generator() -> None:
                 lon = a.get('lon')
                 if rlat is not None and rlon is not None:
                     # readsb does this calculation already, try to use it first
-                    distance = a.get('r_dst', greatcircle(rlat, rlon, lat, lon))
+                    distance = a.get('r_dst')
+                    # NB: doing `distance = a.get('r_dst', greatcircle())` is slower as `get()` needs to
+                    # calculate the fallback value even when 'r_dst' is a valid key. Checking if the key exists
+                    # beforehand prevents having to make unnessary function calls as this would lead to having to calculate
+                    # distance for each plane on every loop.
+                    # From testing, using the current layout is now up to 1.5x faster over time, as long as we're connected to readsb.
+                    if distance is None:
+                        distance = greatcircle(rlat, rlon, lat, lon)
                 else:
                     distance = 0
                 ranges.append(distance)
@@ -2456,7 +2471,9 @@ def main_loop_generator() -> None:
                         iso_code = getICAO(hex).upper()
                         # This key is sometimes present in some readsb setups (eg: adsb.im images).
                         # Because it reads from a much more updated database, we try to use it first
-                        registration = a.get('r', reg_lookup(hex))
+                        registration = a.get('r')
+                        if registration is None:
+                            registration = reg_lookup(hex)
                         # see if we can lookup who runs this plane
                         if (operator_result := operator_lookup(flight)) is not None:
                             if not (operator := operator_result['Company']):
@@ -2526,7 +2543,7 @@ def main_loop_generator() -> None:
                             "Flyby": flyby,
                             "Timestamp": time.monotonic(),
                             }
-                        
+
                         if DATABASE_CONNECTED:
                             database_data = database_lookup(hex)
                             planes.append(data_arbitrator(loop_packet, database_data))
@@ -2684,7 +2701,7 @@ class AirplaneParser:
         override_plane: bool = False
         """ Internal flag to indicate a plane is within the `high_priority_dome` """
         high_priority_dome: float = 0.4 * distance_multiplier
-        override_init: bool = selection_override # just for debug
+        override_init: bool = selection_override
         date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
         # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
         next_select_table = [0,0,0]
@@ -2876,6 +2893,8 @@ class AirplaneParser:
                         focus_plane_ids_discard.clear()
                         self._last_plane_count = 0
                         selection_override = False
+                        operator_lookup.cache_clear()
+                        database_lookup.cache_clear()
 
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
@@ -2971,7 +2990,7 @@ class APIFetcher:
             API_cost_limit_reached = True
             process_time[2] = 0
             return
-        
+
         if 'enhanced_readout_wait_condition' in globals():
             with enhanced_readout_wait_condition:
                 # main_logger.debug(f"Waiting for DisplayFeeder to finish, current ENHANCED_READOUT state: {ENHANCED_READOUT}")
@@ -3782,6 +3801,7 @@ class WriteState:
     def end_thread(self, message):
         self.loop.stop()
 
+@lru_cache(maxsize=500) # the maxsize is based on worst-case using NO_FILTER mode (roughly 500 aircraft)
 def operator_lookup(callsign: str) -> dict | None:
     """ Lookup the operator of a given callsign from our database. This will try to look at the cache first
     from `callsign_lookup_cache` and then the lookup tables in `operators.py`. If there is a match, this function will
@@ -3823,6 +3843,7 @@ def operator_lookup(callsign: str) -> dict | None:
 
     return lookup(callsign)
 
+@lru_cache(maxsize=500)
 def database_lookup(input: str) -> dict:
     """ Functions exactly like `operator_lookup` but with tweaks to handle the database output.
     Given an input ICAO hex, looks at the `database_lookup_cache` first, then uses the database module

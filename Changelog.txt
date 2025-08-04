@@ -5,6 +5,22 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.3.0 - 2025-08-04
+    - Big optimization tweaks for the main data loop processing
+        - If FlightGazer is connected to readsb, filtering and processing is now faster by almost 1.5x
+        - When operating in NO_FILTER mode, there is up to a 10x speedup (tested with about 400 aircraft)
+        - When an aircraft enters the area, lookups using the tar1090 database, callsigns, registrations, and country codes
+          only occurs once rather than on each loop cycle, significantly shortening subsequent processing
+        - Other optimization improvements
+    - Initialization script improvements:
+        - Improved rgbmatrix detection
+        - If the rgbmatrix library exists but isn't available globally, the initialization script will try to install it
+          in the virtual environment
+        - Output tweaks
+    - Lowered threshold for a site being deemed "really active" from 800 flybys to 700
+    - Fix minor issue where the high priority event count doesn't reset (existed since v.5.1.0)
+    - Splash screen now has the same feature added in v.7.2.1
+
 v.7.2.3 - 2025-07-28
     - Minor tweak to 4x4 font for better consistency
 

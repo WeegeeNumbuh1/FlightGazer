@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.7.1.0
+# Last updated: v.7.3.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -16,13 +16,23 @@ import argparse
 from pathlib import Path
 import os
 CURRENT_DIR = Path(__file__).resolve().parent
+if os.name != 'nt':
+    try:
+        PATH_OWNER = CURRENT_DIR.owner()
+        OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
+    except:
+        PATH_OWNER = None
+        OWNER_HOME = Path.home()
+else:
+    PATH_OWNER = None
+    OWNER_HOME = Path.home()
 try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
     except (ModuleNotFoundError, ImportError):
         # handle case when rgbmatrix is not installed and maybe is present in the home directory
-        if (RGBMATRIX_DIR := Path(Path.home(), "rpi-rgb-led-matrix")).exists:
+        if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists:
             sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
             try:
                 from rgbmatrix import graphics

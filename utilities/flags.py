@@ -4,6 +4,7 @@ Modified from https://github.com/wiedehopf/tar1090/blob/master/html/flags.js by 
 Mostly generated from the assignment table in the appendix to Chapter 9 of
 Annex 10 Vol III, Second Edition, July 2007 (with amendments through 88-A, 2013-11-14)
 """
+from functools import lru_cache
 
 ICAO_Ranges = [
     {"start": 0x004000, "end": 0x0043FF, "country": "Zimbabwe", "country_code": "zw"},
@@ -225,6 +226,7 @@ ICAO_Ranges = [
     {"start": 0xF00000, "end": 0xFFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
 ]
 
+@lru_cache(maxsize=500)
 def getICAO(icao: str) -> str:
     """ Returns country code from ICAO Range. Input must be a hexadecimal as string. Returns '??' if no match. """
     try:

@@ -153,8 +153,10 @@ Using this project assumes you have the following:
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
-  - If the `rgbmatrix` library is installed, it needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
-  - `rgbmatrix` does not need to be installed to run this script, however. (see [Usage](#️-usage) section)
+  - If the `rgbmatrix` library is installed:
+    - It needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
+    - Must be built using the adafruit script
+  - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
   - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)
@@ -425,7 +427,8 @@ or, you may [start it manually](#️-interactive-mode).
   - python3-venv
   - tmux
 - Create a new systemd service `flightgazer.service` if not present
-  - Also creates a systemd service for the boot splash screen `flightgazer-bootsplash.service` as well
+  - Also creates a systemd service for the boot splash screen `flightgazer-bootsplash.service` as well, only if
+    the `rgbmatrix` library is present 
 - Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
@@ -555,7 +558,7 @@ If it has been over three (3) months since it last checked, then the next time i
 (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
-**A:** adsbdb/adsb.lol only has user reported route information for aircraft that have known origins and destinations. In my experience, these APIs cannot handle position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. The commercial APIs handle these situations much more elegantly (which is the price to pay, I guess). Moreover, FlightAware's API is the only commercial one that has a usable free tier. I do wish FlightAware had a much lighter API call for pulling very basic information like what this project uses.
+**A:** In my experience, adsbdb/adsb.lol cannot handle position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
 
 **Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
 **A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
