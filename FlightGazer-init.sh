@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.7.3.0
+# Version = v.7.3.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -300,12 +300,13 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo "  > Internet connectivity available, initial setup can continue."
 	fi
+
+	read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
+	echo "  > Determining the home directory..."
+	USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME') >/dev/null 2>&1
+	# https://superuser.com/a/1613980
+	echo -e "  > ${USER_HOME}"
 fi
-echo "  > Determining the home directory..."
-read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
-USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME') >/dev/null 2>&1
-# https://superuser.com/a/1613980
-echo -e "  > ${USER_HOME}"
 
 # start the splash screen
 # note that if this is a fresh install and the rgbmatrix software framework doesn't exist, the splash screen won't run

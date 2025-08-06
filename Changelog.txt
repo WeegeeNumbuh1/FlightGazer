@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.7.3.1 - 2025-08-06
+    - Fix watchdog handling regarding change done in v.7.1.2 (it actually didn't get triggered faster when there were sequential failures)
+    - Initialization script no longer checks what the home directory is on every startup
+    - Following an update or dependency check, pip is checked again in the virtual environment (this check was removed in v.6.0.4)
+    - Minor tweak to 4x4 font again, this time shifting the 'T' glyph one pixel left for better layout
+
 v.7.3.0 - 2025-08-04
     - Big optimization tweaks for the main data loop processing
         - If FlightGazer is connected to readsb, filtering and processing is now faster by almost 1.5x

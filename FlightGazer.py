@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.3.0 --- 2025-08-04'
+VERSION: str = 'v.7.3.1 --- 2025-08-06'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2640,8 +2640,6 @@ def main_loop_generator() -> None:
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
                 else:
                     main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}.")
-                    time.sleep(5)
-                    continue
 
                 if sequential_failures > (dump1090_failures_to_watchdog_trigger // 2):
                     if USING_FILESYSTEM:
@@ -2651,6 +2649,7 @@ def main_loop_generator() -> None:
                     sequential_failures = 0
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
 
+                time.sleep(5)
                 continue
 
             except (SystemExit, KeyboardInterrupt):
