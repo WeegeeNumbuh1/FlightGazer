@@ -5,6 +5,47 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.0.0 - 2025-08-15
+    - The selection algorithm continues to become smarter
+        - FlightGazer now estimates the next position of an aircraft based on its speed and heading
+        - If the next position is calculated to be outside of the designated RANGE, it won't select the aircraft
+        - This new feature also enables FlightGazer to ignore "glancing" approaches
+            - If an aircraft is detected at the edge of the tracking area but it's calculated to leave on the next loop,
+              we don't bother tracking it
+            - Incorporating this new feature required a partial rewrite of the selection algorithm
+    - FlightGazer will now try to synchronize itself with the dump1090 json to minimize the time difference between them
+        - Since these two separate systems are periodic but not synchronized, they will naturally drift from one another
+        - This new internal feature is designed to control that drift and maintain consistent data age, especially as system
+          load changes throughout the day
+        - This also works when FlightGazer is operating across a network and can accommodate for differences between system times,
+          all without having to do any kind of additional querying
+            - Adapts to the inherent drift between two different system clocks as well
+        - All the tracking of internal processing time added over the versions is now bearing useful fruit
+        - Uses a hand-tuned PID controller to achieve convergence and enable this form of phase-locked loop
+    - Even more [sic] gameing: Adaptive and variable refresh rate
+        - When on the clock screen the display renders at 10 FPS
+        - If SHOW_EVEN_MORE_INFO is enabled and the aircraft display is shown, the update speed increases to 24 FPS
+        - There is now internal logic that continually changes the frame times in order to maintain the target frame rate
+            - This significantly improves display performance due to varying system load or when using RGBMatrixEmulator
+        - The FPS meter added in v.3.5.0 is no longer feature creep and is now actually useful
+        - Depreciate and remove the the frames.py file that was in use since v.0.8.0 as we now control the frame rate internally
+    - Further refined API cost tracking calculations
+        - When polling the API for usage costs, the costs are not realtime. If the last API call occurred about 15 minutes
+          before the daily query is done, it's safe to assume what the API returns is the more accurate value and this is used
+          - Previously, a small buffer cost was maintained to play it safe
+    - If a previously tracked aircraft has an API result when it was airborne and is detected again when its on the ground
+      before the FLYBY_STALENESS time, the API result will not be used/shown
+    - New keys added to the state file:
+        - Aircraft now have a "Staleness" key that represents age of the position data
+            - This value has always been evaluated since v.0.1.0 as it's part of the dump1090 data,
+              and has been used by the LOCATION_TIMEOUT feature added in v.2.3.0. Timing data is also used in the above
+              position predictor feature. Additionally, the value written to the state file is corrected using the timing data derived for synchronization
+        - Aircraft also now have "FutureLatitude", "FutureLongitude", and "FutureDistance" keys to reflect the added future position calculation
+        - Additional keys for the json age and derived correction factors
+    - In ENHANCED_READOUT, the RSSI header text on the display when using the smallest font has been shifted one pixel to the right for better alignment
+    - The main python script is now >300 KiB and >6000 lines
+        - Really, how does this all still work, lmao
+
 v.7.3.1 - 2025-08-06
     - Fix watchdog handling regarding change done in v.7.1.2 (it actually didn't get triggered faster when there were sequential failures)
     - Initialization script no longer checks what the home directory is on every startup

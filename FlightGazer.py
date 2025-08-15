@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.7.3.1 --- 2025-08-06'
+VERSION: str = 'v.8.0.0 --- 2025-08-15'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -76,7 +76,6 @@ except (ModuleNotFoundError, ImportError):
 from utilities.flags import getICAO
 from utilities.registrations import registration_from_hexid as reg_lookup
 from utilities.animator import Animator
-from setup import frames
 from utilities import operators as op
 
 argflags = argparse.ArgumentParser(
@@ -516,14 +515,15 @@ Becomes empty if `relevant_planes` is empty (eg: showing the clock) """
 focus_plane: str = ""
 """ Current plane in focus, selected by `AirplaneParser.plane_selector()`. Defaults to an empty string when no active plane is selected. """
 focus_plane_stats: dict = {}
-""" Extracted stats for `focus_plane` from `relevant_planes` """
+""" Extracted stats for `focus_plane` from `relevant_planes`, done by `AirplaneParser.plane_selector()` """
 focus_plane_iter: int = 0
-""" Variable that increments per loop when `AirplaneParser` is active """
+""" Variable that increments per loop when `AirplaneParser` is active. Resets to 0 when not. """
 focus_plane_ids_scratch = set()
 """ Scratchpad of currently tracked planes (all IDs in `relevant_planes` at current loop).
 Elements can be removed if plane count > 1 due to selector algorithm """
 focus_plane_ids_discard = set()
-""" Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution """
+""" Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution.
+Gets cleared when all possible planes have been cycled through. """
 plane_latch_times: list = [
     int(30 // LOOP_INTERVAL),
     int(20 // LOOP_INTERVAL),
@@ -532,6 +532,7 @@ plane_latch_times: list = [
 """ Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
 focus_plane_api_results = deque([None] * 100, maxlen=100)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
+With a successful API call, the result is appended at the end of this deque.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `APIAccessed`}.
 `OriginInfo` and `DestinationInfo` are lists in the order of [name, city] either as strings or None. """
 unique_planes_seen: list = []
@@ -539,9 +540,11 @@ unique_planes_seen: list = []
 Keys are {`ID`, `Time`, `Flyby`} """
 callsign_lookup_cache = deque([{}] * 100, maxlen=100)
 """ Cache of previously looked up callsigns.
+Newest entries are appended to the left of this deque.
 Refer to `operator_lookup()` for valid keys. """
 database_lookup_cache = deque([{}] * 1000, maxlen=1000)
-""" Cache of aircraft data sourced from the database. """
+""" Cache of aircraft data sourced from the database.
+Newest entries are appended to the left of this deque. """
 selection_override: bool = False
 """ When an aircraft is within the 'high-priority' dome (0.4 nmi LOS)
 this will be set to True and override the normal `focus_plane` until it leaves this area. """
@@ -642,9 +645,20 @@ algorithm_rare_events: int = 0
 high_priority_events: int = 0
 """ Count of how many selection overrides were triggered """
 process_time2: list = [0.,0.,0.,0.]
-""" Actual debug info: [time to print last console output, format data, json deserializing, json serializing] ms """
+""" [time to print last console output, format data, json deserializing, json serializing] ms """
 runtime_sizes: list = [0,0,0]
 """ Actual debug info: [dump1090 json size, total data processed, reserved] bytes """
+dump1090_json_age: list = [0., 0.]
+""" Age (seconds) of the [dump1090_json, dump978_json] between when it was written and after we polled and processed (not filtered) it.
+This is used for accurate location projections for planes and for controlling drift.
+If not using the filesystem, there is added uncertainty due to differences between the local system's and remote system's time.
+If `determined_time_offset` is able to be calculated, readouts (Interactive display, state file) will be shown with this correction factor,
+but the values in this list will remain unmodified. """
+lockstep_corrector: float = 0.
+""" Time in seconds to correct drift between this script's loop and the update of the dump1090 json.
+Controlled by `synchronizer()` """
+determined_time_offset: float = 0.
+""" Derived difference in time between this running instance and the dump1090 instance. Controlled by `synchonizer()` """
 display_fps: float = 0.
 """ FPS of the display animator """
 achievement_time: str | None = None
@@ -868,6 +882,12 @@ def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
     except:
         return None
 
+def strip_accents(s: str) -> str:
+    """ This is for the display as it cannot handle glyphs outside of ANSI.
+    https://stackoverflow.com/a/518232 """
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                    if unicodedata.category(c) != 'Mn')
+
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
 
@@ -944,6 +964,7 @@ def probe978() -> str | None:
             return json_978 + '/data/aircraft.json'
         except:
             pass
+    main_logger.debug("dump978 not found.")
     return None
 
 def dump1090_check() -> None:
@@ -1410,7 +1431,7 @@ def timesentinel() -> None:
         time_now = datetime.datetime.now()
         time.sleep(1)
         timechange = (datetime.datetime.now() - time_now).total_seconds() - 1
-        if abs(timechange) > 5:
+        if abs(timechange) > 2:
             main_logger.info(f"Time has been changed by {timechange:.1f} seconds. (was {time_now})")
 
 def perf_monitoring() -> None:
@@ -1473,9 +1494,9 @@ def perf_monitoring() -> None:
 ░         ├───► dump1090_hearbeat() ► dump1090_loop() ► ─┐           ▲ (transient event)    ░
 ░         └───< sleep for LOOP_INTERVAL <────<─┬──<────◄─┴─► Exception Handling             ░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ | ░░░░░░░░░           ▼ (if too many errors) ░
-            ┌──────────────────────────────────┘         ░           |                      ░
-            ▼                                            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
-    [AirplaneParser]                                         [dump1090Watchdog]
+            ┌───────────────────────┬──────────┘         ░           |                      ░
+            ▼                       ▼                    ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
+    [AirplaneParser]          [synchronizer]                   [dump1090Watchdog]
             ├────────────────┬──────────────────┐
             ▼                ▼                  ▼
       [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
@@ -1592,7 +1613,18 @@ def runtime_accumulators_reset() -> None:
                 cost_delta = api_usage_cost_sofar - api_cost
             else: # we under-estimated, the API has the correct number here
                 cost_delta = 0.
-            if cost_delta > 0.1: cost_delta = 0.1 # limit how far off we are in our internal running calculations over time
+            # check the API result cache for the last time we made an API call
+            safe_to_use_API_cost = False
+            try:
+                last_result_time = focus_plane_api_results[-1]['APIAccessed']
+                if (time.monotonic() - last_result_time) > (15 * 60): # the last API call happened more than 15 minutes ago
+                    safe_to_use_API_cost = True
+                    cost_delta = 0
+                else:
+                    if cost_delta > 0.1: cost_delta = 0.1 # limit how far off we are in our internal running calculations over time
+            except:
+                last_result_time = None
+                if cost_delta > 0.1: cost_delta = 0.1
             api_usage_cost_baseline = api_cost + cost_delta # keep a buffer that makes hitting the cost limit faster based on what the API returned
             main_logger.info(f"Difference between calculated (${api_usage_cost_sofar:.3f}) "
                              f"and actual cost: ${abs(api_usage_cost_sofar - api_cost):.3f}")
@@ -1603,11 +1635,12 @@ def runtime_accumulators_reset() -> None:
                                      f"remains before reaching cost limit (${API_COST_LIMIT:.2f}).")
                     if API_cost_limit_reached:
                         main_logger.info(f"There are credits available again, API will be re-enabled.")
-                        # from real-world testing, the cost limit is usually reached many hours before the midnight API check,
-                        # so, if the cost limiter is enabled and it turns out there's more credits available, it's safe to
-                        # assume what the API reports is accurate at this point; we override the whole
-                        # api_usage_cost_baseline = api_cost + cost_delta line above.
-                        api_usage_cost_baseline = api_cost
+                        # from real-world testing, the cost limit is usually reached many hours before the midnight API check
+                        # (we still check though)
+                        if safe_to_use_API_cost:
+                            api_usage_cost_baseline = api_cost
+                        else:
+                            api_usage_cost_baseline = api_cost + cost_delta
                         API_cost_limit_reached = False
                 else:
                     main_logger.warning(f"API usage currently exceeds the set cost limit (${API_COST_LIMIT:.2f}).")
@@ -1839,10 +1872,21 @@ class PrintToConsole:
                 if aircraft['Source'] == 'UAT':
                     print_info.append(" (UAT)")
                 if VERBOSE_MODE:
-                    if not NOFILTER_MODE:
+                    print_info.append(" | AGE: ")
+                    print_info.append(f"{aircraft['Staleness']:.1f}".rjust(4))
+                    print_info.append("s")
+                    if not NOFILTER_MODE: # print info the selection algorithm uses
                         print_info.append(" | A-RATE: ")
                         print_info.append(f"{aircraft['ApproachRate']:.3f}".rjust(8))
                         print_info.append(f"{speed_unit}")
+                        print_info.append(" | NEXT POS: ")
+                        if aircraft['FutureLatitude'] and aircraft['FutureLongitude']: # these can be None
+                            print_info.append(f"({aircraft['FutureLatitude']:.6f}, {aircraft['FutureLongitude']:.6f}) ".rjust(25))
+                            print_info.append("- ")
+                            print_info.append(f"{aircraft['FutureDistance']:.4f}".rjust(7))
+                            print_info.append(f"{distance_unit}")
+                        else:
+                            print_info.append(" < Could not be calculated >")
                     print_info.append(f" | PRI: {aircraft['Priority']:02d}")
                     if aircraft['Registration'] is not None:
                         # longest registrations are from Panama & Laos, at 10 char
@@ -1906,7 +1950,10 @@ class PrintToConsole:
                         api_orig_city = result['OriginInfo'][1]
                         api_dest_name = result['DestinationInfo'][0]
                         api_dest_city = result['DestinationInfo'][1]
-                        api_str.append(f"\n{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: ")
+                        api_str.append("\n") # add space between the last plane info and this section
+                        if focus_plane_stats['Altitude'] == 0:
+                            api_str.append(f"{rst}{italic}Note: The below aircraft may have landed since the API was checked.{rst}\n")
+                        api_str.append(f"{blue_highlight}API results for {white_highlight}{api_flight}{blue_highlight}: ")
                         api_str.append(f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
                         api_str.append(f" | {italic}")
                         if api_orig_name is not None: # known airport reported
@@ -2045,7 +2092,17 @@ class PrintToConsole:
                 json_details.append(f" | Export processing: {process_time2[3]:.3f} ms")
             print("".join(json_details))
 
-        # verbose stats line 3 (database stuff)
+        # verbose stats line 3 (timing info)
+        json_details_2 = []
+        if VERBOSE_MODE:
+            json_details_2.append(f"> Timing control: dump1090 age {dump1090_json_age[0] - determined_time_offset:.3f}s")
+            if DUMP978_JSON is not None:
+                json_details_2.append(f", dump978 age {dump1090_json_age[1] - determined_time_offset:.3f}s")
+            json_details_2.append(f" | Drift correction next loop: {lockstep_corrector * 1000:.3f}ms")
+            json_details_2.append(f" | Detected time offset: {determined_time_offset:.3f}s")
+        print("".join(json_details_2))
+
+        # verbose stats line 4 (database stuff)
         db_stuff = []
         if VERBOSE_MODE and DATABASE_CONNECTED:
             db_stuff.append("> Database stats since start: ")
@@ -2144,6 +2201,7 @@ def main_loop_generator() -> None:
     def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
         """ Calculates distance between two points on Earth based on their latitude and longitude.
         (returns value based on selected units) """
+        # NB: it's slighty faster to not use `math.radians()`
         lat0 = lat0 * math.pi / 180.0
         lon0 = lon0 * math.pi / 180.0
         lat1 = lat1 * math.pi / 180.0
@@ -2178,6 +2236,49 @@ def main_loop_generator() -> None:
         slant_range = math.sqrt(dist_nm**2 + alt_nm**2)
         return round(math.degrees(math.atan2(alt_apparent, dist_nm)), 6), round(slant_range * distance_multiplier, 6)
 
+    def future_position(lat0: float,
+                        lon0: float,
+                        spd: float,
+                        heading: float,
+                        location_age: float = 0,
+                        track_rate: float = 0
+                        ) -> tuple[float|None, float|None]:
+        """ Calculate a future coordinate given an initial position (latitude, longitude), speed, and heading.
+        Returns an estimated coordinate based on `LOOP_INTERVAL` time in the future.
+        If no position is given, this returns a tuple of (`None`, `None`).
+        If speed is zero, just returns the input coordinates.
+        Optionally provide a `location_age` (in seconds) and `track_rate` (degrees/sec) to further refine the estimation.
+        If `LOOP_INTERVAL - location_age` is negative, returns (None, None).
+        This doesn't give *exact* results as there are other variables that need to be accounted for
+        (such as winds, GPS accuracy on the plane, acceleration, floating point precision, and so on) but this is good enough for the selection algorithm.
+        Assumes the Earth is a sphere (and at the scales we're dealing with, doing WGS84 calculations absolutely unnecessary).
+        Someone asked for this over on https://physics.stackexchange.com/a/689642; this is a solution. """
+        if lat0 is None or lon0 is None or heading is None:
+            return None, None
+        if spd is None or spd == 0:
+            return lat0, lon0
+
+        earth_radius = 3400 # in nautical miles
+        lat0 = math.radians(lat0)
+        lon0 = math.radians(lon0)
+        time_offset = LOOP_INTERVAL + location_age
+        if time_offset < 0:
+            return None, None
+        heading = math.radians(heading + (track_rate * time_offset))
+        # Normalize to nautical miles per second, then convert to angular distance
+        dist_assumed = (spd * time_offset) / (3600 * speed_multiplier)
+        theta = dist_assumed / earth_radius
+        lat1 = math.asin(math.sin(lat0) * math.cos(theta) +
+                        math.cos(lat0) * math.sin(theta) * math.cos(heading))
+
+        lon1 = lon0 + math.atan2(math.sin(heading) * math.sin(theta) * math.cos(lat0),
+                                math.cos(theta) - math.sin(lat0) * math.sin(lat1))
+
+        # Convert back to degrees
+        lat1_deg = math.degrees(lat1)
+        lon1_deg = (math.degrees(lon1) + 540) % 360 - 180  # normalize
+        return lat1_deg, lon1_deg
+
     priority_lookup: dict = { # this is ordered based on the readsb docs
     'None': 0, # this is for compatibility reasons as not all dump1090 decoders embed a 'type'
     'adsb_icao': 1,
@@ -2203,15 +2304,15 @@ def main_loop_generator() -> None:
         if not DUMP1090_IS_AVAILABLE: return None
         global process_time, process_time2, runtime_sizes
 
-        def get_data(source: str, is_using_local: bool) -> tuple[list, float, float, float]:
+        def get_data(source: str, is_using_local: bool) -> tuple[list, float, float, float, float]:
             """ Get our json, returns a tuple of: all aircraft, response time (ms), json deserializing time (ms)
-            and file size (bytes) """
+            file size (bytes), and Unix timestamp inside the json """
             load_start = time.perf_counter()
             if is_using_local:
                 try:
                     with open(Path(source), 'rb') as _data:
                         # doing this is slightly slower (~5%) than just doing json.load(_data)
-                        # we do it this way just for the "response" stat and to get the file size
+                        # we do it this way for the "response" stat and to get the file size
                         s = _data.read()
                         load_end = round((time.perf_counter() - load_start) * 1000, 3)
                         filesize = len(s)
@@ -2234,13 +2335,14 @@ def main_loop_generator() -> None:
                 else:
                     aircraft_data_tmp = json.loads(_req.content)
             json_end = round((time.perf_counter() - json_parse) * 1000, 3)
-            return aircraft_data_tmp.get('aircraft', []), load_end, json_end, filesize
+            return aircraft_data_tmp.get('aircraft', []), load_end, json_end, filesize, aircraft_data_tmp.get('now', 0)
 
         try:
             aircraft_data = []
             if not USING_THREADPOOL: # basic dump1090 handling, no threadpool overhead
-                aircraft_data, process_time[0], process_time2[2], runtime_sizes[0] = get_data(DUMP1090_JSON, USING_FILESYSTEM)
+                aircraft_data, process_time[0], process_time2[2], runtime_sizes[0], timestamp = get_data(DUMP1090_JSON, USING_FILESYSTEM)
                 runtime_sizes[1] += runtime_sizes[0]
+                dump1090_json_age[0] = time.time() - timestamp if timestamp != 0 else time.time() - ((process_time[0] + process_time2[2]) / 1000)
             else:
                 dump1090wait = data_threadpool.submit(get_data, DUMP1090_JSON, USING_FILESYSTEM)
                 dump978wait = data_threadpool.submit(get_data, DUMP978_JSON, USING_FILESYSTEM_978)
@@ -2269,6 +2371,9 @@ def main_loop_generator() -> None:
                 process_time2[2] = dump1090_response[2] + dump978_response[2]
                 runtime_sizes[0] = dump1090_response[3] + dump978_response[3]
                 runtime_sizes[1] += runtime_sizes[0]
+                dump1090_json_age[0] = time.time() - dump1090_response[4] if dump1090_response[4] != 0 else time.time() - ((process_time[0] + process_time2[2]) / 1000)
+                dump1090_json_age[1] = time.time() - dump978_response[4] if dump978_response[4] != 0 else time.time() - ((process_time[0] + process_time2[2]) / 1000)
+
                 aircraft_data_1090.extend(aircraft_data_978) # append dump978 data into dump1090 data
                 aircraft_data = aircraft_data_1090
 
@@ -2320,8 +2425,12 @@ def main_loop_generator() -> None:
             - Priority: Value representing how "good" the data is. Closer to 0 = best, defaults to 0
             - Source: Source of the data, either 'ADS-B' or 'UAT'
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
+            - FutureLatitude: Estimated next latitude of the plane based on heading, speed, and LOOP_INTERVAL. Defaults None, always None when NOFILTER_MODE is enabled
+            - FutureLongitude: Same as above, but for longitude
+            - FutureDistance: Estimated next distance for the plane. Defaults None, always None when NOFILTER_MODE is enabled
             - Flyby: The cardinal index of this plane we saw today (ex: 'abcdef' is the 98th plane that flew by today)
-            - Timestamp: timestamp of this data packet
+            - Staleness: Age of the position data of the plane, in seconds
+            - Timestamp: Timestamp of this data packet
         """
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
         # auxiliary info: https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder?tab=readme-ov-file#tar1090-core-configuration
@@ -2456,6 +2565,10 @@ def main_loop_generator() -> None:
                         track = a.get('track', 0)
                         gs = a.get('gs', 0)
                         gs = round(gs * speed_multiplier, 3)
+                        if has_key(a, 'uat_version'):
+                            source = 'UAT'
+                        else:
+                            source = 'ADS-B'
                         if rlat is not None:
                             # readsb also does this calculation, try to use it first and have the fallback ready
                             direc = relative_direction(
@@ -2468,6 +2581,34 @@ def main_loop_generator() -> None:
                         else:
                             direc = ""
                         elevation, slant_range_dist = elevation_and_slant(distance, alt)
+                        if abs(determined_time_offset) > 5: dt = 0
+                        else: dt = determined_time_offset
+                        if source == 'ADS-B':
+                            true_data_age = ((seen_pos
+                                            + (dump1090_json_age[0] - abs(dt)))
+                                            - (process_time[0] + process_time2[2]) / 1000
+                            )
+                        else:
+                            true_data_age = ((seen_pos
+                                            + (dump1090_json_age[1] - abs(dt)))
+                                            - (process_time[0] + process_time2[2]) / 1000
+                            )
+                        if not NOFILTER_MODE:
+                            futlat, futlon = future_position(lat,
+                                                             lon,
+                                                             gs,
+                                                             track,
+                                                             true_data_age,
+                                                             a.get('track_rate', 0)
+                                                             )
+                        else:
+                            futlat = futlon = None
+                        if futlat is not None and futlon is not None:
+                            futdis = greatcircle(rlat, rlon, futlat, futlon)
+                            futlat = round(futlat, 6)
+                            futlon = round(futlon, 6)
+                        else:
+                            futdis = None
                         iso_code = getICAO(hex).upper()
                         # This key is sometimes present in some readsb setups (eg: adsb.im images).
                         # Because it reads from a much more updated database, we try to use it first
@@ -2506,10 +2647,6 @@ def main_loop_generator() -> None:
                                 flight = hex
                         else:
                             flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
-                        if has_key(a, 'uat_version'):
-                            source = 'UAT'
-                        else:
-                            source = 'ADS-B'
 
                         flyby_tracker(hex)
                         flyby = flyby_extractor(hex)
@@ -2540,7 +2677,11 @@ def main_loop_generator() -> None:
                             "Priority": priority_value,
                             "Source": source,
                             "ApproachRate": 0.0, # this is not calculated in this loop, check below
+                            "FutureLatitude": futlat,
+                            "FutureLongitude": futlon,
+                            "FutureDistance": futdis,
                             "Flyby": flyby,
+                            "Staleness": round(true_data_age, 3),
                             "Timestamp": time.monotonic(),
                             }
 
@@ -2617,8 +2758,8 @@ def main_loop_generator() -> None:
                 """ Our main loop polling time with adjustment based on how long it took to do the work
                 in order to reduce drift; all other threads that are dependent on this data
                 work in lockstep with this sleep interval, making this our orchestrator/internal tick generator. """
-                lockstep = LOOP_INTERVAL - (time.perf_counter() - loop_start)
-                if lockstep > (LOOP_INTERVAL / 2): # set minimum sleep time
+                lockstep = LOOP_INTERVAL - (time.perf_counter() - loop_start) + lockstep_corrector
+                if (LOOP_INTERVAL * 0.5) < lockstep < (LOOP_INTERVAL * 1.5): # make sure we're calculating realistic times
                     time.sleep(lockstep)
                 else:
                     time.sleep(LOOP_INTERVAL)
@@ -2633,6 +2774,8 @@ def main_loop_generator() -> None:
                         print(f"Is the {dump1090} service down?")
                     else:
                         print("Is the network connection stable?")
+                        if FASTER_REFRESH:
+                            print("FASTER_REFRESH is enabled. If this message keeps appearing, you might need to disable it.")
 
                 if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
                     sequential_failures = 0
@@ -2673,7 +2816,8 @@ def main_loop_generator() -> None:
     loop()
 
 class AirplaneParser:
-    """ When there are planes in `relevant_planes`, continuously parses plane list, selects an active plane (the algorithm), then triggers API fetcher.
+    """ When there are planes in `relevant_planes`, continuously parses plane list, selects an active plane (the algorithm),
+    extracts the info of the relevant plane into `focus_plane_stats`, then triggers API fetcher.
     Additionally, this is where `PrintToConsole` is called from.
     This thread is awoken every time `main_loop_generator.dump1090_loop()` updates data. This is the crux of FlightGazer's operation. """
     def __init__(self):
@@ -2701,6 +2845,7 @@ class AirplaneParser:
         """ Internal flag to indicate a plane is within the `high_priority_dome` """
         high_priority_dome: float = 0.4 * distance_multiplier
         override_init: bool = selection_override
+        range_buffer = RANGE #- (0.01 * distance_multiplier)
         date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
         # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
         next_select_table = [0,0,0]
@@ -2724,7 +2869,7 @@ class AirplaneParser:
 
         def select():
             """ Our main plane selection algorithm. """
-            """ 
+            """
             Programmer's Notes: The following selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
             and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
             It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
@@ -2735,6 +2880,7 @@ class AirplaneParser:
 
             - v.5.0.0 improvement: the algorithm now prioritizes selecting a plane that has the highest `ApproachRate` when choosing a new focus plane with the use of
             `prioritizer()`. The `ApproachRate` value is already pre-calculated from the main `LOOP`.
+            - v.8.0.0 improvement: if a plane is estimated to leave the area on the next loop, it is ignored when we need to select another focus plane.
 
             A built-in metric on tracking the overall selection "efficiency" is by watching the value of 'Aircraft selections' in Interactive Mode introduced in v.2.4.0.
             The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
@@ -2748,14 +2894,22 @@ class AirplaneParser:
                 for plane in relevant_planes_local_copy:
                     if (plane['ID'] not in focus_plane_ids_discard
                         and plane['ApproachRate'] != 0 # skip any plane that has an undetermined speed or just entered the area
-                        ):
+                    ):
                         return plane['ID'] # first result
                 else:
                     # if we can't find a plane with a non-zero approach rate, just return a random one
-                    return random.choice(list(available_ids))
+                    if len(available_ids) > 0:
+                        return random.choice(list(available_ids))
+                    else:
+                        return ''
 
             with threading.Lock():
                 focus_plane_ids_discard.add(focus_plane_i) # add previously assigned focus plane to scratchpad of planes to ignore
+                for entry in relevant_planes_local_copy:
+                    if entry['FutureDistance'] and entry['FutureDistance'] > range_buffer:
+                        focus_plane_ids_discard.add(entry['ID'])
+                        main_logger.debug(f"Detected aircraft \'{entry['Flight']}\' ({entry['ID']}) leaving area "
+                                          f"(Est. next distance: {entry['FutureDistance']:.4f}) when we needed to select a new focus plane.")
                 discard_list = list(focus_plane_ids_discard)
                 for id in discard_list: # remove all previously focused planes from the global list
                     focus_plane_ids_scratch.discard(id)
@@ -2763,11 +2917,8 @@ class AirplaneParser:
                 if len(focus_plane_ids_scratch) > 0:
                     focus_plane = prioritizer(scratch_list)
                 elif len(focus_plane_ids_scratch) == 0:
-                    whatever_else = get_plane_list.copy()
-                    try:
-                        whatever_else.remove(focus_plane_i) # remove the current focus plane from the list of planes to choose from
-                    except ValueError: # case when current plane drops out of range in this loop
-                        pass
+                    whatever_else = set(get_plane_list)
+                    whatever_else.discard(focus_plane_i) # remove the current focus plane from the list of planes to choose from
                     focus_plane = prioritizer(whatever_else)
                     focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
@@ -2784,16 +2935,16 @@ class AirplaneParser:
                     focus_plane_ids_scratch.clear()
                     for entry in relevant_planes_local_copy:
                         get_plane_list.append(entry['ID']) # current planes in this loop
-                        focus_plane_ids_scratch.add(entry['ID']) # add the above to the global list (rebuilds each loop)
+                        focus_plane_ids_scratch.add(entry['ID']) # add the above to the global set (rebuilds each loop)
                         if (entry['SlantRange'] <= high_priority_dome
                             and entry['SlantRange'] > 0
                             and entry['Altitude'] != 0
-                            ): # there is a plane inside this dome
+                        ): # there is a plane inside this dome
                             override_plane = True # no need for an else statement, `override_plane` is reset to False every loop
                         if (FOLLOW_THIS_AIRCRAFT
                             and not FOLLOW_THIS_AIRCRAFT_SPOTTED
                             and entry['ID'] == FOLLOW_THIS_AIRCRAFT
-                            ):
+                        ):
                             main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
                             FOLLOW_THIS_AIRCRAFT_SPOTTED = True
 
@@ -2801,12 +2952,25 @@ class AirplaneParser:
 
                 # if this block of code is awoken, get the first plane from this loop's copy and declare it our focus plane
                 if not focus_plane_i:
-                    focus_plane = get_plane_list[0]
+                    # check for any planes doing a "glancing" approach;
+                    # if a plane is detected at the edge of the tracking area but its next position is calculated to
+                    # leave the area (essentially a tangential trajectory at our RANGE edge), we don't bother tracking
+                    # it whatsoever and save the effort of polling the API and switching to the aircraft display for a few seconds.
+                    # The result is still shown in the Interactive display, however.
+                    for entry in relevant_planes_local_copy:
+                        # get the first plane that will for certain remain in the area
+                        if entry['FutureDistance'] and entry['FutureDistance'] < range_buffer:
+                            focus_plane = entry['ID']
+                            break
+                    else:
+                        focus_plane = ''
+                        main_logger.debug("Focus loop started, but no aircraft were predicted to remain inside area on next refresh.")
 
-                # For the case when the last focus plane leaves the area and new ones appear on this refresh.
+                # For the case when the last focus plane leaves the area and new planes appear on this refresh.
                 # Always works even if there's one plane left in the area.
-                # note this will never run if the above block executed
-                if focus_plane not in get_plane_list:
+                # Note this will never run if the above block executed, except when encountering a "glancing" approach;
+                # in that case, the `select()` function has logic to handle this (removes that kind of plane)
+                if focus_plane and focus_plane not in get_plane_list:
                     select()
 
                 if plane_count > 1:
@@ -2853,14 +3017,22 @@ class AirplaneParser:
 
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
                 with threading.Lock():
-                    for entry in relevant_planes_local_copy: # find our focus plane in `relevant_planes`
-                        if entry and focus_plane == entry.get('ID', ''):
-                            focus_plane_stats = entry
-                            selection_override = override_plane
-                            break
+                    if focus_plane:
+                        for entry in relevant_planes_local_copy: # find our focus plane in `relevant_planes`
+                            if entry and focus_plane == entry.get('ID', ''):
+                                focus_plane_stats = entry
+                                selection_override = override_plane
+                                break
+                        else:
+                            main_logger.error("Failed to extract aircraft info!")
                     else:
-                        main_logger.error("Failed to extract aircraft info!")
-                        
+                        if plane_count == 1:
+                            entry = relevant_planes_local_copy[0]
+                            main_logger.debug(f"No plane available to select. \'{entry['Flight']}\' ({entry['ID']}) did not any valid criteria.")
+                            main_logger.debug(f"POS: {entry['Distance']}, Est POS: {entry['FutureDistance']}, SPD: {entry['Speed']}, "
+                                              f"TRK: {entry['Track']}, A-RATE: {entry['ApproachRate']}, ALT: {entry['Altitude']}")
+                        else:
+                            main_logger.debug(f"No plane available to select ({plane_count} did not meet any valid criteria)")
                 self._last_plane_count = plane_count
                 if override_plane != override_init:
                     if not override_init:
@@ -2883,7 +3055,7 @@ class AirplaneParser:
                         print('\a', end='') # ring the bell just to drive the user crazy (if the terminal supports it)
 
             else: # when there are no planes
-                if focus_plane: # clean-up variables
+                if focus_plane_iter > 0:# clean-up variables
                     with threading.Lock():
                         focus_plane = ""
                         focus_plane_iter = 0
@@ -2919,11 +3091,6 @@ class APIFetcher:
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_loop()
-
-    def strip_accents(self, s: str) -> str:
-        """ https://stackoverflow.com/a/518232 """
-        return ''.join(c for c in unicodedata.normalize('NFD', s)
-                        if unicodedata.category(c) != 'Mn')
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
@@ -3034,11 +3201,9 @@ class APIFetcher:
                                 if origin is None:
                                     origin = flight['origin'].get('code')
                                 # airport name, not always present if coordinate-based origin
-                                if (_origin_name := flight['origin'].get('name')):
-                                    origin_name = self.strip_accents(_origin_name)
-                                    # origin city, always present even with coordinate-based origin
-                                if (_origin_city := flight['origin'].get('city')):
-                                    origin_city = self.strip_accents(_origin_city)
+                                origin_name = flight['origin'].get('name')
+                                # origin city, always present even with coordinate-based origin
+                                origin_city = flight['origin'].get('city')
 
                             # with position-only flights, the `destination` key will be None
                             if flight['destination']:
@@ -3048,10 +3213,8 @@ class APIFetcher:
                                 if destination is None:
                                     destination = flight['destination'].get('code')
                                 
-                                if (_destination_name := flight['destination'].get('name')):
-                                    destination_name = self.strip_accents(_destination_name)
-                                if (_destination_city := flight['destination'].get('city')):
-                                    destination_city = self.strip_accents(_destination_city)
+                                destination_name = flight['destination'].get('name')
+                                destination_city = flight['destination'].get('city')
 
                             depart_iso = flight.get('actual_off')
                             if depart_iso is None:
@@ -3324,30 +3487,31 @@ class DisplayFeeder:
             api_orig_city = None
             api_dest_name = None
             api_dest_city = None
-            for result in reversed(focus_plane_api_results):
-                try:
-                    if result is not None and focus_plane == result['ID']:
-                        if (time.monotonic() - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
-                            api_orig = result['Origin']
-                            if api_orig is None: api_orig = filler_text
-                            api_dest = result['Destination']
-                            if api_dest is None: api_dest = filler_text
-                            api_dpart_time = result['Departure']
-                            if api_dpart_time is not None:
-                                api_dpart_delta = strfdelta((datetime.datetime.now(datetime.timezone.utc) - api_dpart_time), "{H}h{M:02}m")
-                            else:
-                                api_dpart_delta = filler_text
-                            api_orig_name = result['OriginInfo'][0]
-                            api_orig_city = result['OriginInfo'][1]
-                            api_dest_name = result['DestinationInfo'][0]
-                            api_dest_city = result['DestinationInfo'][1]
+            if focus_plane_stats['Altitude'] != 0: # don't use API results if the plane is on the ground after it was airborne
+                for result in reversed(focus_plane_api_results):
+                    try:
+                        if result is not None and focus_plane == result['ID']:
+                            if (time.monotonic() - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
+                                api_orig = result['Origin']
+                                if api_orig is None: api_orig = filler_text
+                                api_dest = result['Destination']
+                                if api_dest is None: api_dest = filler_text
+                                api_dpart_time = result['Departure']
+                                if api_dpart_time is not None:
+                                    api_dpart_delta = strfdelta((datetime.datetime.now(datetime.timezone.utc) - api_dpart_time), "{H}h{M:02}m")
+                                else:
+                                    api_dpart_delta = filler_text
+                                api_orig_name = result['OriginInfo'][0]
+                                api_orig_city = result['OriginInfo'][1]
+                                api_dest_name = result['DestinationInfo'][0]
+                                api_dest_city = result['DestinationInfo'][1]
+                                break
+                            else: # don't use stale API results
+                                break
+                        elif result is None:
                             break
-                        else: # don't use stale API results
-                            break
-                    elif result is None:
+                    except: # if we bump something else
                         break
-                except: # if we bump something else
-                    break
 
             # Get all the other info from the focus plane provided by the database (if available)
             # Example outputs:
@@ -3430,7 +3594,7 @@ class DisplayFeeder:
                 'Track': track,
                 'VertSpeed': vs,
                 'RSSI': rssi,
-                'AircraftInfo': aircraft_str,
+                'AircraftInfo': strip_accents(aircraft_str),
                 'is_UAT': True if focus_plane_stats['Source'] == 'UAT' else False,
             }
         with threading.Lock():
@@ -3672,6 +3836,9 @@ class WriteState:
                 'dump1090_type': dump1090 if DUMP1090_JSON is not None else None,
                 'location_is_set': True if (rlat is not None and rlon is not None) else False,
                 'response_time_ms': process_time[0],
+                'dump1090_json_data_age_sec': round(dump1090_json_age[0] - determined_time_offset, 3),
+                'dump978_json_data_age_sec': None if not DUMP978_JSON else round(dump1090_json_age[1] - determined_time_offset, 3),
+                'polling_drift_correction_ms': round(lockstep_corrector * 1000, 3),
                 'json_size_KiB': round(runtime_sizes[0] / 1024, 3),
                 'json_transfer_rate_MiB_per_sec': 0. if process_time[0] == 0 else
                                     round((runtime_sizes[0] * 1000)/(process_time[0] * 1048576), 3),
@@ -3750,6 +3917,7 @@ class WriteState:
                 'last_console_print_time_ms': process_time2[0],
                 'last_json_export_time_ms': process_time2[3],
                 'total_data_processed_GiB': round(runtime_sizes[1] / 1073741824, 6),
+                'estimated_time_offset_sec': round(determined_time_offset, 6),
                 'verbose_mode': VERBOSE_MODE,
                 'inside_tmux': INSIDE_TMUX,
                 'flyby_stats_present': flyby_stats_present,
@@ -3959,6 +4127,311 @@ def API_Scheduler() -> None:
             main_logger.debug(f"API_SCHEDULE toggled - API calls disabled: {API_schedule_triggered}")
         time.sleep(10)
 
+class synchronizer():
+    """ Used to synchronize and control drift between FlightGazer and dump1090.
+    Does a bunch of stuff, see the comments in the code. """
+
+    """ ------ Timing logic and what we're trying to achieve -----
+    tl;dr do some phase synchronization and reach/maintain a form of phase-locked loop
+
+    Figure 1: Time slice of key processing points
+
+     Wall Time --->
+     ░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░▒▒▒▒▓▓▓▓//▓▓▓▓
+     ^       ^             ^   ^   ^        ^
+     |1      |2            |3  |4  |5*      |6
+
+    Key:
+        1   = Position data of plane (`seen_pos` in json)
+        2   = json timestamp (Unix time on the dump1090 system)
+        2-3 = "The Unknowns"
+              This is the "uncorrectable" time, which includes
+              time mismatch between systems (the majority of this value),
+              and other minutae such as jitter in the age data, time for the
+              filesystem to write the file and become accessible, our own estimation errors, etc
+        3   = FlightGazer starts polling
+        3-4 = Data is transferred and received by FlightGazer (`process_time[0]`)
+        4   = FlightGazer begins converting the data into an internal form
+        4-5 = Data is processed (`process_time2[2]`)
+        5   = Processing is complete
+        *   = The local Unix time at this point used in the calculations
+        2-5 = The json data age (`dump1090_json_age[0]`)
+        6   = Time after sleeping for (LOOP_INTERVAL - various time adjustments) and we start polling
+              again. (Relationally equivalent to point 3)
+
+    Figure 2: Response curve of json data age
+
+                 Phase 1 <-|-> Phase 2        |-> Phase 3
+     ^                     |                  |      
+     │                     |                  |      
+     │       ■       ■     |                  |         --- max   ----------------------
+     │      ■■      ■■     |                  |                                        |
+    A│     ■ ■     ■ ■     |                  |                                        |
+    G│    ■  ■    ■  ■    ■■■                 |                                        |
+    E│   ■   ■   ■   ■   ■   ■■               |                                        |-- json refresh rate
+     │  ■    ■  ■    ■  ■      ■■■            |                                        |
+     │ ■     ■ ■     ■ ■          ■■■■■■■■■■■■■■■■■■■   --- target to achieve          |
+    s│■      ■■      ■■                                     synchrony                  |
+    e│       ■       ■                                  --- min   ----------------------
+    c│                                                                                 |-- "The Unknowns" offset
+     |                                                                                 |
+     │░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   --- Avg processing time     ----
+     │░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░       (duration 3-5 in Figure 1)
+     └────────────────────────────────────────────────> --- Baseline
+                         Wall Time
+
+    Notes:
+    - Jumping from min to max (and vice versa) is referred to as "wrapping around" internally
+    - The algorithm to derive the target age is described in the `adjust_target()` function
+    - The target age can change over time due to drift when connected to another system;
+      the algorithm to determine when to change the target age is described in `drift_watcher()`
+    - This whole class is very robust when the json and this program are running on the same system.
+      It's when there are two systems involved that we run into complications, mainly just determining
+      "The Unknowns" offset as drift occurs and clocks change, etc, and recalculating a new target point.
+      As long as the target age is achievable, this setup works very well to keep things locked in phase.
+        - If the time offset is negative (eg the remote system has an advanced clock and timestamps are in the future)
+        then gg (there are some workarounds elsewhere in this program that attempts to handle this situation but realistically
+        it's not *that* big of a deal in the grand scheme of things, we basically just ignore it and focus on keeping drift in check)
+    """
+
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        register_signal_handler(self.loop, self.sync, signal=DATA_UPDATED, sender=main_loop_generator)
+        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self.initial_sampling_min = 5
+        self.initial_samples = int((self.initial_sampling_min * 60) // LOOP_INTERVAL)
+        self.initial_sample_count = 0
+        self.deque_size = self.initial_samples + 100
+        self.json_age_data = deque([], maxlen=self.deque_size)
+        self.json_age_data_window = deque([], maxlen=10)
+        self.processing_times = deque([], maxlen=self.deque_size)
+        self.phase_stage = 0
+        self.time_difference = 0. # for debug analysis
+
+        # --- below variables are in seconds
+        self.est_json_refresh = 0. # our guess of how often the json gets updated based on the range between min and max json time
+        self.max_json_age = 0. # only updates when `adjust_target()` is called
+        self.min_json_age = 0. # same as above
+        self.avg_json_age = 0. # used when determining if the setup is stable and checking if there are any spikes to the max json time; used for debug analysis
+        self.json_age_window_avg = 0. # for debug analysis
+        self.avg_processing = 0. # track the processing speed as system load or number of planes changes throughout the day
+        self.min_processing = 0. # best processing time to give a maximum bound for the "uncorrectable" time (below)
+        # The "uncorrectable" difference is the measure of uncertainty of the self-reported time
+        # between FlightGazer and dump1090. If operating across a network, this is essentially the difference
+        # between the two system clocks. It's "uncorrectable" because it's outside of FlightGazer's control.
+        # This value can change over time as well when connected to a remote system.
+        self.est_uncorrectable = 0.
+        self.max_uncorrectable = 0.
+        # --- tuning parameters
+        self.age_target = 0. # the setpoint, controlled by 'adjust_target()`
+        self.max_step = 0.01 # limit how far the PID can drift the main loop (in seconds; can change between Phases)
+
+        # give some wiggle room for loop-to-loop variations and for the PID controller to adjust
+        # so that we don't end up doing the wrap-around effect. This is a ratio of the derived json refresh speed
+        self.sync_buffer = 0.2
+        self.buffer_sec = 0. # the sync buffer but based on derived json refresh speed
+
+        # --- hand-tuned coefficients! (oof)
+        self.proportional_gain = 0.029
+        self.integral_gain = 0.0008
+        self.derivative_gain = 0.031
+        self.control_error = 0
+        self.control_integral = 0
+        self.debug_file = Path(CURRENT_DIR, f'drift_calc_{datetime.datetime.now().strftime("%Y-%m-%dT%H%M%S")}.csv')
+        self.run_loop()
+
+    def sync(self, message) -> None:
+        """ Does what it says on the can. """
+        global lockstep_corrector, determined_time_offset
+        def pid_controller(setpoint, pv, kp, ki, kd, previous_error, integral, dt):
+            """ Thanks Digikey """
+            error = setpoint - pv
+            integral += error * dt
+            derivative = (error - previous_error) / dt
+            control = kp * error + ki * integral + kd * derivative
+            return control, error, integral
+
+        def corrector() -> None:
+            """ Calculate the corrector for the main loop. """
+            global lockstep_corrector
+            if len(self.json_age_data) > 0:
+                self.avg_json_age = sum(self.json_age_data) / len(self.json_age_data)
+                self.json_age_data_window.append(self.avg_json_age)
+                self.json_age_window_avg = sum(self.json_age_data_window) / len(self.json_age_data_window)
+
+            control, self.control_error, self.control_integral = pid_controller(self.age_target,
+                                                      dump1090_json_age[0],
+                                                      self.proportional_gain,
+                                                      self.integral_gain,
+                                                      self.derivative_gain,
+                                                      self.control_error,
+                                                      self.control_integral,
+                                                      1 # the timestep, not actual seconds
+                                                      )
+            # Control the PID output and reinitialize it until the output is below the max_step.
+            # This is to keep divergence in check (avoids integral windup)
+            if abs(control) > self.max_step:
+                lockstep_corrector = self.max_step if control >= 0 else -1 * (self.max_step)
+                self.control_error = 0
+                self.control_integral = 0
+            else:
+                lockstep_corrector = control
+
+        def adjust_target() -> None:
+            """ Change the setpoint """
+            midpoint = self.est_json_refresh / 2
+            # note: if the processing takes longer than half the buffer time, this becomes negative
+            # and the target time moves closer to the midpoint rather than closer to the lower bound
+            headroom = (self.buffer_sec / 2) - self.avg_processing
+            if (desired_target := self.min_json_age + self.buffer_sec - headroom) < self.min_json_age + midpoint:
+                # aim closer to the minimum
+                self.age_target = desired_target
+            else:
+                # meet in the middle
+                self.age_target = self.min_json_age + midpoint
+
+        def drift_watcher() -> None:
+            """ Watches for changes in the upper and lower limits for the json age
+            and changes the setpoint when necessary. Will clear the age data history to
+            reset the averages calculation if the setpoint is changed. """
+            global determined_time_offset
+            self.time_difference = dump1090_json_age[0] - self.age_target
+            max_json_age_this_loop = max(self.json_age_data)
+            min_json_age_this_loop = min(self.json_age_data)
+            max_last = self.max_json_age
+            min_last = self.min_json_age
+            self.min_processing = min(self.processing_times)
+            self.avg_processing = sum(self.processing_times) / len(self.processing_times)
+            triggered = False
+            if (
+                min_json_age_this_loop < self.min_json_age
+                and abs(self.min_json_age - min_json_age_this_loop) > self.buffer_sec
+            ):
+                # the lower bound is now noticably lower than last analyzed, adjust the target to compensate
+                triggered = True
+                reason_text = "due to lower minimum detected"
+                self.min_json_age = min_json_age_this_loop
+                if max_last > (new_max := self.min_json_age + self.est_json_refresh):
+                    self.max_json_age = new_max
+            elif max_json_age_this_loop - self.avg_json_age > self.est_json_refresh - self.buffer_sec:
+                # a spurious spike in the age which could be due to the uncorrectable time increasing
+                # and causing the actual json minimum age to rise as well and we wrap around.
+                # Don't reference the max json age over the deque as it will change once the deque is filled with the stable data
+                triggered = True
+                reason_text = "due to significant spike in json age"
+                self.max_json_age = max_json_age_this_loop
+                if min_last < (new_min := self.max_json_age - self.est_json_refresh):
+                    self.min_json_age = new_min
+            if triggered and len(self.json_age_data) > 20: # lock out the adjustment for these many samples
+                main_logger.debug(f"Detected need to change target {reason_text}:")
+                main_logger.debug("Min | Max (old bounds / new bounds / detected at this loop): "
+                                  f"{min_last:.3f} / {self.min_json_age:.3f} / {min_json_age_this_loop:.3f} | "
+                                  f"{max_last:.3f} / {self.max_json_age:.3f} / {max_json_age_this_loop:.3f}")
+                self.est_uncorrectable = self.min_json_age - self.avg_processing
+                self.max_uncorrectable = self.min_json_age - self.min_processing
+                adjust_target()
+                self.json_age_data.clear()
+                determined_time_offset = self.est_uncorrectable
+                main_logger.debug(f"Correcting target to {self.age_target:.3f}s "
+                                  f"({abs(self.age_target - self.min_json_age):.3f}s from minimum)"
+                                  f", time offset: {determined_time_offset:.6f}s")
+
+        phase_now = self.phase_stage
+        if self.phase_stage == 0: # start the work
+            self.phase_stage += 1
+            # # ********************* CSV logging for later analysis
+            # if VERBOSE_MODE:
+            #     with open(self.debug_file, 'w') as stats:
+            #         stats.write(f"time,json_age,json_age_avg,correction,age_target,time_difference,process_time_avg\n")
+            # # *********************
+
+        self.json_age_data.appendleft(dump1090_json_age[0])
+        self.processing_times.appendleft((process_time[0] + process_time2[2]) / 1000)
+
+        # #*********************
+        # if VERBOSE_MODE:
+        #     with open(self.debug_file, 'a') as stats:
+        #         stats.write(f"{time.time():.3f},{dump1090_json_age[0]:.6f},{self.avg_json_age:.6f},"
+        #                     f"{lockstep_corrector:.6f},{self.age_target:.6f},{self.time_difference:.6f},{self.avg_processing:.6f}\n")
+        # # *********************
+
+        if self.phase_stage == 3:
+            drift_watcher()
+            corrector()
+        elif self.phase_stage == 2:
+            # this catches the case when the bounds of the json age change when we're trying to reach
+            # the setpoint
+            if len(self.json_age_data) >= self.deque_size:
+                drift_watcher()
+            else:
+                self.time_difference = dump1090_json_age[0] - self.age_target
+            corrector()
+
+            # check if stable
+            if (len(self.json_age_data) > int((2 * 60) // LOOP_INTERVAL)
+                and self.age_target - (self.buffer_sec / 2) < self.avg_json_age < self.age_target + (self.buffer_sec / 2)
+            ):
+                main_logger.debug(f"Phase 2 complete. Average json age is within tolerance ({self.buffer_sec / 4:.3f}s) of targeted age.")
+                self.phase_stage += 1
+
+        elif self.phase_stage == 1:
+            self.initial_sample_count += 1
+            if self.initial_sample_count == self.initial_samples:
+                self.max_json_age = max(self.json_age_data)
+                self.min_json_age  = min(self.json_age_data)
+                # derive our fixed constants
+                self.est_json_refresh = self.max_json_age - self.min_json_age
+                self.buffer_sec = self.est_json_refresh * self.sync_buffer
+                # the rest of these can change over time
+                self.avg_processing = sum(self.processing_times) / len(self.processing_times)
+                self.min_processing = min(self.processing_times)
+                self.est_uncorrectable = self.min_json_age - self.avg_processing
+                self.max_uncorrectable = self.min_json_age - self.min_processing
+                determined_time_offset = self.est_uncorrectable
+                adjust_target()
+                main_logger.debug("****************************************************************")
+                main_logger.debug(f"Phase 1 complete. Maximum/Minimum json age: {self.max_json_age:.3f} / {self.min_json_age:.3f} sec.")
+                main_logger.debug(f"Estimated json refresh rate: {self.est_json_refresh:.3f} (~{round(self.est_json_refresh, 1)}) sec")
+                main_logger.debug(f"Avg/Min retrieval and processing: {self.avg_processing:.3f} / {self.min_processing:.3f} sec")
+                main_logger.debug("Estimated/Max time offset (uncorrectable): "
+                                  f"{self.est_uncorrectable:.3f} / {self.max_uncorrectable:.3f} sec")
+                main_logger.debug(f"Realistic target: {self.age_target:.3f} sec ({abs(self.age_target - self.min_json_age):.3f} from minimum)")
+                main_logger.debug("****************************************************************")
+                if abs(determined_time_offset) > 5:
+                    main_logger.warning(f"The system clocks between FlightGazer and the {dump1090} system need to be synced. "
+                                        f"A time difference of {determined_time_offset:.3f} seconds was detected between these two.")
+                self.time_difference = dump1090_json_age[0] - self.age_target
+                self.phase_stage += 1
+
+        if self.phase_stage != phase_now:
+            if self.phase_stage == 1:
+                # Phase 1 - Analyze: Probe the minimum and maximum age difference we can get from the dump1090 json; a sweep essentially.
+                # Additionally determines the clock offset between FlightGazer and the local system (if running locally this ends
+                # up being nearly zero)
+                lockstep_corrector = 0.02 # start by inducing a drift of 20 ms
+                main_logger.debug(f"Starting Phase 1: Probing time differences. Collecting {self.initial_samples} samples "
+                                  f"({self.initial_sampling_min} minutes).")
+            elif self.phase_stage == 2:
+                # Phase 2 - Correct: Approach target age, then let it settle
+                self.max_step = 0.01 # slowly approach the target
+                self.json_age_data.clear()
+                main_logger.debug("Starting Phase 2: Adjusting drift to achieve target time and check for stability.")
+            elif self.phase_stage == 3:
+                # Phase 3 - Maintain and Observe: Maintain targeted age and keep track of stats
+                self.max_step = 0.005 # settle into a more relaxed correction
+                self.json_age_data.clear()
+                main_logger.debug("Now maintaining targeted json age and adjusting target time when necessary.")
+
+    def run_loop(self):
+        def keep_alive():
+            self.loop.call_later(1, keep_alive)
+        keep_alive()
+        self.loop.run_forever()
+
+    def end_thread(self, message):
+        self.loop.stop()
+
 # ========== Display Superclass ============
 # ==========================================
 
@@ -4075,7 +4548,9 @@ class Display(
         super().__init__()
 
         # Overwrite any default settings from Animator
-        self.delay = frames.PERIOD
+        self.framerate = 10
+        self.delay = 1 / self.framerate
+        self._last_framerate = self.framerate
 
         # Error control: count how many times something broke in here
         self.itbroke_count = 0
@@ -4126,9 +4601,25 @@ class Display(
         # First operation after a screen reset
         self.canvas.Clear()
 
-    """ Watches when we need to switch to active plane display or if ENHANCED_READOUT changes """
+    """ Watches when we need to switch to active plane display or if ENHANCED_READOUT changes.
+    Also controls the frame rate. """
     @Animator.KeyFrame.add(1)
     def aa_scene_switch(self, count):
+        def adaptive_speed(frame_rate: int|float, avg_frame_time: float) -> float:
+            """ Try to adjust sleep time per frame to match targeted `frame_rate` based on given
+            `avg_frame_time` (in seconds). Returns time in seconds.
+            If the desired frame rate can't be achieved with the given frame time,
+            returns a minimum time of 1/5th the estimated frame time
+            (eg. if frame rate is 25, returns 0.04 * 0.2 = 0.008).
+            This is to give the other threads a chance to use the GIL. """
+            period = 1 / frame_rate
+            if avg_frame_time is None or avg_frame_time == 0:
+                return period
+            if (remaining := period - avg_frame_time) < (period * 0.2):
+                return period * 0.2
+            else:
+                return remaining
+
         if self._last_active_state != active_plane_display:
             self.active_plane_display = active_plane_display
             self.reset_scene()
@@ -4138,13 +4629,21 @@ class Display(
             self.reinit()
             self.reset_scene()
         self._enhanced_readout_last = ENHANCED_READOUT
+        if self.active_plane_display and self._enhanced_readout_last and SHOW_EVEN_MORE_INFO:
+            self._last_framerate = self.framerate
+            self.framerate = 24
+            self.delay = adaptive_speed(self.framerate, process_time[3] / 1000)
+        else:
+            self._last_framerate = self.framerate
+            self.framerate = 10
+            self.delay = adaptive_speed(self.framerate, process_time[3] / 1000)
         return True
 
     """ Blink the callsign upon plane change or if active plane display starts """
     @Animator.KeyFrame.add(1) # animation is tied to the refresh rate
     def b_callsign_blinker(self, count):
         half_cycle_time: float = 0.5 # in seconds
-        frame_count_per_sec = frames.PER_SECOND
+        frame_count_per_sec = self.framerate
         switch_after_these_many_frames = int(round(frame_count_per_sec * half_cycle_time, 0))
         times_to_blink: int = 5
         # (times_to_blink * 2) gives us a full cycle in regards to frames
@@ -4165,6 +4664,7 @@ class Display(
         # if the callsign changed after we're done blinking (decrement == 0) and active plane display is still true
         if (self._callsign_blinker_cache_last is not None
             and self._callsign_blinker_cache_last != self._callsign_blinker_cache
+            or self.framerate != self._last_framerate
             ):
             reinit()
         if self._callsign_frame_decrement == 0: # stop the blinking
@@ -5102,7 +5602,7 @@ class Display(
     @Animator.KeyFrame.add(1) # animation is tied to the frame rate
     def m_marquee(self, count):
         pause_length_sec = 2
-        pause_frames = int(pause_length_sec * frames.PER_SECOND)
+        pause_frames = int(pause_length_sec * self.framerate)
 
         def reinit():
             self._marquee_pos = 1
@@ -5130,10 +5630,12 @@ class Display(
 
         # if the focus plane changes, restart the animation
         if (
-            self._last_hexID is not None
+            (self._last_hexID is not None
             and focus_plane_stats
             and self._last_hexID != focus_plane_stats.get('ID')
-            ):
+            )
+            or self.framerate != self._last_framerate
+        ):
             reinit()
 
         marquee_str_now = active_data.get('AircraftInfo', "NO ADD'L INFO")
@@ -5257,8 +5759,10 @@ class Display(
             or (SHOW_EVEN_MORE_INFO and (JOURNEY_PLUS or ENHANCED_READOUT))
         ):
             HEADER_TEXT_FONT = fonts.microscopic
+            micro_font = True
         else:
             HEADER_TEXT_FONT = fonts.small
+            micro_font = False
         ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
         SPEED_HEADING_COLOR = colors.speed_heading_color
         TIME_HEADING_COLOR = colors.time_rssi_heading_color
@@ -5292,7 +5796,7 @@ class Display(
             _ = graphics.DrawText(
                 self.canvas,
                 HEADER_TEXT_FONT,
-                48 if (JOURNEY_PLUS and not ENHANCED_READOUT) else 47,
+                48 if micro_font else 47,
                 ACTIVE_TEXT_Y,
                 TIME_HEADING_COLOR,
                 "RSSI"
@@ -5787,6 +6291,7 @@ def main() -> None:
     watchdog_stuff = threading.Thread(target=dump1090Watchdog, name='Dump1090-Watchdog', daemon=True)
     json_writer = threading.Thread(target=WriteState, name='JSON-Writer', daemon=True)
     console_stuff = threading.Thread(target=PrintToConsole, name='Console-Printer', daemon=True)
+    syncing_stuff = threading.Thread(target=synchronizer, name='Synchronization-Thread', daemon=True)
     if WRITE_STATE:
         json_writer.start()
     main_logger.info("Cleared for takeoff.")
@@ -5830,6 +6335,7 @@ def main() -> None:
     dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary
     main_logger.debug("Firing up threads...")
     main_stuff.start()
+    syncing_stuff.start()
     airplane_watcher.start()
     api_getter.start()
     receiver_stuff.start()

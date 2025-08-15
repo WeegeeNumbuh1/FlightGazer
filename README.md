@@ -141,6 +141,7 @@ Using this project assumes you have the following:
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
+  - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
 - The latest Python (>=3.9)
 - At least 100 MB of available disk space
 - A working internet connection for setup
@@ -364,7 +365,7 @@ The script automatically detects that you're running interactively and will disp
 > [!TIP]
 > An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.
 > <br><b>Note: Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
-> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect less than 7 FPS on a Raspberry Pi 3/Zero 2W)
+> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 12 FPS on a Raspberry Pi 3/Zero 2W)
 > <br>
 > <br>By default, `RGBMatrixEmulator` can be viewed through a web browser:
 > - `http://<IP-address-of-device-running-FlightGazer>:8888`
@@ -543,9 +544,12 @@ Getting the RGB display to work is beyond the scope of this project if it wasn't
 **Q:** I broke it 🥺<br>
 **A:** Try running the updater first. If it's still broken, uninstall then reinstall FlightGazer.
 
-**Q:** I restarted my system but it took longer for my display to start. What's going on?<br>
-**A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.
-If it has been over three (3) months since it last checked, then the next time it restarts, it will run these checks. It usually only adds a minute or two to the startup time, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
+**Q:** I restarted/updated my system but it took longer for FlightGazer to start. What's going on?<br>
+**A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.<br>
+If it has been over three (3) months since it last checked, then the next time it restarts, it will run these checks. It usually takes a few minutes to do this, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
+
+**Q:** Okay, but this update is taking a *really long* time. Then, it just stops after awhile. Is it broken?<br>
+**A:** First, restart the whole system. Then, let FlightGazer do the update again (it should do this automatically at system startup). If it stops again, try starting FlightGazer one more time. It should succeed at this point.<br>
 
 **Q:** I see a dot on the right of the aircraft readout display. What is it?<br>
 **A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
@@ -554,11 +558,15 @@ If it has been over three (3) months since it last checked, then the next time i
 **A:** [Click here](#adjusting-colors)
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
-**A:** Sure, just change some things in the script. Have fun. (also, just fork this project)<br>
+**A:** Sure, just change some things in the script. Have fun. (also, you can just fork this project)<br>
 (note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
 
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
-**A:** In my experience, adsbdb/adsb.lol cannot handle position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
+**A:** In my experience, adsbdb/adsb.lol cannot handle chartered/position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
+
+**Q:** FlightGazer detected a plane and it couldn't determine a journey. This same plane showed up again a few minutes later and the result didn't change. What happened?<br>
+**A:** If this plane is blocked from public tracking, there will never be a result. If you know it isn't, try lowering the value for `FLYBY_STALENESS`.<br>
+This situation has been seen when a plane just takes off and the API FlightGazer uses hasn't begun tracking the plane just yet, therefore there isn't a result that the API can give. When this plane shows up again, FlightGazer will reuse the same API result since it would not count this as a new flyby, a metric controlled by `FLYBY_STALENESS`.<br>
 
 **Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
 **A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
