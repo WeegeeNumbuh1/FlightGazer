@@ -30,7 +30,7 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - [Prerequisites (Important)](#️-prerequisites-important)
   - [Installation \& Getting Started](#-installation--getting-started)
   - [Configuration](#️-configuration)
-  - [Making Things Easier](#-making-things-easier)
+  - [Making Things Easier (Recommended)](#-making-things-easier-recommended)
 - [Usage](#️-usage)
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
@@ -298,7 +298,7 @@ Example: `seconds_color = BLACK`
  
 </details>
 
-### 💻 Making Things Easier
+### 💻 Making Things Easier (Recommended)
 
 Want to make dealing with FlightGazer easier without having to use terminal commands all the time? (the author sure did)<br>
 Install the web interface that manages basically everything to do with FlightGazer.<br>

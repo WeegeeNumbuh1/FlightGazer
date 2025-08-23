@@ -5,6 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.0.1 - 2025-08-22
+    - FIX: Distance calculation when using non-aeronautical units and using readsb-provided data
+    - Daily stats output tweaks:
+        - When running in NO_FILTER mode, selection event counts is no longer written
+        - Fix minor edge case when there are aircraft in the area at the time the daily stats are polled and
+          the rare selection event count is reset before it could be written, leading to this stat never being shown
+    - Add validation for BRIGHTNESS_SWITCH_TIME to make sure sunrise occurs before sunset
+    - When installing the webapp service file, access logging is no longer enabled by default (only affects new installs)
+
 v.8.0.0 - 2025-08-15
     - The selection algorithm continues to become smarter
         - FlightGazer now estimates the next position of an aircraft based on its speed and heading

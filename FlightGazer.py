@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.0.0 --- 2025-08-15'
+VERSION: str = 'v.8.0.1 --- 2025-08-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -641,7 +641,8 @@ process_time: list = [0.,0.,0.,0.]
 selection_events: int = 0
 """ Track amount of times the plane selector is triggered. """
 algorithm_rare_events: int = 0
-""" Count of times the rare events section of the selection algorithm is used """
+""" Count of times the rare events section of the selection algorithm is used.
+Controlled by `AirplaneParser`. """
 high_priority_events: int = 0
 """ Count of how many selection overrides were triggered """
 process_time2: list = [0.,0.,0.,0.]
@@ -1528,13 +1529,14 @@ def runtime_accumulators_reset() -> None:
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time
     daily_stats_str = []
     daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys.")
-    if high_priority_events > 0:
-        daily_stats_str.append(f" {high_priority_events} high priority overrides occurred.")
-    daily_stats_str.append(f" {selection_events} selection events")
-    if algorithm_rare_events_now > 0:
-        daily_stats_str.append(f", of which {algorithm_rare_events_now} were rare selection events.")
-    else:
-        daily_stats_str.append(".")
+    if not NOFILTER_MODE:
+        if high_priority_events > 0:
+            daily_stats_str.append(f" {high_priority_events} high priority overrides occurred.")
+        daily_stats_str.append(f" {selection_events} selection events")
+        if algorithm_rare_events_now > 0:
+            daily_stats_str.append(f", of which {algorithm_rare_events_now} were rare selection events.")
+        else:
+            daily_stats_str.append(".")
     main_logger.info(f"{''.join(daily_stats_str)}")
 
     if (
@@ -1551,7 +1553,7 @@ def runtime_accumulators_reset() -> None:
 
     if (len(unique_planes_seen) >= 1300
         and not NOFILTER_MODE
-        and (RANGE <= 2 and HEIGHT_LIMIT <= 15000)
+        and (RANGE <= (2 * distance_multiplier) and HEIGHT_LIMIT <= (15000 * altitude_multiplier))
         and FLYBY_STALENESS >= 60
         and (time.monotonic() - START_TIME) > 72000
         ): # little easter egg only very few will see in the logs (if you're reading this from the source then lmao)
@@ -2544,6 +2546,8 @@ def main_loop_generator() -> None:
                     # From testing, using the current layout is now up to 1.5x faster over time, as long as we're connected to readsb.
                     if distance is None:
                         distance = greatcircle(rlat, rlon, lat, lon)
+                    else: # don't forget to scale to the selected units if we're reading directly from readsb
+                        distance = distance * distance_multiplier
                 else:
                     distance = 0
                 ranges.append(distance)
@@ -2846,7 +2850,11 @@ class AirplaneParser:
         high_priority_dome: float = 0.4 * distance_multiplier
         override_init: bool = selection_override
         range_buffer = RANGE #- (0.01 * distance_multiplier)
-        date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
+        # add a small buffer to allow the daily stats logging (in `runtime_accumulators_reset()`)
+        # to read the `algorithm_rare_events` value before we reset it, in the case there's a plane in the area
+        # when midnight comes around
+        date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=5)).strftime('%Y-%m-%d')
+        last_rare_occurrences = self.rare_occurrences
         # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
         next_select_table = [0,0,0]
         loops_to_next_select = [0,0,0]
@@ -3069,7 +3077,8 @@ class AirplaneParser:
 
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
-            algorithm_rare_events = self.rare_occurrences
+            if last_rare_occurrences != self.rare_occurrences:
+                algorithm_rare_events = self.rare_occurrences
 
         # this triggers the DisplayFeeder and PrintToConsole
         dispatcher.send(message='', signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
@@ -3694,6 +3703,12 @@ def brightness_controller() -> None:
     try:
         switch_time1 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunrise'], "%H:%M").time()
         switch_time2 = datetime.datetime.strptime(BRIGHTNESS_SWITCH_TIME['Sunset'], "%H:%M").time()
+        if switch_time1 > switch_time2:
+            current_brightness = BRIGHTNESS
+            main_logger.warning(f"Desired sunrise time \'{BRIGHTNESS_SWITCH_TIME['Sunrise']}\' "
+                                f"is after sunset \'{BRIGHTNESS_SWITCH_TIME['Sunset']}\'")
+            main_logger.info(f">>> Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
+            return
         main_logger.info("Dynamic brightness is enabled.")
         main_logger.info(f"Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
     except: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
@@ -6233,7 +6248,7 @@ flyby_stats() # initialize first
 
 # define our scheduled tasks (our "one-shot" functions)
 # NB: order matters in the way they're defined as these run sequentially when run at the same time
-schedule.every().day.at("00:00").do(suntimes)
+schedule.every().day.at("00:00").do(suntimes) # do this first since `runtime_accumulators_reset()` takes a few seconds
 schedule.every().day.at("00:00").do(runtime_accumulators_reset)
 schedule.every().hour.at(":00").do(flyby_stats)
 schedule.every().day.at("23:59:58").do(flyby_stats) # get us the day's total count before reset

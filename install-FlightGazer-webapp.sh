@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.7.2.0
+# Last updated: v.8.0.1
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -269,7 +269,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	[Service]
 	# yeah we use root for this, but this web app isn't something you expose to the rest of the internet anyway (if you do, then gg)
 	User=root
-	ExecStart=$VENVPATH/bin/gunicorn -w 1 -b 0.0.0.0:9898 --worker-connections 3 --access-logfile - --chdir "$BASEDIR/web-app/" "FG-webapp:app"
+	ExecStart=$VENVPATH/bin/gunicorn -w 1 -b 0.0.0.0:9898 --worker-connections 3 --chdir "$BASEDIR/web-app/" "FG-webapp:app"
 	Type=simple
 	# Note: the below is required to handle the case when the web interface updates itself and needs to restart the service.
 	# Without this, this service will fail to restart as the process that sent the restart command is killed once the command is initiated.
