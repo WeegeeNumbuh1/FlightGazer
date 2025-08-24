@@ -1,4 +1,5 @@
 <!-- Title -->
+<a id="readme-top"></a>
 <div align="center">
     <a href="https://github.com/WeegeeNumbuh1/FlightGazer">
     <img src="media/FlightGazer-logo.png" alt="Logo">
@@ -70,6 +71,8 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
 Coming Soon™.<br>
 If you want one, I can also build one for you. (also Coming Soon™)
 </details>
+<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 </div>
 
 ## 💪 Features
@@ -129,6 +132,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Adequate documentation
 
 </details>
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🛠️ Setup
 ### ⚠️ Prerequisites (Important)
@@ -237,7 +241,7 @@ Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 <details><summary>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</summary>
 
 Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
-Example: `http://192.168.xxx.xxx:8080`<br>
+Example: `http://192.168.xxx.xxx:8080` or `http://192.168.xxx.xxx/skyaware`<br>
 And then set `PREFER_LOCAL` to `false`.
 
 </details>
@@ -309,6 +313,7 @@ sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh
 The web interface can be accessed via<br>
 `http://<IP-address-of-device-running-FlightGazer>/flightgazer`<br>
 or on port `9898/flightgazer` if there's no web server present on the device running FlightGazer.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🏃‍♂️ Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
@@ -496,6 +501,7 @@ sudo bash /path/to/FlightGazer/FlightGazer-init.sh -c \
 Check the [`utilities`](./utilities/) directory.
 
 </details>
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## ⬆️ How to Update
 
@@ -523,6 +529,7 @@ You can run `git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer \a
 Use the alternative approach above.<br>
 The migrator cannot migrate v.1.x configuration files to the newer format so you must manually migrate your settings.
 </details>
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🚮 Uninstall
 ```
@@ -581,6 +588,7 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
 </details>
 
 <br>If your question isn't listed in the FAQ's, open an issue here on Github.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🐛 Known Issues, Shortcomings, and Reporting Issues
 
@@ -616,6 +624,7 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `settings_migrate.log` if present) which can be found in the FlightGazer directory.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 💬 Support & Discussion
 \* (dust) \*
@@ -632,6 +641,7 @@ Suggestions, comments, and bug reports are always welcomed and encouraged.<br>
 Additionally, word-of-mouth helps plenty!<br>
 If you'd like to make your own edits that changes the way the project operates, please fork this project.<br>
 If there's something not addressed here, please reach out to me directly.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 📖 Additional Related/Similar Projects
 
@@ -641,6 +651,7 @@ If there's something not addressed here, please reach out to me directly.
   - Uses all the same core components that this project relies on at a surface-level: FlightAware's API (the older `Firehose` one), `dump1090`, `rgbmatrix`
 - [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the aircraft that flyby your location
   - Inspired the functionality of the stats file FlightGazer writes out
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🎖️ Highlights Across Media
 \* (dust) \*
@@ -661,3 +672,4 @@ Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmul
 <a href="https://discord.gg/haha98"><img src="https://cdn.discordapp.com/emojis/412016075384029184.webp?size=96&quality=lossless" alt="yahane" width="64" height="64"></a>
 
 ^ Thanks to the fellow tech nerds in here for all the suggestions over the evolution of this project
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
