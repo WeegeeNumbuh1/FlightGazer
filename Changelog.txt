@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.0.2 - 2025-08-24
+    - FIX: Low display framerate when using JOURNEY_PLUS and SHOW_EVEN_MORE_INFO
+    - Fix edge case when pixels aren't cleared when using JOURNEY_PLUS and the API returns a coordinate instead of airport codes
+    - More reliable detection when an aircraft is on the ground when using the more accurate geometric altitude
+
 v.8.0.1 - 2025-08-22
     - FIX: Distance calculation when using non-aeronautical units and using readsb-provided data
     - Daily stats output tweaks:

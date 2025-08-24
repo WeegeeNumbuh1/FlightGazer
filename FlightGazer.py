@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.0.1 --- 2025-08-22'
+VERSION: str = 'v.8.0.2 --- 2025-08-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2558,8 +2558,19 @@ def main_loop_generator() -> None:
                         and (distance < RANGE and distance > 0)
                        )
                 ):
-                    alt = a.get('alt_geom', a.get('alt_baro'))
-                    if alt is None or alt == "ground": alt = 0
+                    alt_g = a.get('alt_geom') # more accurate
+                    alt_b = a.get('alt_baro') # baseline altitude
+                    if alt_g:
+                        # override the geometric altitude when on the ground
+                        if alt_b and alt_b == "ground":
+                            alt = 0
+                        else:
+                            alt = alt_g
+                    else:
+                        alt = alt_b
+                    # always give alt a numerical value
+                    if alt is None or alt == "ground":
+                        alt = 0
                     alt = alt * altitude_multiplier
                     if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT:
                         flight = a.get('flight')
@@ -4644,7 +4655,12 @@ class Display(
             self.reinit()
             self.reset_scene()
         self._enhanced_readout_last = ENHANCED_READOUT
-        if self.active_plane_display and self._enhanced_readout_last and SHOW_EVEN_MORE_INFO:
+        if (self.active_plane_display
+            and (self._enhanced_readout_last
+                 or (JOURNEY_PLUS and not self._enhanced_readout_last)
+            )
+            and SHOW_EVEN_MORE_INFO
+        ):
             self._last_framerate = self.framerate
             self.framerate = 24
             self.delay = adaptive_speed(self.framerate, process_time[3] / 1000)
@@ -5330,7 +5346,7 @@ class Display(
                          'arrow_h': 7,
                          'bbox_x_start': 0,
                          'bbox_x_end': 41,
-                         'bbox_y_height': 9}
+                         'bbox_y_height': 10}
 
         JOURNEY_Y_BASELINE = CONSTANTS['y_baseline']
         ORIGIN_X_POS = CONSTANTS['origin_x_pos']
