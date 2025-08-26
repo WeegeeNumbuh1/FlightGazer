@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.0.3 - 2025-08-26
+    - Fix the edge case fix from the last update
+        - This would cause the distance readout on the active display to get clipped when the origin or destination changed in JOURNEY_PLUS
+    - Tweak some descriptions in the config file to match the better descriptions used on web-app interface
+
 v.8.0.2 - 2025-08-24
     - FIX: Low display framerate when using JOURNEY_PLUS and SHOW_EVEN_MORE_INFO
     - Fix edge case when pixels aren't cleared when using JOURNEY_PLUS and the API returns a coordinate instead of airport codes

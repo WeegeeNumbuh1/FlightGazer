@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.8.0.2 # do not modify this
+CONFIG_VERSION: v.8.0.3 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -12,12 +12,12 @@ UNITS: 0
 # 2 = imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
-# [Integer: 2500 ~ 75000] (feet or meters based on UNITS)
-# Filter out aircraft at an altitude higher than this.
+# [Integer: 2500 ~ 75000 feet or 760 ~ 22860 meters] (only supply a number)
+# Aircraft at an altitude lower than this will be considered for detailed tracking.
 
 RANGE: 2
-# [Float: 0.5 ~ 20] (nautical miles, kilometers, or miles based on UNITS)
-# Radius of which aircraft need to be in for detailed tracking.
+# [Float: 0.5 ~ 20 nautical miles or 0.9 ~ 37 kilometers or 0.6 ~ 23 miles] (only supply a number)
+# Aircraft within this radius from your location will be considered for detailed tracking.
 
 # ================ API settings ====================
 # ==================================================
@@ -25,12 +25,13 @@ RANGE: 2
 API_KEY: ''
 # [String]
 # Put your FlightAware API key here. Leave as '' to not use the API.
-# Don't have one?
+# Having an API key will enable the journey readout (the origin and departure) data for an aircraft.
+# Don't have an API key?
 # https://www.flightaware.com/commercial/aeroapi/#compare-plans-section
 
 API_DAILY_LIMIT:
 # [Integer: > 0, null, or empty]
-# Set this to an integer value if you want to limit calls.
+# Set this to an integer value if you want to limit number of calls in a day.
 # If you want to have unlimited API calls, set this to null or an empty value.
 
 API_COST_LIMIT: 5.00
@@ -38,8 +39,6 @@ API_COST_LIMIT: 5.00
 # Limit API usage of an API key based on its running cost over the past 30 days. (ex: $10.00)
 # If the cost exceeds this value, API calls will stop and will not resume until there are credits available again.
 # If the cost upon startup exceeds this value, the API will not be used but will start if there are credits available at a later time.
-# API_DAILY_LIMIT takes higher priority than this setting in controlling API usage, but if either limit is reached,
-# API calls will stop.
 # If you want to have unlimited API calls, set this to null or an empty value.
 
 API_SCHEDULE:

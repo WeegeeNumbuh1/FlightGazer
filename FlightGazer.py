@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.0.2 --- 2025-08-24'
+VERSION: str = 'v.8.0.3 --- 2025-08-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -5346,7 +5346,7 @@ class Display(
                          'arrow_h': 7,
                          'bbox_x_start': 0,
                          'bbox_x_end': 41,
-                         'bbox_y_height': 10}
+                         'bbox_y_height': 9}
 
         JOURNEY_Y_BASELINE = CONSTANTS['y_baseline']
         ORIGIN_X_POS = CONSTANTS['origin_x_pos']
@@ -5361,12 +5361,13 @@ class Display(
         # Undraw method
         # Note this is different than the other methods as we just black out the area instead
         # of undrawing the text. Additionally, we just continually draw to the canvas
-        # every time this function is run because it's simpler that way
+        # every time this function is run because it's simpler that way.
+        # Additional note: we add a 1 pixel offset to the top and bottom
         if self._last_origin != origin_now or self._last_destination != destination_now:
             if self._last_origin is not None or self._last_destination is not None:
                 self.draw_square(
                     CONSTANTS['bbox_x_start'],
-                    JOURNEY_Y_BASELINE - 1,
+                    JOURNEY_Y_BASELINE + 1, # recall: a higher y-value means lower on the display
                     CONSTANTS['bbox_x_end'],
                     JOURNEY_Y_BASELINE - CONSTANTS['bbox_y_height'] - 1,
                     colors.BLACK
