@@ -85,7 +85,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
   - With v.6.0.0 and newer, you can see additional info like aircraft type, airline, and owner, all without needing API access
-  - There are a total of 3 different layouts for aircraft info!
+  - There are a total of [3 different layouts for aircraft info](#screen-layout)!
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
@@ -130,6 +130,21 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Unique tools and fonts that can be used in other projects (don't forget to credit me)
 - Constant development
 - Adequate documentation
+
+</details>
+
+### Screen Layout
+<details><summary><b>Show/Hide</b></summary>
+<div align="center">
+
+| Layout | Description |
+|---|---|
+| <img src="media/FG_clock-annotated.png" width="360" alt="FlightGazer clock layout"> | <b>Clock</b><br>1.	Time, day of week, date<br>2.	Center readout<br>3.	Flyby counter – Number of aircraft that have been in your designated area today<br>4.	Tracking counter – How many aircraft your receiver is currently tracking<br>5.	Range – The distance of the farthest aircraft your receiver can detect<br> |
+| <img src="media/FG_default-journey-annotated.png" width="360" alt="FlightGazer journey layout"> | <b>Journey Readout</b><br>1.	Aircraft's callsign<br>2.	Aircraft's current distance and direction from your site<br>3.	Country of the aircraft<br>4.	Current altitude of the aircraft<br>5.	Current speed of the aircraft<br>6.	Time the aircraft has spent in the air<br>7.	Origin airport<br>8.	Destination airport<br>9.	Current count of aircraft in your specified tracking area<br>10.	UAT indicator<br>11.	Progress bar indicating how long the current aircraft will be displayed<br> |
+| <img src="media/FG_journey-plus-annotated.png" width="360" alt="FlightGazer journey plus"> | <b>Journey Plus</b><br>1.	Scrolling marquee (enabled with `Show Even More Info`) or aircraft ground track and vertical speed<br>2.	RSSI – (Received Signal Strength Index) how strong of a signal from the aircraft as detected by the receiver (in dBFS)<br> |
+| <img src="media/FG_enhanced-readout-annotated.png" width="360" alt="FlightGazer enhanced readout"> | <b>Enhanced Readout</b><br>1.	Current position of the aircraft<br>2.	Ground track of the aircraft<br>3.	Current vertical speed<br> |
+
+</div>
 
 </details>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
