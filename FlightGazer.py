@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.0.3 --- 2025-08-26'
+VERSION: str = 'v.8.0.4 --- 2025-08-27'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -3047,7 +3047,7 @@ class AirplaneParser:
                     else:
                         if plane_count == 1:
                             entry = relevant_planes_local_copy[0]
-                            main_logger.debug(f"No plane available to select. \'{entry['Flight']}\' ({entry['ID']}) did not any valid criteria.")
+                            main_logger.debug(f"No plane available to select. \'{entry['Flight']}\' ({entry['ID']}) did not meet any valid criteria.")
                             main_logger.debug(f"POS: {entry['Distance']}, Est POS: {entry['FutureDistance']}, SPD: {entry['Speed']}, "
                                               f"TRK: {entry['Track']}, A-RATE: {entry['ApproachRate']}, ALT: {entry['Altitude']}")
                         else:
@@ -4523,6 +4523,7 @@ class Display(
         self._last_active_state = False
 
         # Set up previous-data buffers for *all* elements that change their value
+        self.time_now = datetime.datetime.now()
         # clock elements
         self._last_time = None
         self._last_date = None
@@ -4710,6 +4711,15 @@ class Display(
     # =========== Clock Elements =============
     # ========================================
 
+    """ Clock polling """
+    @Animator.KeyFrame.add(1)
+    def ba_clock_poller(self, count):
+        if self.active_plane_display:
+            return True
+        
+        self.time_now = datetime.datetime.now()
+        return True
+
     """ Seconds """
     @Animator.KeyFrame.add(base_refresh_speed)
     def c_second(self, count):
@@ -4720,8 +4730,7 @@ class Display(
         SECONDS_POSITION = (41, 12) if not CLOCK_24HR else (46, 12)
         SECONDS_COLOR = colors.seconds_color
 
-        now = datetime.datetime.now()
-        current_timesec = now.strftime("%S")
+        current_timesec = self.time_now.strftime("%S")
 
         # Only draw if seconds needs to be updated
         if self._last_seconds != current_timesec:
@@ -4759,12 +4768,11 @@ class Display(
         CLOCK_POSITION = (1, 12) if not CLOCK_24HR else (6, 12)
         CLOCK_COLOR = colors.clock_color
 
-        now = datetime.datetime.now()
         if not CLOCK_24HR:
-            current_time = now.strftime("%I:%M")
+            current_time = self.time_now.strftime("%I:%M")
             current_time = current_time[0].replace("0", " ", 1) + current_time[1:] # replace leading zero
         else:
-            current_time = now.strftime("%H:%M")
+            current_time = self.time_now.strftime("%H:%M")
 
         # Only draw if time needs updating
         if self._last_time != current_time:
@@ -4801,12 +4809,10 @@ class Display(
         AMPM_COLOR = colors.am_pm_color
         AMPM_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         AMPM_POSITION = (41, 6)
-        now = datetime.datetime.now()
-        current_ampm = now.strftime("%p")
+        current_ampm = self.time_now.strftime("%p")
 
-        # Only draw if time needs to be updated
+        # You should be seeing a pattern at this point (see `c_second()` and `d_clock()`)
         if self._last_ampm != current_ampm:
-            # Undraw last if different from current
             if self._last_ampm is not None:
                 _ = graphics.DrawText(
                     self.canvas,
@@ -4819,7 +4825,6 @@ class Display(
 
             self._last_ampm = current_ampm
 
-            # Draw
             _ = graphics.DrawText(
                 self.canvas,
                 AMPM_FONT,
@@ -4839,12 +4844,11 @@ class Display(
         DAY_COLOR = colors.day_of_week_color
         DAY_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DAY_POSITION = (51, 6)
-        now = datetime.datetime.now()
-        current_day = now.strftime("%a").upper()
+        current_day = strip_accents(self.time_now.strftime("%a")[:3]).upper()
+        if not current_day.isascii(): # possible if locale returns a string that can't be rendered to ascii
+            current_day = f"D-{self.time_now.weekday()}"
 
-        # Only draw if the indicator needs to be updated
         if self._last_day != current_day:
-            # Undraw last day if different from current
             if self._last_day is not None:
                 _ = graphics.DrawText(
                     self.canvas,
@@ -4857,7 +4861,6 @@ class Display(
 
             self._last_day = current_day
 
-            # Draw day
             _ = graphics.DrawText(
                 self.canvas,
                 DAY_FONT,
@@ -4877,12 +4880,9 @@ class Display(
         DATE_COLOR = colors.date_color
         DATE_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DATE_POSITION = (55, 12)
-        now = datetime.datetime.now()
-        current_date = now.strftime("%d")
+        current_date = self.time_now.strftime("%d")
 
-        # Only draw if date needs to be updated
         if self._last_date != current_date:
-            # Undraw last date if different from current
             if self._last_date is not None:
                 _ = graphics.DrawText(
                     self.canvas,
@@ -4895,7 +4895,6 @@ class Display(
 
             self._last_date = current_date
 
-            # Draw date
             _ = graphics.DrawText(
                 self.canvas,
                 DATE_FONT,
@@ -5065,9 +5064,16 @@ class Display(
 
         sunrise_sunset_now = idle_data_2.get('SunriseSunset', "▲--:-- ▼--:--")
         receiver_stats_now = idle_data_2.get('ReceiverStats', "G --- N --- L--")
-        calendar_info_now = datetime.datetime.now().strftime('%b WK%V D%j').upper() if CLOCK_CENTER_ROW_2ROWS else\
-                            datetime.datetime.now().strftime('%b wk%V d%j')
-        
+        calendar_info_now = 'CALENDAR'
+        if CLOCK_CENTER_ROW['ROW1'] == 3 or CLOCK_CENTER_ROW['ROW2'] == 3:
+            month_name = strip_accents(self.time_now.strftime('%b')[:3])
+            if not month_name.isascii():
+                month_name = self.time_now('M%m')
+            if CLOCK_CENTER_ROW_2ROWS:
+                calendar_info_now = month_name.upper() + self.time_now.strftime(' WK%V D%j')
+            else:
+                calendar_info_now = month_name + self.time_now.strftime(' wk%V d%j')
+
         # row 1 data
         if CLOCK_CENTER_ROW['ROW1'] is None:
             row1_data = ""
@@ -5459,7 +5465,7 @@ class Display(
             elif len(origin_now) == 4:
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE - 2,
                     ORIGIN_COLOR,
@@ -5472,7 +5478,7 @@ class Display(
                 # a coordinate instead of an IATA code, so we write text on two lines
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE - 4,
                     ORIGIN_COLOR,
@@ -5480,7 +5486,7 @@ class Display(
                 )
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     ORIGIN_X_POS + 1,
                     JOURNEY_Y_BASELINE + 1,
                     ORIGIN_COLOR,
@@ -5499,7 +5505,7 @@ class Display(
             elif len(destination_now) == 4:
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     DESTINATION_X_POS,
                     JOURNEY_Y_BASELINE - 2,
                     DESTINATION_COLOR,
@@ -5508,7 +5514,7 @@ class Display(
             elif len(destination_now) > 4:
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     DESTINATION_X_POS,
                     JOURNEY_Y_BASELINE - 4,
                     DESTINATION_COLOR,
@@ -5516,7 +5522,7 @@ class Display(
                 )
                 _ = graphics.DrawText(
                     self.canvas,
-                    fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest,
+                    fonts.smallest_alt,
                     DESTINATION_X_POS,
                     JOURNEY_Y_BASELINE + 1,
                     DESTINATION_COLOR,

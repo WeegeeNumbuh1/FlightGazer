@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.0.4 - 2025-08-27
+    - Fix case where the display would potentially crash if the locale is not in English
+        - This is caused by the way the locale outputs the weekday and month names; if the output isn't ASC-II, the font in use
+          doesn't have the corresponding glyph to render the required character, thus causing the rendering to fail
+    - Optimized time polling for the clock to reduce the amount of function calls, making rendering faster when the clock is shown
+    - For clarity, the alternative font is used when JOURNEY_PLUS is enabled and the API returns a result with 4 or more characters
+
 v.8.0.3 - 2025-08-26
     - Fix the edge case fix from the last update
         - This would cause the distance readout on the active display to get clipped when the origin or destination changed in JOURNEY_PLUS
