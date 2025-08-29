@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.0.4 --- 2025-08-27'
+VERSION: str = 'v.8.1.0 --- 2025-08-29'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2097,9 +2097,9 @@ class PrintToConsole:
         # verbose stats line 3 (timing info)
         json_details_2 = []
         if VERBOSE_MODE:
-            json_details_2.append(f"> Timing control: dump1090 age {dump1090_json_age[0] - determined_time_offset:.3f}s")
+            json_details_2.append(f"> Timing control: dump1090 age {dump1090_json_age[0]:.3f}s")
             if DUMP978_JSON is not None:
-                json_details_2.append(f", dump978 age {dump1090_json_age[1] - determined_time_offset:.3f}s")
+                json_details_2.append(f", dump978 age {dump1090_json_age[1]:.3f}s")
             json_details_2.append(f" | Drift correction next loop: {lockstep_corrector * 1000:.3f}ms")
             json_details_2.append(f" | Detected time offset: {determined_time_offset:.3f}s")
         print("".join(json_details_2))
@@ -2596,7 +2596,8 @@ def main_loop_generator() -> None:
                         else:
                             direc = ""
                         elevation, slant_range_dist = elevation_and_slant(distance, alt)
-                        if abs(determined_time_offset) > 5: dt = 0
+                        if abs(determined_time_offset) > 5 or USING_FILESYSTEM:
+                            dt = 0
                         else: dt = determined_time_offset
                         if source == 'ADS-B':
                             true_data_age = ((seen_pos
@@ -3862,8 +3863,9 @@ class WriteState:
                 'dump1090_type': dump1090 if DUMP1090_JSON is not None else None,
                 'location_is_set': True if (rlat is not None and rlon is not None) else False,
                 'response_time_ms': process_time[0],
-                'dump1090_json_data_age_sec': round(dump1090_json_age[0] - determined_time_offset, 3),
-                'dump978_json_data_age_sec': None if not DUMP978_JSON else round(dump1090_json_age[1] - determined_time_offset, 3),
+                'dump1090_json_data_age_sec': round(dump1090_json_age[0] - determined_time_offset, 3) if not USING_FILESYSTEM else round(dump1090_json_age[0], 3),
+                'dump978_json_data_age_sec': None if not DUMP978_JSON else
+                                                (round(dump1090_json_age[1] - determined_time_offset, 3) if not USING_FILESYSTEM_978 else round(dump1090_json_age[1], 3)),
                 'polling_drift_correction_ms': round(lockstep_corrector * 1000, 3),
                 'json_size_KiB': round(runtime_sizes[0] / 1024, 3),
                 'json_transfer_rate_MiB_per_sec': 0. if process_time[0] == 0 else
@@ -4469,18 +4471,53 @@ class Display(
     Uses techniques from Colin Waddell's its-a-plane-python project but diverges significantly from his design.
 
     This Display class is a huge mess, but it works and its structure has not changed since v.0.8.0.
+    On a Raspberry Pi Zero 2W and using rgbmatrix, it takes about 4 ms to generate each frame.
     Why is this class not broken out as its own module? Threading and global variables, basically. A rewrite at this point isn't worth it imho.
     Data to display is handled and parsed by `DisplayFeeder` while time-based elements like the clock are handled internally.
     Actual draw routines and shape primitives are also handled internally.
-    The actual workings of this class should already be well-explained with all the comments and docstrings.
+
+    Drawing to the display is done in parts and containerized by functionality; as individual data samples can change from loop to loop, it's more
+    "efficient" and flexible to handle the drawing elements piecewise rather than as a whole "scene". This does make the overall logic handling harder,
+    as at this point (v.8.1.0) there are 7 settings that influence the rendering of 4 main layouts, each with subvariations which rely on logic agreements between methods.
+    Additionally during runtime, these layouts can switch between one another as required by other global runtime variables referenced outside of this class.
+    Keeping track of how globals influence what each method does is one of the main sticking points in regards to adding or modifying the display layout.
+    But realistically, the layout has been stable with the last major addition being v.6.0.0 and nothing in the forseeable future should change this in a significant way.
+    (see the changelog of this class at the end of this docstring, I hope you like reading lore)
+
+    Figure 1: The general display state flowchart
+
+    ░░░░░░░░░░░░░░░░░                  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+    ░   Clock (2)   ░ ◄──────────────► ░   Active Plane Display                                        ░
+    ░░░░░░░░░░░░░░░░░                  ░            |                                                  ░
+    Base Display Layout                ░            if        F ──► Default Journey -or (3)-           ░
+                                       ░     ENHANCED_READOUT       Journey Plus (1)                   ░
+                                       ░            |                  ▲                               ░
+                                       ░           T|                  | depends on                    ░
+                                       ░            |                  | ENHANCED_READOUT_AS_FALLBACK  ░
+                                       ░            |                  ▼                               ░
+                                       ░            └───────────► Enhanced Readout (1)                 ░
+                                       ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+    Key:
+    Sublayouts that are chosen on startup:
+        (1) The default layout or when SHOW_EVEN_MORE_INFO is enabled
+        (2) The default or when CLOCK_CENTER_ROW_2ROWS is enabled
+        (3) Default Journey or Journey Plus
+
+    Notes:
+    Essentially at every loop, all methods are called to draw to the display, but their ability to draw is mainly controlled
+    by the global `active_plane_display`. Then, each section will draw their respective part, depending on what needs to be drawn
+    and where, including positioning, what font to use, and what color. Look through each method as needed.
 
     Use the @Animator decorator to control both how often elements update along with associated logic evaluations.
     When using the decorator, the second (optional) argument specifies the offset for each element in the render queue such that
-    when (global frame counter - offset) % frame duration == 0, the function will run (except for the first frame).
-    Additional quirks: functions when requested to render on the same frame as another are rendered alphabetically, not
-    in the order they are defined in the class. Hence why functions within this class will have a letter prefix before their name.
-    Additionally, each function has their own internal frame counter `count` for each time they are run, incremented by `Animator`.
-    If a function returns True, this resets that internal counter.
+    when (global frame counter - offset) % frame duration == 0, the method will run (except for the first frame).
+    Additional quirks: methods when requested to render on the same frame as another are rendered alphabetically, not
+    in the order they are defined in the class. Hence why methods within this class will have a letter prefix before their name.
+    Additionally, each method has their own internal frame counter `count` for each time they are run, incremented by `Animator`.
+    If a method returns True, this resets that internal counter.
+
+    Figure 2: Frame representation in relation to method order and arguments
 
     Frame ---->  0      1      2      3      4 ...
     a_func(1)    ░░░0░░░▒▒▒1▒▒▒░░░2░░░▒▒▒3▒▒▒
@@ -4488,6 +4525,30 @@ class Display(
     b_func(1)    ░░░0░░░▒▒▒1▒▒▒░░░2░░░▒▒▒3▒▒▒
     c_func(3,1)         ░░░░░░░░░░0░░░░░░░░░░
     ...
+
+    Major additions/changes to this class (living document):
+    - v.8.1.0: In JOURNEY_PLUS and with SHOW_EVEN_MORE_INFO, the Time/RSSI section now shows ground track instead
+    - v.8.0.0: Add variable/adaptive frame rate
+    - v.6.0.0: Implemented the scrolling/marquee (SHOW_EVEN_MORE_INFO), requiring font adapations and layout changes for ENHANCED_READOUT and JOURNEY_PLUS
+    - v.3.4.0: Fully enable JOURNEY_PLUS
+    - v.3.3.0: Responsiveness improvements
+    - v.3.1.0: Add handling for ALTERNATIVE_FONT
+    - v.3.0.0:
+        - Depreciate old sunrise/sunset method and use CLOCK_CENTER_ROW
+        - Enable printing of two lines in the Clock's center row
+    - v.2.9.0:
+        - Add progress bar for planes
+        - Add exception handling for this class
+    - v.2.2.0: Colors are no longer hardcoded
+    - v.2.1.0: Rewrote callsign blink routine
+    - v.2.0.0:
+        - Add sunrise/sunset times or receiver stats to clock
+        - Add brightness changing
+        - Add callsign blinking
+    - v.1.4.0: Introduced ENHANCED_READOUT
+    - v.1.0.0: Baseline Release - "works good enough"
+    - v.0.9.0: The Clock works
+    - v.0.8.0: Borrow logic framework from Collin Waddell's `its-a-plane` project and lay groundwork for this class
     """
     def __init__(self):
 
@@ -5373,7 +5434,7 @@ class Display(
             if self._last_origin is not None or self._last_destination is not None:
                 self.draw_square(
                     CONSTANTS['bbox_x_start'],
-                    JOURNEY_Y_BASELINE + 1, # recall: a higher y-value means lower on the display
+                    JOURNEY_Y_BASELINE, # recall: a higher y-value means lower on the display
                     CONSTANTS['bbox_x_end'],
                     JOURNEY_Y_BASELINE - CONSTANTS['bbox_y_height'] - 1,
                     colors.BLACK
@@ -5789,7 +5850,7 @@ class Display(
 
         return return_flag
 
-    """ Static text (altitude, speed, time/rssi headers) """
+    """ Static text (altitude, speed, time/rssi/track headers) """
     @Animator.KeyFrame.add(base_refresh_speed)
     def o_active_header(self, count):
         if not self.active_plane_display: return True
@@ -5830,6 +5891,17 @@ class Display(
                 TIME_HEADING_COLOR,
                 "TIME"
             )
+        elif not ENHANCED_READOUT and (
+            JOURNEY_PLUS and SHOW_EVEN_MORE_INFO
+        ):
+            _ = graphics.DrawText(
+                self.canvas,
+                HEADER_TEXT_FONT,
+                48 if micro_font else 46,
+                ACTIVE_TEXT_Y,
+                TIME_HEADING_COLOR,
+                "TRCK"
+            )
         else:
             _ = graphics.DrawText(
                 self.canvas,
@@ -5840,13 +5912,16 @@ class Display(
                 "RSSI"
             )
 
-    """ Our active stats readout """
+    """ Our active stats readout. Always includes altitude and speed;
+    RSSI and ground track are also handled here, based on what mode is being seen. """
     @Animator.KeyFrame.add(base_refresh_speed)
     def p_active_readout(self, count):
         if not self.active_plane_display:
             self._last_altitude = None
             self._last_speed = None
             self._last_flighttime = None
+            # note that self._last_groundspeed is not set here, even
+            # though it's being used. `q_enhanced()` (the next method) will do it for us
             return True
         STATS_TEXT_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         ALTITUDE_TEXT_COLOR = colors.altitude_color
@@ -5869,6 +5944,7 @@ class Display(
         speed_now = active_data.get('Speed', "0")
         flighttime_now = active_data.get('FlightTime', "---")
         rssi_now = active_data.get('RSSI', "0")
+        track_now = active_data.get('Track', "T▲0°")
 
         if self._last_altitude != altitude_now:
             if self._last_altitude is not None:
@@ -5937,7 +6013,33 @@ class Display(
                 )
                 return_flag = True
 
-        else:
+        elif not ENHANCED_READOUT and (
+            JOURNEY_PLUS and SHOW_EVEN_MORE_INFO
+        ):
+            # when doing this, we remove the leading 'T' in the text and keep the degree symbol
+            if self._last_groundtrack != track_now:
+                if self._last_groundtrack is not None:
+                    _ = graphics.DrawText(
+                        self.canvas,
+                        STATS_TEXT_FONT,
+                        right_align(self._last_groundtrack[1:]),
+                        READOUT_TEXT_Y,
+                        colors.BLACK,
+                        self._last_groundtrack[1:]
+                    )
+                self._last_groundtrack = track_now
+
+                _ = graphics.DrawText(
+                    self.canvas,
+                    STATS_TEXT_FONT,
+                    right_align(track_now[1:]),
+                    READOUT_TEXT_Y,
+                    TIME_TEXT_COLOR,
+                    track_now[1:]
+                )
+                return_flag = True
+
+        else: # Enhanced Readout or Journey Plus w/o the marquee
             if self._last_rssi != rssi_now:
                 if self._last_rssi is not None:
                     _ = graphics.DrawText(
@@ -5965,10 +6067,17 @@ class Display(
     """ Enhanced readout part 2: Ground track and Vertical Speed """
     @Animator.KeyFrame.add(base_refresh_speed)
     def q_enhanced(self, count):
-        if not self.active_plane_display or not ENHANCED_READOUT:
+        if not self.active_plane_display:
             self._last_groundtrack = None
             self._last_vertspeed = None
             return True
+        if not ENHANCED_READOUT:
+            self._last_vertspeed = None
+            if not (JOURNEY_PLUS and SHOW_EVEN_MORE_INFO):
+                # only reset self._last_groundtrack when `p_active_readout()` isn't referencing it
+                self._last_groundtrack = None
+            return True
+    
         X_POS = 39
         GT_Y_POS = 12
         VS_Y_POS = 18 if not SHOW_EVEN_MORE_INFO else 16

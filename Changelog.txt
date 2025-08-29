@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.1.0 - 2025-08-29
+    - Layout Change:
+        - When using JOURNEY_PLUS and SHOW_EVEN_MORE_INFO, the RSSI section is replaced with the track of the aircraft
+    - Tweaks for timing control when using a local instance of dump1090
+    - Documentation updates
+
 v.8.0.4 - 2025-08-27
     - Fix case where the display would potentially crash if the locale is not in English
         - This is caused by the way the locale outputs the weekday and month names; if the output isn't ASC-II, the font in use
@@ -16,6 +22,8 @@ v.8.0.3 - 2025-08-26
     - Fix the edge case fix from the last update
         - This would cause the distance readout on the active display to get clipped when the origin or destination changed in JOURNEY_PLUS
     - Tweak some descriptions in the config file to match the better descriptions used on web-app interface
+    - Modify webapp service file so that it will attempt to restart itself if it fails to start successfully following an update
+        - Only affects new installs
 
 v.8.0.2 - 2025-08-24
     - FIX: Low display framerate when using JOURNEY_PLUS and SHOW_EVEN_MORE_INFO
