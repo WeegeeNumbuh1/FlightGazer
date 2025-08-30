@@ -1584,7 +1584,7 @@ def runtime_accumulators_reset() -> None:
         main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(congrats) - 1)]}")
 
     if sum(api_hits) > 0: # if we used the API at all
-        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]}/{api_hits[0]+api_hits[1]} "
+        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]+api_hits[2]}/{api_hits[0]+api_hits[1]+api_hits[2]} "
                          f"successful API calls, of which {api_hits[2]} returned no data. "
                          f"Estimated cost: ${estimated_api_cost:.2f}")
 
