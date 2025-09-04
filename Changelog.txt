@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.1.1 - 2025-09-04
+    - Fix rare edge case that would cause the daily stats reset and API cost querying to fail
+
 v.8.1.0 - 2025-08-29
     - Layout Change:
         - When using JOURNEY_PLUS and SHOW_EVEN_MORE_INFO, the RSSI section is replaced with the track of the aircraft

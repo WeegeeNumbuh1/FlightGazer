@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.1.0 --- 2025-08-29'
+VERSION: str = 'v.8.1.1 --- 2025-09-04'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1501,8 +1501,8 @@ def perf_monitoring() -> None:
             ├────────────────┬──────────────────┐
             ▼                ▼                  ▼
       [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
-                                                ▼
-                                           [WriteState]
+            ▲                |4                 ▼
+            └- - - - - - - - ┘             [WriteState]
 
 1 = Only executes completely when the following are true:
     - API_KEY exists                 | set only on startup
@@ -1516,6 +1516,10 @@ def perf_monitoring() -> None:
 
 3 = Only executes completely when INTERACTIVE is True, always sends a signal
     to WriteState
+
+4 = If ENHANCED_READOUT_AS_FALLBACK is True, there exists a Condition
+    so that APIFetcher can wait until DisplayFeeder is done and evaluate
+    the value of ENHANCED_READOUT
 
 """
 
@@ -1581,7 +1585,7 @@ def runtime_accumulators_reset() -> None:
             "Serenity and sonorous silence -- stillness suffuses the sky as the machines of air slumber.",
             "Hopefully this isn't affecting your rankings on some leaderboards (if you're into that).",
         ]
-        main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(congrats) - 1)]}")
+        main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
 
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]+api_hits[2]}/{api_hits[0]+api_hits[1]+api_hits[2]} "
@@ -6351,7 +6355,9 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
     if ENHANCED_READOUT_AS_FALLBACK and API_KEY: 
         enhanced_readout_wait_condition = threading.Condition()
         """ Create a way to synchronize the API caller and Display Feeder when the Display Feeder switches
-        the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled. """
+        the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled.
+        Note that this is still safe to use even if the API_KEY is disabled later on as the API caller will
+        simply return before waiting for this Condition. """
     try:
         display = Display()
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
