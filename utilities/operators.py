@@ -3,10 +3,12 @@ All data sourced from the Federal Aviation Administration, Directive No. JO 7340
 along with Wikipedia (https://en.wikipedia.org/wiki/List_of_airline_codes) for the operators' friendly names.
 The accuracy of the 'friendly names' for the operators is dependent on what is pulled from Wikipedia at the time
 this file was generated, so your mileage may vary.
+When comparing which version of the Directive was used, check the generation timestamp below
+with the release schedule in Section 1-1-6 (https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap1_section_1.html).
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer """
 
-# Generated on: 2025-06-28 15:38:40
+# Generated on: 2025-09-10 00:55:40
 A_TABLE = [
     {'3Ltr': 'AAA', 'Company': 'AVICON AVIATION CONSULTANTS & AGENTS', 'Country': 'PAKISTAN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AAB', 'Company': 'ABELAG AVIATION', 'Country': 'BELGIUM', 'Telephony': 'ABG', 'FriendlyName': '', 'Comments': ''},
@@ -148,6 +150,7 @@ A_TABLE = [
     {'3Ltr': 'AFX', 'Company': 'AIRFREIGHT EXPRESS LIMITED', 'Country': 'UNITED KINGDOM', 'Telephony': '', 'FriendlyName': 'Airfreight Express', 'Comments': 'Ceased operations 08/03/2002'},
     {'3Ltr': 'AFY', 'Company': 'AFRICA CHARTERED SERVICES', 'Country': 'NIGERIA', 'Telephony': 'AFRICA CHARTERED', 'FriendlyName': 'Africa Chartered Services', 'Comments': ''},
     {'3Ltr': 'AFZ', 'Company': 'ATLANTIC FLIGHT TRAINING ACADEMY', 'Country': 'IRELAND', 'Telephony': 'AFTA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'AGA', 'Company': 'ASHIANEH', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'IRAN HANGAR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AGB', 'Company': 'AIR-SERVICE-GABON', 'Country': 'GABON', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AGD', 'Company': 'AGRICOLAIR, S.L.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AGE', 'Company': 'AEROMANAGE', 'Country': 'LITHUANIA', 'Telephony': 'AEROMANAGE', 'FriendlyName': '', 'Comments': ''},
@@ -187,18 +190,18 @@ A_TABLE = [
     {'3Ltr': 'AIF', 'Company': 'AIM AVIATION', 'Country': 'ISRAEL', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIG', 'Company': 'AIR INTER GABON', 'Country': 'GABON', 'Telephony': '', 'FriendlyName': 'Air Inter Gabon', 'Comments': ''},
     {'3Ltr': 'AIH', 'Company': 'AIR INCHEON CO. LTD', 'Country': 'REPUBLIC OF KOREA', 'Telephony': 'AIR INCHEON', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'AIJ', 'Company': 'ABC AEROLINEAS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'ABC AEROLINEAS', 'FriendlyName': 'Interjet', 'Comments': ''},
+    {'3Ltr': 'AIJ', 'Company': 'ABC AEROLINEAS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'ABC AEROLINEAS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIK', 'Company': 'AFRICAN AIRLINES INTERNATIONAL LIMITED', 'Country': 'KENYA', 'Telephony': 'AFRICAN AIRLINES', 'FriendlyName': 'African Airlines International Limited', 'Comments': ''},
     {'3Ltr': 'AIM', 'Company': 'TRABAJOS AEREOS MURCIANOS S.L.', 'Country': 'SPAIN', 'Telephony': 'PIJO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIN', 'Company': 'AFRICAN INTERNATIONAL AIRWAYS (PTY) LTD', 'Country': 'SOUTH AFRICA', 'Telephony': 'FLY CARGO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIO', 'Company': 'CHIEF OF STAFF, UNITED STATES AIR FORCE (ANDREWS AFB, MD)', 'Country': 'UNITED STATES', 'Telephony': 'AIR CHIEF', 'FriendlyName': 'Chief of Staff, United States Air Force', 'Comments': ''},
     {'3Ltr': 'AIP', 'Company': 'ALPINE AVIATION, INC. (PROVO, UT)', 'Country': 'UNITED STATES', 'Telephony': 'ALPINE AIR', 'FriendlyName': 'Alpine Air Express', 'Comments': ''},
     {'3Ltr': 'AIQ', 'Company': 'THAI AIR ASIA CO., LTD', 'Country': 'THAILAND', 'Telephony': 'THAI ASIA', 'FriendlyName': 'Thai  AirAsia', 'Comments': ''},
-    {'3Ltr': 'AIR', 'Company': 'AIRLIFT INTERNATIONAL INC.', 'Country': 'UNITED STATES', 'Telephony': 'AIRLIFT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIS', 'Company': 'AIR SURESTE', 'Country': 'SPAIN', 'Telephony': 'SURESTE', 'FriendlyName': 'Air Sureste', 'Comments': ''},
     {'3Ltr': 'AIT', 'Company': 'AIR TAURUS LLC', 'Country': 'UKRAINE', 'Telephony': 'AIR TAURUS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIU', 'Company': 'AIR SEGURA S.L.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': 'Alicante Internacional Airlines', 'Comments': ''},
     {'3Ltr': 'AIW', 'Company': 'AEROHELI INTERNATIONAL GMBH & CO KG', 'Country': 'GERMANY', 'Telephony': 'AIRWOLF', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'AIX', 'Company': 'AIR ANDREW LTD.', 'Country': 'CANADA', 'Telephony': 'ANDREW', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AIZ', 'Company': 'ARKIA ISRAEL INLAND AIRLINES', 'Country': 'ISRAEL', 'Telephony': 'ARKIA', 'FriendlyName': 'Arkia Israel Airlines', 'Comments': ''},
     {'3Ltr': 'AJA', 'Company': 'AFGHAN JET INTERNATIONAL AIRLINES', 'Country': 'AFGHANISTAN', 'Telephony': 'AFGHAN JET', 'FriendlyName': 'Afghan Jet International Airlines', 'Comments': ''},
     {'3Ltr': 'AJB', 'Company': 'AMERICAN JET S.A.', 'Country': 'ARGENTINA', 'Telephony': 'AMJET', 'FriendlyName': '', 'Comments': ''},
@@ -352,7 +355,7 @@ A_TABLE = [
     {'3Ltr': 'APY', 'Company': 'AEROPAPA, S.L.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'APZ', 'Company': 'AIR PREMIA', 'Country': 'REPUBLIC OF KOREA', 'Telephony': 'AIR PREMIA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AQA', 'Company': 'AEROATLAS S.A.', 'Country': 'COLOMBIA', 'Telephony': 'ATCO', 'FriendlyName': 'Aeroatlas, S.A.', 'Comments': ''},
-    {'3Ltr': 'AQL', 'Company': 'ALTAIR AIRLINES', 'Country': 'KAZAKHSTAN', 'Telephony': 'ALTCARGO', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'AQL', 'Company': 'ALTAIR AIRLINES', 'Country': 'KAZAKHSTAN', 'Telephony': 'ALTACARGO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AQQ', 'Company': 'APSARA INTERNATIONAL AIR', 'Country': 'CAMBODIA', 'Telephony': 'APSARA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AQS', 'Company': 'AIRSTREAM', 'Country': 'CZECHIA', 'Telephony': 'AIRSTREAM', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AQU', 'Company': 'AIRQUARIUS AVIATION', 'Country': 'SOUTH AFRICA', 'Telephony': 'QUARIUS', 'FriendlyName': '', 'Comments': ''},
@@ -502,9 +505,9 @@ A_TABLE = [
     {'3Ltr': 'AXL', 'Company': 'ANGUILLA AIR SERVICES LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'ANGUILLA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXM', 'Company': 'AIRASIA SDN BHD', 'Country': 'MALAYSIA', 'Telephony': 'RED CAP', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXN', 'Company': 'ASCEND AIRWAYS MALAYSIA', 'Country': 'MALAYSIA', 'Telephony': 'ASTRA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'AXO', 'Company': 'FENIX AIR CHARTER', 'Country': 'UNITED STATES', 'Telephony': 'AXIO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXP', 'Company': 'AEROMAX, S.L.', 'Country': 'SPAIN', 'Telephony': 'AEROMAX SPAIN', 'FriendlyName': 'Aeromax', 'Comments': ''},
     {'3Ltr': 'AXQ', 'Company': 'ACTION AIRLINES (ACTION AIR CHARTER)', 'Country': 'UNITED STATES', 'Telephony': 'ACTION AIR', 'FriendlyName': 'Action Airlines (Action Air Charter)', 'Comments': ''},
-    {'3Ltr': 'AXR', 'Company': 'ARCHER AIR LLC', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXS', 'Company': 'AXIS AVIATION SAN MARINO S.R.L.', 'Country': 'SAN MARINO', 'Telephony': 'AXIS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXT', 'Company': 'AX TRANSPORTER, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AXTRANSPORTER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AXV', 'Company': 'AVA AIRLINES', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'AVA', 'FriendlyName': '', 'Comments': ''},
@@ -544,7 +547,7 @@ A_TABLE = [
     {'3Ltr': 'AZX', 'Company': 'AIR MAX AFRICA', 'Country': 'GABON', 'Telephony': 'AZIMA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'AZY', 'Company': 'AZTEC WORLDWIDE AIRLINES, INC. (FT. LAUDERDALE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'AZTEC WORLD', 'FriendlyName': 'Aztec Worldwide Airlines', 'Comments': ''},
     {'3Ltr': 'AZZ', 'Company': 'AZZA TRANSPORT CO. LTD', 'Country': 'SUDAN', 'Telephony': 'AZZA TRANSPORT', 'FriendlyName': 'Azza Transport', 'Comments': ''},
-] # 536 entries.
+] # 537 entries.
 
 B_TABLE = [
     {'3Ltr': 'BAA', 'Company': 'BALKAN AGRO AVIATION', 'Country': 'BULGARIA', 'Telephony': 'BALKAN AGRO', 'FriendlyName': 'Balkan Agro Aviation', 'Comments': ''},
@@ -620,6 +623,7 @@ B_TABLE = [
     {'3Ltr': 'BEE', 'Company': 'FLYBE LIMITED', 'Country': 'UNITED KINGDOM', 'Telephony': 'JERSEY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BEF', 'Company': 'BALEAR EXPRESS, S.L.', 'Country': 'SPAIN', 'Telephony': 'BALEAR EXPRESS', 'FriendlyName': 'Balear Express', 'Comments': ''},
     {'3Ltr': 'BEG', 'Company': 'BULGARIAN EAGLE', 'Country': 'BULGARIA', 'Telephony': 'BULGARIAN EAGLE', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'BEJ', 'Company': 'SD AVIATION', 'Country': 'FRANCE', 'Telephony': 'BEEJET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BEK', 'Company': 'BERKHUT AIR', 'Country': 'KAZAKHSTAN', 'Telephony': 'BEKAIR', 'FriendlyName': 'Berkut Air', 'Comments': ''},
     {'3Ltr': 'BEL', 'Company': 'BRUSSELS AIRLINES', 'Country': 'BELGIUM', 'Telephony': 'BEELINE', 'FriendlyName': 'Brussels Airlines', 'Comments': ''},
     {'3Ltr': 'BEM', 'Company': 'SERVICIO AUTONOMO DE LA FUERZA AEREA VENEZOLANA (SAFAV)', 'Country': 'VENEZUELA', 'Telephony': 'SAFAV EJECUTIVO', 'FriendlyName': '', 'Comments': ''},
@@ -789,7 +793,6 @@ B_TABLE = [
     {'3Ltr': 'BPS', 'Company': 'BUDAPEST AIRCRAFT SERVICE LTD', 'Country': 'HUNGARY', 'Telephony': 'BASE', 'FriendlyName': 'Budapest Aircraft Services / Manx2', 'Comments': ''},
     {'3Ltr': 'BPT', 'Company': 'BONUS AVIATION', 'Country': 'UNITED KINGDOM', 'Telephony': 'BONUS', 'FriendlyName': 'Bonus Aviation', 'Comments': ''},
     {'3Ltr': 'BPX', 'Company': 'PHOENIX EAST AVIATION, LLC.', 'Country': 'UNITED STATES', 'Telephony': 'BLUE PHOENIX', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'BQA', 'Company': 'AXIS AVIATION SWITZERLAND AG', 'Country': 'SWITZERLAND', 'Telephony': 'AVIATION', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BQB', 'Company': 'AXIS AVIATION AUSTRIA GMBH', 'Country': 'AUSTRIA', 'Telephony': 'ICE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BRA', 'Company': 'AVIATSIYA STATE AVIATION EMERGENCY RESCUE AGENCY', 'Country': 'BELARUS', 'Telephony': 'BELRESCUE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BRB', 'Company': 'BRA-TRANSPORTES AEREOS LTDA.', 'Country': 'BRAZIL', 'Telephony': 'BRA-TRANSPAEREOS', 'FriendlyName': 'BRA-Transportes Aereos', 'Comments': ''},
@@ -838,6 +841,7 @@ B_TABLE = [
     {'3Ltr': 'BTL', 'Company': 'BALTIA AIR LINES, INC. (JAMAICA, NY)', 'Country': 'UNITED STATES', 'Telephony': 'BALTIA', 'FriendlyName': 'Baltia Air Lines', 'Comments': 'Callsign changed from "BALTIA FLIGHT" in 2015 [ 11 ]'},
     {'3Ltr': 'BTM', 'Company': 'BLUE TEAM FLIGHT SCHOOL', 'Country': 'SPAIN', 'Telephony': 'BLUE TEAM', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BTN', 'Company': 'BHUTAN AIRLINE', 'Country': 'BHUTAN', 'Telephony': 'BHUTAN AIR', 'FriendlyName': 'Bhutan Airlines', 'Comments': ''},
+    {'3Ltr': 'BTO', 'Company': 'BATOT AIR', 'Country': 'BURKINA FASO', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BTP', 'Company': 'KINGCRETE ASSOCIATES', 'Country': 'PAKISTAN', 'Telephony': 'BAHRIA TOWN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'BTQ', 'Company': 'BOUTIQUE AIR', 'Country': 'UNITED STATES', 'Telephony': 'BOUTIQUE', 'FriendlyName': 'Boutique Air', 'Comments': ''},
     {'3Ltr': 'BTU', 'Company': 'ROLLS ROYCE LTD. (BRISTOL ENGINE DIVISION)', 'Country': 'UNITED KINGDOM', 'Telephony': 'ROLLS', 'FriendlyName': 'Rolls-Royce plc', 'Comments': 'Rolls-Royce Bristol Engine Division'},
@@ -884,7 +888,7 @@ B_TABLE = [
     {'3Ltr': 'BZS', 'Company': 'AERO BINIZA, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'BINIZA', 'FriendlyName': 'Aero Biniza', 'Comments': ''},
     {'3Ltr': 'BZY', 'Company': 'FRESH AIR AVIATION (CHARLEVOIX, MI)', 'Country': 'UNITED STATES', 'Telephony': 'BREEZY', 'FriendlyName': 'Fresh Air Aviation', 'Comments': '2015 [ 24 ]'},
     {'3Ltr': 'BZZ', 'Company': 'BUTANE BUZZARD AVIATION CORPORATION', 'Country': 'UNITED KINGDOM', 'Telephony': 'BUZZARD', 'FriendlyName': 'Butane Buzzard Aviation Corporation', 'Comments': ''},
-] # 337 entries.
+] # 338 entries.
 
 C_TABLE = [
     {'3Ltr': 'CAA', 'Company': 'CIVIL AVIATION AUTHORITY OF THE CZECH REPUBLIC', 'Country': 'CZECHIA', 'Telephony': 'INSPECTOR', 'FriendlyName': '', 'Comments': ''},
@@ -1019,6 +1023,7 @@ C_TABLE = [
     {'3Ltr': 'CGO', 'Company': 'CHICAGO AIR, INC. (CHICAGO, IL)', 'Country': 'UNITED STATES', 'Telephony': 'WILD ONION', 'FriendlyName': 'Chicago Air', 'Comments': ''},
     {'3Ltr': 'CGP', 'Company': 'CAPITAL AIRCRAFT GROUP', 'Country': 'BELGIUM', 'Telephony': 'CAPGROUP', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'CGR', 'Company': 'COMPAGNIA GENERALE RIPRESEAEREE S.P.A.', 'Country': 'ITALY', 'Telephony': 'COMPRIP', 'FriendlyName': 'Compagnia Generale Ripreseaeree', 'Comments': ''},
+    {'3Ltr': 'CGS', 'Company': 'SOLITAIR AVIATION SERVICES', 'Country': 'UNITED ARAB EMIRATES', 'Telephony': 'GLOBAL SOUTH', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'CGU', 'Company': 'CHINGUETTI AIRLINES', 'Country': 'MAURITANIA', 'Telephony': 'CHINGUETTI', 'FriendlyName': 'Chinguetti Airlines', 'Comments': ''},
     {'3Ltr': 'CGV', 'Company': 'AERO CLUBE DO ALGARVE', 'Country': 'PORTUGAL', 'Telephony': 'CLUBE ALGARVE', 'FriendlyName': 'Aero Clube Do Algarve', 'Comments': ''},
     {'3Ltr': 'CGZ', 'Company': 'COLORFUL GUIZHOU AIRLINES CO. LTD.', 'Country': 'CHINA', 'Telephony': 'COLORFUL', 'FriendlyName': '', 'Comments': ''},
@@ -1215,6 +1220,7 @@ C_TABLE = [
     {'3Ltr': 'CSS', 'Company': 'SF AIRLINES COMPANY LIMITED', 'Country': 'CHINA', 'Telephony': 'SHUN FENG', 'FriendlyName': 'SF Airlines', 'Comments': ''},
     {'3Ltr': 'CST', 'Company': 'SHORELINE AVIATION, INC.', 'Country': 'UNITED STATES', 'Telephony': 'SHORELINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'CSV', 'Company': 'COASTAL TRAVELS LIMITED', 'Country': 'UNITED REPUBLIC OF TANZANIA', 'Telephony': 'COASTAL TRAVEL', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'CSW', 'Company': 'CHAIR AIRLINES AG', 'Country': 'SWITZERLAND', 'Telephony': 'EIGER', 'FriendlyName': 'Chair Airlines', 'Comments': ''},
     {'3Ltr': 'CSX', 'Company': 'CHOICE AIRWAYS, INC. (SUNRISE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'CHOICE AIR', 'FriendlyName': 'Choice Airways', 'Comments': ''},
     {'3Ltr': 'CSY', 'Company': 'SHUANGYANG GENERAL AVIATION CO.', 'Country': 'CHINA', 'Telephony': 'SHUANGYANG', 'FriendlyName': 'Shuangyang General Aviation', 'Comments': ''},
     {'3Ltr': 'CSZ', 'Company': 'SHENZHEN AIRLINES', 'Country': 'CHINA', 'Telephony': 'SHENZHEN AIR', 'FriendlyName': 'Shenzhen Airlines', 'Comments': ''},
@@ -1293,7 +1299,7 @@ C_TABLE = [
     {'3Ltr': 'CYP', 'Company': 'CYPRUS AIRWAYS', 'Country': 'CYPRUS', 'Telephony': 'CYPRUS', 'FriendlyName': 'Cyprus Airways', 'Comments': ''},
     {'3Ltr': 'CYT', 'Company': 'CRYSTAL AIR', 'Country': 'UNITED STATES', 'Telephony': 'CRYSTAL AIR', 'FriendlyName': 'Crystal Shamrock Airlines', 'Comments': ''},
     {'3Ltr': 'CYZ', 'Company': 'CHINA POSTAL AIRLINES LTD', 'Country': 'CHINA', 'Telephony': 'CHINA POST', 'FriendlyName': 'China Postal Airlines', 'Comments': ''},
-] # 406 entries.
+] # 408 entries.
 
 D_TABLE = [
     {'3Ltr': 'DAA', 'Company': 'DECATUR AVIATION, INC. (DECATUR, IL)', 'Country': 'UNITED STATES', 'Telephony': 'DECUR', 'FriendlyName': 'Decatur Aviation', 'Comments': ''},
@@ -1354,6 +1360,7 @@ D_TABLE = [
     {'3Ltr': 'DFS', 'Company': 'DWYER AIRCRAFT SALES, INC. (MASON CITY, IA)', 'Country': 'UNITED STATES', 'Telephony': 'DWYAIR', 'FriendlyName': 'Dwyer Aircraft Services', 'Comments': ''},
     {'3Ltr': 'DGA', 'Company': 'YELLOW RIVER DELTA GENERAL AVIATION CO., LTD', 'Country': 'CHINA', 'Telephony': 'YELLOW RIVER', 'FriendlyName': 'Yellow River Delta General Aviation', 'Comments': ''},
     {'3Ltr': 'DGC', 'Company': 'SERVICIO AEREO DE LA GUARDIA CIVIL', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'DGJ', 'Company': 'DIGAJET AVIATION GMBH', 'Country': 'GERMANY', 'Telephony': 'DEEGA JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DGO', 'Company': 'DGO JET, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'DGO JET', 'FriendlyName': 'DGO Jet', 'Comments': ''},
     {'3Ltr': 'DGP', 'Company': 'CUERPO NACIONAL DE POLICIA', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DGT', 'Company': 'DIGITAL EQUIPMENT CORPORATION (MAYNARD, MA)', 'Country': 'UNITED STATES', 'Telephony': 'DIGITAL', 'FriendlyName': 'Digital Equipment Corporation', 'Comments': ''},
@@ -1376,7 +1383,7 @@ D_TABLE = [
     {'3Ltr': 'DJH', 'Company': 'DEER JET AVIATION CO., LTD.', 'Country': 'CHINA', 'Telephony': 'JET FLAG', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DJR', 'Company': 'DESERT JET, LLC (THERMAL, CA)', 'Country': 'UNITED STATES', 'Telephony': 'DESERT JET', 'FriendlyName': 'Desert Jet', 'Comments': ''},
     {'3Ltr': 'DJT', 'Company': 'DREAMJET', 'Country': 'FRANCE', 'Telephony': 'DREAMJET', 'FriendlyName': 'Dreamjet', 'Comments': '2014 [ 17 ]'},
-    {'3Ltr': 'DKA', 'Company': 'DOKIA AIR S.R.L.', 'Country': 'ROMANIA', 'Telephony': 'DOKIA AIR', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'DKA', 'Company': 'DOKIA AIR S.R.L', 'Country': 'ROMANIA', 'Telephony': 'DOKIA AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DKE', 'Company': 'JUBILEE AIRWAYS LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'DUKE', 'FriendlyName': 'Jubilee Airways', 'Comments': ''},
     {'3Ltr': 'DKH', 'Company': 'JUNEYAO AIRLINES CO., LTD', 'Country': 'CHINA', 'Telephony': 'AIR JUNEYAO', 'FriendlyName': 'Juneyao Air', 'Comments': ''},
     {'3Ltr': 'DKN', 'Company': 'AIR DECCAN', 'Country': 'INDIA', 'Telephony': 'AIR DECCAN', 'FriendlyName': 'Deccan Charters', 'Comments': ''},
@@ -1412,6 +1419,7 @@ D_TABLE = [
     {'3Ltr': 'DNY', 'Company': 'DANISH NAVY', 'Country': 'DENMARK', 'Telephony': 'DANISH NAVY', 'FriendlyName': 'Danish Navy', 'Comments': ''},
     {'3Ltr': 'DOC', 'Company': 'NORSK LUFTAMBULANSE A/S', 'Country': 'NORWAY', 'Telephony': 'HELIDOC', 'FriendlyName': 'Norsk Luftambulanse', 'Comments': ''},
     {'3Ltr': 'DOD', 'Company': 'USAF AIR MOBILITY OPERATIONS CONTROL CENTER', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'USAF Air Mobility Operations Control Center', 'Comments': ''},
+    {'3Ltr': 'DOG', 'Company': 'CANINE COMPANIONS FOR INDEPENDENCE', 'Country': 'UNITED STATES', 'Telephony': 'CANINE FLIGHT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DOI', 'Company': 'U.S. DEPARTMENT OF THE INTERIOR, OFFICE OF AIRCRAFT SERVICES, (BOISE, ID)', 'Country': 'UNITED STATES', 'Telephony': 'INTERIOR', 'FriendlyName': 'U.S. Department of the Interior', 'Comments': 'Office of Aircraft Services'},
     {'3Ltr': 'DOJ', 'Company': 'UNITED STATES DEPARTMENT OF JUSTICE PRISONER AND ALIEN TRANSPORTATION SERVICE (JPATS) (EL PASO, TX)', 'Country': 'UNITED STATES', 'Telephony': 'JUSTICE', 'FriendlyName': 'Justice Prisoner and Alien Transportation System', 'Comments': ''},
     {'3Ltr': 'DOK', 'Company': 'NORDIC AIR AMBULANCE A/S', 'Country': 'DENMARK', 'Telephony': 'DOCTOR', 'FriendlyName': '', 'Comments': ''},
@@ -1419,7 +1427,7 @@ D_TABLE = [
     {'3Ltr': 'DOM', 'Company': 'DOMERGUE AVIATION', 'Country': 'FRANCE', 'Telephony': 'DOME AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DON', 'Company': 'DONAIR FLYING CLUB LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'DONAIR', 'FriendlyName': 'Donair Flying Club', 'Comments': ''},
     {'3Ltr': 'DOR', 'Company': 'GENERAL ATOMICS AEROTEC SYSTEMS GMBH', 'Country': 'GERMANY', 'Telephony': 'DORNIER', 'FriendlyName': 'Dornier', 'Comments': ''},
-    {'3Ltr': 'DOS', 'Company': 'UNITED STATES GOVERNMENT, DEPARTMENT OF STATE INL/A', 'Country': '', 'Telephony': 'DOSAIR', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'DOS', 'Company': 'UNITED STATES GOVERNMENT, DEPARTMENT OF STATE INL/A', 'Country': 'UNITED STATES', 'Telephony': 'DOSAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DOV', 'Company': 'DOVE AIR SERVICES CO. LTD', 'Country': 'SUDAN', 'Telephony': 'DOVAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DOW', 'Company': 'BEST JETS INTERNATIONAL (MINNEAPOLIS, MN)', 'Country': 'UNITED STATES', 'Telephony': 'DOWNTOWN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DPH', 'Company': 'DOMODEDOVO AIRPORT HANDLING, CJSC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
@@ -1466,7 +1474,6 @@ D_TABLE = [
     {'3Ltr': 'DVR', 'Company': 'DIVI DIVI AIR INC.', 'Country': 'NETHERLANDS', 'Telephony': 'DIVI AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DVY', 'Company': 'LEGENDS AIRWAYS, LLC.', 'Country': 'UNITED STATES', 'Telephony': 'DEVIL RAY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DVZ', 'Company': 'AEROTAXI DVZ, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEROTAXI DVZ', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'DWA', 'Company': 'DESERT WINGS AVIATION', 'Country': 'SAUDI ARABIA', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DWC', 'Company': 'EMPIRE AVIATION SAN MARINO SRL', 'Country': 'SAN MARINO', 'Telephony': 'SMOOTH', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DWG', 'Company': 'VALKYRIE AERO, LLC', 'Country': 'UNITED STATES', 'Telephony': 'DARK WING', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DWI', 'Company': 'ARAJET S.A.', 'Country': 'DOMINICAN REPUBLIC', 'Telephony': 'DOMINICAN', 'FriendlyName': 'Arajet', 'Comments': ''},
@@ -1479,7 +1486,7 @@ D_TABLE = [
     {'3Ltr': 'DYN', 'Company': 'AERODYNAMICS, INC. (WATERFORD, MI)', 'Country': 'UNITED STATES', 'Telephony': 'AERODYNAMICS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DZD', 'Company': 'YAZD AIRWAYS', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'YAZD AIRWAYS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'DZR', 'Company': 'MIDWEST AVIATION (OMAHA, NE)', 'Country': 'UNITED STATES', 'Telephony': 'DOZER', 'FriendlyName': 'Midwest Aviation', 'Comments': ''},
-] # 183 entries.
+] # 184 entries.
 
 E_TABLE = [
     {'3Ltr': 'EAA', 'Company': "ELIT'AVIA INTERNATIONAL SM S.R.L", 'Country': 'SAN MARINO', 'Telephony': 'IMOLA', 'FriendlyName': '', 'Comments': ''},
@@ -1507,7 +1514,7 @@ E_TABLE = [
     {'3Ltr': 'EBS', 'Company': 'AEG AVIATION SERVICES (STATELINE, NV)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'AEG Aviation Services', 'Comments': ''},
     {'3Ltr': 'EBV', 'Company': 'AERBRAVA, S.C.P.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ECA', 'Company': 'OHL AIR CHARTERFLUG', 'Country': 'GERMANY', 'Telephony': 'DARK KNIGHT', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'ECC', 'Company': 'ECLAIR AVIATION', 'Country': 'CZECHIA', 'Telephony': 'ECLAIR', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'ECC', 'Company': 'ECLAIR', 'Country': 'CZECHIA', 'Telephony': 'ECLAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ECD', 'Company': 'ECOTOUR', 'Country': 'MEXICO', 'Telephony': 'ECOTOUR', 'FriendlyName': 'Ecotour', 'Comments': ''},
     {'3Ltr': 'ECF', 'Company': 'EUROCOPTER', 'Country': 'FRANCE', 'Telephony': 'EUROCOPTER', 'FriendlyName': 'Eurocopter', 'Comments': ''},
     {'3Ltr': 'ECH', 'Company': 'ESN JET SERVICE, LLC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
@@ -1555,7 +1562,7 @@ E_TABLE = [
     {'3Ltr': 'EFY', 'Company': 'EASYFLY S.A. (EMPRESA AEREA DE SERVICIOS Y FACILITACION LOGISTICA INTEGRAL S.A.)', 'Country': 'COLOMBIA', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'EGA', 'Company': 'AIR EAGLE', 'Country': 'PAKISTAN', 'Telephony': 'AIR EAGLE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'EGC', 'Company': 'FIRST WING AIRCRAFT CHARTER AND MAINTENANCE (INDIANAPOLIS, IN)', 'Country': 'UNITED STATES', 'Telephony': 'EAGLE CREEK', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'EGE', 'Company': 'EAGLE AIR INC', 'Country': 'UNITED STATES', 'Telephony': 'EAGLE AIR', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'EGE', 'Company': 'EAGLE AIR INC.', 'Country': 'UNITED STATES', 'Telephony': 'EAGLE AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'EGL', 'Company': 'CAPITAL AIR AMBULANCE LIMITED', 'Country': 'UNITED KINGDOM', 'Telephony': 'PRESTIGE', 'FriendlyName': 'Capital Trading Aviation', 'Comments': ''},
     {'3Ltr': 'EGM', 'Company': 'ECUATOGUINEANA DE AIR ET MARITIME SERVICE - EGAMS', 'Country': 'EQUATORIAL GUINEA', 'Telephony': 'EGAMS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'EGO', 'Company': 'GAUTENG AIR CARGO CC', 'Country': 'SOUTH AFRICA', 'Telephony': 'GAUTENG', 'FriendlyName': 'Gauteng Air Cargo', 'Comments': ''},
@@ -1694,7 +1701,6 @@ E_TABLE = [
     {'3Ltr': 'ESW', 'Company': 'ASG BUSINESS AVIATION LLC', 'Country': 'AZERBAIJAN', 'Telephony': 'W-BUSINESS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ESX', 'Company': 'EUROSKYLINK LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'CATFISH', 'FriendlyName': 'Euroskylink', 'Comments': ''},
     {'3Ltr': 'ESY', 'Company': 'EASOFLYERS, S.L.', 'Country': 'SPAIN', 'Telephony': 'DONOSTI', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'ETA', 'Company': 'ZETTA JET USA, INC.', 'Country': 'UNITED STATES', 'Telephony': 'TIME MACHINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ETC', 'Company': 'AFRICAN TRANSPORT TRADING AND INVESTMENT CO. (ATTICO)', 'Country': 'SUDAN', 'Telephony': 'TRANATTICO', 'FriendlyName': 'African Transport Trading and Investment Company', 'Comments': ''},
     {'3Ltr': 'ETD', 'Company': 'ETIHAD AIRWAYS', 'Country': 'UNITED ARAB EMIRATES', 'Telephony': 'ETIHAD', 'FriendlyName': 'Etihad Airways', 'Comments': ''},
     {'3Ltr': 'ETE', 'Company': 'SERVICIOS AEREOS ELITE, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'SAELITE', 'FriendlyName': 'Aero Siete', 'Comments': ''},
@@ -1765,7 +1771,7 @@ E_TABLE = [
     {'3Ltr': 'EZX', 'Company': 'EAGLEXPRESS AIR CHARTER SDN. BHD.', 'Country': 'MALAYSIA', 'Telephony': 'EAGLEXPRESS AIR', 'FriendlyName': 'Eagle Express Air Charter', 'Comments': ''},
     {'3Ltr': 'EZY', 'Company': 'EASYJET UK LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'EASY', 'FriendlyName': 'easyJet UK', 'Comments': ''},
     {'3Ltr': 'EZZ', 'Company': 'ETF AIRWAYS', 'Country': 'CROATIA', 'Telephony': 'ENTERPRIZE', 'FriendlyName': '', 'Comments': ''},
-] # 283 entries.
+] # 282 entries.
 
 F_TABLE = [
     {'3Ltr': 'FAC', 'Company': 'FUERZA AEREA COLOMBIANA', 'Country': 'COLOMBIA', 'Telephony': 'COLOMBIAN AIR FORCE', 'FriendlyName': '', 'Comments': ''},
@@ -1819,6 +1825,7 @@ F_TABLE = [
     {'3Ltr': 'FCS', 'Company': 'NEDGISTIC EXPRESS SERVICES & AVIATION', 'Country': 'NETHERLANDS', 'Telephony': 'NESA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FDA', 'Company': 'FUJI DREAM AIRLINES', 'Country': 'JAPAN', 'Telephony': 'FUJI DREAM', 'FriendlyName': 'Fuji Dream Airlines', 'Comments': ''},
     {'3Ltr': 'FDB', 'Company': 'FLYDUBAI', 'Country': 'UNITED ARAB EMIRATES', 'Telephony': 'SKY DUBAI', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'FDC', 'Company': 'FLY DIAMOND COMPANY', 'Country': 'LIBYA', 'Telephony': 'DIAMOND AIRLINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FDD', 'Company': 'FEEDER AIRLINES', 'Country': 'SUDAN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FDF', 'Company': 'IVV FEMIDA, LTD', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FDJ', 'Company': 'FREEDOM AIR LLC', 'Country': 'UNITED STATES', 'Telephony': 'FREEDOM JET', 'FriendlyName': '', 'Comments': ''},
@@ -1856,6 +1863,7 @@ F_TABLE = [
     {'3Ltr': 'FFL', 'Company': 'FOREFLIGHT, LLC', 'Country': 'UNITED STATES', 'Telephony': 'FOREFLIGHT', 'FriendlyName': 'ForeFlight', 'Comments': '3rd party Privacy ICAO Address (PIA) callsign used to obscure true airplane registrations'},
     {'3Ltr': 'FFM', 'Company': 'FLYFIREFLY SDN BHD', 'Country': 'MALAYSIA', 'Telephony': 'FIREFLY', 'FriendlyName': 'Firefly', 'Comments': ''},
     {'3Ltr': 'FFN', 'Company': 'FLY & FUN, S.L.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'FFP', 'Company': 'UNITED STATES DEPARTMENT OF TRANSPORTATION, FEDERAL AVIATION ADMINISTRATION, FLIGHT INSPECTION SERVICES (OKLAHOMA CITY, OK)', 'Country': 'UNITED STATES', 'Telephony': 'FLIGHT PRO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FFS', 'Company': 'FLORIDA DEPT OF AGRICULTURE (TALLAHASSEE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'FORESTRY', 'FriendlyName': 'Florida Department of Agriculture', 'Comments': ''},
     {'3Ltr': 'FFT', 'Company': 'FRONTIER AIRLINES, INC. (DENVER, CO)', 'Country': 'UNITED STATES', 'Telephony': 'FRONTIER FLIGHT', 'FriendlyName': 'Frontier Airlines', 'Comments': ''},
     {'3Ltr': 'FFU', 'Company': 'GEC MARCONI AVIONICS LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'FERRANTI', 'FriendlyName': 'GEC Marconi Avionics', 'Comments': ''},
@@ -1947,7 +1955,6 @@ F_TABLE = [
     {'3Ltr': 'FNL', 'Company': 'LAPIN TILAUSLENTO OY', 'Country': 'FINLAND', 'Telephony': 'FINN FLIGHT', 'FriendlyName': 'Oulun Tilauslento', 'Comments': ''},
     {'3Ltr': 'FNO', 'Company': 'AEROFLOTA DEL NOROESTE S.L.', 'Country': 'SPAIN', 'Telephony': 'RIAZOR', 'FriendlyName': 'Aeroflota Del Noroeste', 'Comments': ''},
     {'3Ltr': 'FNS', 'Company': 'FINESSE EXECUTIVE LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'FINESSE', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'FNX', 'Company': 'FENIX AIR CHARTER', 'Country': 'UNITED STATES', 'Telephony': 'CRESCENT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FNY', 'Company': 'FRANCE MARINE NATIONALE', 'Country': 'FRANCE', 'Telephony': 'FRENCH NAVY', 'FriendlyName': 'France Marine Nationale', 'Comments': ''},
     {'3Ltr': 'FOA', 'Company': 'FORTUNE AIR (PTY) LTD', 'Country': 'SOUTH AFRICA', 'Telephony': 'FORTUNE AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FOC', 'Company': "OFFICE FEDERAL DE L'AVIATION CIVILE", 'Country': 'SWITZERLAND', 'Telephony': 'FOCA', 'FriendlyName': "Office Federal De'Aviation Civile", 'Comments': ''},
@@ -2070,7 +2077,7 @@ F_TABLE = [
     {'3Ltr': 'FZA', 'Company': 'FUZHOU AIRLINES CO. LTD.', 'Country': 'CHINA', 'Telephony': 'STRAIT AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FZM', 'Company': 'TRABAJOS AEREOS DE CORDOBA S.L.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'FZW', 'Company': 'FLY AFRICA - ZIMBABWE', 'Country': 'ZIMBABWE', 'Telephony': 'FRESH EXPRESS', 'FriendlyName': '', 'Comments': ''},
-] # 302 entries.
+] # 303 entries.
 
 G_TABLE = [
     {'3Ltr': 'GAA', 'Company': 'GLOABAL AFRICA AVIATION', 'Country': 'ZIMBABWE', 'Telephony': 'GLOBAL AFRICA', 'FriendlyName': '', 'Comments': ''},
@@ -2142,11 +2149,11 @@ G_TABLE = [
     {'3Ltr': 'GEM', 'Company': 'AIR AFRICA INTERNATIONAL LTD', 'Country': 'UNITED REPUBLIC OF TANZANIA', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GEN', 'Company': 'GENSA - GENERAL SERVICES AVIATION', 'Country': 'BRAZIL', 'Telephony': 'GENSA-BRASIL', 'FriendlyName': 'GENSA', 'Comments': ''},
     {'3Ltr': 'GEO', 'Company': 'AMS AIRLINES L.L.C.', 'Country': 'GEORGIA', 'Telephony': 'APOLAX', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'GER', 'Company': 'GERMAN AIRWAYS GMBH', 'Country': 'GERMANY', 'Telephony': 'GERMAN EAGLE', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'GER', 'Company': 'GERMAN AIRWAYS GMBH', 'Country': 'GERMANY', 'Telephony': 'GERMAN EAGLE', 'FriendlyName': 'German Airways', 'Comments': ''},
     {'3Ltr': 'GES', 'Company': 'GESTAIR, S.A.', 'Country': 'SPAIN', 'Telephony': 'GESTAIR', 'FriendlyName': 'Gestair', 'Comments': ''},
     {'3Ltr': 'GET', 'Company': 'GET HIGH, UNIPESSOAL LDA', 'Country': 'PORTUGAL', 'Telephony': 'AIR FLOW', 'FriendlyName': 'Get High', 'Comments': ''},
     {'3Ltr': 'GEX', 'Company': 'AERO EXPEDITION LLC', 'Country': 'GEORGIA', 'Telephony': 'AERO GEORGIA', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'GFA', 'Company': 'GULF AIR B.S.C. ( C )', 'Country': 'BAHRAIN', 'Telephony': 'GULF AIR', 'FriendlyName': 'Gulf Air', 'Comments': ''},
+    {'3Ltr': 'GFA', 'Company': 'GULF AIR B.S.C.(C)', 'Country': 'BAHRAIN', 'Telephony': 'GULF AIR', 'FriendlyName': 'Gulf Air', 'Comments': ''},
     {'3Ltr': 'GFC', 'Company': 'GAIL FORCE EXPRESS (JANESVILLE, WI)', 'Country': 'UNITED STATES', 'Telephony': 'GAIL FORCE', 'FriendlyName': 'Gail Force Express', 'Comments': ''},
     {'3Ltr': 'GFD', 'Company': 'GFD GESELLSCHAFT FUER FLUGZIELDARSTELLUNG MBH, HOHN', 'Country': 'GERMANY', 'Telephony': 'KITE', 'FriendlyName': 'Gesellschaft Fur Flugzieldarstellung', 'Comments': ''},
     {'3Ltr': 'GFF', 'Company': 'GREAT FLIGHT', 'Country': 'UNITED STATES', 'Telephony': 'GREAT RIDE', 'FriendlyName': '', 'Comments': ''},
@@ -2251,6 +2258,7 @@ G_TABLE = [
     {'3Ltr': 'GRL', 'Company': 'AIR GREENLAND A/S', 'Country': 'DENMARK', 'Telephony': 'GREENLAND', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GRM', 'Company': 'ARIZONA STATE GOVERNMENT, COCHISE COUNTY SHERIFF', 'Country': 'UNITED STATES', 'Telephony': 'GERONIMO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GRN', 'Company': 'GRANDE AVIATION', 'Country': 'UNITED STATES', 'Telephony': 'GRANDE', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'GRO', 'Company': 'GRYPHON AIR SRL', 'Country': 'ROMANIA', 'Telephony': 'OAKLEAF', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GRP', 'Company': 'GRYPHON AIR, LLC', 'Country': 'UNITED STATES', 'Telephony': 'AIR FOX', 'FriendlyName': 'Great Plains Airlines', 'Comments': ''},
     {'3Ltr': 'GRR', 'Company': 'AGROAR - TRABALHOS AEREOS LDA.', 'Country': 'PORTUGAL', 'Telephony': 'AGROAR', 'FriendlyName': 'Agroar - Trabalhos Aereos', 'Comments': ''},
     {'3Ltr': 'GRT', 'Company': 'GABON-AIR-TRANSPORT', 'Country': 'GABON', 'Telephony': '', 'FriendlyName': 'Gabon-Air-Transport', 'Comments': ''},
@@ -2272,7 +2280,6 @@ G_TABLE = [
     {'3Ltr': 'GSP', 'Company': 'GLOBAL FLIGHT SCHOOL', 'Country': 'PORTUGAL', 'Telephony': 'GLOBAL SCHOOL', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GSS', 'Company': 'GSS AIRLINE S.R.L', 'Country': 'SAN MARINO', 'Telephony': 'CARGO BIRD', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GST', 'Company': 'GLOBAL SUPERTANKER', 'Country': 'UNITED STATES', 'Telephony': 'SUPERTANK', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'GSW', 'Company': 'CHAIR AIRLINES AG', 'Country': 'SWITZERLAND', 'Telephony': 'EIGER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GSY', 'Company': 'DEVINAIRE, LLC', 'Country': 'UNITED STATES', 'Telephony': 'GRAY SKY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GTA', 'Company': 'CITY AIRWAYS CO. LTD', 'Country': 'THAILAND', 'Telephony': 'CITY AIRWAYS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GTF', 'Company': 'ELJ AVIATION LLC (SANFORD, FL)', 'Country': 'UNITED STATES', 'Telephony': 'GATOR FLIGHT', 'FriendlyName': '', 'Comments': ''},
@@ -2300,7 +2307,7 @@ G_TABLE = [
     {'3Ltr': 'GWG', 'Company': 'GREEN AFRICA AIRWAYS LIMITED', 'Country': 'NIGERIA', 'Telephony': 'GREEN AFRICA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GWI', 'Company': 'GERMANWINGS GMBH, KOELN', 'Country': 'GERMANY', 'Telephony': 'GERMAN WINGS', 'FriendlyName': 'Germanwings', 'Comments': ''},
     {'3Ltr': 'GWL', 'Company': 'GREAT WALL AIRLINES CO., LTD', 'Country': 'CHINA', 'Telephony': 'GREAT WALL', 'FriendlyName': 'Great Wall Airlines', 'Comments': ''},
-    {'3Ltr': 'GWN', 'Company': 'GEWAN AIRWAYS', 'Country': 'KYRGYZSTAN', 'Telephony': 'GEWAN', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'GWN', 'Company': 'GEWAN AIRWAYS', 'Country': 'KAZAKHSTAN', 'Telephony': 'GEWAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GWR', 'Company': 'AURA AIRLINES SL (GOWAIR)', 'Country': 'SPAIN', 'Telephony': 'LEMON', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'GWS', 'Company': 'GENERAL AIRWAYS', 'Country': 'SOUTH AFRICA', 'Telephony': 'GENAIR', 'FriendlyName': 'General Airways', 'Comments': ''},
     {'3Ltr': 'GWW', 'Company': 'GLOBAL WINGS SEZC LTD', 'Country': 'CAYMAN ISLANDS', 'Telephony': 'GLOBAL WINGS', 'FriendlyName': '', 'Comments': ''},
@@ -2368,6 +2375,7 @@ H_TABLE = [
     {'3Ltr': 'HDL', 'Company': 'HENDELL AVIATION OY', 'Country': 'FINLAND', 'Telephony': 'HENDELL', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HDM', 'Company': 'HARLEY-DAVISON MOTOR COMPANY', 'Country': 'UNITED STATES', 'Telephony': 'HOG', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HDR', 'Company': 'HELITRANS AS', 'Country': 'NORWAY', 'Telephony': 'HELITRANS', 'FriendlyName': 'Helitrans Air Service', 'Comments': ''},
+    {'3Ltr': 'HDT', 'Company': 'HADHRAMOUT AIRWAYS', 'Country': 'YEMEN', 'Telephony': 'HADHRAMOUT AIRWAYS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HEA', 'Company': 'HELIAVIA-TRANSPORTE AEREO, LDA', 'Country': 'PORTUGAL', 'Telephony': 'HELIAVIA', 'FriendlyName': 'Heliavia-Transporte Aereo', 'Comments': ''},
     {'3Ltr': 'HEB', 'Company': 'HELI BERNINA AG', 'Country': 'SWITZERLAND', 'Telephony': 'HELIBERNINA', 'FriendlyName': 'Heli Bernina', 'Comments': ''},
     {'3Ltr': 'HED', 'Company': 'HERITAGE AVIATION DEVELOPMENTS LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'FLAPJACK', 'FriendlyName': 'Heritage Aviation Developments', 'Comments': ''},
@@ -2537,7 +2545,7 @@ H_TABLE = [
     {'3Ltr': 'HTS', 'Company': 'HELISTAR SAS', 'Country': 'COLOMBIA', 'Telephony': 'HELISAS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HTT', 'Company': 'LATITUDE AIR AMBULANCE', 'Country': 'CANADA', 'Telephony': 'HEART BEAT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HTY', 'Company': 'GLOBAL AERONAUTICS SOLUTIONS CORP, S.L.', 'Country': 'SPAIN', 'Telephony': 'HELITY', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'HUA', 'Company': 'HUNGARY AIRLINES LTD.', 'Country': 'HUNGARY', 'Telephony': 'BUDAPEST', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'HUA', 'Company': 'HUNGARY AIRLINES LTD.', 'Country': 'HUNGARY', 'Telephony': 'HUNGARY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HUB', 'Company': 'HUB AIRLINES, INC. (FT. WAYNE, IN)', 'Country': 'UNITED STATES', 'Telephony': 'HUB', 'FriendlyName': 'Hub Airlines', 'Comments': ''},
     {'3Ltr': 'HUC', 'Company': 'AEROLINEAS DE TEHUACAN, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'LINEAS TEHUACAN', 'FriendlyName': 'Aerolineas de Techuacan', 'Comments': ''},
     {'3Ltr': 'HUE', 'Company': 'HAUTE AVIATION', 'Country': 'SWITZERLAND', 'Telephony': 'HAUTE', 'FriendlyName': '', 'Comments': ''},
@@ -2570,7 +2578,7 @@ H_TABLE = [
     {'3Ltr': 'HZR', 'Company': 'LOT POLISH AIRLINES S.A.', 'Country': 'POLAND', 'Telephony': 'HUZAR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HZS', 'Company': 'AVIATION HORIZONS LTD.', 'Country': 'SAUDI ARABIA', 'Telephony': 'HORIZON SKY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'HZY', 'Company': 'HAINAN LILY JET CO., LTD.', 'Country': 'CHINA', 'Telephony': 'AIR LILY', 'FriendlyName': '', 'Comments': ''},
-] # 253 entries.
+] # 254 entries.
 
 I_TABLE = [
     {'3Ltr': 'IAA', 'Company': 'INAER AVIONES ANFIBIOS, S.A.U.', 'Country': 'SPAIN', 'Telephony': 'ANFIBIOS', 'FriendlyName': '', 'Comments': ''},
@@ -2641,6 +2649,7 @@ I_TABLE = [
     {'3Ltr': 'IGA', 'Company': 'SKYTAXI LTD', 'Country': 'POLAND', 'Telephony': 'IGUANA', 'FriendlyName': 'Skytaxi', 'Comments': ''},
     {'3Ltr': 'IGC', 'Company': 'IRAQ GATE', 'Country': 'IRAQ', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IGL', 'Company': 'AIR TRANSPORT IGLESIAS S.A', 'Country': 'VENEZUELA', 'Telephony': 'ATISA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'IGM', 'Company': 'AERO COATL MEXICANO', 'Country': 'MEXICO', 'Telephony': 'AERO COATLE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IGN', 'Company': 'INTERGUIDE AIR LIMITED', 'Country': 'NIGERIA', 'Telephony': 'DIVINE AIR', 'FriendlyName': 'Interguide Air', 'Comments': ''},
     {'3Ltr': 'IGO', 'Company': 'INTERGLOBE AVIATION PRIVATE LTD (T/A INDIGO)', 'Country': 'INDIA', 'Telephony': 'IFLY', 'FriendlyName': 'IndiGo', 'Comments': 'InterGlobe Aviation'},
     {'3Ltr': 'IGS', 'Company': 'ISLE GRANDE FLYING SCHOOL (HATO REY, PR)', 'Country': 'UNITED STATES', 'Telephony': 'ISLA GRANDE', 'FriendlyName': 'Isle Grande Flying School', 'Comments': ''},
@@ -2684,11 +2693,11 @@ I_TABLE = [
     {'3Ltr': 'INA', 'Company': 'AIR1AIR', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'AVICENNA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INB', 'Company': 'INTER BUILD LLC', 'Country': 'TAJIKISTAN', 'Telephony': 'INTERBUILD', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INC', 'Company': 'INSEL AIR INTERNATIONAL N.V.', 'Country': 'NETHERLANDS', 'Telephony': 'INSELAIR', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'ING', 'Company': 'INAER GALICIA, S.L.', 'Country': 'SPAIN', 'Telephony': 'INAER GALICIA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'ING', 'Company': 'AVINCIS AVIATION IBERIA S.L.', 'Country': 'SPAIN', 'Telephony': 'INAER GALICIA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INI', 'Company': 'INITIUM AVIATION', 'Country': 'SPAIN', 'Telephony': 'INITIUM', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INM', 'Company': 'INVERSIONES MANDUCA, C.A.', 'Country': 'VENEZUELA', 'Telephony': 'INDUCA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INP', 'Company': 'F A NAVAL DEL PERU', 'Country': 'PERU', 'Telephony': '', 'FriendlyName': 'Peruvian Navy', 'Comments': ''},
-    {'3Ltr': 'INR', 'Company': 'INAER HELICOPTEROS, S.A.', 'Country': 'SPAIN', 'Telephony': 'INAER HELICOPTEROS', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'INR', 'Company': 'AVINCIS AVIATION ESPAÑA S.A.U.', 'Country': 'SPAIN', 'Telephony': 'INAER HELICOPTEROS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'INS', 'Company': 'INFLITE THE JET CENTRE', 'Country': 'UNITED KINGDOM', 'Telephony': '', 'FriendlyName': 'Inflite The Jet Centre', 'Comments': ''},
     {'3Ltr': 'INT', 'Company': 'INTEGRA MAP & GEOINFORMACION CONSULTING, S.L.', 'Country': 'SPAIN', 'Telephony': 'INTEGRA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IOA', 'Company': 'GSEC MONARCH AND DECCAN AVIATION PRIVATE LIMITED', 'Country': 'INDIA', 'Telephony': 'INDIA FIRST', 'FriendlyName': 'IndiaOne Air', 'Comments': ''},
@@ -2726,7 +2735,7 @@ I_TABLE = [
     {'3Ltr': 'IRY', 'Company': 'ERAM AIR', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'ERAM AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IRZ', 'Company': 'SAHA AIRLINES SERVICES', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'SAHA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ISA', 'Company': 'ISLAND AIRLINES, INC. (NANTUCKET, MA)', 'Country': 'UNITED STATES', 'Telephony': 'ISLAND', 'FriendlyName': 'Island Airlines', 'Comments': ''},
-    {'3Ltr': 'ISC', 'Company': 'AIR SERVICE CANAIMA, C. A.', 'Country': 'VENEZUELA', 'Telephony': 'AIR SERVICE', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'ISC', 'Company': 'AIR SERVICE CANAIMA, C.A', 'Country': 'VENEZUELA', 'Telephony': 'AIR SERVICE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ISF', 'Company': 'INTERNATIONAL STABILISATION ASSISTANCE FORCE', 'Country': 'UNITED KINGDOM', 'Telephony': '', 'FriendlyName': 'International Stabilisation Assistance Force', 'Comments': ''},
     {'3Ltr': 'ISH', 'Company': 'ISLAND WINGS INC', 'Country': 'UNITED STATES', 'Telephony': 'ISLAND HOP', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ISI', 'Company': 'ISLAND AIR, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'ISLANDMEX', 'FriendlyName': 'Island Air', 'Comments': ''},
@@ -2749,6 +2758,7 @@ I_TABLE = [
     {'3Ltr': 'ITM', 'Company': 'TAB ASSOCIATES, INC. DBA ISLAND TYME', 'Country': 'UNITED STATES', 'Telephony': 'ISLAND TYME', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ITN', 'Company': 'INDUSTRIAS TITAN, S.A.', 'Country': 'SPAIN', 'Telephony': 'TITANLUX', 'FriendlyName': 'Industrias Titan', 'Comments': ''},
     {'3Ltr': 'ITP', 'Company': 'INTERNATIONAL TRIP PLANNING SERVICES, LLC (HOUSTON, TX)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'ITR', 'Company': 'INTIRA (2009) AIR COMPANY LIMITED', 'Country': 'THAILAND', 'Telephony': 'FLYINTIRA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'ITS', 'Company': 'INTER-STATE AVIATION, INC. (PULLMAN, WA)', 'Country': 'UNITED STATES', 'Telephony': 'INTER-STATE', 'FriendlyName': 'Inter-State Aviation', 'Comments': ''},
     {'3Ltr': 'ITY', 'Company': 'ITALIA TRASPORTO AEREO S.P.A.', 'Country': 'ITALY', 'Telephony': 'ITARROW', 'FriendlyName': 'ITA Airways', 'Comments': ''},
     {'3Ltr': 'IVA', 'Company': 'AEROBOLIVAR, C.A.', 'Country': 'VENEZUELA', 'Telephony': 'AEROBOLIVAR', 'FriendlyName': '', 'Comments': ''},
@@ -2762,7 +2772,7 @@ I_TABLE = [
     {'3Ltr': 'IZA', 'Company': 'IZHAVIA', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'IZHAVIA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IZG', 'Company': 'ZAGROS AIRLINES', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'ZAGROS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'IZM', 'Company': 'IHY IZMIR HAVAYOLLARI A.S.', 'Country': 'TURKEY', 'Telephony': 'IZMIR', 'FriendlyName': 'Izair', 'Comments': ''},
-] # 189 entries.
+] # 191 entries.
 
 J_TABLE = [
     {'3Ltr': 'JAA', 'Company': 'JET ASIA AIRWAYS CO., LTD', 'Country': 'THAILAND', 'Telephony': 'JET ASIA', 'FriendlyName': '', 'Comments': ''},
@@ -2778,7 +2788,7 @@ J_TABLE = [
     {'3Ltr': 'JAP', 'Company': 'JETSMART AIRLINES PERU SAC', 'Country': 'PERU', 'Telephony': 'RED SMART', 'FriendlyName': 'JetSMART Peru', 'Comments': ''},
     {'3Ltr': 'JAR', 'Company': 'AIRLINK LUFTVERKEHRSGESELLSCHAFT M.B.H.', 'Country': 'AUSTRIA', 'Telephony': 'AIRLINK', 'FriendlyName': 'Airlink', 'Comments': ''},
     {'3Ltr': 'JAS', 'Company': 'JET AVIATION FLIGHT SERVICES, INC. (TETERBORO, NJ)', 'Country': 'UNITED STATES', 'Telephony': 'JET SETTER', 'FriendlyName': 'Jet Aviation Flight Services', 'Comments': ''},
-    {'3Ltr': 'JAT', 'Company': 'JETSMART SPA', 'Country': 'CHILE', 'Telephony': 'ROCKSMART', 'FriendlyName': 'JetSMART', 'Comments': ''},
+    {'3Ltr': 'JAT', 'Company': 'JETSMART SPA', 'Country': 'CHILE', 'Telephony': 'ROCKSMART', 'FriendlyName': 'JetSmart', 'Comments': ''},
     {'3Ltr': 'JAV', 'Company': 'JORDANIAN ENTERPRISE FOR AIR NAVIGATION AND AVIATION SERVICES (JATE) - JORDAN AVIATION', 'Country': 'JORDAN', 'Telephony': 'JORDAN AVIATION', 'FriendlyName': 'Jordan Aviation', 'Comments': ''},
     {'3Ltr': 'JAW', 'Company': 'JASMIN AIRWAYS', 'Country': 'TUNISIA', 'Telephony': 'JASMINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JAX', 'Company': 'JANAIR, INC. (DALLAS, TX)', 'Country': 'UNITED STATES', 'Telephony': 'JANAIR', 'FriendlyName': 'Janair', 'Comments': ''},
@@ -2841,7 +2851,7 @@ J_TABLE = [
     {'3Ltr': 'JKK', 'Company': 'SPANAIR', 'Country': 'SPAIN', 'Telephony': 'SPANAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JKN', 'Company': 'KSA CHARTERS LTD DBA JUNKANOO AIR', 'Country': 'BAHAMAS', 'Telephony': 'JUNKANOO AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JKR', 'Company': 'JUSTICE AIR INC.', 'Country': 'UNITED STATES', 'Telephony': 'JOKER', 'FriendlyName': 'Justice Air Charter', 'Comments': 'Trading name for Reliant Aviation, allocated in 2014 [ 33 ]'},
-    {'3Ltr': 'JKT', 'Company': 'JETSTAR HONG KONG AIRWAYS LIMITED', 'Country': 'CHINA', 'Telephony': 'KAITAK', 'FriendlyName': 'Jetstar Hong Kong Airways', 'Comments': ''},
+    {'3Ltr': 'JKT', 'Company': 'JETSTAR HONG KONG AIRWAYS LIMITED', 'Country': 'CHINA', 'Telephony': 'KAITAK', 'FriendlyName': 'Jetstar Hong Kong', 'Comments': ''},
     {'3Ltr': 'JKY', 'Company': 'HELICOPTER & AVIATION SERVICES LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'JOCKEY', 'FriendlyName': 'Helicopter & Aviation Services', 'Comments': ''},
     {'3Ltr': 'JLA', 'Company': 'AERO JL', 'Country': 'MEXICO', 'Telephony': 'AERO JOE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JLB', 'Company': 'JHONLIN AIR TRANSPORT, PT.', 'Country': 'INDONESIA', 'Telephony': 'JHONLIN', 'FriendlyName': '', 'Comments': ''},
@@ -2859,6 +2869,7 @@ J_TABLE = [
     {'3Ltr': 'JMC', 'Company': 'JMC AIRLINES LIMITED', 'Country': 'UNITED KINGDOM', 'Telephony': 'JAYEMMSEE', 'FriendlyName': 'JMC Airlines', 'Comments': ''},
     {'3Ltr': 'JME', 'Company': 'EJME (PORTUGAL) AIRCRAFT MANAGEMENT LDA', 'Country': 'PORTUGAL', 'Telephony': 'JETMAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JMG', 'Company': 'JET MANAGEMENT SAN MARINO S.R.L.', 'Country': 'SAN MARINO', 'Telephony': 'TRE TORRE', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'JMH', 'Company': 'JET MACH MÉXICO S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'MEX JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JMK', 'Company': 'JETMAGIC LTD', 'Country': 'MALTA', 'Telephony': 'JET MAGIC', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JML', 'Company': 'JET AVIATION FLIGHT SERVICES (MALTA) LTD.', 'Country': 'MALTA', 'Telephony': 'MALTA JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JMM', 'Company': 'JOINT MILITARY COMMISSION (JMC) NUBA MOUNTAINS - SUDAN', 'Country': 'SUDAN', 'Telephony': 'JOICOMAIR', 'FriendlyName': 'Joint Military Commission', 'Comments': ''},
@@ -2899,7 +2910,7 @@ J_TABLE = [
     {'3Ltr': 'JRO', 'Company': 'JETAEROFUELS, LLC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JRT', 'Company': 'JETRIGHT AIR MANAGEMENT, LLC', 'Country': 'UNITED STATES', 'Telephony': 'JETRIGHT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JRY', 'Company': 'JET READY', 'Country': 'SPAIN', 'Telephony': 'JET READY', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'JSA', 'Company': 'JETSTAR ASIA AIRWAYS PTE LTD', 'Country': 'SINGAPORE', 'Telephony': 'JETSTAR ASIA', 'FriendlyName': 'Jetstar Asia Airways', 'Comments': ''},
+    {'3Ltr': 'JSA', 'Company': 'JETSTAR ASIA AIRWAYS PTE LTD', 'Country': 'SINGAPORE', 'Telephony': 'JETSTAR ASIA', 'FriendlyName': 'Jetstar Asia', 'Comments': ''},
     {'3Ltr': 'JSC', 'Company': 'JETSTREAM AVIATION CONGO', 'Country': 'CONGO', 'Telephony': 'CONGO RIVER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JSD', 'Company': 'B. J. AVIATION D.O.O.', 'Country': 'SLOVENIA', 'Telephony': 'ALPOK', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JSG', 'Company': 'B. J. AVIATION KFT', 'Country': 'HUNGARY', 'Telephony': 'BOOMAIR', 'FriendlyName': '', 'Comments': ''},
@@ -2953,7 +2964,7 @@ J_TABLE = [
     {'3Ltr': 'JYR', 'Company': 'TRANSPORTE AEREO DE CARGA DEL CARIBE S.A. TAECA', 'Country': 'PANAMA', 'Telephony': 'TAECA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'JZA', 'Company': 'JAZZ AVIATION LP', 'Country': 'CANADA', 'Telephony': 'JAZZ', 'FriendlyName': 'Air Canada Jazz', 'Comments': ''},
     {'3Ltr': 'JZR', 'Company': 'JAZEERA AIRWAYS', 'Country': 'KUWAIT', 'Telephony': 'JAZEERA', 'FriendlyName': 'Jazeera Airways', 'Comments': ''},
-] # 188 entries.
+] # 189 entries.
 
 K_TABLE = [
     {'3Ltr': 'KAA', 'Company': 'K-AVIATION', 'Country': 'REPUBLIC OF KOREA', 'Telephony': 'AVIJET', 'FriendlyName': '', 'Comments': ''},
@@ -3345,7 +3356,7 @@ L_TABLE = [
     {'3Ltr': 'LTG', 'Company': 'ABSA AEROLINHAS BRASILEIRAS S/A', 'Country': 'BRAZIL', 'Telephony': 'TAMCARGO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LTR', 'Company': 'LUFTTRANSPORT A/S', 'Country': 'NORWAY', 'Telephony': 'LUFT TRANSPORT', 'FriendlyName': 'Lufttransport', 'Comments': ''},
     {'3Ltr': 'LTS', 'Company': 'FLIGHT INSPECTIONS AND SYSTEMS, CJSC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'SPECAIR', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'LTU', 'Company': 'TFC FLUGBETRIEB UND -TECHNIK BERATUNGSGESELLSCHAFT MBH', 'Country': 'GERMANY', 'Telephony': 'GERMANAIR', 'FriendlyName': 'LTU International', 'Comments': ''},
+    {'3Ltr': 'LTU', 'Company': 'LTU LUFTTRANSPORTUNTERNEHMEN GMBH', 'Country': 'GERMANY', 'Telephony': 'GERMANAIR', 'FriendlyName': 'LTU International', 'Comments': ''},
     {'3Ltr': 'LTZ', 'Company': 'LOUTZAVIA CHARTERS CC', 'Country': 'SOUTH AFRICA', 'Telephony': 'LAMINAR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LUA', 'Company': 'LUMINAIR GMBH', 'Country': 'GERMANY', 'Telephony': 'LUMINAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LUC', 'Company': 'ALBINATI AERONAUTICS SA', 'Country': 'SWITZERLAND', 'Telephony': 'ALBINATI', 'FriendlyName': 'Albinati Aeronautics', 'Comments': ''},
@@ -3374,7 +3385,7 @@ L_TABLE = [
     {'3Ltr': 'LXP', 'Company': 'TRANSPORTE AEREO S.A. (LAN EXPRESS)', 'Country': 'CHILE', 'Telephony': 'LANEX', 'FriendlyName': 'LATAM Express', 'Comments': ''},
     {'3Ltr': 'LXR', 'Company': 'SKY PRIME MALTA', 'Country': 'MALTA', 'Telephony': 'SKY LUXURY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LXS', 'Company': 'LYNX SERVICIOS AEREOS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'LYNX SERVICIOS', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'LXW', 'Company': 'LANEXANG', 'Country': "LAO PEOPLE'S DEMOCRATIC REPUBLIC", 'Telephony': 'LANEXANG', 'FriendlyName': 'Lanexang Airways International', 'Comments': ''},
+    {'3Ltr': 'LXW', 'Company': 'LANXANG AIRWAYS INTERNATIONAL', 'Country': "LAO PEOPLE'S DEMOCRATIC REPUBLIC", 'Telephony': 'LANEXANG', 'FriendlyName': 'Lanexang Airways International', 'Comments': ''},
     {'3Ltr': 'LXX', 'Company': 'LIBYAN EXPRESS FOR AIR TRANSPORT', 'Country': 'LIBYA', 'Telephony': 'LIBYANEXPRESS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LYA', 'Company': 'LIBYAN AIR AMBULANCE', 'Country': 'LIBYA', 'Telephony': 'LIBYAN AIR AMBULANCE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'LYB', 'Company': 'LYNDEN AIR CARGO', 'Country': 'PAPUA NEW GUINEA', 'Telephony': 'HIGHLANDS', 'FriendlyName': 'Lynden Air Cargo', 'Comments': ''},
@@ -3425,6 +3436,7 @@ M_TABLE = [
     {'3Ltr': 'MBT', 'Company': 'PROVINCE OF MANITOBA, AIR SERVICES BRANCH', 'Country': 'CANADA', 'Telephony': 'MANITOBA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MBU', 'Company': 'MARABU AIRLINES OU', 'Country': 'ESTONIA', 'Telephony': 'MARABU', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MCA', 'Company': 'MEDITERRANEAN COASTAL AIRLINES LTD.', 'Country': 'MALTA', 'Telephony': 'COASTAL CLIPPER', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'MCB', 'Company': 'BEAVER AIR SERVICES L.P.', 'Country': 'CANADA', 'Telephony': 'MISSINIPPI', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MCC', 'Company': 'MCC AVIATION (PTY) LTD', 'Country': 'SOUTH AFRICA', 'Telephony': 'DISCOVERY', 'FriendlyName': 'MCC Aviation', 'Comments': ''},
     {'3Ltr': 'MCD', 'Company': 'AIR MEDICAL LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'AIR MED', 'FriendlyName': 'Air Medical', 'Comments': ''},
     {'3Ltr': 'MCE', 'Company': 'MARSHALL AEROSPACE', 'Country': 'UNITED KINGDOM', 'Telephony': 'MARSHALL', 'FriendlyName': 'Marshall Aerospace', 'Comments': ''},
@@ -3522,7 +3534,6 @@ M_TABLE = [
     {'3Ltr': 'MIG', 'Company': 'RUSSIAN AIRCRAFT CORPORATION -MIG, FEDERAL STATE UNITARY ENTERPRISE', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'MIG AVIA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MIH', 'Company': 'MASSY AIRLINES', 'Country': 'NIGER', 'Telephony': 'MASSYLINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MIM', 'Company': 'MILLESIME AVIATION', 'Country': 'FRANCE', 'Telephony': 'MILLESIME', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'MIN', 'Company': 'MJET LIMITED', 'Country': 'THAILAND', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MIP', 'Company': 'THE MITRE CORPORATION', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MIR', 'Company': 'SERVICIOS AEREOS MIRA, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEROMIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'MIS', 'Company': 'BIRD IN A BIPLANE LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'ARTEMIS', 'FriendlyName': '', 'Comments': ''},
@@ -3775,7 +3786,7 @@ N_TABLE = [
     {'3Ltr': 'NDA', 'Company': 'NORDICA', 'Country': 'ESTONIA', 'Telephony': 'NORDICA AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NDD', 'Company': 'NORDEND SRL', 'Country': 'ITALY', 'Telephony': 'NORDEND', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NDF', 'Company': 'NAMIBIAN DEFENCE FORCE', 'Country': 'NAMIBIA', 'Telephony': 'NAMIBIAN AIRFORCE', 'FriendlyName': 'Namibian Defence Force', 'Comments': ''},
-    {'3Ltr': 'NDG', 'Company': 'MEDIMPACT HOLDINGS INC.', 'Country': 'UNITED STATES', 'Telephony': 'SANDOG', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'NDG', 'Company': 'MEDIMPACT HOLDINGS INC', 'Country': 'UNITED STATES', 'Telephony': 'SANDOG', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NDJ', 'Company': 'MAIBA AIRWAYS', 'Country': 'CHAD', 'Telephony': 'BASSAMAT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NDL', 'Company': 'CHRONO AVIATION INC. D/B/A CHRONO AVIATION', 'Country': 'CANADA', 'Telephony': 'NEEDLE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NDT', 'Company': 'ND AEROTAXIS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'ND AEROTAXIS', 'FriendlyName': '', 'Comments': ''},
@@ -3804,7 +3815,6 @@ N_TABLE = [
     {'3Ltr': 'NGO', 'Company': 'AIR-ANGOL SOCIEDAD AERONAUTICA, LDA', 'Country': 'ANGOLA', 'Telephony': 'AIR ANGOL', 'FriendlyName': 'Air-Angol', 'Comments': ''},
     {'3Ltr': 'NGP', 'Company': 'AIR NIGERIA PLC', 'Country': 'NIGERIA', 'Telephony': 'REGAL EAGLE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NGR', 'Company': 'NIGERIAN AIR FORCE', 'Country': 'NIGERIA', 'Telephony': 'NIGERIAN AIRFORCE', 'FriendlyName': 'Nigerian Air Force', 'Comments': ''},
-    {'3Ltr': 'NGT', 'Company': 'AIR DILIJANS', 'Country': 'ARMENIA', 'Telephony': 'NIKA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NGV', 'Company': 'ANGOAVIA', 'Country': 'ANGOLA', 'Telephony': 'ANGOAVIA', 'FriendlyName': 'Angoavia', 'Comments': ''},
     {'3Ltr': 'NGX', 'Company': 'NIGERIAN GLOBAL', 'Country': 'NIGERIA', 'Telephony': 'AIR GLOBAL', 'FriendlyName': 'Nigerian Global', 'Comments': ''},
     {'3Ltr': 'NHC', 'Company': 'NORTHERN HELICOPTER GMBH, EMDEN', 'Country': 'GERMANY', 'Telephony': 'NORTHERN', 'FriendlyName': 'Northern Helicopter', 'Comments': ''},
@@ -3954,7 +3964,7 @@ N_TABLE = [
     {'3Ltr': 'NYT', 'Company': 'YETI AIRLINES (DOMESTIC)', 'Country': 'NEPAL', 'Telephony': 'YETI AIRLINES', 'FriendlyName': 'Yeti Airlines', 'Comments': 'Domestic'},
     {'3Ltr': 'NYX', 'Company': 'NYXAIR OU', 'Country': 'ESTONIA', 'Telephony': 'NYX AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'NZM', 'Company': 'MOUNT COOK AIRLINE LTD', 'Country': 'NEW ZEALAND', 'Telephony': 'MOUNTCOOK', 'FriendlyName': 'Mount Cook Airline', 'Comments': ''},
-] # 215 entries.
+] # 214 entries.
 
 O_TABLE = [
     {'3Ltr': 'OAC', 'Company': 'ORIENTAL AIRLINES LIMITED', 'Country': 'NIGERIA', 'Telephony': 'ORIENTAL AIR', 'FriendlyName': 'Oriental Airlines', 'Comments': ''},
@@ -3978,7 +3988,7 @@ O_TABLE = [
     {'3Ltr': 'OCE', 'Company': 'HELICOCEAN', 'Country': 'FRANCE', 'Telephony': 'HELIOCEAN', 'FriendlyName': 'Heliocean', 'Comments': ''},
     {'3Ltr': 'OCJ', 'Company': 'OVERSTAR S.R.L.', 'Country': 'SAN MARINO', 'Telephony': 'OVERSTAR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'OCL', 'Company': 'OCL BARBADOS LTD', 'Country': 'BARBADOS', 'Telephony': 'SOCA', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'OCN', 'Company': 'EW DISCOVER GMBH', 'Country': 'GERMANY', 'Telephony': 'OCEAN', 'FriendlyName': 'Eurowings Discover', 'Comments': ''},
+    {'3Ltr': 'OCN', 'Company': 'EW DISCOVER GMBH', 'Country': 'GERMANY', 'Telephony': 'OCEAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'OCO', 'Company': 'OSTEND AIR COLLEGE', 'Country': 'BELGIUM', 'Telephony': 'AIR COLLEGE', 'FriendlyName': 'Ostend Air College', 'Comments': ''},
     {'3Ltr': 'ODM', 'Company': 'PAN AFRICAN AIRWAYS LTD', 'Country': 'KENYA', 'Telephony': 'JETAFRICA', 'FriendlyName': 'Pan African Airways', 'Comments': ''},
     {'3Ltr': 'OEA', 'Company': 'ORIENT THAI AIRLINES', 'Country': 'THAILAND', 'Telephony': 'ORIENT THAI', 'FriendlyName': 'Orient Thai Airlines', 'Comments': ''},
@@ -4086,8 +4096,9 @@ O_TABLE = [
     {'3Ltr': 'OYO', 'Company': 'OYONNAIR', 'Country': 'FRANCE', 'Telephony': 'ROGUE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'OZB', 'Company': 'PRIVATE AIRLINES SERVICES LTD', 'Country': 'NIGERIA', 'Telephony': 'AIR PRIMUS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'OZK', 'Company': 'SOMA JETS', 'Country': 'UNITED STATES', 'Telephony': 'SILVER SCREEN', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'OZN', 'Company': 'AVIATOR ZONE ACADEMY LLC', 'Country': 'UNITED STATES', 'Telephony': 'ORANGE TAIL', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'OZT', 'Company': 'PREMIER FLIGHT CENTER, LLC', 'Country': 'UNITED STATES', 'Telephony': 'OZARK TECH', 'FriendlyName': '', 'Comments': ''},
-] # 130 entries.
+] # 131 entries.
 
 P_TABLE = [
     {'3Ltr': 'PAA', 'Company': 'PAN AMERICAN AIRWAYS CORPORATION (DANIA, FL)', 'Country': 'UNITED STATES', 'Telephony': 'CLIPPER', 'FriendlyName': '', 'Comments': ''},
@@ -4218,7 +4229,7 @@ P_TABLE = [
     {'3Ltr': 'PJI', 'Company': 'PREMIER JETS, INC.', 'Country': 'UNITED STATES', 'Telephony': 'PRE JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PJJ', 'Company': 'PARADOX JETS LTD.', 'Country': 'BULGARIA', 'Telephony': 'SKYBOSS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PJP', 'Company': 'PRINCELY JETS (PVT)', 'Country': 'PAKISTAN', 'Telephony': 'PRINCELY JETS', 'FriendlyName': 'Princely Jets', 'Comments': ''},
-    {'3Ltr': 'PJS', 'Company': 'JET AVIATION, BUSINESS JETS AG', 'Country': 'SWITZERLAND', 'Telephony': 'JETAVIATION', 'FriendlyName': 'Jet Aviation', 'Comments': ''},
+    {'3Ltr': 'PJS', 'Company': 'JET AVIATION BUSINESS JETS AG', 'Country': 'SWITZERLAND', 'Telephony': 'JETAVIATION', 'FriendlyName': 'Jet Aviation', 'Comments': ''},
     {'3Ltr': 'PJT', 'Company': 'PARTNER JET INC.', 'Country': 'CANADA', 'Telephony': 'PARTNERJET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PJV', 'Company': 'PREMIUM JET GMBH', 'Country': 'AUSTRIA', 'Telephony': 'PREMIUM JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PJZ', 'Company': 'PREMIUM JET AG', 'Country': 'SWITZERLAND', 'Telephony': 'PRIMEJET', 'FriendlyName': '', 'Comments': ''},
@@ -4268,6 +4279,7 @@ P_TABLE = [
     {'3Ltr': 'PNO', 'Company': 'PANORAMA AVIATION', 'Country': 'CANADA', 'Telephony': 'PANO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PNP', 'Company': 'PINEAPPLE AIR', 'Country': 'BAHAMAS', 'Telephony': 'PINEAPPLE AIR', 'FriendlyName': 'Pineapple Air', 'Comments': ''},
     {'3Ltr': 'PNR', 'Company': 'PANAIR', 'Country': 'SPAIN', 'Telephony': 'SKYJET', 'FriendlyName': 'PAN Air', 'Comments': ''},
+    {'3Ltr': 'PNT', 'Company': 'TRANSPORTADORA PRINT LTDA', 'Country': 'BRAZIL', 'Telephony': 'PRINT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'PNU', 'Company': 'AERO SERVICIOS PLATINUM, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AERO PLATINUM', 'FriendlyName': 'Aero Servicios Platinum', 'Comments': ''},
     {'3Ltr': 'PNW', 'Company': 'PALESTINIAN AIRLINES', 'Country': 'EGYPT', 'Telephony': 'PALESTINIAN', 'FriendlyName': 'Palestinian Airlines', 'Comments': ''},
     {'3Ltr': 'PNX', 'Company': 'AIS AIRLINES', 'Country': 'NETHERLANDS', 'Telephony': 'SPINNER', 'FriendlyName': 'AIS Airlines', 'Comments': ''},
@@ -4275,6 +4287,7 @@ P_TABLE = [
     {'3Ltr': 'POA', 'Company': 'PORTUGUESE ARMY', 'Country': 'PORTUGAL', 'Telephony': 'PORTUGUESE ARMY', 'FriendlyName': 'Portuguese Army', 'Comments': ''},
     {'3Ltr': 'POB', 'Company': 'SERVICIOS AEREOS POBLANOS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'POBLANOS', 'FriendlyName': 'Servicios Aereos Poblanos', 'Comments': ''},
     {'3Ltr': 'POC', 'Company': 'POCONO AIR LINES, INC. (EAST STROUDSBURG, PA)', 'Country': 'UNITED STATES', 'Telephony': 'POCONO', 'FriendlyName': 'Pocono Air Lines', 'Comments': ''},
+    {'3Ltr': 'POD', 'Company': 'CRAFT CHARTER, LLC (OPA LOCKA, FL)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'Craft Charter', 'Comments': '(manually added to this database)'},
     {'3Ltr': 'POE', 'Company': 'PORTER AIRLINES (CANADA) LIMITED', 'Country': 'CANADA', 'Telephony': 'PORTER AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'POF', 'Company': 'POLICE AUX FRONTIERS', 'Country': 'FRANCE', 'Telephony': 'AIRPOL', 'FriendlyName': 'Police Aux Frontieres', 'Comments': ''},
     {'3Ltr': 'POL', 'Company': 'RIKSPOLISSTYRELSEN', 'Country': 'SWEDEN', 'Telephony': '', 'FriendlyName': 'Rikspolisstyrelsen', 'Comments': ''},
@@ -4394,7 +4407,7 @@ P_TABLE = [
     {'3Ltr': 'PYN', 'Company': 'HAVERFORDWEST AIR CHARTER SERVICES', 'Country': 'UNITED KINGDOM', 'Telephony': 'POYSTON', 'FriendlyName': 'Haverfordwest Air Charter Services', 'Comments': ''},
     {'3Ltr': 'PYZ', 'Company': 'PLAYERS AIR, INC. (LAWRENCEVILLE, GA)', 'Country': 'UNITED STATES', 'Telephony': 'PLAYERS AIR', 'FriendlyName': 'Players Air', 'Comments': ''},
     {'3Ltr': 'PZA', 'Company': 'AEREO TAXI PARAZA, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEREO PARAZA', 'FriendlyName': 'Aereo Taxi Paraza', 'Comments': ''},
-] # 304 entries.
+] # 306 entries.
 
 Q_TABLE = [
     {'3Ltr': 'QAF', 'Company': 'AMIRI FLIGHT', 'Country': 'QATAR', 'Telephony': 'AMIRI', 'FriendlyName': 'Qatar Amiri Flight', 'Comments': ''},
@@ -4409,16 +4422,16 @@ Q_TABLE = [
     {'3Ltr': 'QCL', 'Company': 'AEROVIP S.A. (AIR CLASS)', 'Country': 'URUGUAY', 'Telephony': 'ACLA', 'FriendlyName': 'Air Class Lineas Aereas', 'Comments': ''},
     {'3Ltr': 'QDA', 'Company': 'QINGDAO AIRLINES CO., LTD', 'Country': 'CHINA', 'Telephony': 'SKY LEGEND', 'FriendlyName': 'Qingdao Airlines', 'Comments': ''},
     {'3Ltr': 'QFA', 'Company': 'QANTAS AIRWAYS LIMITED', 'Country': 'AUSTRALIA', 'Telephony': 'QANTAS', 'FriendlyName': 'Qantas', 'Comments': ''},
-    {'3Ltr': 'QFF', 'Company': 'FLY ADEN LTD', 'Country': 'YEMEN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'QFF', 'Company': 'FLY ADEN', 'Country': 'YEMEN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QFX', 'Company': 'SPARFELL MALTA LTD', 'Country': 'MALTA', 'Telephony': 'SPARFELL', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QFY', 'Company': 'QUALITY FLY S.A.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QFZ', 'Company': 'FARS QESHM AIR LINES', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'FARS QESHM', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QGA', 'Company': 'WINDROSE AIR JETCHARTER GMBH, BERLIN', 'Country': 'GERMANY', 'Telephony': 'QUADRIGA', 'FriendlyName': 'Windrose Air', 'Comments': ''},
     {'3Ltr': 'QHD', 'Company': 'MEREGRASS, INC.', 'Country': 'UNITED STATES', 'Telephony': 'QUAHADI', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QID', 'Company': 'U.S. AIR FORCE 100TH AIR REFUELING WING, RAF MILDENHALL', 'Country': 'UNITED STATES', 'Telephony': 'QUID', 'FriendlyName': 'USAF 100th Air Refueling Wing', 'Comments': ''},
-    {'3Ltr': 'QJE', 'Company': 'NATIONAL JET SYSTEMS PTY LTD', 'Country': 'AUSTRALIA', 'Telephony': 'KANGA', 'FriendlyName': 'QantasLink', 'Comments': 'Qantaslink Jet Operations'},
+    {'3Ltr': 'QJE', 'Company': 'NATIONAL JET SYSTEMS PTY LTD', 'Country': 'AUSTRALIA', 'Telephony': 'KANGA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QJT', 'Company': 'QINGDAO JIUTIAN INTERNATIONAL FLIGHT ACADEMY CO., LTD', 'Country': 'CHINA', 'Telephony': 'JIU TIAN', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'QLK', 'Company': 'QANTASLINK', 'Country': 'AUSTRALIA', 'Telephony': 'Q LINK', 'FriendlyName': 'QantasLink', 'Comments': 'Turbo-Props'},
+    {'3Ltr': 'QLK', 'Company': 'QANTASLINK', 'Country': 'AUSTRALIA', 'Telephony': 'Q LINK', 'FriendlyName': 'QantasLink', 'Comments': ''},
     {'3Ltr': 'QNK', 'Company': 'KABO AIR TRAVELS', 'Country': 'NIGERIA', 'Telephony': 'KABO', 'FriendlyName': 'Kabo Air', 'Comments': ''},
     {'3Ltr': 'QNR', 'Company': 'QUEEN AIR S.R.O.', 'Country': 'CZECHIA', 'Telephony': 'QUEEN AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'QNT', 'Company': 'QANOT SHARQ', 'Country': 'UZBEKISTAN', 'Telephony': 'SHARQ', 'FriendlyName': 'Qanot Sharq', 'Comments': ''},
@@ -4478,6 +4491,7 @@ R_TABLE = [
     {'3Ltr': 'RCH', 'Company': 'AIR MOBILITY COMMAND (AMC)', 'Country': 'UNITED STATES', 'Telephony': 'REACH', 'FriendlyName': 'Air Mobility Command', 'Comments': 'United States Air Force'},
     {'3Ltr': 'RCI', 'Company': 'AIR CASSAI LDA.', 'Country': 'ANGOLA', 'Telephony': 'AIR CASSAI', 'FriendlyName': 'Air Cassai', 'Comments': ''},
     {'3Ltr': 'RCJ', 'Company': 'HAWKER BEECHCRAFT LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'NEWPIN', 'FriendlyName': 'Raytheon Corporate Jets', 'Comments': ''},
+    {'3Ltr': 'RCK', 'Company': 'ROCKET AVIATION SERVICES LTD', 'Country': 'NIGERIA', 'Telephony': 'ROCKET AVIATION', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RCL', 'Company': 'REAL AERO CLUB DE VALENCIA', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RCM', 'Company': 'AIR CANNES MEDITERRANEE', 'Country': 'FRANCE', 'Telephony': 'CANNES AZUR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RCN', 'Company': 'RACE CARGO AIRLINES (NIG) LIMITED', 'Country': 'NIGERIA', 'Telephony': 'SPEED CARGO', 'FriendlyName': '', 'Comments': ''},
@@ -4548,6 +4562,7 @@ R_TABLE = [
     {'3Ltr': 'RHH', 'Company': 'REDSTAR AVIATION', 'Country': 'TURKEY', 'Telephony': 'STAR CRESCENT', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RHK', 'Company': 'SOVEREIGN BUSINESS JETS LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'REDHAWK', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RHL', 'Company': 'AIR ARCHIPELS', 'Country': 'FRANCE', 'Telephony': 'ARCHIPELS', 'FriendlyName': 'Air Archipels', 'Comments': ''},
+    {'3Ltr': 'RHT', 'Company': 'BUSY BEE CONGO', 'Country': 'DEMOCRATIC REPUBLIC OF THE CONGO', 'Telephony': 'YELLOW BEE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'RIA', 'Company': 'RICH INTERNATIONAL AIRWAYS, INC. (MIAMI, FL)', 'Country': 'UNITED STATES', 'Telephony': 'RICHAIR', 'FriendlyName': 'Rich International Airways', 'Comments': ''},
     {'3Ltr': 'RIC', 'Company': "RICHARDSON'S AIRWAY, INC. (YAKIMA, WA)", 'Country': 'UNITED STATES', 'Telephony': 'RICHARDSON', 'FriendlyName': "Richardson's Airway", 'Comments': ''},
     {'3Ltr': 'RIE', 'Company': 'ARIELLA AIRLINES SA', 'Country': 'BURKINA FASO', 'Telephony': 'ARIEL', 'FriendlyName': '', 'Comments': ''},
@@ -4749,7 +4764,7 @@ R_TABLE = [
     {'3Ltr': 'RZO', 'Company': 'SATA INTERNACIONAL - AZORES AIRLINES S.A', 'Country': 'PORTUGAL', 'Telephony': 'AIR AZORES', 'FriendlyName': 'SATA International', 'Comments': ''},
     {'3Ltr': 'RZR', 'Company': 'ZEPHYR EXPRESS (BURBANK, CA)', 'Country': 'UNITED STATES', 'Telephony': 'RECOVERY', 'FriendlyName': 'Zephyr Express', 'Comments': ''},
     {'3Ltr': 'RZT', 'Company': 'SUN RITZ JET CO., LTD', 'Country': 'CHINA', 'Telephony': 'RITZ JET', 'FriendlyName': '', 'Comments': ''},
-] # 311 entries.
+] # 313 entries.
 
 S_TABLE = [
     {'3Ltr': 'SAA', 'Company': 'SOUTH AFRICAN AIRWAYS (SAA)', 'Country': 'SOUTH AFRICA', 'Telephony': 'SPRINGBOK', 'FriendlyName': 'South African Airways', 'Comments': ''},
@@ -4828,6 +4843,7 @@ S_TABLE = [
     {'3Ltr': 'SDC', 'Company': 'SUNRISE AIRLINES (PAGE, AZ)', 'Country': 'UNITED STATES', 'Telephony': 'SUNDANCE', 'FriendlyName': 'Sunrise Airlines', 'Comments': ''},
     {'3Ltr': 'SDD', 'Company': 'R I C INC., D/B/A SKYMASTER AIR TAXI (LACONIA, NH)', 'Country': 'UNITED STATES', 'Telephony': 'SKY DANCE', 'FriendlyName': 'Skymaster Air Taxi', 'Comments': ''},
     {'3Ltr': 'SDE', 'Company': 'AIR PARTNERS CORP.', 'Country': 'CANADA', 'Telephony': 'STAMPEDE', 'FriendlyName': 'Air Partners Corp.', 'Comments': ''},
+    {'3Ltr': 'SDF', 'Company': 'SUNRISE AIRWAYS (DOMINICA) LIMITED', 'Country': 'ANTIGUA AND BARBUDA', 'Telephony': 'SUNFLY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SDG', 'Company': 'STAR AIR, M/S GHODAWAT ENTERPRISES PVT. LTD.', 'Country': 'INDIA', 'Telephony': 'HI STAR', 'FriendlyName': 'Star Air (India)', 'Comments': ''},
     {'3Ltr': 'SDI', 'Company': 'SERVICIOS DINAMICOS DE AVIACION, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'SERVI DINAMIC', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SDK', 'Company': 'SOCIEDAD AEREA DEL CAQUETA LTDA', 'Country': 'COLOMBIA', 'Telephony': 'SADELCA', 'FriendlyName': 'SADELCA Ltda.', 'Comments': ''},
@@ -4987,6 +5003,7 @@ S_TABLE = [
     {'3Ltr': 'SKZ', 'Company': 'SKYWAY ENTERPRISES, INC. (KISSIMMEE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'SKYWAY-INC', 'FriendlyName': 'Skyway Enterprises', 'Comments': ''},
     {'3Ltr': 'SLB', 'Company': 'SLOK AIR LIMITED', 'Country': 'NIGERIA', 'Telephony': 'SLOK AIR', 'FriendlyName': 'Slok Air', 'Comments': ''},
     {'3Ltr': 'SLC', 'Company': 'SERVICES AERIENS LATINO-AMERICAINS D/B/A SALSA S.A.', 'Country': 'HAITI', 'Telephony': 'SALSA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'SLD', 'Company': 'SILVER AIR LTD', 'Country': 'CZECHIA', 'Telephony': 'SILVERLINE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SLE', 'Company': 'STREAMLINE NAC', 'Country': 'SOUTH AFRICA', 'Telephony': 'SLIPSTREAM', 'FriendlyName': 'Streamline', 'Comments': ''},
     {'3Ltr': 'SLF', 'Company': 'SKYLINE AIRLINES', 'Country': 'KYRGYZSTAN', 'Telephony': 'KYRGYZ EAGLE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SLG', 'Company': 'SASKATCHEWAN GOVERNMENT AIR AMBULANCE SERVICE', 'Country': 'CANADA', 'Telephony': 'LIFEGUARD', 'FriendlyName': 'Saskatchewan Government', 'Comments': 'Air Ambulance Service'},
@@ -5099,11 +5116,12 @@ S_TABLE = [
     {'3Ltr': 'SQA', 'Company': 'SLOVAK NATIONAL AEROCLUB', 'Country': 'SLOVAKIA', 'Telephony': 'SLOVAK AEROCLUB', 'FriendlyName': 'Slovak National Aeroclub', 'Comments': ''},
     {'3Ltr': 'SQD', 'Company': "TOMORROW'S AERONAUTICAL MUSEUM, INC. (COMPTON, CA)", 'Country': 'UNITED STATES', 'Telephony': 'AERO SQUAD', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SQF', 'Company': 'SLOVAK AIR FORCE', 'Country': 'SLOVAKIA', 'Telephony': 'SLOVAK AIRFORCE', 'FriendlyName': 'Slovak Air Force', 'Comments': ''},
-    {'3Ltr': 'SQH', 'Company': 'BACKCOUNTRY AVIATION LLC', 'Country': 'UNITED STATES', 'Telephony': 'SASQUATCH', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'SQH', 'Company': 'BACKCOUNTRY AVIATION LLC', 'Country': 'UNITED STATES', 'Telephony': 'SASQUATCH', 'FriendlyName': 'SeaPort Airlines (2008–2016)', 'Comments': 'Former airline: Wings of Alaska now part of SeaPort Airlines . Alternative callsign: WINGS (for VFR flights only). Former ICAO code: WAK.'},
     {'3Ltr': 'SQM', 'Company': 'SIAM AIR TRANSPORT CO., LTD', 'Country': 'THAILAND', 'Telephony': 'GOLDEN FIN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SQP', 'Company': 'SKYUP AIRLINES', 'Country': 'UKRAINE', 'Telephony': 'SKYUP', 'FriendlyName': 'SkyUp', 'Comments': ''},
     {'3Ltr': 'SQS', 'Company': 'ASI PUDJIASTUTI AVIATION, PT', 'Country': 'INDONESIA', 'Telephony': 'SKY QUEEN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SQU', 'Company': 'AEROSPATIALLE', 'Country': 'UNITED STATES', 'Telephony': 'REMUDO', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'SQY', 'Company': 'VISION AIR', 'Country': 'REPUBLIC OF MOLDOVA', 'Telephony': 'SKY TIRAS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SRA', 'Company': 'SAUDI ROYAL AVIATION', 'Country': 'SAUDI ARABIA', 'Telephony': 'SAUDI ARABIAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SRB', 'Company': 'SERBIAN AIR FORCE', 'Country': 'SERBIA', 'Telephony': 'SERBIAN AIR FORCE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SRC', 'Company': 'SEARCA LTDA.', 'Country': 'COLOMBIA', 'Telephony': 'SEARCA', 'FriendlyName': 'Searca', 'Comments': ''},
@@ -5282,7 +5300,7 @@ S_TABLE = [
     {'3Ltr': 'SZN', 'Company': 'AIR SENEGAL SA', 'Country': 'SENEGAL', 'Telephony': 'SENSA', 'FriendlyName': 'Air Senegal', 'Comments': ''},
     {'3Ltr': 'SZS', 'Company': 'SCANDINAVIAN AIRLINES IRELAND LIMITED DBA SAS CONNECT', 'Country': 'IRELAND', 'Telephony': 'SPINNAKER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'SZT', 'Company': 'SERVICIOS AERONAUTICOS Z, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AERO ZEE', 'FriendlyName': 'Servicios Aeronauticos Z', 'Comments': ''},
-] # 530 entries.
+] # 533 entries.
 
 T_TABLE = [
     {'3Ltr': 'TAA', 'Company': 'AEROSERVICIOS DE LA COSTA, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AERO COSTA', 'FriendlyName': 'Aeroservicios de La Costa', 'Comments': ''},
@@ -5297,7 +5315,7 @@ T_TABLE = [
     {'3Ltr': 'TAJ', 'Company': 'TUNISAVIA - SOCIETE DE TRANSPORTS, SERVICES ET TRAVAUX AERIENS', 'Country': 'TUNISIA', 'Telephony': 'TUNISAVIA', 'FriendlyName': 'Tunisavia', 'Comments': ''},
     {'3Ltr': 'TAK', 'Company': 'TRANSAFRICAN AIR LIMITED', 'Country': 'KENYA', 'Telephony': 'TRANSAFRICAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TAL', 'Company': 'TALAIR PTY. LTD.', 'Country': 'PAPUA NEW GUINEA', 'Telephony': 'TALAIR', 'FriendlyName': 'Talair', 'Comments': ''},
-    {'3Ltr': 'TAM', 'Company': 'TAM - LINHAS AEREAS S.A.', 'Country': 'BRAZIL', 'Telephony': 'TAM', 'FriendlyName': 'LATAM  Brasil', 'Comments': ''},
+    {'3Ltr': 'TAM', 'Company': 'TAM - LINHAS AEREAS S.A.', 'Country': 'BRAZIL', 'Telephony': 'TAM', 'FriendlyName': 'LATAM Brasil', 'Comments': ''},
     {'3Ltr': 'TAN', 'Company': 'ZANAIR LIMITED', 'Country': 'UNITED REPUBLIC OF TANZANIA', 'Telephony': 'ZANAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TAO', 'Company': 'TRANSPORTES AEROMAR', 'Country': 'MEXICO', 'Telephony': 'TRANS-AEROMAR', 'FriendlyName': 'Aeromar', 'Comments': ''},
     {'3Ltr': 'TAP', 'Company': 'TRANSPORTES AEREOS PORTUGUESES, E.P.', 'Country': 'PORTUGAL', 'Telephony': 'AIR PORTUGAL', 'FriendlyName': 'TAP  Portugal', 'Comments': ''},
@@ -5438,6 +5456,7 @@ T_TABLE = [
     {'3Ltr': 'TKJ', 'Company': 'AJET HAVA TASIMACILIGI ANONIM SIRKETI', 'Country': 'TURKEY', 'Telephony': 'ANATOLIA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TKK', 'Company': 'AERO WAYS, INC. (NEW CASTLE, DE)', 'Country': 'UNITED STATES', 'Telephony': 'TARKA', 'FriendlyName': 'flyADVANCED', 'Comments': 'Aero Ways Inc. flyADVANCED'},
     {'3Ltr': 'TKM', 'Company': 'JM FAMILY AVIATION (FT. LAUDERDALE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'TACOMA', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'TKN', 'Company': 'FLY KISH AIRLINES', 'Country': 'IRAN (ISLAMIC REPUBLIC OF)', 'Telephony': 'TOUCAN', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TKR', 'Company': 'FOR FIREFIGHTING PURPOSES- NOT TO BE ASSIGNED', 'Country': '', 'Telephony': 'TANKER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TKU', 'Company': 'TRANSAFRIC UGANDA LIMITED', 'Country': 'UGANDA', 'Telephony': 'UGATRANS', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TLA', 'Company': 'AEREOTCLA, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEROCLA', 'FriendlyName': '', 'Comments': ''},
@@ -5559,6 +5578,7 @@ T_TABLE = [
     {'3Ltr': 'TSS', 'Company': 'TRI-STATE AERO, INC. (EVANSVILLE, IL)', 'Country': 'UNITED STATES', 'Telephony': 'TRI-STATE', 'FriendlyName': 'Tri-State Aero', 'Comments': ''},
     {'3Ltr': 'TST', 'Company': 'SHATA AIR SERVICES LTD', 'Country': 'NIGERIA', 'Telephony': 'SHATA AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TSU', 'Company': 'GULF & CARIBBEAN CARGO, INC. (WATERFORD, MI)', 'Country': 'UNITED STATES', 'Telephony': 'TRANSAUTO', 'FriendlyName': 'Gulf & Caribbean Cargo / Contract Air Cargo', 'Comments': ''},
+    {'3Ltr': 'TSW', 'Company': 'TRANSWING', 'Country': 'AUSTRIA', 'Telephony': 'GRIZZLY', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TSX', 'Company': 'CLUB DE VUELO TAS', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TSY', 'Company': 'TRISTAR AIR', 'Country': 'EGYPT', 'Telephony': 'TRIPLE STAR', 'FriendlyName': 'Tristar  Air', 'Comments': ''},
     {'3Ltr': 'TSZ', 'Company': 'SKY HANDLING LLC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
@@ -5624,7 +5644,7 @@ T_TABLE = [
     {'3Ltr': 'TXD', 'Company': 'AEROTAXIS DEL NOROESTE, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'TAXI OESTE', 'FriendlyName': 'Aerotaxis del Noroeste', 'Comments': ''},
     {'3Ltr': 'TXE', 'Company': 'TRABAJOS AEREOS EXTREMENOS, S.A.', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TXF', 'Company': 'AEROTAXIS ALFE, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'ALFE', 'FriendlyName': 'Aerotaxis Alfe', 'Comments': ''},
-    {'3Ltr': 'TXG', 'Company': '7AIR LLC.', 'Country': 'UNITED STATES', 'Telephony': 'CARGO BOX', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'TXG', 'Company': '7 AIR LLC.', 'Country': 'UNITED STATES', 'Telephony': 'CARGO BOX', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TXH', 'Company': 'BELL HELICOPTER', 'Country': 'CANADA', 'Telephony': 'TEXTRON', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TXI', 'Company': 'AEREOTAXIS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEREOTAXIS', 'FriendlyName': 'Aereotaxis', 'Comments': ''},
     {'3Ltr': 'TXJ', 'Company': 'BRILLIANT JET CO., LTD.', 'Country': 'CHINA', 'Telephony': 'TAIXIANG', 'FriendlyName': '', 'Comments': ''},
@@ -5647,7 +5667,7 @@ T_TABLE = [
     {'3Ltr': 'TZR', 'Company': 'RAINBOW AIR, C.A.', 'Country': 'VENEZUELA', 'Telephony': 'RAIN-BEE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TZS', 'Company': 'TCA LTD', 'Country': 'GEORGIA', 'Telephony': 'TOKA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'TZT', 'Company': 'AIR ZAMBEZI', 'Country': 'ZIMBABWE', 'Telephony': 'ZAMBEZI', 'FriendlyName': 'Air Zambezi', 'Comments': ''},
-] # 362 entries.
+] # 364 entries.
 
 U_TABLE = [
     {'3Ltr': 'UAA', 'Company': 'UAS/AEF LEUCHARS', 'Country': 'UNITED KINGDOM', 'Telephony': '', 'FriendlyName': 'University Air Squadron', 'Comments': 'Leuchars'},
@@ -5788,6 +5808,7 @@ V_TABLE = [
     {'3Ltr': 'VAS', 'Company': 'ATRAN', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'ATRAN', 'FriendlyName': 'ATRAN Cargo Airlines', 'Comments': ''},
     {'3Ltr': 'VAV', 'Company': 'VOSTOKAVIASERVIS, LLC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VAW', 'Company': 'FLY2SKY', 'Country': 'BULGARIA', 'Telephony': 'SOFIA JET', 'FriendlyName': 'Fly2Sky', 'Comments': ''},
+    {'3Ltr': 'VAX', 'Company': 'AVAX AIR LTD', 'Country': 'MALAWI', 'Telephony': 'AVAX', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VBA', 'Company': 'AVB 2012 LTD.', 'Country': 'BULGARIA', 'Telephony': 'NOVE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VBB', 'Company': 'ALK JSC', 'Country': 'BULGARIA', 'Telephony': 'AIR LUBO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VBW', 'Company': 'AIR BURKINA', 'Country': 'BURKINA FASO', 'Telephony': 'BURKINA', 'FriendlyName': 'Air Burkina', 'Comments': ''},
@@ -5853,11 +5874,12 @@ V_TABLE = [
     {'3Ltr': 'VIR', 'Company': 'VIRGIN ATLANTIC', 'Country': 'UNITED KINGDOM', 'Telephony': 'VIRGIN', 'FriendlyName': 'Virgin Atlantic', 'Comments': ''},
     {'3Ltr': 'VIS', 'Company': 'VISION AIR INTERNATIONAL (PVT) LIMITED', 'Country': 'PAKISTAN', 'Telephony': 'DREAM BIRD', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VIT', 'Company': 'AVIASTAR MANDIRI, PT', 'Country': 'INDONESIA', 'Telephony': 'AVIASTAR', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'VIV', 'Company': 'AEROENLACES NACIONALES, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'VIVA', 'FriendlyName': 'VivaAerobus', 'Comments': ''},
+    {'3Ltr': 'VIV', 'Company': 'AEROENLACES NACIONALES, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'AEROENLACES', 'FriendlyName': 'VivaAerobus', 'Comments': '(manually edited in this database)'},
     {'3Ltr': 'VIZ', 'Company': 'AEROVIS AIRLINES LTD', 'Country': 'UKRAINE', 'Telephony': 'AEROVIZ', 'FriendlyName': 'Aerovis Airlines', 'Comments': ''},
-    {'3Ltr': 'VJA', 'Company': 'JETSELECT DBA VISTA AMERICA', 'Country': 'UNITED STATES', 'Telephony': 'ICONIC', 'FriendlyName': 'Vista America', 'Comments': 'Using the ICAO code that was previously assigned to ValuJet Airlines .'},
+    {'3Ltr': 'VJA', 'Company': 'JETSELECT DBA VISTA AMERICA', 'Country': 'UNITED STATES', 'Telephony': 'ICONIC', 'FriendlyName': 'Vista America', 'Comments': 'Using the ICAO code that was previously assigned to ValuJet Airlines.'},
     {'3Ltr': 'VJC', 'Company': 'VIETJET AVIATION JOINT STOCK COMPANY', 'Country': 'VIET NAM', 'Telephony': 'VIETJETAIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VJH', 'Company': 'VISTAJET GMBH, HAMBURG', 'Country': 'GERMANY', 'Telephony': 'VISTA GERMANY', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'VJI', 'Company': 'CHARLIE FOXTROT AVIATION SERVICES PRIVATE LIMITED', 'Country': 'INDIA', 'Telephony': 'SILVER JET', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VJM', 'Company': 'VIAJES EJECUTIVOS MEXICANOS, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'VIAJES MEXICANOS', 'FriendlyName': 'Viajes Ejecutivos Mexicanos', 'Comments': ''},
     {'3Ltr': 'VJS', 'Company': 'VISTAJET', 'Country': 'MALTA', 'Telephony': 'CARBON', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VJT', 'Company': 'VISTAJET LTD', 'Country': 'MALTA', 'Telephony': 'VISTA JET', 'FriendlyName': '', 'Comments': ''},
@@ -5909,6 +5931,7 @@ V_TABLE = [
     {'3Ltr': 'VPP', 'Company': 'VINTAGE PROPS AND JETS, INC. (NEW SMYRNA BEACH, FL)', 'Country': 'UNITED STATES', 'Telephony': 'VINTAGE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VPT', 'Company': 'STREAM AIR', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'POTOK', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VQI', 'Company': 'VILLA AIR PRIVATE LIMITED', 'Country': 'MALDIVES', 'Telephony': 'VILLA AIR', 'FriendlyName': 'Villa Air', 'Comments': ''},
+    {'3Ltr': 'VRA', 'Company': 'VIRGIN AUSTRALIA REGIONAL AIRLINES', 'Country': 'AUSTRALIA', 'Telephony': 'RAPID', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VRB', 'Company': 'SILVERBACK CARGO FREIGHTERS', 'Country': 'RWANDA', 'Telephony': 'SILVERBACK', 'FriendlyName': 'Silverback Cargo Freighters', 'Comments': ''},
     {'3Ltr': 'VRC', 'Company': 'TAXI AEREO DE VERACRUZ', 'Country': 'MEXICO', 'Telephony': 'VERACRUZ', 'FriendlyName': 'Taxi de Veracruz', 'Comments': ''},
     {'3Ltr': 'VRD', 'Company': 'VIRGIN AMERICA, INC. (BURLINGAME, CA)', 'Country': 'UNITED STATES', 'Telephony': 'REDWOOD', 'FriendlyName': 'Virgin America', 'Comments': ''},
@@ -5965,9 +5988,9 @@ V_TABLE = [
     {'3Ltr': 'VYT', 'Company': 'VALLEY FTU', 'Country': 'UNITED KINGDOM', 'Telephony': 'ANGLESEY', 'FriendlyName': 'RAF Valley Flying Training Unit', 'Comments': 'Royal Air Force'},
     {'3Ltr': 'VYU', 'Company': 'FLY VAAYU', 'Country': 'UNITED ARAB EMIRATES', 'Telephony': 'VAAYU', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VZA', 'Company': 'AVE C.A.', 'Country': 'VENEZUELA', 'Telephony': 'AVEAIR', 'FriendlyName': '', 'Comments': ''},
-    {'3Ltr': 'VZK', 'Company': 'APK VZLET', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'SKYLIFT', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'VZK', 'Company': 'APK VZLET', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'VZLET POLAR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'VZL', 'Company': 'VZLYET', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'VZLYET', 'FriendlyName': '', 'Comments': ''},
-] # 194 entries.
+] # 197 entries.
 
 W_TABLE = [
     {'3Ltr': 'WAA', 'Company': 'WESTAIR AVIATION (PTY) LTD', 'Country': 'NAMIBIA', 'Telephony': 'WESTAIR WINGS', 'FriendlyName': 'Westair Aviation', 'Comments': ''},
@@ -5992,6 +6015,7 @@ W_TABLE = [
     {'3Ltr': 'WBC', 'Company': 'FTV AVIATION', 'Country': 'UNITED STATES', 'Telephony': 'WABAC', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WCC', 'Company': 'WEST COAST CHARTERS (SANTA ANA, CA)', 'Country': 'UNITED STATES', 'Telephony': 'WEST COAST', 'FriendlyName': 'Sport Air Travel', 'Comments': ''},
     {'3Ltr': 'WCD', 'Company': 'KYUNGWOON UNIVERSITY', 'Country': 'REPUBLIC OF KOREA', 'Telephony': 'WHITE CLOUD', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'WCG', 'Company': 'WARSAW CARGO SP. Z O.O.', 'Country': 'POLAND', 'Telephony': 'WARSAW CARGO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WCM', 'Company': 'WORLD CARGO AIRLINE SDN. BHD.', 'Country': 'MALAYSIA', 'Telephony': 'WORLD CARGO', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WCO', 'Company': 'COLUMBIA HELICOPTERS, INC. (LAKE CHARLES, LA)', 'Country': 'UNITED STATES', 'Telephony': 'COLUMBIA HELI', 'FriendlyName': 'Columbia Helicopters', 'Comments': ''},
     {'3Ltr': 'WCP', 'Company': 'AVIATOR COLLEGE OF AERONAUTICAL SCIENCE AND TECHNOLOGY (FORT PIERCE, FL)', 'Country': 'UNITED STATES', 'Telephony': 'WHITECAP', 'FriendlyName': 'Primaris Airlines', 'Comments': ''},
@@ -6071,6 +6095,7 @@ W_TABLE = [
     {'3Ltr': 'WPA', 'Company': 'WESTERN PACIFIC AIRSERVICE', 'Country': 'SOLOMON ISLANDS', 'Telephony': 'WESTPAC', 'FriendlyName': 'Western Pacific Airservice', 'Comments': ''},
     {'3Ltr': 'WPC', 'Company': 'COMMANDAIR C.A', 'Country': 'VENEZUELA', 'Telephony': 'COMMAND AIR', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WPH', 'Company': 'WAT PHNOM AIRLINES', 'Country': 'CAMBODIA', 'Telephony': 'WAT PHNOM', 'FriendlyName': '', 'Comments': ''},
+    {'3Ltr': 'WPK', 'Company': 'COYWOLF AVIATION LIMITED', 'Country': 'CANADA', 'Telephony': 'WOLF PACK', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WPR', 'Company': 'AUCKLAND REGIONAL RESCUE HELICOPTER TRUST', 'Country': 'NEW ZEALAND', 'Telephony': 'WESTPAC RESCUE', 'FriendlyName': 'Auckland Regional Rescue Helicopter Trust', 'Comments': ''},
     {'3Ltr': 'WPT', 'Company': 'WORLD2FLY PORTUGAL', 'Country': 'PORTUGAL', 'Telephony': 'NEW BLUE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WRA', 'Company': 'WHITE RIVER AIR SERVICES LTD.', 'Country': 'CANADA', 'Telephony': '', 'FriendlyName': 'White River Air Services', 'Comments': ''},
@@ -6115,7 +6140,7 @@ W_TABLE = [
     {'3Ltr': 'WZE', 'Company': 'SKYFIVE AIRLINES LIMITED TRADING AS AIRWAZE', 'Country': 'CYPRUS', 'Telephony': 'APHRODITE', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WZM', 'Company': 'WALTZING MATILDA AVIATION', 'Country': 'UNITED STATES', 'Telephony': 'MATILDA', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'WZZ', 'Company': 'WIZZ AIR HUNGARY LTD', 'Country': 'HUNGARY', 'Telephony': 'WIZZAIR', 'FriendlyName': 'Wizz Air', 'Comments': ''},
-] # 145 entries.
+] # 147 entries.
 
 X_TABLE = [
     {'3Ltr': 'XAA', 'Company': 'AERONAUTICAL RADIO, INC. (ARINC)', 'Country': 'UNITED STATES', 'Telephony': 'ROCKFISH', 'FriendlyName': 'Aeronautical Radio Inc', 'Comments': ''},
@@ -6168,6 +6193,7 @@ X_TABLE = [
     {'3Ltr': 'XJC', 'Company': 'XCLUSIVE JET CHARTER LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'EXCLUSIVE JET', 'FriendlyName': 'XJC Limited', 'Comments': ''},
     {'3Ltr': 'XKA', 'Company': 'KAVOURAS, INC. (MINNEAPOLIS, MN)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'Kavouras Inc', 'Comments': ''},
     {'3Ltr': 'XKX', 'Company': 'ASECNA - AGENCE POUR LA SECURITE DE LA NAVIGATION AERIENNE EN AFRIQUE ET A MADAGASCAR', 'Country': 'FRANCE', 'Telephony': '', 'FriendlyName': 'ASECNA', 'Comments': ''},
+    {'3Ltr': 'XKY', 'Company': 'SKYWAY AIRLINES INC.', 'Country': 'PHILIPPINES', 'Telephony': 'SKY RACER', 'FriendlyName': '', 'Comments': ''},
     {'3Ltr': 'XLB', 'Company': 'AIRCRAFT PERFORMANCE GROUP, INC. (CASTLE ROCK, CO)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'Aircraft Performance Group', 'Comments': ''},
     {'3Ltr': 'XLD', 'Company': 'JEPPESEN DATA PLAN, INC. (SAN FRANCISCO, CA)', 'Country': 'UNITED STATES', 'Telephony': '', 'FriendlyName': 'Jeppesen Data Plan', 'Comments': ''},
     {'3Ltr': 'XLE', 'Company': 'NG EAGLE LIMITED', 'Country': 'NIGERIA', 'Telephony': 'AQUILA', 'FriendlyName': '', 'Comments': ''},
@@ -6208,7 +6234,7 @@ X_TABLE = [
     {'3Ltr': 'XXS', 'Company': 'SKYPLAN SERVICES LTD', 'Country': 'CANADA', 'Telephony': '', 'FriendlyName': 'Skyplan Services', 'Comments': ''},
     {'3Ltr': 'XXV', 'Company': 'ADMINISTRACION DE AEROPUERTOS Y SERVICIOS AUXILIARES A LA NAVEGACION AEREA (AASANA)', 'Country': 'BOLIVIA', 'Telephony': '', 'FriendlyName': 'AASANA', 'Comments': ''},
     {'3Ltr': 'XYZ', 'Company': 'ISLAND AIR EXPRESS (FRIDAY HARBOR, WA)', 'Country': 'UNITED STATES', 'Telephony': 'RAINBIRD', 'FriendlyName': 'Island Air Express', 'Comments': ''},
-] # 90 entries.
+] # 91 entries.
 
 Y_TABLE = [
     {'3Ltr': 'YAK', 'Company': 'YAK DESIGN BUREAU', 'Country': 'RUSSIAN FEDERATION', 'Telephony': 'YAK AVIA', 'FriendlyName': '', 'Comments': ''},
@@ -6268,4 +6294,4 @@ Z_TABLE = [
     {'3Ltr': 'ZZZ', 'Company': 'AIRCRAFT IN FLIGHT', 'Country': '', 'Telephony': '', 'FriendlyName': '', 'Comments': ''},
 ] # 29 entries.
 
-# 6183 entries in total.
+# 6207 entries in total.

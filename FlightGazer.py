@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.1.1 --- 2025-09-04'
+VERSION: str = 'v.8.1.2 --- 2025-09-10'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -52,6 +52,7 @@ from getpass import getuser
 import socket
 import logging
 import unicodedata
+import traceback
 
 if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
@@ -888,6 +889,11 @@ def strip_accents(s: str) -> str:
     https://stackoverflow.com/a/518232 """
     return ''.join(c for c in unicodedata.normalize('NFD', s)
                     if unicodedata.category(c) != 'Mn')
+
+def catcher(exctype, value, tb):
+    """ Catch unhandled exceptions and dump to log.
+    https://stackoverflow.com/a/73119119 """
+    main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -4370,7 +4376,7 @@ class synchronizer():
                                   f", time offset: {determined_time_offset:.6f}s")
 
         phase_now = self.phase_stage
-        if self.phase_stage == 0: # start the work
+        if self.phase_stage == 0 and DUMP1090_IS_AVAILABLE: # start the work
             self.phase_stage += 1
             # # ********************* CSV logging for later analysis
             # if VERBOSE_MODE:
@@ -6499,6 +6505,7 @@ def main() -> None:
     main_logger.info("========== Main loop started! ===========")
     main_logger.info("=========================================") 
     main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
+    sys.excepthook = catcher
 
     try:
         while True: #keep-alive

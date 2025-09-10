@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.1.2 - 2025-09-10
+    - Add logging for uncaught exceptions
+    - Synchronization thread will no longer start if dump1090 is not found on startup
+    - Operators database update
+    - Update the operators_generator file to use a random useragent
+
 v.8.1.1 - 2025-09-04
     - Fix rare edge case that would cause the daily stats reset and API cost querying to fail
 

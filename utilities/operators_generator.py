@@ -1,9 +1,10 @@
 """ Script that downloads the FAA's list of ICAO airline codes and formats it
 into a series of lookup tables separated by letter for use with FlightGazer or any other python program.
-Can be used to update the database in the future. """
+Can be used to update the database in the future.
+To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: June 2025
-# Released in conjunction with Flightgazer version: v.6.0.0
+# Last updated: September 2025
+# Released in conjunction with Flightgazer version: v.8.1.2
 
 if __name__ != '__main__':
     print("This script cannot be imported as a module.")
@@ -22,6 +23,13 @@ except (ImportError, ModuleNotFoundError):
     print("This script requires the 'beautifulsoup4' module.")
     print("You can install it using 'pip install beautifulsoup4'.")
     raise SystemExit
+try:
+    from fake_useragent import UserAgent
+except (ImportError, ModuleNotFoundError):
+    print("This script requires the 'fake_useragent' module.")
+    print("You can install it using 'pip install fake_useragent'.")
+    raise SystemExit
+
 from pathlib import Path
 import datetime
 import unicodedata
@@ -34,8 +42,12 @@ All data sourced from the Federal Aviation Administration, Directive No. JO 7340
 along with Wikipedia (https://en.wikipedia.org/wiki/List_of_airline_codes) for the operators' friendly names.
 The accuracy of the 'friendly names' for the operators is dependent on what is pulled from Wikipedia at the time
 this file was generated, so your mileage may vary.
+When comparing which version of the Directive was used, check the generation timestamp below
+with the release schedule in Section 1-1-6 (https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap1_section_1.html).
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer \"\"\"\n\n"""
+user = UserAgent(browsers='Chrome')
+HTML_header = {'User-Agent': str(user.random)}
 
 def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
     """ Function pulled directly from FlightGazer """
@@ -55,11 +67,11 @@ def strip_accents(s: str) -> str:
                   if unicodedata.category(c) != 'Mn')
 
 print("Downloading data from the FAA...")
-dataset = requests.get('https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3_section_3.html', timeout=5)
+dataset = requests.get('https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3_section_3.html', headers=HTML_header, timeout=5)
 dataset.raise_for_status()
 html = dataset.text
 print("Downloading supplementary info from Wikipedia...")
-dataset2 = dataset = requests.get('https://en.wikipedia.org/wiki/List_of_airline_codes', timeout=5)
+dataset2 = dataset = requests.get('https://en.wikipedia.org/wiki/List_of_airline_codes', headers=HTML_header, timeout=5)
 dataset2.raise_for_status()
 html2 = dataset2.text
 print("Parsing HTML... (this will take a few seconds)")
@@ -135,4 +147,5 @@ with open(write_path, 'w', encoding='utf-8') as file:
     file.write(f"# {len(data)} entries in total.\n")
 
 print(f"A total of {len(data)} entries were written.")
+print(f"Resulting file size: {(write_path.stat().st_size) / (1024):.3f} KiB.")
 print("\nDone.")
