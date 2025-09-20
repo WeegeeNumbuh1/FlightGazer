@@ -959,7 +959,7 @@ def dxing_log() -> None:
     data0.append(f"\'{super_far_plane['Flight']}\' ({super_far_plane['ID']}, {super_far_plane['Country']}) ")
     data0.append(f"was detected {super_far_plane['Distance']} {distance_unit} away ")
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
-    data0.append(f"{super_far_plane['Datetime'].strftime("%Y-%m-%d %H:%M:%S")}.")
+    data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
     main_logger.info(f"{''.join(data0)}")
     main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today. Tropospheric ducting may have enabled this.")
     main_logger.info("Freeze-frame data:")
@@ -4768,7 +4768,7 @@ class Display(
         options.inverse_colors = ADV_LED_INVERSE_COLORS
         options.panel_type = ADV_LED_PANEL_TYPE
         options.limit_refresh_rate_hz = ADV_LED_LIMIT_REFRESH_RATE
-        options.disable_busy_waiting = ADV_LED_DISABLE_BUSY_WAITING
+        #options.disable_busy_waiting = ADV_LED_DISABLE_BUSY_WAITING # exists only in newer builds
         options.pwm_dither_bits = ADV_LED_PWM_DITHER_BITS
         # setting the next option to True affects our ability to write to our stats file if set and present
         # this bug took awhile to figure out, lmao
