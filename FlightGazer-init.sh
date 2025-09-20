@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.8.1.1
+# Version = v.8.2.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -556,11 +556,11 @@ fi
 
 if [ -f "$LOGFILE" ]; then
 	LOGLENGTH=$(wc -l < $LOGFILE)
-	if [ $LOGLENGTH -gt 1000 ]; then
+	if [ $LOGLENGTH -gt 2000 ]; then
 		time_now=$(date '+%Y-%m-%d %H:%M')
-		echo "$(tail -n 1000 $LOGFILE)" > $LOGFILE
-		sed -i -e "1i********** $time_now --- This logfile has been truncated to the latest 1000 lines. (was $LOGLENGTH) **********\\" $LOGFILE
-		echo "> Logfile housekeeping: truncated logfile to latest 1000 lines. (was $LOGLENGTH)"
+		echo "$(tail -n 2000 $LOGFILE)" > $LOGFILE
+		sed -i -e "1i********** $time_now --- This logfile has been truncated to the latest 2000 lines. (was $LOGLENGTH) **********\\" $LOGFILE
+		echo "> Logfile housekeeping: truncated logfile to latest 2000 lines. (was $LOGLENGTH)"
 	fi
 fi
 

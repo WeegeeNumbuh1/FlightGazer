@@ -5,6 +5,17 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.0 - 2025-09-20
+    - NEW: DXing! FlightGazer will now log instances when aircraft are detected beyond the typical limit for ADS-B signals usually due to tropospheric ducting
+        - Results of the farthest aircraft are printed at the end of the day or upon exit in the log file
+        - If you use the graphs1090 interface, this is a more accurate result compared to looking at the "Peak Range" value on the ADS-B Range graph
+        - This is also the equivalent of using the "ptracks" feature in tar1090 and sorting by descending distance, but done automatically
+        - The criteria for this to occur is a detected distance greater than 290 nmi
+        - This feature is aimed at very well-sited locations and where the above cutoff occurs only a few times a year
+    - Aircraft in the state file now have their relative direction have the actual degree measurement along with the cardinal direction
+    - Increased logfile length limit to 2000 lines from 1000
+    - Add support for advanced settings with RGB matrix setups outside of the expected Adafruit RGB Bonnet and HUB75 displays
+
 v.8.1.2 - 2025-09-10
     - Add logging for uncaught exceptions
     - Synchronization thread will no longer start if dump1090 is not found on startup

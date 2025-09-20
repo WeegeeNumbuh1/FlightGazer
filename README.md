@@ -123,9 +123,9 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Set up to automatically start on boot via `systemd`
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
-- 🆕 A web interface that makes it easier to configure, check, and update FlightGazer (as a separate project)
-- Can be configured to run automatically inside `tmux`
+- A web interface that makes it easier to configure, check, and update FlightGazer (as a separate project)
 - Program state is available in a json file for use elsewhere
+- Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Robust and hard-to-break
 - Unique tools and fonts that can be used in other projects (don't forget to credit me)
 - Constant development
@@ -178,8 +178,9 @@ Using this project assumes you have the following:
     - Must be built using the adafruit script
   - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
-  - Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
+  - Recommended: Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
   - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)
+  - Other matrix displays and setups can be used as well using advanced settings
 - Your location set in `dump1090`
 - A console that can interpret ANSI escape sequences (should be most modern ones)
 - If using a Raspberry Pi, use a model that has multiple CPU cores (Raspberry Pi 3/Raspberry Pi 2W or newer)
@@ -241,6 +242,7 @@ Edit [`config.yaml`](./config.yaml) which is found in the same directory as the 
 If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.<br>
 Example:
 ```bash
+cd /path/to/Flightgazer
 nano config.yaml
 # press Ctrl+O to save, Ctrl+X to exit
 ```
@@ -331,10 +333,12 @@ or on port `9898/flightgazer` if there's no web server present on the device run
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🏃‍♂️ Usage
-The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.
+The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.<br>
+When FlightGazer is installed, you can use the command `sudo systemctl start flightgazer` to start it if it's not already running.
 
 > [!IMPORTANT]
-> By default, the script is designed to run at boot (via systemd with `flightgazer.service`). You can check its status with:
+> By default, the script is designed to run at boot (via systemd with `flightgazer.service`).<br>
+> You can check its status with:
 > ```bash
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
 > # or
@@ -349,7 +353,7 @@ The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be 
 ### ⚙️ Interactive Mode
 However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
 ```
-sudo /path/to/FlightGazer/FlightGazer-init.sh
+sudo bash /path/to/FlightGazer/FlightGazer-init.sh
 ```
 The script automatically detects that you're running interactively and will display realtime output, like so:
 <details open><summary>Example output</summary>
@@ -649,7 +653,7 @@ Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [ ] Docker image?
-- [x] Settings management from webpage 🆕 [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
+- [x] Settings management from webpage [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
 Suggestions, comments, and bug reports are always welcomed and encouraged.<br>

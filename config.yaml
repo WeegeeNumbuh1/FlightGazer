@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.8.1.2 # do not modify this
+CONFIG_VERSION: v.8.2.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -95,13 +95,15 @@ ENHANCED_READOUT: false
 ENHANCED_READOUT_AS_FALLBACK: true
 # [true/false]
 # When true, switch to using ENHANCED_READOUT if the API Key fails at startup or when any API limits are reached.
+# When the API can be used again, the display will switch back to the other layouts.
 # This setting only works if ENHANCED_READOUT is false. Recommended to be left as true.
 
 SHOW_EVEN_MORE_INFO: true
 # [true/false]
 # Display additional information like aircraft type and airline/owner as a scrolling marquee.
 # This option only works with the JOURNEY_PLUS or EHNANCED_READOUT display types.
-# If using JOURNEY_PLUS, this information will replace the track and vertical speed readout.
+# If using JOURNEY_PLUS, this information will replace the default center readout
+# and relocate RSSI in the bottom right with the aircraft track (vertical speed is no longer shown).
 
 CLOCK_CENTER_ROW:
   ROW1: 1
@@ -245,3 +247,25 @@ HAT_PWM_ENABLED: true
 LED_PWM_BITS: 8
 # [Integer: 1 ~ 11]
 # Lower decreases color depth but increases refresh rate. Adjust to taste. '8' works well in most cases.
+
+# ========== Advanced RGB-Matrix settings ==========
+# ==================================================
+# Only enable the below settings if you know what you're doing!
+# Remove the leading '#' to enable the setting.
+# There will be no support if something breaks when using these settings.
+# Refer to https://github.com/hzeller/rpi-rgb-led-matrix for valid values.
+
+# ADV_LED_PWM_LSB: 130
+# ADV_LED_HARDWARE_MAPPING: 'regular'
+# ADV_LED_ROW_ADDRESS_TYPE: 0
+# ADV_LED_MULTIPLEXING: 0
+# ADV_LED_SCAN_MODE: 0
+# ADV_LED_DISABLE_HARDWARE_PULSING: false
+# ADV_LED_INVERSE_COLORS: false
+# ADV_LED_RGB_SEQUENCE: 'RGB'
+# ADV_LED_PANEL_TYPE: ''
+# ADV_LED_LIMIT_REFRESH_RATE: 0
+# ADV_LED_PIXEL_MAPPER_CONFIG: ''
+# ADV_LED_LIMIT_REFRESH_RATE: 0
+# ADV_LED_DISABLE_BUSY_WAITING: false
+# ADV_LED_PWM_DITHER_BITS: 0

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.1.2 --- 2025-09-10'
+VERSION: str = 'v.8.2.0 --- 2025-09-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -242,6 +242,8 @@ if VERBOSE_MODE:
     # main_logger.debug("Connected loggers:")
     # for key in logging.Logger.manager.loggerDict:
     #     main_logger.debug(f"{key}")
+BEYOND_LOS_LIMIT = 290
+""" Criteria for determining if a plane is detected beyond typical LOS limits for ADS-B, in nautical miles. """
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
@@ -403,6 +405,22 @@ API_SCHEDULE: dict = {
 }
 SHOW_EVEN_MORE_INFO: bool = True
 
+# Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
+ADV_LED_PWM_LSB = 130
+ADV_LED_HARDWARE_MAPPING = None # don't provide a default
+ADV_LED_ROW_ADDRESS_TYPE = 0
+ADV_LED_MULTIPLEXING = 0
+ADV_LED_SCAN_MODE = 0
+ADV_LED_DISABLE_HARDWARE_PULSING = None # don't provide a default
+ADV_LED_INVERSE_COLORS = False
+ADV_LED_RGB_SEQUENCE = 'RGB'
+ADV_LED_PANEL_TYPE = ''
+ADV_LED_LIMIT_REFRESH_RATE = 0
+ADV_LED_PIXEL_MAPPER_CONFIG = ''
+ADV_LED_LIMIT_REFRESH_RATE = 0
+ADV_LED_DISABLE_BUSY_WAITING = False
+ADV_LED_PWM_DITHER_BITS = 0
+
 # Programmer's notes for settings that are dicts:
 # Don't change key names or extend the dict. You're stuck with them once baked into this script.
 # Why? The settings migrator can't handle migrating dicts that have different keys.
@@ -452,6 +470,23 @@ default_settings: dict = {
 }
 """ Dict of default settings """
 
+advanced_LED_settings: dict = {
+    "ADV_LED_PWM_LSB": ADV_LED_PWM_LSB,
+    "ADV_LED_HARDWARE_MAPPING": ADV_LED_HARDWARE_MAPPING,
+    "ADV_LED_ROW_ADDRESS_TYPE": ADV_LED_ROW_ADDRESS_TYPE,
+    "ADV_LED_MULTIPLEXING": ADV_LED_MULTIPLEXING,
+    "ADV_LED_SCAN_MODE": ADV_LED_SCAN_MODE,
+    "ADV_LED_DISABLE_HARDWARE_PULSING": ADV_LED_DISABLE_HARDWARE_PULSING,
+    "ADV_LED_INVERSE_COLORS": ADV_LED_INVERSE_COLORS,
+    "ADV_LED_RGB_SEQUENCE": ADV_LED_RGB_SEQUENCE,
+    "ADV_LED_PANEL_TYPE": ADV_LED_PANEL_TYPE,
+    "ADV_LED_PIXEL_MAPPER_CONFIG": ADV_LED_PIXEL_MAPPER_CONFIG,
+    "ADV_LED_LIMIT_REFRESH_RATE": ADV_LED_LIMIT_REFRESH_RATE,
+    "ADV_LED_DISABLE_BUSY_WAITING": ADV_LED_DISABLE_BUSY_WAITING,
+    "ADV_LED_PWM_DITHER_BITS": ADV_LED_PWM_DITHER_BITS,
+    }
+""" Dict for advanced RGB-Matrix settings """
+
 CONFIG_MISSING: bool = False
 main_logger.info("Loading configuration...")
 config_version: None|str = None
@@ -492,6 +527,13 @@ if not CONFIG_MISSING:
     else:
         main_logger.info(f"Loaded settings from configuration file. Version: {config_version}")
         del setting_key
+    for advanced_key in advanced_LED_settings:
+        try:
+            globals()[f"{advanced_key}"] = config[advanced_key]
+            main_logger.info(f"Detected advanced LED setting: \'{advanced_key}\'")
+        except:
+            pass # these settings are not necessary to function
+    del advanced_key
 if config: del config
 
 if FASTER_REFRESH:
@@ -549,6 +591,11 @@ Newest entries are appended to the left of this deque. """
 selection_override: bool = False
 """ When an aircraft is within the 'high-priority' dome (0.4 nmi LOS)
 this will be set to True and override the normal `focus_plane` until it leaves this area. """
+super_far_plane: dict = {}
+""" Data packet of the farthest plane that was detected beyond the `BEYOND_LOS_LIMIT` within the same day.
+This is a dictionary with the same keys in `relevant_planes` with an added datetime
+accessible with the `Datetime` key. This dictionary remains empty if nothing meets the required criteria.
+This dictionary is reset at the end of the day with the `runtime_accumulators_reset()` function. """
 
 # display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
@@ -690,6 +737,8 @@ PLANE_SELECTOR_DONE: str = "there-is-plane-data"
 LOOP_WORK_COMPLETE: str = "loop-done"
 END_THREADS: str = "terminate"
 KICK_DUMP1090_WATCHDOG: str = "kick-watchdog"
+REALLY_FAR_PLANE: str = "woah-faraway"
+REALLY_FAR_PLANE2: str = "back-to-normal"
 
 # define our units and multiplication factors (based on aeronautical units)
 distance_unit: str = "nmi"
@@ -737,6 +786,7 @@ def sigterm_handler(signum, frame):
     if DATABASE_CONNECTED: db.close()
     if state_json: state_json.unlink(missing_ok=True)
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
+    if super_far_plane: dxing_log()
     os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
     os.write(sys.stdout.fileno(), str.encode(f"Shutting down... "))
@@ -894,6 +944,56 @@ def catcher(exctype, value, tb):
     """ Catch unhandled exceptions and dump to log.
     https://stackoverflow.com/a/73119119 """
     main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
+
+def dxing_log() -> None:
+    """ If `super_far_plane` has data, print the contents to the log. """
+    if not super_far_plane: return
+    data0 = []
+    dis = super_far_plane['Distance'] / distance_multiplier
+    if dis >= 400:
+        data0.append("Frame this and tell everyone! ")
+    elif 350 < dis < 400:
+        data0.append("Absolutely insane! ")
+    else:
+        data0.append("Exciting! ")
+    data0.append(f"\'{super_far_plane['Flight']}\' ({super_far_plane['ID']}, {super_far_plane['Country']}) ")
+    data0.append(f"was detected {super_far_plane['Distance']} {distance_unit} away ")
+    data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
+    data0.append(f"{super_far_plane['Datetime'].strftime("%Y-%m-%d %H:%M:%S")}.")
+    main_logger.info(f"{''.join(data0)}")
+    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today. Tropospheric ducting may have enabled this.")
+    main_logger.info("Freeze-frame data:")
+    data1 = []
+    data1.append("   DESC: ")
+    if (pdesc := super_far_plane['AircraftDesc']):
+        data1.append(f"\"{pdesc}\"")
+    else:
+        data1.append("N/A")
+    if (icaot := super_far_plane['ICAOType']):
+        data1.append(f" ({icaot})")
+    if (regs := super_far_plane['Registration']):
+        data1.append(f", REG: {regs}")
+    if super_far_plane['TrackingFlag'] != "None":
+        data1.append(f" ({super_far_plane['TrackingFlag']} aircraft)")
+    data1.append(" | OWNER: ")
+    if (own := super_far_plane['Owner']):
+        data1.append(f"{own}")
+    else:
+        data1.append("N/A")
+    data1.append(" | OPERATOR: ")
+    if (ope := super_far_plane['Operator']):
+        data1.append(f"{ope}")
+    else:
+        data1.append("N/A")
+    if (opea := super_far_plane['OperatorAKA']):
+        data1.append(f" (a.k.a. \"{opea}\")")
+
+    main_logger.info(f"{''.join(data1)}")
+    main_logger.info(f"   SPD: {super_far_plane['Speed']} {speed_unit} | HDG: {super_far_plane['Track']} | "
+                        f"DIR: {super_far_plane['DirectionDegrees']} ({super_far_plane['Direction']}) | ELV: {round(super_far_plane['Elevation'], 3)} deg | "
+                        f"ALT: {super_far_plane['Altitude']} {altitude_unit} ({super_far_plane['VertSpeed']} {altitude_unit}/min)"
+                        f" | RSSI: {super_far_plane['RSSI']} dBFS ({super_far_plane['Source']})"
+                        )
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -1536,7 +1636,8 @@ def runtime_accumulators_reset() -> None:
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
-    global really_active_adsb_site, really_really_active_adsb_site, achievement_time
+    global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
+
     daily_stats_str = []
     daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys.")
     if not NOFILTER_MODE:
@@ -1598,6 +1699,9 @@ def runtime_accumulators_reset() -> None:
                          f"successful API calls, of which {api_hits[2]} returned no data. "
                          f"Estimated cost: ${estimated_api_cost:.2f}")
 
+    if super_far_plane:
+        dxing_log()
+
     # do the actual reset
     with threading.Lock():
         unique_planes_seen.clear()
@@ -1608,6 +1712,9 @@ def runtime_accumulators_reset() -> None:
             main_logger.debug("API calls for the day have been reset.")
         selection_events = 0
         high_priority_events = 0
+        super_far_plane.clear()
+        # reset the distance tracker for `DistantDeterminator`
+        dispatcher.send(message='', signal=REALLY_FAR_PLANE, sender=runtime_accumulators_reset)
         if FOLLOW_THIS_AIRCRAFT_SPOTTED:
             FOLLOW_THIS_AIRCRAFT_SPOTTED = False
 
@@ -2193,8 +2300,8 @@ def main_loop_generator() -> None:
             if entry['ID'] == input_ID:
                 return entry['Flyby']
 
-    def relative_direction(**kwargs) -> str:
-        """ Gets us the plane's relative cardinal direction in respect to our location.
+    def relative_direction(**kwargs) -> tuple[str, float]:
+        """ Gets us the plane's relative cardinal direction in respect to our location. Also returns actual degrees.
         Supply a `rdir` angle value to skip internal calculation. If `rdir` is None, supply `lat0`, `lon0`, `lat1`, `lon1`.
         Sourced from here: https://gist.github.com/RobertSudwarts/acf8df23a16afdb5837f?permalink_comment_id=3070256#gistcomment-3070256 """
         dirs = ['N ', 'NE', 'E ', 'SE', 'S ', 'SW', 'W ', 'NW'] # note the spaces for 1 letter directions
@@ -2206,9 +2313,9 @@ def main_loop_generator() -> None:
                     (kwargs['lon1'] - kwargs['lon0']), (kwargs['lat1'] - kwargs['lat0'])
                     ) * (180 / math.pi)
             except:
-                return ""
+                return "", 0.
         ix = round(d / (360. / len(dirs)))
-        return dirs[ix % len(dirs)]
+        return dirs[ix % len(dirs)], round(d, 1)
 
     def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
         """ Calculates distance between two points on Earth based on their latitude and longitude.
@@ -2419,6 +2526,7 @@ def main_loop_generator() -> None:
             - Speed: Plane's ground speed in selected units. Returns 0 if can't be determined.
             - Distance: Plane's distance from your location in the selected units. Returns 0 if location is not defined.
             - Direction: Cardinal direction of plane in relation to your location. Returns an empty string if location is not defined.
+            - DirectionDegrees: Actual degree direction of plane. Returns 0 if location is not defined.
             - Latitude
             - Longitude
             - Track: Plane's track over ground in degrees
@@ -2514,6 +2622,7 @@ def main_loop_generator() -> None:
         max_range: float = 0.
         ranges = []
         planes = []
+        farplanes = []
 
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
@@ -2546,6 +2655,9 @@ def main_loop_generator() -> None:
                 total += 1
                 lat = a.get('lat')
                 lon = a.get('lon')
+                if lat == lon == 0: # prefilter for case when there's an invalid location
+                    lat = None
+                    lon = None
                 if rlat is not None and rlon is not None:
                     # readsb does this calculation already, try to use it first
                     distance = a.get('r_dst')
@@ -2567,7 +2679,13 @@ def main_loop_generator() -> None:
                     or (not NOFILTER_MODE
                         and (distance < RANGE and distance > 0)
                        )
+                    or (not NOFILTER_MODE
+                        and (distance >= BEYOND_LOS_LIMIT / distance_multiplier)
+                        )
                 ):
+                    really_far = False
+                    if not NOFILTER_MODE and (distance >= BEYOND_LOS_LIMIT / distance_multiplier):
+                        really_far = True
                     alt_g = a.get('alt_geom') # more accurate
                     alt_b = a.get('alt_baro') # baseline altitude
                     if alt_g:
@@ -2582,7 +2700,7 @@ def main_loop_generator() -> None:
                     if alt is None or alt == "ground":
                         alt = 0
                     alt = alt * altitude_multiplier
-                    if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT:
+                    if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT or really_far:
                         flight = a.get('flight')
                         rssi = a.get('rssi', 0)
                         vs = a.get('geom_rate', a.get('baro_rate', 0))
@@ -2596,7 +2714,7 @@ def main_loop_generator() -> None:
                             source = 'ADS-B'
                         if rlat is not None:
                             # readsb also does this calculation, try to use it first and have the fallback ready
-                            direc = relative_direction(
+                            direc, direcd = relative_direction(
                                 rdir = a.get('r_dir'),
                                 lat0 = rlat,
                                 lon0 = rlon,
@@ -2605,6 +2723,7 @@ def main_loop_generator() -> None:
                                 )
                         else:
                             direc = ""
+                            direcd = 0.
                         elevation, slant_range_dist = elevation_and_slant(distance, alt)
                         if abs(determined_time_offset) > 5 or USING_FILESYSTEM:
                             dt = 0
@@ -2674,8 +2793,11 @@ def main_loop_generator() -> None:
                         else:
                             flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
 
-                        flyby_tracker(hex)
-                        flyby = flyby_extractor(hex)
+                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                            flyby_tracker(hex)
+                            flyby = flyby_extractor(hex)
+                        else: # do not append really far planes
+                            flyby = 0
 
                         loop_packet = {
                             "ID": hex,
@@ -2685,6 +2807,7 @@ def main_loop_generator() -> None:
                             "Speed": gs,
                             "Distance": distance,
                             "Direction": direc,
+                            "DirectionDegrees": direcd,
                             "Latitude": lat,
                             "Longitude": lon,
                             "Track": track,
@@ -2713,9 +2836,20 @@ def main_loop_generator() -> None:
 
                         if DATABASE_CONNECTED:
                             database_data = database_lookup(hex)
-                            planes.append(data_arbitrator(loop_packet, database_data))
+                            if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                                planes.append(data_arbitrator(loop_packet, database_data))
+                            if really_far:
+                                farplanes.append(data_arbitrator(loop_packet, database_data))
                         else:
-                            planes.append(loop_packet)
+                            if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                                planes.append(loop_packet)
+                            if really_far:
+                                farplanes.append(loop_packet)
+            # end of the main loop
+            if farplanes:
+                dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
+            else:
+                dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
 
             if not NOFILTER_MODE:
                 if relevant_planes_last:
@@ -4470,6 +4604,55 @@ class synchronizer():
     def end_thread(self, message):
         self.loop.stop()
 
+class DistantDeterminator():
+    """ Thread that watches when we encounter a plane that has been detected
+    way beyond the typical LOS limit (`BEYOND_LOS_LIMIT`) for ADS-B signals.
+    Gets triggered by `main_loop_generator.dump1090_loop()`, reads the data packet sent by the function,
+    determines if this is the furthest plane in the day, and writes to the global `super_far_plane`. """
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        register_signal_handler(self.loop, self.comparator, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
+        register_signal_handler(self.loop, self.reset_distance, signal=REALLY_FAR_PLANE, sender=runtime_accumulators_reset)
+        register_signal_handler(self.loop, self.debug_switch, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
+        register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self.last_max_distance = 0
+        self._detected = False
+        self.run_loop()
+    
+    def comparator(self, message: list):
+        global super_far_plane
+        if not message or not isinstance(message, list):
+            self._detected = False
+            return
+        if not self._detected:
+            self._detected = True
+            main_logger.debug(f"Detected aircraft beyond normal line-of-sight limit ({BEYOND_LOS_LIMIT} nmi) for ADS-B!")
+        message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
+        furthest: dict = message[0] # and get the top result
+        if furthest['Distance'] > self.last_max_distance:
+            furthest.update({'Datetime': datetime.datetime.now()})
+            self.last_max_distance = furthest['Distance']
+            super_far_plane = furthest
+    
+    def reset_distance(self, message):
+        main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
+        self.last_max_distance = 0
+    
+    def debug_switch(self, message):
+        if self._detected:
+            main_logger.debug(f"No longer detecting extremely distant aircraft.")
+        self._detected = False
+
+    def run_loop(self):
+        def keep_alive():
+            self.loop.call_later(1, keep_alive)
+        keep_alive()
+        self.loop.run_forever()
+
+    def end_thread(self, message):
+        self.loop.stop()
+
 # ========== Display Superclass ============
 # ==========================================
 
@@ -4537,6 +4720,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.8.2.0: Add support for additional rgbmatrix options for different setups
     - v.8.1.0: In JOURNEY_PLUS and with SHOW_EVEN_MORE_INFO, the Time/RSSI section now shows ground track instead
     - v.8.0.0: Add variable/adaptive frame rate
     - v.6.0.0: Implemented the scrolling/marquee (SHOW_EVEN_MORE_INFO), requiring font adapations and layout changes for ENHANCED_READOUT and JOURNEY_PLUS
@@ -4564,21 +4748,28 @@ class Display(
 
         # Setup Display
         options = RGBMatrixOptions()
-        options.hardware_mapping = "adafruit-hat-pwm" if HAT_PWM_ENABLED else "adafruit-hat"
+        # valid options: https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/include/led-matrix.h
+        options.hardware_mapping = ADV_LED_HARDWARE_MAPPING if ADV_LED_HARDWARE_MAPPING else ("adafruit-hat-pwm" if HAT_PWM_ENABLED else "adafruit-hat")
+        options.disable_hardware_pulsing = ADV_LED_DISABLE_HARDWARE_PULSING if ADV_LED_DISABLE_HARDWARE_PULSING else (False if HAT_PWM_ENABLED else True)
         options.rows = RGB_ROWS
         options.cols = RGB_COLS
         options.chain_length = 1
         options.parallel = 1
-        options.row_address_type = 0
-        options.multiplexing = 0
+        options.row_address_type = ADV_LED_ROW_ADDRESS_TYPE
+        options.multiplexing = ADV_LED_MULTIPLEXING
         options.brightness = BRIGHTNESS
-        options.pwm_lsb_nanoseconds = 130
-        options.led_rgb_sequence = "RGB"
-        options.pixel_mapper_config = ""
+        options.pwm_lsb_nanoseconds = ADV_LED_PWM_LSB
+        options.led_rgb_sequence = ADV_LED_RGB_SEQUENCE
+        options.pixel_mapper_config = ADV_LED_PIXEL_MAPPER_CONFIG
         options.show_refresh_rate = 0
         options.pwm_bits = LED_PWM_BITS
         options.gpio_slowdown = GPIO_SLOWDOWN
-        options.disable_hardware_pulsing = False if HAT_PWM_ENABLED else True
+        options.scan_mode = ADV_LED_SCAN_MODE
+        options.inverse_colors = ADV_LED_INVERSE_COLORS
+        options.panel_type = ADV_LED_PANEL_TYPE
+        options.limit_refresh_rate_hz = ADV_LED_LIMIT_REFRESH_RATE
+        options.disable_busy_waiting = ADV_LED_DISABLE_BUSY_WAITING
+        options.pwm_dither_bits = ADV_LED_PWM_DITHER_BITS
         # setting the next option to True affects our ability to write to our stats file if set and present
         # this bug took awhile to figure out, lmao
         options.drop_privileges = False if (flyby_stats_present or WRITE_STATE) else True
@@ -6451,6 +6642,8 @@ def main() -> None:
     json_writer = threading.Thread(target=WriteState, name='JSON-Writer', daemon=True)
     console_stuff = threading.Thread(target=PrintToConsole, name='Console-Printer', daemon=True)
     syncing_stuff = threading.Thread(target=synchronizer, name='Synchronization-Thread', daemon=True)
+    dxing_stuff = threading.Thread(target=DistantDeterminator, name='Distance-Watcher', daemon=True)
+    # DXing -> https://en.wikipedia.org/wiki/DXing
     if WRITE_STATE:
         json_writer.start()
     main_logger.info("Cleared for takeoff.")
@@ -6500,6 +6693,7 @@ def main() -> None:
     receiver_stuff.start()
     watchdog_stuff.start()
     console_stuff.start()
+    dxing_stuff.start()
     main_logger.debug(f"Running with {this_process.num_threads()} threads, with CPU priority {this_process.nice()}")
     print()
     main_logger.info("========== Main loop started! ===========")
