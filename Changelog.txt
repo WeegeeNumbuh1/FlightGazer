@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.1 - 2025-09-21
+    - Filter out low altitude aircraft for the dxing logic (this usually occurs with glitchy ADS-B transponders on general aviation aircraft)
+    - Refactored display initialization and exception handling to be more robust
+    - More verbose logging when handling atypical exceptions
+
 v.8.2.0 - 2025-09-20
     - NEW: DXing! FlightGazer will now log instances when aircraft are detected beyond the typical limit for ADS-B signals usually due to tropospheric ducting
         - Results of the farthest aircraft are printed at the end of the day or upon exit in the log file

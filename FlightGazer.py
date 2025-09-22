@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.2.0 --- 2025-09-20'
+VERSION: str = 'v.8.2.1 --- 2025-09-21'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -311,7 +311,7 @@ if not NODISPLAY_MODE:
     except Exception as e:
         DISPLAY_IS_VALID = False
         main_logger.error("Display modules failed to load. There will be no display output!")
-        main_logger.error(f"Error details regarding \'{e}\':", exc_info=True)
+        main_logger.exception(f"Error details regarding \'{e}\':")
         main_logger.warning(">>> Please check the working environment, reboot the system, and do a reinstallation if necessary.")
         main_logger.warning("    If this error continues to occur, submit a bug report to the developer.")
         main_logger.warning(">>> This script will still function as a basic flight parser and stat generator")
@@ -322,8 +322,6 @@ if not NODISPLAY_MODE:
 else:
     DISPLAY_IS_VALID = False
     main_logger.info("Display output disabled. Running in console-only mode.")
-
-if not VERBOSE_MODE: sys.tracebacklimit = 0 # supress tracebacks; it should be handled from here on out
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals (previously)
@@ -2299,6 +2297,8 @@ def main_loop_generator() -> None:
         for entry in reversed(unique_planes_seen):
             if entry['ID'] == input_ID:
                 return entry['Flyby']
+        else:
+            return 0
 
     def relative_direction(**kwargs) -> tuple[str, float]:
         """ Gets us the plane's relative cardinal direction in respect to our location. Also returns actual degrees.
@@ -2877,7 +2877,7 @@ def main_loop_generator() -> None:
             current_stats = {"Tracking": total, "Range": max_range}
 
         except Exception as e: # raise it up to the next handler
-            main_logger.error(f"Error processing dump1090 data ({e})", exc_info=True)
+            main_logger.exception(f"Error processing dump1090 data ({e})")
             raise
 
         return current_stats, planes
@@ -2966,7 +2966,7 @@ def main_loop_generator() -> None:
                     sequential_failures = 0
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator) # break out
                 print(f"FlightGazer: LOOP thread caught an exception. ({e}) Trying again...")
-                main_logger.error(f"LOOP thread caught an exception. ({e}) Trying again...", exc_info=True)
+                main_logger.exception(f"LOOP thread caught an exception. ({e}) Trying again...")
                 time.sleep(LOOP_INTERVAL * 3)
                 print("If this continues, please shutdown FlightGazer and report this error to the developer.")
                 time.sleep(LOOP_INTERVAL * 2)
@@ -4124,7 +4124,7 @@ class WriteState:
             process_time2[3] = round((time.perf_counter() - export_start) * 1000, 3)
 
         except Exception as e:
-            main_logger.error(f"Could not write to {self.json_file}. Error: {e}", exc_info=True)
+            main_logger.exception(f"Could not write to {self.json_file}. Error: {e}")
             main_logger.error("Writing state to json has stopped.")
             process_time2[3] = 0.
             self.json_file.unlink(missing_ok=True)
@@ -4629,11 +4629,18 @@ class DistantDeterminator():
             self._detected = True
             main_logger.debug(f"Detected aircraft beyond normal line-of-sight limit ({BEYOND_LOS_LIMIT} nmi) for ADS-B!")
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
-        furthest: dict = message[0] # and get the top result
-        if furthest['Distance'] > self.last_max_distance:
-            furthest.update({'Datetime': datetime.datetime.now()})
-            self.last_max_distance = furthest['Distance']
-            super_far_plane = furthest
+        for packet in message:
+            # filter out general aviation with glitchy locations
+            if packet['Altitude'] / altitude_multiplier < 20000:
+                continue
+            farthest = packet
+            break
+        else:
+            return
+        if farthest['Distance'] > self.last_max_distance:
+            farthest.update({'Datetime': datetime.datetime.now()})
+            self.last_max_distance = farthest['Distance']
+            super_far_plane = farthest
     
     def reset_distance(self, message):
         main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
@@ -4720,6 +4727,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.8.2.1: More "flexible" attribute setting
     - v.8.2.0: Add support for additional rgbmatrix options for different setups
     - v.8.1.0: In JOURNEY_PLUS and with SHOW_EVEN_MORE_INFO, the Time/RSSI section now shows ground track instead
     - v.8.0.0: Add variable/adaptive frame rate
@@ -4749,30 +4757,40 @@ class Display(
         # Setup Display
         options = RGBMatrixOptions()
         # valid options: https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/include/led-matrix.h
-        options.hardware_mapping = ADV_LED_HARDWARE_MAPPING if ADV_LED_HARDWARE_MAPPING else ("adafruit-hat-pwm" if HAT_PWM_ENABLED else "adafruit-hat")
-        options.disable_hardware_pulsing = ADV_LED_DISABLE_HARDWARE_PULSING if ADV_LED_DISABLE_HARDWARE_PULSING else (False if HAT_PWM_ENABLED else True)
-        options.rows = RGB_ROWS
-        options.cols = RGB_COLS
-        options.chain_length = 1
-        options.parallel = 1
-        options.row_address_type = ADV_LED_ROW_ADDRESS_TYPE
-        options.multiplexing = ADV_LED_MULTIPLEXING
-        options.brightness = BRIGHTNESS
-        options.pwm_lsb_nanoseconds = ADV_LED_PWM_LSB
-        options.led_rgb_sequence = ADV_LED_RGB_SEQUENCE
-        options.pixel_mapper_config = ADV_LED_PIXEL_MAPPER_CONFIG
-        options.show_refresh_rate = 0
-        options.pwm_bits = LED_PWM_BITS
-        options.gpio_slowdown = GPIO_SLOWDOWN
-        options.scan_mode = ADV_LED_SCAN_MODE
-        options.inverse_colors = ADV_LED_INVERSE_COLORS
-        options.panel_type = ADV_LED_PANEL_TYPE
-        options.limit_refresh_rate_hz = ADV_LED_LIMIT_REFRESH_RATE
-        #options.disable_busy_waiting = ADV_LED_DISABLE_BUSY_WAITING # exists only in newer builds
-        options.pwm_dither_bits = ADV_LED_PWM_DITHER_BITS
-        # setting the next option to True affects our ability to write to our stats file if set and present
-        # this bug took awhile to figure out, lmao
-        options.drop_privileges = False if (flyby_stats_present or WRITE_STATE) else True
+        valid_attr = [elem for elem in dir(options) if not elem.startswith('__')]
+        attribute_assignment = {
+            'hardware_mapping': ADV_LED_HARDWARE_MAPPING if ADV_LED_HARDWARE_MAPPING else ("adafruit-hat-pwm" if HAT_PWM_ENABLED else "adafruit-hat"),
+            'disable_hardware_pulsing': ADV_LED_DISABLE_HARDWARE_PULSING if ADV_LED_DISABLE_HARDWARE_PULSING else (False if HAT_PWM_ENABLED else True),
+            'rows': RGB_ROWS,
+            'cols': RGB_COLS,
+            'chain_length': 1,
+            'parallel': 1,
+            'row_address_type': ADV_LED_ROW_ADDRESS_TYPE,
+            'multiplexing': ADV_LED_MULTIPLEXING,
+            'brightness': BRIGHTNESS, # initial brightness, this can change at runtime
+            'pwm_lsb_nanoseconds': ADV_LED_PWM_LSB,
+            'led_rgb_sequence': ADV_LED_RGB_SEQUENCE,
+            'pixel_mapper_config': ADV_LED_PIXEL_MAPPER_CONFIG,
+            'show_refresh_rate': 0,
+            'pwm_bits': LED_PWM_BITS,
+            'gpio_slowdown': GPIO_SLOWDOWN,
+            'scan_mode': ADV_LED_SCAN_MODE,
+            'inverse_colors': ADV_LED_INVERSE_COLORS,
+            'panel_type': ADV_LED_PANEL_TYPE,
+            'limit_refresh_rate_hz': ADV_LED_LIMIT_REFRESH_RATE,
+            'disable_busy_waiting': ADV_LED_DISABLE_BUSY_WAITING,
+            'pwm_dither_bits': ADV_LED_PWM_DITHER_BITS,
+            # setting the next option to True affects our ability to write to our stats file if set and present
+            # this bug took awhile to figure out, lmao
+            'drop_privileges': False if (flyby_stats_present or WRITE_STATE) else True
+        }
+        for attr in valid_attr:
+            try:
+                setattr(options, attr, attribute_assignment[attr])
+            except KeyError:
+                pass
+            except:
+                main_logger.debug(f"Failed to set attribute \'{attr}\' for display.")
         self.matrix = RGBMatrix(options=options)
 
         # Setup canvas
@@ -6506,7 +6524,7 @@ class Display(
                     main_logger.critical("*  Please raise this issue with the developer.  *")
                     main_logger.critical("*************************************************")
                     return
-                main_logger.error(f"Display thread error ({e}), count {self.itbroke_count}:\n", exc_info=True)
+                main_logger.exception(f"Display thread error ({e}), count {self.itbroke_count}:\n")
                 time.sleep(5)
                 self.a_clear_screen()
                 time.sleep(5)
@@ -6567,7 +6585,11 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         display_sender.start()
     except OSError:
         DISPLAY_IS_VALID = False
-        main_logger.error(f"RGBMatrixEmulator failed to start. No display will be available!", exc_info=True, stacklevel=1)
+        main_logger.exception(f"RGBMatrixEmulator failed to start. No display will be available!")
+        time.sleep(5)
+    except Exception as e:
+        DISPLAY_IS_VALID = False
+        main_logger.exception(f"Display failed to start: {e}.")
         time.sleep(5)
 
 configuration_check_api()
@@ -6697,8 +6719,9 @@ def main() -> None:
     main_logger.debug(f"Running with {this_process.num_threads()} threads, with CPU priority {this_process.nice()}")
     print()
     main_logger.info("========== Main loop started! ===========")
-    main_logger.info("=========================================") 
-    main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
+    main_logger.info("=========================================")
+    if INTERACTIVE:
+        main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
     sys.excepthook = catcher
 
     try:

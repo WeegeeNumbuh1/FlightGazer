@@ -184,6 +184,7 @@ Using this project assumes you have the following:
 - Your location set in `dump1090`
 - A console that can interpret ANSI escape sequences (should be most modern ones)
 - If using a Raspberry Pi, use a model that has multiple CPU cores (Raspberry Pi 3/Raspberry Pi 2W or newer)
+- Not using a combined feed for the data source (you would know if you set this up)
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
@@ -193,7 +194,7 @@ Using this project assumes you have the following:
 
 **tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
 You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
-*Note:* FlightGazer will not work with UAT-only setups.
+*Note:* FlightGazer will not work with UAT-only setups and assumes single-site decoders (not a combined feed).
 
 ### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
