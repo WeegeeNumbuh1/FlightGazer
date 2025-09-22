@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.2.1 --- 2025-09-21'
+VERSION: str = 'v.8.2.2 --- 2025-09-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1599,9 +1599,10 @@ def perf_monitoring() -> None:
 ░         ├───► dump1090_hearbeat() ► dump1090_loop() ► ─┐           ▲ (transient event)    ░
 ░         └───< sleep for LOOP_INTERVAL <────<─┬──<────◄─┴─► Exception Handling             ░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ | ░░░░░░░░░           ▼ (if too many errors) ░
-            ┌───────────────────────┬──────────┘         ░           |                      ░
-            ▼                       ▼                    ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
-    [AirplaneParser]          [synchronizer]                   [dump1090Watchdog]
+            ┌────────────────┬──────────────┬──┘         ░           |                      ░
+            ▼                ▼              ▼            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
+    [AirplaneParser]   [synchronizer]   [DistantDeterminator]      [dump1090Watchdog]
+            |
             ├────────────────┬──────────────────┐
             ▼                ▼                  ▼
       [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
@@ -2342,6 +2343,7 @@ def main_loop_generator() -> None:
         we are looking at the local horizon. Additionally, this returns the 'real'
         elevation angle and line-of-sight distance unaffected by atmospheric conditions 
         as we already have a generally accurate location of the target.
+        Returns `0.0, 0.0` if distance is zero.
         Excellent references: https://www.ngs.noaa.gov/CORS/Articles/SolerEisemannJSE.pdf
         https://commons.wikimedia.org/wiki/File:Fade_regions.jpg """
         if greatcircle_dist <= 0:
@@ -2623,6 +2625,9 @@ def main_loop_generator() -> None:
         ranges = []
         planes = []
         farplanes = []
+        location_is_set = False
+        if rlat is not None and rlon is not None:
+            location_is_set = True
 
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
@@ -2658,7 +2663,7 @@ def main_loop_generator() -> None:
                 if lat == lon == 0: # prefilter for case when there's an invalid location
                     lat = None
                     lon = None
-                if rlat is not None and rlon is not None:
+                if location_is_set and lat is not None:
                     # readsb does this calculation already, try to use it first
                     distance = a.get('r_dst')
                     # NB: doing `distance = a.get('r_dst', greatcircle())` is slower as `get()` needs to
@@ -2712,7 +2717,7 @@ def main_loop_generator() -> None:
                             source = 'UAT'
                         else:
                             source = 'ADS-B'
-                        if rlat is not None:
+                        if location_is_set:
                             # readsb also does this calculation, try to use it first and have the fallback ready
                             direc, direcd = relative_direction(
                                 rdir = a.get('r_dir'),

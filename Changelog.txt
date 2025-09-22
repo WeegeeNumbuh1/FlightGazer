@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.2 - 2025-09-22
+    - Fix minor issue in LOOP logic when handling aircraft that don't report a valid latitude or longitude
+
 v.8.2.1 - 2025-09-21
     - Filter out low altitude aircraft for the dxing logic (this usually occurs with glitchy ADS-B transponders on general aviation aircraft)
     - Refactored display initialization and exception handling to be more robust
