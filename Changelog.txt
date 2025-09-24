@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.3 - 2025-09-24
+    - Fix issue where the dxing logic doesn't work when using NO_FILTER mode
+    - Tweak 3x3 font so that the '1' glyph is more readable compared to '2', along with other minor changes
+
 v.8.2.2 - 2025-09-22
     - Fix minor issue in LOOP logic when handling aircraft that don't report a valid latitude or longitude
 

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.2.2 --- 2025-09-22'
+VERSION: str = 'v.8.2.3 --- 2025-09-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2632,7 +2632,7 @@ def main_loop_generator() -> None:
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
                 dump1090_data[i]['priority'] = priority_lookup.get(
-                dict_.get('type', 'None')
+                    dict_.get('type', 'None')
                 )
             if len(dump1090_data) > 1:
                 dump1090data_ = ensure_unique(dump1090_data, 'hex', 'priority')
@@ -2652,7 +2652,7 @@ def main_loop_generator() -> None:
                 # filter planes that have valid tracking data and were seen recently
                 if (seen_pos is None
                     or seen_pos > LOCATION_TIMEOUT
-                    or (not NOFILTER_MODE 
+                    or (not NOFILTER_MODE
                         and (priority_value > 10)
                     )
                 ):
@@ -2678,19 +2678,18 @@ def main_loop_generator() -> None:
                 else:
                     distance = 0
                 ranges.append(distance)
+                really_far = False # flag for indicating if a plane is worthy of being tracked by the dxing logic
+                if distance >= BEYOND_LOS_LIMIT / distance_multiplier:
+                    really_far = True
                 if (
                     NOFILTER_MODE
                     or hex == FOLLOW_THIS_AIRCRAFT
                     or (not NOFILTER_MODE
-                        and (distance < RANGE and distance > 0)
+                        and ((0 < distance < RANGE) or
+                             really_far
                        )
-                    or (not NOFILTER_MODE
-                        and (distance >= BEYOND_LOS_LIMIT / distance_multiplier)
-                        )
+                    )
                 ):
-                    really_far = False
-                    if not NOFILTER_MODE and (distance >= BEYOND_LOS_LIMIT / distance_multiplier):
-                        really_far = True
                     alt_g = a.get('alt_geom') # more accurate
                     alt_b = a.get('alt_baro') # baseline altitude
                     if alt_g:
@@ -2801,7 +2800,7 @@ def main_loop_generator() -> None:
                         if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
                             flyby_tracker(hex)
                             flyby = flyby_extractor(hex)
-                        else: # do not append really far planes
+                        else: # do not append really far planes when operating normally
                             flyby = 0
 
                         loop_packet = {
@@ -2853,26 +2852,25 @@ def main_loop_generator() -> None:
             # end of the main loop
             if farplanes:
                 dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
-            else:
+            else: # tell DistantDeterminator that there are no distant planes right now
                 dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
 
-            if not NOFILTER_MODE:
-                if relevant_planes_last:
-                    # calculate approach rate for each plane based on the last loop's data
-                    for plane in planes:
-                        try:
-                            for last_plane in relevant_planes_last:
-                                if plane['ID'] == last_plane['ID']:
-                                    # calculate approach rate in speed units (negative = moving away)
-                                    plane['ApproachRate'] = round(
-                                        ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
-                                        (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
-                                        )
-                                    break
-                        except KeyError: # shouldn't happen, but just in case
-                            main_logger.debug("KeyError in approach rate calculation")
-                            plane['ApproachRate'] = 0.0
-                            break
+            if not NOFILTER_MODE and relevant_planes_last:
+                # calculate approach rate for each plane based on the last loop's data
+                for plane in planes:
+                    try:
+                        for last_plane in relevant_planes_last:
+                            if plane['ID'] == last_plane['ID']:
+                                # calculate approach rate in speed units (negative = moving away)
+                                plane['ApproachRate'] = round(
+                                    ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
+                                    (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
+                                    )
+                                break
+                    except KeyError: # shouldn't happen, but just in case
+                        main_logger.debug("KeyError in approach rate calculation")
+                        plane['ApproachRate'] = 0.0
+                        break
 
             if not ranges:
                 max_range = 0
@@ -2881,8 +2879,7 @@ def main_loop_generator() -> None:
 
             current_stats = {"Tracking": total, "Range": max_range}
 
-        except Exception as e: # raise it up to the next handler
-            main_logger.exception(f"Error processing dump1090 data ({e})")
+        except Exception: # raise it up to the next handler
             raise
 
         return current_stats, planes
@@ -2973,7 +2970,7 @@ def main_loop_generator() -> None:
                 print(f"FlightGazer: LOOP thread caught an exception. ({e}) Trying again...")
                 main_logger.exception(f"LOOP thread caught an exception. ({e}) Trying again...")
                 time.sleep(LOOP_INTERVAL * 3)
-                print("If this continues, please shutdown FlightGazer and report this error to the developer.")
+                print("If this continues, please shutdown FlightGazer and report this error (with the logs) to the developer.")
                 time.sleep(LOOP_INTERVAL * 2)
                 continue
 
