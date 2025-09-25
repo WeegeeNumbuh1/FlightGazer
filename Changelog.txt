@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.4 - 2025-09-24
+    - When using FOLLOW_MODE, freeze-frame data is now logged when the aircraft is first detected
+    - Tweak 3x3 font again
+    - Other logging output tweaks
+
 v.8.2.3 - 2025-09-24
     - Fix issue where the dxing logic doesn't work when using NO_FILTER mode
     - Tweak 3x3 font so that the '1' glyph is more readable compared to '2', along with other minor changes

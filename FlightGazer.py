@@ -7,7 +7,7 @@
 #                        _/_/
 
 """
-A comprehensive flight-tracking program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
+A comprehensive flight-tracking and logging program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
 Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
 Uses the FlightAware API for info outside what ADS-B can provide.
 """
@@ -955,43 +955,49 @@ def dxing_log() -> None:
     else:
         data0.append("Exciting! ")
     data0.append(f"\'{super_far_plane['Flight']}\' ({super_far_plane['ID']}, {super_far_plane['Country']}) ")
-    data0.append(f"was detected {super_far_plane['Distance']} {distance_unit} away ")
+    data0.append(f"was detected {round(super_far_plane['Distance'], 3)} {distance_unit} away ")
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
     main_logger.info(f"{''.join(data0)}")
-    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today. Tropospheric ducting may have enabled this.")
+    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today. Tropospheric propagation may have enabled this.")
+    freeze_frame_packet(super_far_plane, show_distance=False)
+
+def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
+    """ Print the current plane data to the log. """
     main_logger.info("Freeze-frame data:")
     data1 = []
     data1.append("   DESC: ")
-    if (pdesc := super_far_plane['AircraftDesc']):
+    if (pdesc := packet['AircraftDesc']):
         data1.append(f"\"{pdesc}\"")
     else:
         data1.append("N/A")
-    if (icaot := super_far_plane['ICAOType']):
+    if (icaot := packet['ICAOType']):
         data1.append(f" ({icaot})")
-    if (regs := super_far_plane['Registration']):
+    if (regs := packet['Registration']):
         data1.append(f", REG: {regs}")
-    if super_far_plane['TrackingFlag'] != "None":
-        data1.append(f" ({super_far_plane['TrackingFlag']} aircraft)")
+    if packet['TrackingFlag'] != "None":
+        data1.append(f" ({packet['TrackingFlag']} aircraft)")
     data1.append(" | OWNER: ")
-    if (own := super_far_plane['Owner']):
+    if (own := packet['Owner']):
         data1.append(f"{own}")
     else:
         data1.append("N/A")
     data1.append(" | OPERATOR: ")
-    if (ope := super_far_plane['Operator']):
+    if (ope := packet['Operator']):
         data1.append(f"{ope}")
     else:
         data1.append("N/A")
-    if (opea := super_far_plane['OperatorAKA']):
+    if (opea := packet['OperatorAKA']):
         data1.append(f" (a.k.a. \"{opea}\")")
 
     main_logger.info(f"{''.join(data1)}")
-    main_logger.info(f"   SPD: {super_far_plane['Speed']} {speed_unit} | HDG: {super_far_plane['Track']} | "
-                        f"DIR: {super_far_plane['DirectionDegrees']} ({super_far_plane['Direction']}) | ELV: {round(super_far_plane['Elevation'], 3)} deg | "
-                        f"ALT: {super_far_plane['Altitude']} {altitude_unit} ({super_far_plane['VertSpeed']} {altitude_unit}/min)"
-                        f" | RSSI: {super_far_plane['RSSI']} dBFS ({super_far_plane['Source']})"
-                        )
+    if show_distance:
+        main_logger.info(f"   DIST: {round(packet['Distance'])} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
+    main_logger.info(f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
+                    f"DIR: {packet['DirectionDegrees']} ({packet['Direction']}) | ELV: {round(packet['Elevation'], 3)} deg | "
+                    f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
+                    f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
+                    )
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -3112,6 +3118,7 @@ class AirplaneParser:
                             and entry['ID'] == FOLLOW_THIS_AIRCRAFT
                         ):
                             main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
+                            freeze_frame_packet(entry, show_distance=True)
                             FOLLOW_THIS_AIRCRAFT_SPOTTED = True
 
                 focus_plane_iter += 1
@@ -6550,7 +6557,7 @@ if len(matching_processes) > 1:
         process_started = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(elem['create_time']))
         if process_ID != this_process.pid:
             main_logger.warning(f"   PID {process_ID} -- [ {process_name} ] started: {process_started}")
-    main_logger.warning(f"This current instance (PID {this_process.pid}) of FlightGazer will now exit.")
+    main_logger.critical(f"This current instance (PID {this_process.pid}) of FlightGazer will now exit.")
     time.sleep(1)
     sys.exit(1)
 else:
@@ -6594,15 +6601,19 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         main_logger.exception(f"Display failed to start: {e}.")
         time.sleep(5)
 
+get_ip()
+HOSTNAME = socket.gethostname()
+main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
+if not CURRENT_IP:
+    main_logger.warning("Could not determine the current IP address at startup! Some functionality may be limited or unavailable.")
+    main_logger.info(">>> If this device is normally connected to a network, it is recommended to restart FlightGazer to restore functionality.")
+
 configuration_check_api()
 if API_KEY:
     API_session = requests.Session()
 api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)
 api_scheduling_thread.start()
 
-get_ip()
-HOSTNAME = socket.gethostname()
-main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
 flyby_stats() # initialize first
 
 # define our scheduled tasks (our "one-shot" functions)
