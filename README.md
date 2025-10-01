@@ -653,7 +653,7 @@ If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `sett
 Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
-- [ ] Docker image?
+- [ ] ~~Docker image?~~ (unlikely)
 - [x] Settings management from webpage [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>

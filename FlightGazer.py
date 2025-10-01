@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.2.4 --- 2025-09-24'
+VERSION: str = 'v.8.2.5 --- 2025-10-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2322,7 +2322,7 @@ def main_loop_generator() -> None:
             except:
                 return "", 0.
         ix = round(d / (360. / len(dirs)))
-        return dirs[ix % len(dirs)], round(d, 1)
+        return dirs[ix % len(dirs)], round(d % 360, 1)
 
     def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
         """ Calculates distance between two points on Earth based on their latitude and longitude.
@@ -3279,9 +3279,13 @@ class APIFetcher:
         date_yesterday_iso = time_delta_yesterday.astimezone().replace(microsecond=0).isoformat()
         date_tomorrow = date_now + datetime.timedelta(days=1)
         date_tomorrow_iso = date_tomorrow.astimezone().replace(microsecond=0).isoformat()
-        origin = None
-        destination = None
-        departure_time = None
+        origin: str | None = None
+        destination: str | None = None
+        depart_iso: str | None = None
+        origin_city: str | None = None
+        origin_name: str | None = None
+        destination_city: str | None = None
+        destination_name: str | None = None
         stale_age = FLYBY_STALENESS * 60 # seconds
 
         flight_id = focus_plane_stats.get('Flight', "")
@@ -3337,6 +3341,7 @@ class APIFetcher:
                 enhanced_readout_wait_condition.wait()
             # main_logger.debug(f"Wait complete, ENHANCED_READOUT: {ENHANCED_READOUT}")
         if ENHANCED_READOUT: return
+        focus_plane_now = focus_plane # store in case focus plane changes while we wait for API result
 
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
         base_url = API_URL + f"flights/{flight_id}"
@@ -3346,17 +3351,9 @@ class APIFetcher:
                   }
 
         try:
-            origin: str | None = None
-            destination: str | None = None
-            depart_iso: str | None = None
-            origin_city: str | None = None
-            origin_name: str | None = None
-            destination_city: str | None = None
-            destination_name: str | None = None
-
             start_time = time.perf_counter()
             response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
-            process_time[2] = round((time.perf_counter() - start_time)*1000, 3)
+            process_time[2] = round((time.perf_counter() - start_time) * 1000, 3)
             response.raise_for_status()
             if response.status_code == 200: # check if service to the API call was valid
                 response_json = response.json()
@@ -3423,7 +3420,7 @@ class APIFetcher:
                 destination = f"{abs(lon):.1f}{lon_str}"
 
             api_results = {
-                'ID': focus_plane,
+                'ID': focus_plane_now,
                 'Flight': flight_id,
                 'Origin': origin,
                 'Destination': destination,
@@ -4640,7 +4637,7 @@ class DistantDeterminator():
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
         for packet in message:
             # filter out general aviation with glitchy locations
-            if packet['Altitude'] / altitude_multiplier < 20000:
+            if packet['Altitude'] / altitude_multiplier < 10000:
                 continue
             farthest = packet
             break

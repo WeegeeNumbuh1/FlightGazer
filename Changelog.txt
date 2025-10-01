@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.5 - 2025-10-01
+    - Fix edge case when the focus plane changes while waiting for an API result, leading to the wrong API result being used
+    - Tweak dxing logic slightly
+    - Fix aircraft direction measurement to only be between 0 and 360 degrees
+
 v.8.2.4 - 2025-09-24
     - When using FOLLOW_MODE, freeze-frame data is now logged when the aircraft is first detected
     - Tweak 3x3 font again
