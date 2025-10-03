@@ -176,6 +176,7 @@ Using this project assumes you have the following:
   - If the `rgbmatrix` library is installed:
     - It needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
     - Must be built using the adafruit script
+    - Note: if using a Raspberry Pi, the core `rgbmatrix` library [doesn't run on a Pi 5 or newer](https://github.com/hzeller/rpi-rgb-led-matrix/issues/1603). Use a Pi 4 or older.
   - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Recommended: Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
@@ -187,6 +188,7 @@ Using this project assumes you have the following:
 - Not using a combined feed for the data source (you would know if you set this up)
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
+  - It is highly recommended to generate a key that will only be used for FlightGazer for accurate cost tracking
 - a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>

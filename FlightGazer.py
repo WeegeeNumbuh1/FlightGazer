@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.2.5 --- 2025-10-01'
+VERSION: str = 'v.8.2.6 --- 2025-10-03'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -544,7 +544,7 @@ general_stats: dict = {'Tracking':0, 'Range':0}
 """ General dump1090 stats (updated per loop).
 `general_stats` = {`Tracking`, `Range`} """
 receiver_stats: dict = {'Gain':None, 'Noise':None, 'Strong':None}
-""" Receiver stats (if available). None values for keys if data is unavailable. 
+""" Receiver stats (if available). None values for keys if data is unavailable.
 `receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage} """
 
 # active plane stuff
@@ -711,7 +711,7 @@ display_fps: float = 0.
 achievement_time: str | None = None
 """ Gameing. """
 database_stats: list = [0, 0, 0, 0., 0.]
-""" Info about how the database is performing. 
+""" Info about how the database is performing.
 [Total queries, queries with no result, failed queries, average response time (ms), last response time (ms)] """
 resource_usage: list = [0., 0., None]
 """ [CPU (normalized) and memory usage (MiB) of this running process, along with CPU temp (None if not available)] """
@@ -914,7 +914,7 @@ def get_ip() -> None:
     CURRENT_IP = IP
 
 def api_limiter_reached() -> bool:
-    """ Convenience function that returns True if *any* of the API limiters (`API_daily_limit_reached`, 
+    """ Convenience function that returns True if *any* of the API limiters (`API_daily_limit_reached`,
     `API_cost_limit_reached`, `API_schedule_triggered`) are reached. """
     return (API_daily_limit_reached or API_cost_limit_reached or API_schedule_triggered)
 
@@ -994,7 +994,7 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
     if show_distance:
         main_logger.info(f"   DIST: {round(packet['Distance'])} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
     main_logger.info(f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
-                    f"DIR: {packet['DirectionDegrees']} ({packet['Direction']}) | ELV: {round(packet['Elevation'], 3)} deg | "
+                    f"DIR: {packet['DirectionDegrees']} ({packet['Direction'].strip()}) | ELV: {round(packet['Elevation'], 3)} deg | "
                     f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
                     f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
                     )
@@ -1003,7 +1003,7 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
 # ========( Initialization Tools )==========
 
 def probe1090() -> tuple[str | None, str | None]:
-    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL` 
+    """ Determines which json exists on the system. Returns `JSON1090_LOCATION` and its base `URL`
     If `PREFER_LOCAL` is enabled, this function will try to see if it can access dump1090 from the local
     file system and use that if it works first. When this happens, `USING_FILESYSTEM` flag will be set. """
     global USING_FILESYSTEM
@@ -1642,9 +1642,14 @@ def runtime_accumulators_reset() -> None:
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
+    extra_text = False
 
     daily_stats_str = []
-    daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} flybys.")
+    if NOFILTER_MODE:
+        d_txt = "flights observed"
+    else:
+        d_txt = "flybys"
+    daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
     if not NOFILTER_MODE:
         if high_priority_events > 0:
             daily_stats_str.append(f" {high_priority_events} high priority overrides occurred.")
@@ -1666,6 +1671,7 @@ def runtime_accumulators_reset() -> None:
         main_logger.info("This appears to be a rather active ADS-B site. Very nice setup you have here, hopefully you're sharing your data!")
         main_logger.info(">>> To prevent spamming the log any further, rare selection event logging will be disabled until FlightGazer is restarted.")
         really_active_adsb_site = True
+        extra_text = True
 
     if (len(unique_planes_seen) >= 1300
         and not NOFILTER_MODE
@@ -1687,6 +1693,7 @@ def runtime_accumulators_reset() -> None:
             "the winds have decided your fate: become one with an approach lighting system."
         ]
         main_logger.info(f"{len(unique_planes_seen)} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
+        extra_text = True
 
     if really_really_active_adsb_site and len(unique_planes_seen) <= 300:
         # opposite direction of congrats (https://i.kym-cdn.com/photos/images/original/002/573/423/ced.jpg)
@@ -1698,14 +1705,20 @@ def runtime_accumulators_reset() -> None:
             "Hopefully this isn't affecting your rankings on some leaderboards (if you're into that).",
         ]
         main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
-
-    if sum(api_hits) > 0: # if we used the API at all
-        main_logger.info(f"API STATS   for {date_now_str}: {api_hits[0]+api_hits[2]}/{api_hits[0]+api_hits[1]+api_hits[2]} "
-                         f"successful API calls, of which {api_hits[2]} returned no data. "
-                         f"Estimated cost: ${estimated_api_cost:.2f}")
+        extra_text = True
 
     if super_far_plane:
         dxing_log()
+        extra_text = True
+
+    if sum(api_hits) > 0: # if we used the API at all
+        if extra_text:
+            align = " "
+        else:
+            align = "   "
+        main_logger.info(f"API STATS{align}for {date_now_str}: {api_hits[0]+api_hits[2]}/{api_hits[0]+api_hits[1]+api_hits[2]} "
+                         f"successful API calls, of which {api_hits[2]} returned no data. "
+                         f"Estimated cost: ${estimated_api_cost:.2f}")
 
     # do the actual reset
     with threading.Lock():
@@ -1778,7 +1791,7 @@ def runtime_accumulators_reset() -> None:
     return
 
 def flyby_stats() -> None:
-    """ If `FLYBY_STATS_ENABLED` is true, write the gathered stats from our flybys to a csv file. 
+    """ If `FLYBY_STATS_ENABLED` is true, write the gathered stats from our flybys to a csv file.
     When this is run for the first time, it will check if `FLYBY_STATS_FILE` exists and sets appropriate flags.
     If `FLYBY_STATS_FILE` is valid, subsequent calls to this function will append data to the end of it.
     This function assumes it will be called hourly to keep track of stats thoughout the day.
@@ -1800,7 +1813,7 @@ def flyby_stats() -> None:
         # load in last line of stats file, check if today's the current date, and re-populate our running stats
         if flyby_stats_present:
             with open(FLYBY_STATS_FILE, 'rb') as f:
-                try:  # catch OSError in case of a one line file 
+                try: # catch OSError in case of a one line file
                     f.seek(-2, os.SEEK_END)
                     while f.read(1) != b'\n':
                         f.seek(-2, os.SEEK_CUR)
@@ -2347,7 +2360,7 @@ def main_loop_generator() -> None:
         """ Calculates elevation angle and slant range based on given distance and altitude.
         NB: this function assumes the site elevation is 0 relative to the target, eg,
         we are looking at the local horizon. Additionally, this returns the 'real'
-        elevation angle and line-of-sight distance unaffected by atmospheric conditions 
+        elevation angle and line-of-sight distance unaffected by atmospheric conditions
         as we already have a generally accurate location of the target.
         Returns `0.0, 0.0` if distance is zero.
         Excellent references: https://www.ngs.noaa.gov/CORS/Articles/SolerEisemannJSE.pdf
@@ -2425,7 +2438,7 @@ def main_loop_generator() -> None:
     """ Map the broadcast type to a priority table, returns an int. """
 
     def dump1090_heartbeat() -> list | None:
-        """ Checks if dump1090 service is up and returns the parsed json file(s) as a list of nested dictionaries. 
+        """ Checks if dump1090 service is up and returns the parsed json file(s) as a list of nested dictionaries.
         If service is down/times out, returns None. Returned list can be empty (still valid). Most of the processing time occurs here.
         This function is also the most vital for FlightGazer's normal operation (hence, "heartbeat"). """
         if not DUMP1090_IS_AVAILABLE: return None
@@ -3302,7 +3315,7 @@ class APIFetcher:
         # check if we already have results
         for result in reversed(focus_plane_api_results):
             try:
-                if (result is not None 
+                if (result is not None
                     and focus_plane == result['ID']
                     ): # cache hit...
                     if time.monotonic() - result['APIAccessed'] < stale_age:
@@ -3383,7 +3396,7 @@ class APIFetcher:
                                     destination = flight['destination'].get('code_iata')
                                 if destination is None:
                                     destination = flight['destination'].get('code')
-                                
+
                                 destination_name = flight['destination'].get('name')
                                 destination_city = flight['destination'].get('city')
 
@@ -3537,7 +3550,7 @@ class DisplayFeeder:
                     sunrise = sunrise_1[:-2] + sunrise_1[-2].lower()
                 if (sunset_1 := sunset_sunrise['Sunset'].strftime("%I:%M%p")).startswith("0"):
                     sunset = sunset_1[1:-2] + sunset_1[-2].lower()
-                else:  
+                else:
                     sunset = sunset_1[:-2] + sunset_1[-2].lower()
         else:
             sunrise = "--:--"
@@ -3936,7 +3949,7 @@ def display_FPS_counter(display_instance) -> None:
 class WriteState:
     """ Write to a json in `/run/FlightGazer` every `LOOP_INTERVAL` that dumps almost
     all the values stored in the globals. Essentially what `print_to_console()` does but now
-    accessible outside of FlightGazer. Could be useful for other programs. Runs when all data processing threads 
+    accessible outside of FlightGazer. Could be useful for other programs. Runs when all data processing threads
     are done working as to not interrupt their processing. """
 
     def __init__(self):
@@ -4082,9 +4095,9 @@ class WriteState:
                 'display_formatting_time_ms': process_time2[1],
                 'fps': display_fps,
                 'render_time_ms': process_time[3],
-                'current_brightness': (ACTIVE_PLANE_DISPLAY_BRIGHTNESS if 
+                'current_brightness': (ACTIVE_PLANE_DISPLAY_BRIGHTNESS if
                                       (active_plane_display and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None)
-                                      else current_brightness 
+                                      else current_brightness
                                       ) if DISPLAY_IS_VALID else None,
                 'current_mode': None if not DISPLAY_IS_VALID else ('active (plane display)' if active_plane_display else 'idle (clock)'),
                 'data_for_screen': None if not DISPLAY_IS_VALID else (active_data if active_plane_display else idle_data),
@@ -4136,7 +4149,7 @@ class WriteState:
             self.json_file.unlink(missing_ok=True)
             self.can_run_flag = False
             return
-        
+
     def run_loop(self):
         def keep_alive():
             self.loop.call_later(1, keep_alive)
@@ -4278,7 +4291,7 @@ def API_Scheduler() -> None:
             main_logger.info("API_SCHEDULE parsed successfully with no errors.")
         else:
             main_logger.warning("API_SCHEDULE parsed with errors, but will still run. The time slot(s) listed above will not be used for API calls.")
-    
+
     def check_time_slot(day_dict: dict, time_slot_key: str, time_now: datetime.datetime) -> bool:
         """ Given the day dict and time slot key, check if the current time falls within the specified time slot.
         Returns True if the current hour matches with an 'x' in the time slot, otherwise False. """
@@ -4286,7 +4299,7 @@ def API_Scheduler() -> None:
         if time_slot_string[time_now.hour % 12] == 'x' or time_slot_string[time_now.hour % 12] == 'X':
             return True
         return False
-    
+
     main_logger.debug("Starting API Scheduler thread.")
     while True:
         last_API_schedule_triggered = API_schedule_triggered
@@ -4340,8 +4353,8 @@ class synchronizer():
     Figure 2: Response curve of json data age
 
                  Phase 1 <-|-> Phase 2        |-> Phase 3
-     ^                     |                  |      
-     │                     |                  |      
+     ^                     |                  |
+     │                     |                  |
      │       ■       ■     |                  |         --- max   ----------------------
      │      ■■      ■■     |                  |                                        |
     A│     ■ ■     ■ ■     |                  |                                        |
@@ -4625,7 +4638,7 @@ class DistantDeterminator():
         self.last_max_distance = 0
         self._detected = False
         self.run_loop()
-    
+
     def comparator(self, message: list):
         global super_far_plane
         if not message or not isinstance(message, list):
@@ -4647,11 +4660,11 @@ class DistantDeterminator():
             farthest.update({'Datetime': datetime.datetime.now()})
             self.last_max_distance = farthest['Distance']
             super_far_plane = farthest
-    
+
     def reset_distance(self, message):
         main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
         self.last_max_distance = 0
-    
+
     def debug_switch(self, message):
         if self._detected:
             main_logger.debug(f"No longer detecting extremely distant aircraft.")
@@ -5002,7 +5015,7 @@ class Display(
     def ba_clock_poller(self, count):
         if self.active_plane_display:
             return True
-        
+
         self.time_now = datetime.datetime.now()
         return True
 
@@ -5820,7 +5833,7 @@ class Display(
     """ Journey Plus: Relocate the flight time and add additional info like Enhanced Readout """
     @Animator.KeyFrame.add(base_refresh_speed)
     def ll_journeyplus(self, count): # Love Live?
-        """ This function is different because we go against the adage that `DisplayFeeder` should be doing 
+        """ This function is different because we go against the adage that `DisplayFeeder` should be doing
         most of the formatting work. Instead of having to add more functionality to it, we just
         reuse the results to enable functionality for JOURNEY_PLUS. """
         if not self.active_plane_display or not JOURNEY_PLUS or ENHANCED_READOUT:
@@ -5942,11 +5955,11 @@ class Display(
             self._last_hexID = None
             reinit()
             return True
-        
+
         Y_POS = 21
         COLOR = (
-                colors.marquee_color_enhanced_readout 
-                 if ENHANCED_READOUT 
+                colors.marquee_color_enhanced_readout
+                 if ENHANCED_READOUT
                  else colors.marquee_color_journey_plus
         )
         FONT = fonts.extrasmall
@@ -6002,7 +6015,7 @@ class Display(
         if (self._last_marquee_pos + marquee_length < 0):
             self._marquee_pos = self.canvas.width
             return_flag = True
-        
+
         if focus_plane_stats:
             self._last_hexID = focus_plane_stats.get('ID')
         else:
@@ -6062,7 +6075,7 @@ class Display(
                     self._last_longitude
                 )
             self._last_longitude = lon_now
-        
+
             _ = graphics.DrawText(
                 self.canvas,
                 FONT,
@@ -6302,7 +6315,7 @@ class Display(
                 # only reset self._last_groundtrack when `p_active_readout()` isn't referencing it
                 self._last_groundtrack = None
             return True
-    
+
         X_POS = 39
         GT_Y_POS = 12
         VS_Y_POS = 18 if not SHOW_EVEN_MORE_INFO else 16
@@ -6505,7 +6518,7 @@ class Display(
 
             except (SystemExit, KeyboardInterrupt, ImportError):
                 return
-            
+
             except AttributeError as e:
                 self.itbroke_count += 1
                 self.a_clear_screen()
@@ -6566,14 +6579,14 @@ procmon.start()
 configuration_check() # very important
 
 # start all the display-related threads before the API check and dump1090 load-in
-if DISPLAY_IS_VALID and not NODISPLAY_MODE: 
+if DISPLAY_IS_VALID and not NODISPLAY_MODE:
     main_logger.info("Initializing display...")
     if 'RGBMatrixEmulator' in sys.modules:
         main_logger.info("We are using 'RGBMatrixEmulator'")
         main_logger.info("Heads up: Running the emulator is slow! Animations may be laggy.")
     else:
         main_logger.info("We are using 'rgbmatrix'")
-    if ENHANCED_READOUT_AS_FALLBACK and API_KEY: 
+    if ENHANCED_READOUT_AS_FALLBACK and API_KEY:
         enhanced_readout_wait_condition = threading.Condition()
         """ Create a way to synchronize the API caller and Display Feeder when the Display Feeder switches
         the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled.
@@ -6687,7 +6700,7 @@ def main() -> None:
               f"     \'{LOGFILE}\'")
         print("Or, you can press the \'Pause/Break\' key at any time to pause the output.\n")
         interactive_wait_time = 15
-        # silly random distractions while you wait 
+        # silly random distractions while you wait
         if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
             interactive_wait_time -= 5
             time.sleep(5)

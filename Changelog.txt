@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.2.6 - 2025-10-03
+    - Tweak the output of the daily stats to account for NO_FILTER mode, along with better text alignment and output order
+    - Minor code cleanup
+
 v.8.2.5 - 2025-10-01
     - Fix edge case when the focus plane changes while waiting for an API result, leading to the wrong API result being used
     - Tweak dxing logic slightly
