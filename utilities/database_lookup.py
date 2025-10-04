@@ -8,7 +8,7 @@ from collections import deque
 database_logger = logging.getLogger("database-handler")
 
 class DatabaseHandler:
-    """ Handles the database querying. Pass a path for the database location and a timeout in seconds. 
+    """ Handles the database querying. Pass a path for the database location and a timeout in seconds.
     Once this class is instantiated, use `.connect()` to initiate the database connection. Don't forget
     to call `.close()` at some point! (preferably during shutdown) """
     def __init__(self, database_location, timeout: float):
@@ -22,7 +22,7 @@ class DatabaseHandler:
         self._access_times = deque(maxlen=50)
         self.average_speed = 0.0
         self.database_version = ''
-        
+
     def connect(self) -> bool:
         """ Connect to the database that was provided when this class was instanced.
         Opens the database as read-only.
@@ -95,7 +95,7 @@ class DatabaseHandler:
             return True
         else:
             return False
-    
+
     def close(self) -> None:
         """ Close the connection. """
         if self._connection is not None:
@@ -104,4 +104,3 @@ class DatabaseHandler:
             self._connection = None
         else:
             database_logger.warning("Attempt to close database with no established connection.")
-        return

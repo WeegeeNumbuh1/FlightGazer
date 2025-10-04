@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.7.1.1
+# Last updated: v.8.3.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -233,8 +233,10 @@ else
 			MIGRATE_FLAG=1
 		fi
 	else
-		echo "> Settings have been reset to default during this update." | tee -a $MIGRATE_LOG 
+		mv ${BASEDIR}/config.yaml ${BASEDIR}/config_old.yaml >/dev/null 2>&1
+		echo "> Settings have been reset to default during this update." | tee -a $MIGRATE_LOG
 		echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
+		echo "  Your previous configuration has been backed up as: ${BASEDIR}/config_old.yaml" | tee -a $MIGRATE_LOG
 	fi
 fi
 if [ $RESET_FLAG -eq 0 ]; then
@@ -285,11 +287,14 @@ fi
 rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
 if [ $WEB_UPDATE -eq 1 ]; then
 	echo -e "${FADE}"
-	echo "*************** Web Interface info *****************"
+	echo "*************** Web Interface Info *****************"
 	echo "*   Updating the web interface in the background.  *"
+	echo "*                                                  *"
 	echo "* If you're viewing this log in the web interface, *"
-	echo "*          please wait about 15 seconds.           *"
-	echo "*     The Back to Home button may not appear.      *"
+	echo "*   the webpages may not load or error out once    *"
+	echo "*     you press Back to Home or navigate back.     *"
+	echo "*          Please wait a few minutes for           *"
+	echo "*          the install to fully complete.          *"
 	echo "****************************************************"
 	nohup bash $BASEDIR/web-app/update-webapp.sh >/dev/null 2>&1 &
 	disown

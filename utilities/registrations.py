@@ -234,7 +234,7 @@ def registration_from_hexid(hexid_input: str) -> str | None:
             return "HL" + hex(hexid - 0x71C200 + 0x8200)[2:]
 
         return None
- 
+
     # Japan
     def ja_reg(hexid) -> str | None:
         offset = hexid - 0x840000
@@ -286,7 +286,7 @@ def registration_from_hexid(hexid_input: str) -> str | None:
 
         if (reg := numeric_reg(hexid)) is not None:
             return reg
-        
+
         if (reg := stride_reg(hexid)) is not None:
             return reg
 

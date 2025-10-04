@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.3.0 - 2025-10-04
+    - Release number bump
+    - Fix issue that arises when the API returns an empty result caused by the code cleanup in last update
+    - The updater script now backs up the current configuration when using the reset flag
+    - Improved handling when running in Interactive mode and the initialization process is canceled
+    - Numerous code cleanups across multiple components
+
 v.8.2.6 - 2025-10-03
     - Tweak the output of the daily stats to account for NO_FILTER mode, along with better text alignment and output order
     - Minor code cleanup

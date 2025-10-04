@@ -16,7 +16,7 @@ if os.name != 'nt':
     try:
         PATH_OWNER = CURRENT_DIR.owner()
         OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
-    except:
+    except Exception:
         PATH_OWNER = None
         OWNER_HOME = Path.home()
 else:
@@ -25,13 +25,13 @@ else:
 try:
     import rgbmatrix
     sys.exit(0)
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
         sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
         try:
             import rgbmatrix
             sys.exit(3) # rgbmatrix isn't available globally
-        except (ModuleNotFoundError, ImportError):
+        except ImportError:
             sys.exit(1)
     else:
         sys.exit(1)

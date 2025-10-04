@@ -2,7 +2,7 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.7.0.0
+# Last updated: v.8.3.0
 # By WeegeeNumbuh1
 
 import sys
@@ -17,8 +17,8 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 try:
     from ruamel.yaml import YAML
 except:
-    print(f"Error: Migrator failed to load required module \'ruamel.yaml\'. Is it present in the venv?")
-    sys.exit(1) 
+    print("Error: Migrator failed to load required module \'ruamel.yaml\'. Is it present in the venv?")
+    sys.exit(1)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("current_settings_file")
@@ -74,16 +74,15 @@ for settings_key in new_config:
             new_config[settings_key] = user_settings[settings_key]
     except KeyError: # settings key in new config does not exist in the older config
         print(f"New setting in this configuration: {settings_key}")
-else:
-    print("All other settings are the same as the default settings.")
+print("All other settings are the same as the default settings.")
 
 try:
     with open(PATH2, 'w') as updated_config:
         yaml.dump(new_config, updated_config)
 except:
-    print(f"Error: Could not write updated configuration file.")
+    print("Error: Could not write updated configuration file.")
     sys.exit(1)
 else:
-    print(f"Setting migration completed.\n")
+    print("Setting migration completed.\n")
 
 sys.exit(0)

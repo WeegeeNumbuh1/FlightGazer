@@ -42,7 +42,7 @@ class Animator(object):
         self._polling_window_start = 0.
 
         self._register_keyframes()
-        
+
         super().__init__()
 
         # break out of this loop if the system calls for our termination
@@ -69,8 +69,7 @@ class Animator(object):
                 frame_timer_start = perf_counter()
                 for keyframe in self.keyframes:
                     # If divisor == 0 then only run once on first loop
-                    if self.frame == 0:
-                        if keyframe.properties["divisor"] == 0:
+                    if self.frame == 0 and keyframe.properties["divisor"] == 0:
                             keyframe()
 
                     # Otherwise perform normal operation
@@ -86,7 +85,7 @@ class Animator(object):
                             keyframe.properties["count"] = 0
                         else:
                             keyframe.properties["count"] += 1
-                
+
                 # do the frame stats
                 self._frame_times.append((perf_counter() - frame_timer_start) * 1000)
                 self._render_counter += 1
@@ -101,11 +100,11 @@ class Animator(object):
                 self._reset_scene = False
                 self.frame += 1
                 sleep(self._delay)
-                
-        except (KeyboardInterrupt, SystemExit):
+
+        except KeyboardInterrupt:
             print("Screen animator exiting...")
             return
-        
+
         except Exception as e:
             raise e
 

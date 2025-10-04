@@ -4,9 +4,9 @@ import os
 try:
     try:
         from rgbmatrix import graphics
-    except (ModuleNotFoundError, ImportError):
+    except ImportError:
         from RGBMatrixEmulator import graphics
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     raise NotImplementedError
 
 # Fonts

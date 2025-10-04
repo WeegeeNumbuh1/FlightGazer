@@ -4,7 +4,7 @@
 # is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.7.2.1
+# Last updated: v.8.3.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -31,7 +31,7 @@ if os.name != 'nt':
     try:
         PATH_OWNER = CURRENT_DIR.owner()
         OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
-    except:
+    except Exception:
         PATH_OWNER = None
         OWNER_HOME = Path.home()
 else:
@@ -41,13 +41,13 @@ try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    except (ModuleNotFoundError, ImportError):
+    except ImportError:
         # handle case when rgbmatrix is not installed and maybe is present in the home directory
         if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
             sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
             from rgbmatrix import graphics
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
-except: # if the hardware display can't be loaded, don't bother showing the splash screen
+except Exception: # if the hardware display can't be loaded, don't bother showing the splash screen
     print("FlightGazer boot splash screen: ERROR: No display driver found. Splash screen is not available.")
     sys.exit(1)
 
@@ -62,7 +62,7 @@ try:
     from ruamel.yaml import YAML
     yaml = YAML()
     can_load_config = True
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     can_load_config = False
 
 config_default = {
@@ -73,7 +73,7 @@ config_default = {
 if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load_config:
     try:
         config = yaml.load(open(CONFIG_FILE, 'r'))
-    except:
+    except Exception:
         config = None
 
     if config:
@@ -95,7 +95,7 @@ try:
     if result.returncode == 0 and result.stdout.strip() == 'active' or result2:
         print("FlightGazer boot splash screen: ERROR: FlightGazer main service is already running.")
         sys.exit(1)
-except:
+except Exception:
     print("FlightGazer boot splash screen: ERROR: Could not determine running state of the system.")
     print("FlightGazer boot splash screen: Splash screen will not run.")
     sys.exit(1)
@@ -120,7 +120,7 @@ def timing():
     TIMING_CONTROL = 2
     print("FlightGazer boot splash screen: 30 seconds have passed since this has started.")
     print("FlightGazer boot splash screen: Assuming we have not reached multi-user.target yet.")
-    return
+
 threading.Thread(target=timing, daemon=True).start()
 
 class SplashText():
@@ -185,8 +185,7 @@ class SplashText():
                     self.spinner_index = 0
                 _skip_frames = 0
 
-            if TIMING_CONTROL >= 2:
-                if not NO_TEXT_SPLASH:
+            if TIMING_CONTROL >= 2 and not NO_TEXT_SPLASH:
                     _ = graphics.DrawText(
                         self.double_buffer,
                         loaded_font,

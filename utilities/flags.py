@@ -236,5 +236,5 @@ def getICAO(icao: str) -> str:
             if hexa >= entry['start'] and hexa <= entry['end']:
                 return entry['country_code']
         return "??"
-    except:
+    except Exception:
         return "??"

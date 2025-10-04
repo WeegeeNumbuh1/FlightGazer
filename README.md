@@ -198,6 +198,18 @@ Using this project assumes you have the following:
 You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
 *Note:* FlightGazer will not work with UAT-only setups and assumes single-site decoders (not a combined feed).
 
+
+<details><summary>Starting from scratch and want to follow the least amount of steps?</summary>
+
+1. [Follow this guide entirely](https://adsb.im/howto) and use a Raspberry Pi
+2. Get SSH access (go to System → Management)
+   1. Press the Show Password button in the Generate New Root Password section
+   2. Copy the password and press the Accept button
+   3. With your SSH client, log into the device at `root@[IP address of the device]`
+3. Continue the below steps and install the web interface as well
+
+</details>
+
 ### 📶 Installation & Getting Started
 Make sure you meet the above prerequisites. To begin:
 ```

@@ -1,7 +1,7 @@
 """ FlightGazer color settings module """
 
 """
-VERSION: v.7.1.1
+VERSION: v.8.3.0
 How to modify colors:
 
 If you are using the predefined colors, simply use the name of the color.
@@ -25,9 +25,9 @@ default to the original colors.
 try:
     try:
         from rgbmatrix import graphics
-    except (ModuleNotFoundError, ImportError):
+    except ImportError:
         from RGBMatrixEmulator import graphics
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     raise NotImplementedError
 
 # Color helpers

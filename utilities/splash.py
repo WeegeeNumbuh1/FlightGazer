@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.7.3.0
+# Last updated: v.8.3.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -20,7 +20,7 @@ if os.name != 'nt':
     try:
         PATH_OWNER = CURRENT_DIR.owner()
         OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
-    except:
+    except Exception:
         PATH_OWNER = None
         OWNER_HOME = Path.home()
 else:
@@ -30,14 +30,14 @@ try:
     try:
         from rgbmatrix import graphics
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    except (ModuleNotFoundError, ImportError):
+    except ImportError:
         # handle case when rgbmatrix is not installed and maybe is present in the home directory
         if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists:
             sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
             try:
                 from rgbmatrix import graphics
                 from rgbmatrix import RGBMatrix, RGBMatrixOptions
-            except (ModuleNotFoundError, ImportError):
+            except ImportError:
                 os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
                 from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
                 RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
@@ -49,12 +49,12 @@ try:
             RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
             from RGBMatrixEmulator import graphics
             from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
-except: # if display can't be loaded, don't bother showing the splash screen
+except Exception: # if display can't be loaded, don't bother showing the splash screen
     print("FG-Splash: Error: No display driver found. Splash screen is not available.")
     sys.exit(1)
 try:
     from PIL import Image
-except:
+except Exception:
     print("FG-Splash: Error: PIL (Pillow) library not found. Splash screen is not available.")
     sys.exit(1)
 
@@ -62,13 +62,13 @@ try:
     from ruamel.yaml import YAML
     yaml = YAML()
     can_load_config = True
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     can_load_config = False
 
 try:
     with open(Path(CURRENT_DIR, '..', 'version'), 'rb') as f:
         VER_STR = f.read(12).decode('utf-8').strip()
-except:
+except Exception:
     VER_STR = "UNKNOWN"
 
 config_default = {
@@ -79,7 +79,7 @@ config_default = {
 if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load_config:
     try:
         config = yaml.load(open(CONFIG_FILE, 'r'))
-    except:
+    except Exception:
         config = None
 
     if config:
@@ -108,7 +108,7 @@ except FileNotFoundError:
 class ImageScroller():
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
-        self.parser.add_argument("image", 
+        self.parser.add_argument("image",
                       help="The image to display",
                       default=f"{Path(CURRENT_DIR, '..', 'FG-Splash.ppm')}"
                       )
@@ -155,7 +155,7 @@ class ImageScroller():
         if not 'image' in self.__dict__:
             try:
                 self.image = Image.open(Path(self.args.image)).convert('RGB')
-            except:
+            except Exception:
                 # if we can't open the image, just exit
                 print(f"FG-Splash: Error: Could not open image '{self.args.image}'. Please check the file path and format.")
                 sys.exit(1)
@@ -171,7 +171,7 @@ class ImageScroller():
             xpos += 1
             if (xpos >= img_width):
                 xpos = 0
-            
+
             # the fade effect
             if self.top_text_color_dir:
                 self.top_text_color_control += 10
@@ -190,7 +190,7 @@ class ImageScroller():
                 if self.spinner_index >= len(self.spinner):
                     self.spinner_index = 0
                 _skip_frames = 0
-            
+
             # scrolls to the right
             self.double_buffer.SetImage(self.image, xpos)
             self.double_buffer.SetImage(self.image, xpos - img_width)

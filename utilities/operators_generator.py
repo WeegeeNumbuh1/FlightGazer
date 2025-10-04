@@ -4,7 +4,7 @@ Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
 # Last updated: September 2025
-# Released in conjunction with Flightgazer version: v.8.1.2
+# Released in conjunction with Flightgazer version: v.8.3.0
 
 if __name__ != '__main__':
     print("This script cannot be imported as a module.")
@@ -13,19 +13,19 @@ if __name__ != '__main__':
 
 try:
     import requests
-except (ImportError, ModuleNotFoundError):
+except ImportError:
     print("This script requires the 'requests' module.")
     print("You can install it using 'pip install requests'.")
     raise SystemExit
 try:
     from bs4 import BeautifulSoup as bs
-except (ImportError, ModuleNotFoundError):
+except ImportError:
     print("This script requires the 'beautifulsoup4' module.")
     print("You can install it using 'pip install beautifulsoup4'.")
     raise SystemExit
 try:
     from fake_useragent import UserAgent
-except (ImportError, ModuleNotFoundError):
+except ImportError:
     print("This script requires the 'fake_useragent' module.")
     print("You can install it using 'pip install fake_useragent'.")
     raise SystemExit
@@ -56,9 +56,8 @@ def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
     try:
         for dict_ in [x for x in list_of_dicts if x.get(key) == search_term]:
             return dict_
-        else:
-            return None
-    except:
+        return None
+    except Exception:
         return None
 
 def strip_accents(s: str) -> str:
