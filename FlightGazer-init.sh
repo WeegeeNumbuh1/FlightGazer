@@ -445,10 +445,6 @@ EOF
 	echo "    > RGBMatrixEmulator settings created."
 	fi
 fi
-if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
-	STAGEA=$(date '+%s')
-	echo -e "${NC}Stage 1 of setup took $((STAGEA - STARTTIME)) seconds.${FADE}"
-fi
 if [ ! -d "$VENVPATH" ]; then
 	mkdir ${VENVPATH}
 	echo ""
@@ -468,6 +464,10 @@ if [ ! -d "$VENVPATH" ]; then
 	# fi
 fi
 echo ""
+STAGEA=$(date '+%s')
+if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
+	echo -e "${NC}Stage 1 of setup took $((STAGEA - STARTTIME)) seconds.${FADE}"
+fi
 
 if command -v tmux 2>&1 >/dev/null; then
 	TMUX_AVAIL=true
@@ -539,7 +539,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
 	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
 	STAGEB=$(date '+%s')
-	echo -e "${NC}Stage 2 of setup took $((STAGEB - STARTTIME)) seconds.${FADE}"
+	echo -e "${NC}Stage 2 of setup took $((STAGEB - STAGEA)) seconds.${FADE}"
 	# start the database updater/generator
 	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
 	if [ $INTERNET_STAT -eq 0 ] && [ -f $DB_DOWNLOADER ]; then
