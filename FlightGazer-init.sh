@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.8.3.0
+# Version = v.8.3.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -194,7 +194,7 @@ fi
 CORECOUNT=$(grep -c ^processor /proc/cpuinfo)
 
 if [ ! -f "$CHECK_FILE" ];
-then 
+then
 	echo -e "${NC}> First run or upgrade detected, installing needed dependencies.
   This may take some time, depending on how fast your system is.${FADE}"
 
@@ -337,6 +337,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 	echo ""
 	echo "  > Installing needed dependencies..."
 	echo "    [ python3-dev python3-venv python3-numpy libjpeg-dev tmux ]"
+	echo "    (this might also take awhile if these components aren't installed, please wait.)"
 	# should speed up things
 	# https://askubuntu.com/a/1333505
 	apt-cache --generate pkgnames | \
@@ -365,7 +366,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		Type=forking
 		TimeoutStartSec=720
 		TimeoutStopSec=5
-		
+
 		[Install]
 		WantedBy=multi-user.target
 		Also=flightgazer-bootsplash.service
@@ -385,7 +386,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		ExecStart=$VENVPATH/bin/python3 $BASEDIR/utilities/splash-sysinit.py
 		Type=simple
 		Restart=no
-		
+
 		[Install]
 		# start real early
 		WantedBy=sysinit.target
@@ -435,14 +436,19 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
         "debug_text": false,
         "image_format": "JPEG"
     },
-    "log_level": "info"
+    "log_level": "info",
+    "icon_path": null,
+    "emulator_title: "FlightGazer - Emulated"
 }
 EOF
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/emulator_config.json >/dev/null 2>&1
 	echo "    > RGBMatrixEmulator settings created."
 	fi
 fi
-
+if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
+	STAGEA=$(date '+%s')
+	echo -e "${NC}Stage 1 of setup took $((STAGEA - STARTTIME)) seconds.${FADE}"
+fi
 if [ ! -d "$VENVPATH" ]; then
 	mkdir ${VENVPATH}
 	echo ""
@@ -517,7 +523,9 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		${VENVCMD} install --upgrade RGBMatrixEmulator >/dev/null
 		if [ $WEB_INT -eq 1 ]; then
 			systemctl stop flightgazer-webapp >/dev/null 2>&1
-			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}Flask"
+			echo -e "${CHECKMARK}${FADE}"
+			echo "Web-app components:"
+			echo "${VERB_TEXT}Flask"
 			${VENVCMD} install --upgrade Flask >/dev/null
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}gunicorn"
 			${VENVCMD} install --upgrade gunicorn >/dev/null
@@ -530,6 +538,8 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	touch $LOGFILE
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
 	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
+	STAGEB=$(date '+%s')
+	echo -e "${NC}Stage 2 of setup took $((STAGEB - STARTTIME)) seconds.${FADE}"
 	# start the database updater/generator
 	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
 	if [ $INTERNET_STAT -eq 0 ] && [ -f $DB_DOWNLOADER ]; then

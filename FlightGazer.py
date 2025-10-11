@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.3.0 --- 2025-10-04'
+VERSION: str = 'v.8.3.1 --- 2025-10-11'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -88,7 +88,7 @@ Report bugs to WeegeeNumbuh1: <https://github.com/WeegeeNumbuh1/FlightGazer>"
     )
 argflags.add_argument('-i', '--interactive',
                       action='store_true',
-                      help="Print program output to console. If this flag is not used, this program runs silently."
+                      help="Print live data to console. If this flag is not used, only log output is sent to stdout."
                       )
 argflags.add_argument('-e', '--emulate',
                       action='store_true',
@@ -217,6 +217,7 @@ if PATH_OWNER:
 else:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+main_logger.debug(f"Python version: {sys.version}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
@@ -2190,7 +2191,8 @@ class PrintToConsole:
 
         # flyby stats line
         flyby_str = []
-        flyby_str.append(f"> Total flybys today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
+        flybytext = "flybys" if not NOFILTER_MODE else "flights"
+        flyby_str.append(f"> Total {flybytext} today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
         if VERBOSE_MODE or algorithm_rare_events > 0:
             flyby_str.append(f" | Rare events from algorithm: {algorithm_rare_events}")
         if VERBOSE_MODE:
@@ -4766,6 +4768,8 @@ class Display(
         # Setup Display
         options = RGBMatrixOptions()
         # valid options: https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/include/led-matrix.h
+        if not (FG_icon := Path(CURRENT_DIR, "web-app", "static", "favicon.ico")).exists():
+            FG_icon = None
         valid_attr = [elem for elem in dir(options) if not elem.startswith('__')]
         attribute_assignment = {
             'hardware_mapping': ADV_LED_HARDWARE_MAPPING if ADV_LED_HARDWARE_MAPPING else ("adafruit-hat-pwm" if HAT_PWM_ENABLED else "adafruit-hat"),
@@ -4791,7 +4795,9 @@ class Display(
             'pwm_dither_bits': ADV_LED_PWM_DITHER_BITS,
             # setting the next option to True affects our ability to write to our stats file if set and present
             # this bug took awhile to figure out, lmao
-            'drop_privileges': False if (flyby_stats_present or WRITE_STATE) else True
+            'drop_privileges': False if (flyby_stats_present or WRITE_STATE) else True,
+            'emulator_title': f"FlightGazer {VERSION.split(' --- ')[0]} - Emulated", # for RGBMatrixEmulator >v0.13.5
+            'icon_path': FG_icon, # for RGBMatrixEmulator >v0.13.5
         }
         for attr in valid_attr:
             try:
@@ -5202,6 +5208,7 @@ class Display(
         if self.active_plane_display: return True
         small_font_style = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         HEADER_TEXT_FONT = small_font_style if not CLOCK_CENTER_ROW_2ROWS else fonts.microscopic
+        FLYBY_TEXT = "FLYBY" if not NOFILTER_MODE else "FLGTS"
         FLYBY_HEADING_COLOR = colors.flyby_header_color
         TRACK_HEADING_COLOR = colors.track_header_color
         RANGE_HEADING_COLOR = colors.range_header_color
@@ -5212,7 +5219,7 @@ class Display(
             1,
             IDLE_TEXT_Y,
             FLYBY_HEADING_COLOR,
-            "FLYBY",
+            FLYBY_TEXT,
         )
         _ = graphics.DrawText(
             self.canvas,
@@ -6576,7 +6583,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
     main_logger.info("Initializing display...")
     if 'RGBMatrixEmulator' in sys.modules:
         main_logger.info("We are using 'RGBMatrixEmulator'")
-        main_logger.info("Heads up: Running the emulator is slow! Animations may be laggy.")
+        main_logger.warning("Running the emulator is slow! Animations may be laggy.")
     else:
         main_logger.info("We are using 'rgbmatrix'")
     if ENHANCED_READOUT_AS_FALLBACK and API_KEY:
@@ -6585,6 +6592,13 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled.
         Note that this is still safe to use even if the API_KEY is disabled later on as the API caller will
         simply return before waiting for this Condition. """
+    if not EMULATE_DISPLAY and os.name == 'posix' and os.geteuid() != 0:
+        main_logger.critical("*************************************************")
+        main_logger.critical("*   Display driver 'rgbmatrix' requires root!   *")
+        main_logger.critical("*      Please run FlightGazer using sudo.       *")
+        main_logger.critical("*************************************************")
+        main_logger.critical("FlightGazer has exited.")
+        sys.exit(1)
     try:
         display = Display()
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)

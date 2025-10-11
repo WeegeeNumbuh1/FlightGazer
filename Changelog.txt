@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.3.1 - 2025-10-11
+    - When using NO_FILTER mode, the display now uses the heading text "FLGTS" (flights) instead of "FLYBY" to describe the
+      amount of aircraft tracked in the day
+    - Add new options for RGBMatrixEmulator v0.13.5
+    - Add check in the main script to really make sure it's running as root when loading rgbmatrix
+    - Some output tweaks for the initialization script
+
 v.8.3.0 - 2025-10-04
     - Release number bump
     - Fix issue that arises when the API returns an empty result caused by the code cleanup in last update

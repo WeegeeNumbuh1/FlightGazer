@@ -164,6 +164,7 @@ Using this project assumes you have the following:
 - The latest Python (>=3.9)
 - At least 100 MB of available disk space
 - A working internet connection for setup
+- `git` needs to be installed
 - *for Linux distros:*
   - Basic knowledge of how to use `bash` or similar terminal
   - `ssh` access if running headless
@@ -205,8 +206,9 @@ You don't actually need a physical RGB display, but it's recommended. Other ADS-
 2. Get SSH access (go to System → Management)
    1. Press the Show Password button in the Generate New Root Password section
    2. Copy the password and press the Accept button
-   3. With your SSH client, log into the device at `root@[IP address of the device]`
+   3. With your SSH client, log into the device at `root@adsb-feeder.local`
 3. Continue the below steps and install the web interface as well
+4. You can add the RGB Matrix hardware later, expand the prerequisites above for the hardware setup
 
 </details>
 
@@ -331,7 +333,7 @@ Example: `seconds_color = BLACK`
 - [Reserve a CPU core solely for the display](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#cpu-use)
 - Lower the value for `LED_PWM_BITS` (though `8` seems good enough)
 - Switch CPU governor to `performance` or add `force_turbo=1` to a Raspberry Pi's `config.txt` file
- 
+
 </details>
 
 ### 💻 Making Things Easier (Recommended)
@@ -404,7 +406,7 @@ The script automatically detects that you're running interactively and will disp
 > [!TIP]
 > An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.
 > <br><b>Note: Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
-> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 12 FPS on a Raspberry Pi 3/Zero 2W)
+> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
 > <br>
 > <br>By default, `RGBMatrixEmulator` can be viewed through a web browser:
 > - `http://<IP-address-of-device-running-FlightGazer>:8888`
@@ -468,7 +470,7 @@ or, you may [start it manually](#️-interactive-mode).
   - tmux
 - Create a new systemd service `flightgazer.service` if not present
   - Also creates a systemd service for the boot splash screen `flightgazer-bootsplash.service` as well, only if
-    the `rgbmatrix` library is present 
+    the `rgbmatrix` library is present
 - Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
@@ -549,7 +551,7 @@ sudo bash /path/to/FlightGazer/update.sh
 or, to use the most up-to-date version of the update script:
 ```bash
 # alternative approach
-cd /path/to/FlightGazer 
+cd /path/to/FlightGazer
 wget -O update.sh https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh
 sudo bash update.sh
 ```
@@ -612,7 +614,7 @@ This situation has been seen when a plane just takes off and the API FlightGazer
 **Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
 **A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
 Reasoning: The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
-The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font. 
+The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.
 Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
 
 **Q:** Some of your code is not pythonic!!!1!!111 ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
@@ -632,14 +634,14 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
   - This stat relies on the number of *unique aircraft seen*, not each occurrence of an actual flyby
     - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
   - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
-  
+
 - If using `No Filter` mode and restarting FlightGazer often, we can artifically inflate the flyby count
   - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of aircraft
   - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of aircraft IDs it keeps track of for flybys
   - The flyby count runs under the assumption that the flyby area itself is small, but since `No Filter` removes that restriction, it's a free-for-all
   - This is not usually a problem, as long as we don't restart often in the same day
   - May not ever get fixed
-  
+
 - On rare occasions are times when there will be two entries of the same aircraft (only when using `No Filter` mode)
   - This is an edge case that's been noted since the v.0.x days, mainly due to a dual receiver setup
   - It has been associated with aircraft that uses a dual mode transponder or there is TIS-B contact of the same aircraft on UAT while it's present over ADS-B
@@ -652,7 +654,7 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
   - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd
   - ~~May not actually get fixed (simply just code better, smh)~~
   - **I think it's okay now**
-  
+
 </details>
 <br>
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
