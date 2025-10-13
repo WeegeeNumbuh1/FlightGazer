@@ -17,7 +17,6 @@ Uses the FlightAware API to get an aircraft's departure and destination airports
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
-As usual, this project was developed before being tracked by `git`. ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=24)<br>
 >[!NOTE]
 > Fun fact: this is also the author's second-only Python project.
 
@@ -31,7 +30,6 @@ As usual, this project was developed before being tracked by `git`. ![:gladsuna:
   - [Prerequisites (Important)](#️-prerequisites-important)
   - [Installation \& Getting Started](#-installation--getting-started)
   - [Configuration](#️-configuration)
-  - [Making Things Easier (Recommended)](#-making-things-easier-recommended)
 - [Usage](#️-usage)
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
@@ -152,7 +150,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 ## 🛠️ Setup
 ### ⚠️ Prerequisites (Important)
 
-<details><summary><b>Show/Hide</b></summary>
+<details><summary><b>Show/Hide All</b></summary>
 
 Using this project assumes you have the following:
 #### MINIMUM
@@ -196,62 +194,51 @@ Using this project assumes you have the following:
 <br>
 
 **tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
-You don't actually need a physical RGB display, but it's recommended. Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
+You don't actually need a physical RGB display, but it's recommended. You can install this hardware later if you choose to do so.<br>
+Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
 *Note:* FlightGazer will not work with UAT-only setups and assumes single-site decoders (not a combined feed).
 
-
-<details><summary>Starting from scratch and want to follow the least amount of steps?</summary>
+<details><summary>Not tracking planes yet and want to use this project?</summary>
 
 1. [Follow this guide entirely](https://adsb.im/howto) and use a Raspberry Pi
-2. Get SSH access (go to System → Management)
+2. Get SSH access (go to System → Management from the main webpage)
    1. Press the Show Password button in the Generate New Root Password section
    2. Copy the password and press the Accept button
    3. With your SSH client, log into the device at `root@adsb-feeder.local`
 3. Continue the below steps and install the web interface as well
-4. You can add the RGB Matrix hardware later, expand the prerequisites above for the hardware setup
+4. You can add the RGB Matrix hardware later, expand the prerequisites above for the hardware set-up
 
 </details>
 
 ### 📶 Installation & Getting Started
-Make sure you meet the above prerequisites. To begin:
+Make sure you meet the above prerequisites.<br>
+There are two approaches:
+- Using the web-app (recommended)
+- Installing the traditional way (a little more involved)
+
+To begin:
 ```
 git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
 cd FlightGazer
 ```
-> [!IMPORTANT]
-> Once the above command is completed, it is recommended to **configure your setup now** before running the initialization file.<br>See the [Configuration](#️-configuration) section below, then return to this step.
-
-<details open><summary>if running Linux (Debian) / Raspberry Pi</summary>
-
-then run the following:
+Now, choose either one of these methods:
+#### Using the web-app
+Run this command exactly:
+```bash
+sudo bash FlightGazer-init.sh -c && echo y | sudo bash install-FlightGazer-webapp.sh
 ```
-sudo bash FlightGazer-init.sh
-```
-which will set up everything needed to run FlightGazer and then will start FlightGazer afterwards.<br>
-**If you'd like to change the setup behavior before the first run, [check out the options](#-optional-behaviors).**
-</details>
-<details><summary>if running Windows</summary>
+Watch the output closely. If the install is successful, near the end of the output will be the URL that you need to navigate to in order to complete the setup.<br>
+Once at that webpage, configure settings first and start/restart FlightGazer to apply those settings. Done!
 
-You will need to put in some elbow grease here.
->[!IMPORTANT]
-> You're likely not going to be running `rgbmatrix` on Windows. Instead, use `RGBMatrixEmulator`.
+#### Installing the traditional way
+If you want finer control over the installation process and didn't use the web-app method above, follow these steps:<br>
 
-```powershell
-pip install psutil
-python3 -m venv --system-site-packages "\path\to\new-python-venv"
-cd "\path\to\new-python-venv\Scripts"
-pip install requests
-pip install pydispatcher
-pip install schedule
-pip install RGBMatrixEmulator
-pip install suntime
-pip install orjson
-pip install ruamel.yaml
-```
-If you don't care for running in a virtual environment, skip the `python3 -m venv` and `cd "path\to..."` lines and install the packages globally.<br>
-Then, [read here](#-misc).
-
-</details>
+- Edit the configuration first (see the section below)
+- Run `sudo bash FlightGazer-init.sh`
+  - Optional: if you just want to try out FlightGazer without a permanent install, pass the `-l` flag at the end of the above command
+  - Additional operating modes are explained [here](#-optional-behaviors)
+- To make management easier later on, install the web-app
+  - Run `sudo bash install-FlightGazer-webapp.sh`
 
 ### 🎚️ Configuration
 
@@ -263,10 +250,6 @@ cd /path/to/Flightgazer
 nano config.yaml
 # press Ctrl+O to save, Ctrl+X to exit
 ```
-
-> [!NOTE]
-> If the configuration file is missing or has invalid values, the main script has built-in fallbacks. It will alert you as necessary.<br>
-> (Just don't try to purposely break the script!)
 
 #### Adjusting Colors
 Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
@@ -336,17 +319,6 @@ Example: `seconds_color = BLACK`
 
 </details>
 
-### 💻 Making Things Easier (Recommended)
-
-Want to make dealing with FlightGazer easier without having to use terminal commands all the time? (the author sure did)<br>
-Install the web interface that manages basically everything to do with FlightGazer.<br>
-The web interface can be installed using:<br>
-```bash
-sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh
-```
-The web interface can be accessed via<br>
-`http://<IP-address-of-device-running-FlightGazer>/flightgazer`<br>
-or on port `9898/flightgazer` if there's no web server present on the device running FlightGazer.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🏃‍♂️ Usage
@@ -355,7 +327,9 @@ When FlightGazer is installed, you can use the command `sudo systemctl start fli
 
 > [!IMPORTANT]
 > By default, the script is designed to run at boot (via systemd with `flightgazer.service`).<br>
-> You can check its status with:
+> It's much more convenient to check how FlightGazer is running through the web-app.
+>
+> However, you can also check its status with any of the following commands:
 > ```bash
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
 > # or
@@ -368,7 +342,7 @@ When FlightGazer is installed, you can use the command `sudo systemctl start fli
 > journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
 ### ⚙️ Interactive Mode
-However, the script and python file are also designed to run interactively in a console. If you run the following command manually:
+The script and python file are designed to run interactively in a console. If you run the following command manually:
 ```
 sudo bash /path/to/FlightGazer/FlightGazer-init.sh
 ```
@@ -425,7 +399,8 @@ The main python file accepts almost all the same arguments as the initialization
 </details>
 
 ### 🔕 Shutting Down & Restarting
-To shutdown FlightGazer, do any one of the following:
+It's easier with the web-app.<br>
+If that's not in use, to shutdown FlightGazer, do any one of the following:
 <details><summary>Show/Hide</summary>
 
 ```bash
@@ -482,7 +457,7 @@ or, you may [start it manually](#️-interactive-mode).
   - ruamel.yaml
   - orjson
   - RGBMatrixEmulator<br>
-  *if the web app is installed as well:*
+*if the web app is installed as well:*
   - Flask
   - gunicorn
 - Downloads the `tar1090-db` aircraft database and generates a sqlite3 database that can be used by FlightGazer
@@ -493,7 +468,18 @@ or, you may [start it manually](#️-interactive-mode).
 
 <details><summary>Running on Windows</summary>
 
-No fancy initialization script here. Run FlightGazer as so:
+You will need to put in some elbow grease here.
+>[!IMPORTANT]
+> You're likely not going to be running `rgbmatrix` on Windows. Instead, use `RGBMatrixEmulator`.
+
+```powershell
+pip install psutil
+python3 -m venv --system-site-packages "\path\to\new-python-venv"
+cd "\path\to\new-python-venv\Scripts"
+pip install requests pydispatcher schedule suntime ruamel.yaml orjson RGBMatrixEmulator
+```
+If you don't care for running in a virtual environment, skip the `python3 -m venv` and `cd "path\to..."` lines and install the packages globally.<br>
+Run FlightGazer as so:
 ```
 \path\to\new-python-venv\Scripts\python \path\to\FlightGazer\FlightGazer.py -i -e
 ```
@@ -540,15 +526,15 @@ Check the [`utilities`](./utilities/) directory.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## ⬆️ How to Update
-
-It is recommended to use the most up-to-date versions!
+Use the web-app ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20).<br>
+or:
 
 Version v.2.x and newer:
 ```bash
 # recommended
 sudo bash /path/to/FlightGazer/update.sh
 ```
-or, to use the most up-to-date version of the update script:
+To use the most up-to-date version of the update script:
 ```bash
 # alternative approach
 cd /path/to/FlightGazer
@@ -602,7 +588,7 @@ If it has been over three (3) months since it last checked, then the next time i
 
 **Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
 **A:** Sure, just change some things in the script. Have fun. (also, you can just fork this project)<br>
-(note: any changes done to the main script will be overwritten if you update with the updater) ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20)
+(note: any changes done to the main script will be overwritten if you update with the updater)
 
 **Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
 **A:** In my experience, adsbdb/adsb.lol cannot handle chartered/position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
