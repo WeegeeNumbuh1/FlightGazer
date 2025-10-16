@@ -656,7 +656,8 @@ Read: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [ ] ~~Docker image?~~ (unlikely)
-- [x] Settings management from webpage [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
+- [x] Settings management from webpage → [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
+- [ ] Support display output to a [FlightFeeder Pro](https://flightaware.store/products/flightfeeder-pro-ads-b-flight-tracker-1090-mhz-piaware)?
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
 Suggestions, comments, and bug reports are always welcomed and encouraged.<br>

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.3.1 --- 2025-10-11'
+VERSION: str = 'v.8.3.2 --- 2025-10-16'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1673,7 +1673,7 @@ def runtime_accumulators_reset() -> None:
         really_active_adsb_site = True
         extra_text = True
 
-    if (len(unique_planes_seen) >= 1300
+    if (len(unique_planes_seen) >= 1250
         and not NOFILTER_MODE
         and (RANGE <= (2 * distance_multiplier) and HEIGHT_LIMIT <= (15000 * altitude_multiplier))
         and FLYBY_STALENESS >= 60
@@ -2051,9 +2051,17 @@ class PrintToConsole:
                         else: # note, PIA aircraft are not handled here because they always have an Operator (callsign)
                             print_info.append(" | Other kind of aircraft")
                 if aircraft['AircraftDesc']:
-                    print_info.append(f" | {aircraft['AircraftDesc']} (Type: {aircraft['ICAOType']})")
+                    print_info.append(f" | {aircraft['AircraftDesc']} (Type: {aircraft['ICAOType']}")
+                    if aircraft['CategoryDesc'] != 'None':
+                        print_info.append(f", {aircraft['CategoryDesc']})")
+                    else:
+                        print_info.append(")")
                 elif not aircraft['AircraftDesc'] and aircraft['ICAOType'] != "None":
-                    print_info.append(f" | Aircraft type: {aircraft['ICAOType']}")
+                    print_info.append(f" | Aircraft Type: {aircraft['ICAOType']}")
+                    if aircraft['CategoryDesc'] != 'None':
+                        print_info.append(f" ({aircraft['CategoryDesc']})")
+                elif aircraft['CategoryDesc'] != 'None':
+                    print_info.append(f" | Aircraft Type: {aircraft['CategoryDesc']})")
 
                 # finally, print it all
                 print_info.append(rst)
@@ -2433,6 +2441,27 @@ def main_loop_generator() -> None:
     }
     """ Map the broadcast type to a priority table, returns an int. """
 
+    category_description: dict = { # Emitter Category ADS-B DO-260B 2.2.3.2.5.2
+    'A1': 'Light (<15500 lbs)',
+    'A2': 'Small (15500-75000 lbs)',
+    'A3': 'Large (75000-300000 lbs)',
+    'A4': 'High Vortex Large (75000-300000 lbs)',
+    'A5': 'Heavy (>300000 lbs)',
+    'A6': 'High Performance (>5G & 400kts)',
+    'A7': 'Rotorcraft',
+    'B1': 'Glider/Sailplane',
+    'B2': 'Lighter-than-air',
+    'B3': 'Parachutist/Skydiver',
+    'B4': 'Ultralight',
+    'B6': 'Unmanned Aerial Vehicle',
+    'B7': 'Space Vehicle',
+    'C1': 'Surface Vehicle (Emergency)',
+    'C2': 'Surface Vehicle (Service)',
+    'C3': 'Point Obstacle',
+    'C4': 'Cluster Obstacle',
+    'C5': 'Line Obstacle',
+    }
+
     def dump1090_heartbeat() -> list | None:
         """ Checks if dump1090 service is up and returns the parsed json file(s) as a list of nested dictionaries.
         If service is down/times out, returns None. Returned list can be empty (still valid). Most of the processing time occurs here.
@@ -2556,6 +2585,7 @@ def main_loop_generator() -> None:
             - OperatorAKA: Plane's airline as more commonly known (if available), defaults None
             - Owner: Plane's owner (usually different than Operator), defaults None
             - ICAOType: ICAO type code for the plane (eg. A380), defaults to string "None"
+            - CategoryDesc: Characteristics of the ADS-B unit, defaults to string "None"
             - AircraftDesc: The type of plane (if available, includes year if available), defaults None
             - TrackingFlag: What the plane is operating as (eg: LADD, military), represented as a string, defaults as string "None"
             - Registration: Plane's registration (if available), defaults None
@@ -2770,6 +2800,7 @@ def main_loop_generator() -> None:
                             futlon = round(futlon, 6)
                         else:
                             futdis = None
+                        emitter = category_description.get(a.get('category'), "None")
                         iso_code = getICAO(hex).upper()
                         # This key is sometimes present in some readsb setups (eg: adsb.im images).
                         # Because it reads from a much more updated database, we try to use it first
@@ -2837,6 +2868,7 @@ def main_loop_generator() -> None:
                             "Owner": owner,
                             "AircraftDesc": adesc,
                             "ICAOType": atype,
+                            "CategoryDesc": emitter,
                             "TrackingFlag": "None",
                             "Registration": registration,
                             "Priority": priority_value,
@@ -3691,18 +3723,25 @@ class DisplayFeeder:
                         break
 
             # Get all the other info from the focus plane provided by the database (if available)
-            # Example outputs:
+            # Example outputs (non-exhaustive):
             # "2025 BOEING 787-8 Dreamliner | United Airlines"
             # "1998 CESSNA T182 Turbo Skylane | DOE JOHN"
             # "2024 BELL 429 GlobalRanger (LADD aircraft) | CITY OF CHICAGO DEPARTMENT OF POLICE"
             # "BOEING-VERTOL CH-47 Chinook (Military aircraft) | AIR MOBILITY COMMAND (AMC)"
             # "BOEING KC-135R/T Stratotanker (Military aircraft)"
+            # "Aircraft type: High Vortex Large (75000-300000 lbs) (PIA aircraft) | ForeFlight"
             # "FlightAware (PIA aircraft)"
             aircraft_str_ = []
             if focus_plane_stats['AircraftDesc']:
                 aircraft_str_.append(focus_plane_stats['AircraftDesc'])
-            elif focus_plane_stats['ICAOType'] != "None":
-                aircraft_str_.append(f"Aircraft type: {focus_plane_stats['ICAOType']}")
+            else:
+                if focus_plane_stats['ICAOType'] != "None":
+                    aircraft_str_.append(f"Aircraft type: {focus_plane_stats['ICAOType']}")
+                    if focus_plane_stats['CategoryDesc'] != "None": # fallback on what ADS-B reports
+                        aircraft_str_.append(f", {focus_plane_stats['CategoryDesc']}")
+                else:
+                    if focus_plane_stats['CategoryDesc'] != "None":
+                        aircraft_str_.append(f"Aircraft type: {focus_plane_stats['CategoryDesc']}")
             if (part1 := "".join(aircraft_str_)): # if any of the above proved true
                 if focus_plane_stats['TrackingFlag'] != "None":
                     # recall: PIA aircraft will not have an aircraft description and will never show up here

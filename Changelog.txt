@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.3.2 - 2025-10-16
+    - Add reading ADS-B emitter category (the self-reported aircraft type) which can be used as a fallback
+      when there's no other available information about an aircraft
+
 v.8.3.1 - 2025-10-11
     - When using NO_FILTER mode, the display now uses the heading text "FLGTS" (flights) instead of "FLYBY" to describe the
       amount of aircraft tracked in the day
