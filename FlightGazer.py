@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.3.2 --- 2025-10-16'
+VERSION: str = 'v.8.4.0 --- 2025-10-18'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -58,26 +58,11 @@ if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
     sys.exit(1)
 
-# external imports
-import requests
-from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
-import schedule
-import psutil
-from suntime import Sun, SunTimeException
-try:
-    # faster json deserialization for the dump1090 processing loop
-    # Fun stats from testing:
-    # - orjson is 2-3x faster than the built-in json module
-    # - orjson is 1.05-1.2x faster than msgspec (even after reusing a decoder, as suggested in the msgspec docs)
-    import orjson
-    ORJSON_IMPORTED = True
-except ImportError:
-    ORJSON_IMPORTED = False # we can always fall back on the standard json library
-# our utilities
-from utilities.flags import getICAO
-from utilities.registrations import registration_from_hexid as reg_lookup
-from utilities.animator import Animator
-from utilities import operators as op
+CURRENT_EXE = sys.executable
+if 'FlightGazer-pyvenv' in CURRENT_EXE:
+    INSTALLED = True
+else:
+    INSTALLED = False
 
 argflags = argparse.ArgumentParser(
     description="FlightGazer, a program to show dump1090 info to an RGB-Matrix display.\n\
@@ -216,11 +201,45 @@ if PATH_OWNER:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\' (owned by \'{PATH_OWNER}\')")
 else:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
-main_logger.info(f"Using: \'{sys.executable}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+main_logger.info(f"Using: \'{CURRENT_EXE}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
 main_logger.debug(f"Python version: {sys.version}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
+main_logger.debug("Loading modules...")
+# external imports
+try:
+    import requests
+    from pydispatch import dispatcher # pip install pydispatcher *not* pip install pydispatch
+    import schedule
+    import psutil
+    from suntime import Sun, SunTimeException
+    try:
+        # faster json deserialization for the dump1090 processing loop
+        # Fun stats from testing:
+        # - orjson is 2-3x faster than the built-in json module
+        # - orjson is 1.05-1.2x faster than msgspec (even after reusing a decoder, as suggested in the msgspec docs)
+        import orjson
+        ORJSON_IMPORTED = True
+    except ImportError:
+        ORJSON_IMPORTED = False # we can always fall back on the standard json library
+except Exception as e:
+    main_logger.exception(f"{e}")
+    main_logger.critical("Could not load required 3rd-party modules.")
+    if INSTALLED:
+        main_logger.critical("The virtual environment must be rebuilt. Run the initialization script or restart the service.")
+    sys.exit(1)
+# our utilities
+try:
+    from utilities.flags import getICAO
+    from utilities.registrations import registration_from_hexid as reg_lookup
+    from utilities.animator import Animator
+    from utilities import operators as op
+except Exception as e:
+    main_logger.exception(f"{e}")
+    main_logger.critical("Could not load or find required internal modules.")
+    main_logger.critical("FlightGazer needs to be reinstalled.")
+    sys.exit(1)
 
 # Main "constants"
 CONFIG_FILE = Path(CURRENT_DIR, "config.yaml")
@@ -950,7 +969,7 @@ def dxing_log() -> None:
     data0 = []
     dis = super_far_plane['Distance'] / distance_multiplier
     if dis >= 400:
-        data0.append("Frame this and tell everyone! ")
+        data0.append("*** Frame this and tell everyone!*** ")
     elif 350 < dis < 400:
         data0.append("Absolutely insane! ")
     else:
@@ -2310,6 +2329,17 @@ def main_loop_generator() -> None:
             # search backwards through list
             if entry['ID'] == input_ID:
                 if (time_now - entry['Time']) < stale_age:
+                    # Programmer's note: if you want to update the
+                    # timestamp for this flyby you'll need to update the
+                    # dict at the list index using this:
+                    # def enumerate_reversed(iter):
+                    #     for index in range(len(iter) -1, -1, -1):
+                    #         yield (index, iter[index])
+                    # and do:
+                    # for index, entry in enumerate_reversed(unique_planes_seen):
+                    #   unique_planes_seen[index]['Time'] = time.monotonic()
+                    #
+                    # However, this is 2-3x as slow.
                     return # if we recently have seen this plane
                 else:
                     add_entry()

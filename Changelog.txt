@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.8.4.0 - 2025-10-18
+    - Handle situations when the base OS is upgraded (ex: Debian 12 to Debian 13)
+        - Initialization script will now test if the modules in the virtual environment can actually be loaded
+          and if not, the virtual environment will be fully rebuilt
+        - The main python script now logs when module imports fails
+    - Updated aircraft database fetcher to embed the license type for the data
+
 v.8.3.2 - 2025-10-16
     - Add reading ADS-B emitter category (the self-reported aircraft type) which can be used as a fallback
       when there's no other available information about an aircraft

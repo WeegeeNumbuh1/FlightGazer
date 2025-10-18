@@ -289,7 +289,7 @@ Also important to note, if your dump978 instance uses a different set location t
 `BRIGHTNESS_2: 0`
 
 If you don't want it to turn off at sunset,<br>
-`USE_SUNRISE_SETSET: false`<br>
+`USE_SUNRISE_SUNSET: false`<br>
 then set `BRIGHTNESS_SWITCH_TIME` to whatever time you want.
 
 Note that FlightGazer will still be running *and* driving the screen even with a brightness of `0` so CPU usage will remain the same.
@@ -567,7 +567,8 @@ Simply delete the folder (and the virtual python environment if you set that up 
 
 **Q:** My RGB display is blank when running this, what broke?<br>
 **A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
-Additionally, this project assumes the use of the adafruit rgbmatrix bonnet and only 1 HUB75-based RGB panel. Other setups are not supported.<br>
+This project assumes the use of the adafruit rgbmatrix bonnet and only 1 HUB75-based RGB panel.<br>
+Other setups are not guaranteed to work but they might work by using the Advanced RGB Matrix options in the config file.<br>
 Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
 
 **Q:** I broke it 🥺<br>

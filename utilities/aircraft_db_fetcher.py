@@ -1,11 +1,11 @@
 """ This script imports the `aircraft.csv.gz` file that's kept up-to-date from wiedehopf's `tar1090-db` repository
 (https://github.com/wiedehopf/tar1090-db/tree/csv) and converts it into a sqlite3 database.
-Additional credit goes to Mictronics (https://github.com/Mictronics) for maintaining the actual database.
+Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-database/index.php) for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer)
 and is intended to be used in conjunction with FlightGazer's `FlightGazer-init.sh` script.
-If you use the generated database in your own project, please credit the original authors. """
+This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: July 2025
+# Last updated: October 2025
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -225,6 +225,7 @@ except OSError:
     username = "< Unknown >"
 machine = uname()
 machine_name = f"\'{machine.node}\', running {machine.system} {machine.release} [ {machine.version} on {machine.machine} ]"
+license_type = "Open Data Commons Attribution License"
 
 write_start = perf_counter()
 # Write to a sqlite database
@@ -265,9 +266,9 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
 
     cursor.execute("DELETE FROM DB_INFO")
     cursor.execute("""
-        INSERT INTO DB_INFO (version, created_date, created_by, machine)
-        VALUES (?, ?, ?, ?)
-        """, (db_ver, date_now, username, machine_name))
+        INSERT INTO DB_INFO (version, created_date, created_by, machine, license)
+        VALUES (?, ?, ?, ?, ?)
+        """, (db_ver, date_now, username, machine_name, license_type))
     
     conn.commit()
 conn.close()
