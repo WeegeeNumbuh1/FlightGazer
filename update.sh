@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.8.3.0
+# Last updated: v.9.0.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -11,7 +11,7 @@
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH=/tmp/FlightGazer-tmp
 VENVPATH=/etc/FlightGazer-pyvenv
-MIGRATE_LOG=${TEMPPATH}/settings_migrate.log
+MIGRATE_LOG="${TEMPPATH}/settings_migrate.log"
 GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 RED='\033[0;31m'
@@ -25,7 +25,7 @@ RESET_FLAG=0 # 1 = reset settings when updating
 
 help_str(){
 	echo ""
-	echo "Usage: sudo bash $BASEDIR/$(basename $0) [options]"
+	echo "Usage: sudo bash \"${BASEDIR}/$(basename $0)\" [options]"
 	echo "[-h]     Print this help message."
 	echo "[-r]     Reset existing configuration to default when updating."
 	echo "Default (no options) updates to the latest version and migrates settings."
@@ -41,7 +41,7 @@ while getopts ':hr' opt; do
 		h)
 		echo "This is the FlightGazer updater script."
 		help_str
-		exit 1
+		exit 0
 		;;
 		\?)
 		INVALID_FLAG=true
@@ -95,6 +95,12 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+REQUIRED_PYTHON_MAJOR=3
+REQUIRED_PYTHON_MINOR=10
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+INSTALLED_MAJOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f1)
+INSTALLED_MINOR=$(echo "$PYTHON_VERSION" | cut -d'.' -f2)
+
 echo -e "${GREEN}>>> Checking for updates...${NC}"
 WEB_INF=0
 WEB_UPDATE=0
@@ -106,7 +112,7 @@ fi
 echo ""
 echo "===== FlightGazer info ====="
 if [ -f "${BASEDIR}/version" ]; then
-	VER_STR=$(head -c 12 ${BASEDIR}/version)
+	VER_STR=$(head -c 12 "${BASEDIR}/version")
 	echo -e "> Currently installed version:        ${VER_STR}"
 else
 	VER_STR=""
@@ -128,7 +134,7 @@ fi
 if [ $WEB_INF -eq 1 ]; then
 	echo "===== Web Interface info ====="
 	if [ -f "${BASEDIR}/web-app/version-webapp" ]; then
-		VER_STR=$(head -c 12 ${BASEDIR}/web-app/version-webapp)
+		VER_STR=$(head -c 12 "${BASEDIR}/web-app/version-webapp")
 		echo -e "> Currently installed version:        ${VER_STR}"
 	else
 		VER_STR=""
@@ -162,8 +168,8 @@ while read -t 30 -p "[yY|nN]: " do_it; do
 		"y" | "Y" | "yes" | "Yes" | "YES")
 			break
 			;;
-		"n" | "N" | "No" | "NO")
-			echo "> Update canceled. No changes have been made."
+		"n" | "N" | "no" | "No" | "NO")
+			echo "> Update cancelled. No changes have been made."
 			exit 0
 			;;
 		*)
@@ -177,20 +183,38 @@ if [ -z "$do_it" ]; then
 	exit 0
 fi
 
-rm -rf ${TEMPPATH} >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
+rm -rf "$TEMPPATH" >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
 echo -e "${GREEN}>>> Downloading latest version...${NC}${FADE}"
 git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer $TEMPPATH
 if [ $? -ne 0 ]; then
-	rm -rf ${TEMPPATH} >/dev/null 2>&1
+	rm -rf "$TEMPPATH" >/dev/null 2>&1
 	echo -e "${RED}>>> ERROR: Failed to download from GitHub. Updater cannot continue.${NC}"
 	exit 1
 fi
-rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
+rm -rf "${TEMPPATH}/.git" >/dev/null 2>&1
 find "${TEMPPATH}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
+
 if [ -f "${TEMPPATH}/version" ]; then
-	VER_STR=$(head -c 12 ${TEMPPATH}/version)
+	VER_STR=$(head -c 12 "${TEMPPATH}/version")
 	echo -e "${NC}> Downloaded FlightGazer version: ${VER_STR}"
 fi
+
+if [ -f "${TEMPPATH}/setup/min_python_version" ]; then
+	REQUIRED_PYTHON_NEW=$(head -c 8 "${TEMPPATH}/setup/min_python_version")
+	REQUIRED_PYTHON_MAJOR=$(echo "$REQUIRED_PYTHON_NEW" | cut -d '.' -f1)
+	REQUIRED_PYTHON_MINOR=$(echo "$REQUIRED_PYTHON_NEW" | cut -d '.' -f2)
+fi
+if (( INSTALLED_MAJOR < REQUIRED_PYTHON_MAJOR )) || \
+   (( INSTALLED_MAJOR == REQUIRED_PYTHON_MAJOR && INSTALLED_MINOR < REQUIRED_PYTHON_MINOR )); then
+	echo -e "\n${NC}${RED}>>> ERROR: Python version too old. Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}${NC}"
+	echo ""
+	echo "To prevent breaking a working FlightGazer install, please upgrade to a newer Python version before updating."
+	echo "If you're viewing this in the web-app, it's safe to leave this page."
+	rm -rf "$TEMPPATH" >/dev/null 2>&1
+	echo -e "${NC}${GREEN}>>> Update complete.${NC}" # for the web-app
+	exit 1
+fi
+
 echo -e "${GREEN}>>> Shutting down any running FlightGazer processes...${NC}${FADE}"
 systemctl stop flightgazer.service
 sleep 2s
@@ -209,50 +233,50 @@ color_migrator () {
 		echo "$line"
 		done < "$file"
 	# read colors.py from current install from and including "# CONFIG_START" line to end of file
-	sed -n '/# CONFIG_START/,$p' $file2
+	sed -n '/# CONFIG_START/,$p' "$file2"
 }
 echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
 # get current owner of the install directory
-read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
+read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
 echo -e "> ${BASEDIR} | Owner: ${OWNER_OF_FGDIR}, Group: ${GROUP_OF_FGDIR}"
-if [ -f "$BASEDIR/settings_migrate.log" ]; then
-	cp -p "$BASEDIR/settings_migrate.log" ${TEMPPATH} >/dev/null 2>&1
+if [ -f "${BASEDIR}/settings_migrate.log" ]; then
+	cp -p "${BASEDIR}/settings_migrate.log" "$TEMPPATH" >/dev/null 2>&1
 fi
 if [ -f "$BASEDIR/config.py" ] && [ ! -f "$BASEDIR/config.yaml" ]; then
 	echo "> Old version of FlightGazer detected. You must migrate your settings manually."
-	mv ${BASEDIR}/config.py ${BASEDIR}/config_old.py >/dev/null 2>&1
-	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/config_old.py >/dev/null 2>&1
-	chmod -f 644 ${BASEDIR}/config_old.py >/dev/null 2>&1
+	mv "${BASEDIR}/config.py" "${BASEDIR}/config_old.py" >/dev/null 2>&1
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/config_old.py" >/dev/null 2>&1
+	chmod -f 644 "${BASEDIR}/config_old.py" >/dev/null 2>&1
 	OLDER_BUILD=1
 else
 	time_now=$(date '+%Y-%m-%d %H:%M')
-	echo -e "\n--- FlightGazer settings migration log. ${time_now} ---" >> $MIGRATE_LOG
+	echo -e "\n--- FlightGazer settings migration log. ${time_now} ---" >> "$MIGRATE_LOG"
 	if [ $RESET_FLAG -eq 0 ]; then
-		${VENVPATH}/bin/python3 ${BASEDIR}/utilities/settings_migrator.py ${BASEDIR}/config.yaml ${TEMPPATH}/config.yaml | tee -a $MIGRATE_LOG
+		"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/settings_migrator.py" "${BASEDIR}/config.yaml" "${TEMPPATH}/config.yaml" | tee -a "$MIGRATE_LOG"
 		if [ $? -ne 0 ]; then
 			MIGRATE_FLAG=1
 		fi
 	else
-		mv ${BASEDIR}/config.yaml ${BASEDIR}/config_old.yaml >/dev/null 2>&1
-		echo "> Settings have been reset to default during this update." | tee -a $MIGRATE_LOG
-		echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
-		echo "  Your previous configuration has been backed up as: ${BASEDIR}/config_old.yaml" | tee -a $MIGRATE_LOG
+		mv "${BASEDIR}/config.yaml" "${BASEDIR}/config_old.yaml" >/dev/null 2>&1
+		echo "> Settings have been reset to default during this update." | tee -a "$MIGRATE_LOG"
+		echo "  Please reconfigure as necessary." | tee -a "$MIGRATE_LOG"
+		echo "  Your previous configuration has been backed up as: ${BASEDIR}/config_old.yaml" | tee -a "$MIGRATE_LOG"
 	fi
 fi
 if [ $RESET_FLAG -eq 0 ]; then
-	echo -n "> Migrating color configuration... " | tee -a $MIGRATE_LOG
-	grep -q "# CONFIG_START" ${BASEDIR}/setup/colors.py >/dev/null 2>&1 # check that this is using the newer-style
+	echo -n "> Migrating color configuration... " | tee -a "$MIGRATE_LOG"
+	grep -q "# CONFIG_START" "${BASEDIR}/setup/colors.py" >/dev/null 2>&1 # check that this is using the newer-style
 	if [ $? -eq 0 ]; then
-		if [ $(wc -l < ${TEMPPATH}/setup/colors.py) -eq $(wc -l < ${BASEDIR}/setup/colors.py) ]; then
-			color_migrator ${TEMPPATH}/setup/colors.py ${BASEDIR}/setup/colors.py > ${TEMPPATH}/colors_migrated
-			mv -f ${TEMPPATH}/colors_migrated ${TEMPPATH}/setup/colors.py >/dev/null 2>&1
-			echo "Done." | tee -a $MIGRATE_LOG
+		if [ $(wc -l < "${TEMPPATH}/setup/colors.py") -eq $(wc -l < "${BASEDIR}/setup/colors.py") ]; then
+			color_migrator "${TEMPPATH}/setup/colors.py" "${BASEDIR}/setup/colors.py" > "${TEMPPATH}/colors_migrated"
+			mv -f "${TEMPPATH}/colors_migrated" "${TEMPPATH}/setup/colors.py" >/dev/null 2>&1
+			echo "Done." | tee -a "$MIGRATE_LOG"
 		else
-			mv ${BASEDIR}/setup/colors.py ${BASEDIR}/setup/colors.bak >/dev/null 2>&1
-			echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a $MIGRATE_LOG
-			echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a $MIGRATE_LOG
-			echo "  Please reconfigure as necessary." | tee -a $MIGRATE_LOG
-			echo -e "> Your previous color configuration has been backed up as: ${BASEDIR}/setup/colors.bak${NC}" | tee -a $MIGRATE_LOG
+			mv "${BASEDIR}/setup/colors.py" "${BASEDIR}/setup/colors.bak" >/dev/null 2>&1
+			echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a "$MIGRATE_LOG"
+			echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a "$MIGRATE_LOG"
+			echo "  Please reconfigure as necessary." | tee -a "$MIGRATE_LOG"
+			echo -e "> Your previous color configuration has been backed up as: ${BASEDIR}/setup/colors.bak${NC}" | tee -a "$MIGRATE_LOG"
 			# no need to do any fancy interim migration here, we just overwrite the file
 			sleep 2s
 		fi
@@ -260,19 +284,19 @@ if [ $RESET_FLAG -eq 0 ]; then
 		echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 	fi
 fi
-cp -f ${BASEDIR}/flybys.csv ${TEMPPATH}/flybys.csv >/dev/null 2>&1 # copy flyby stats file if present
-cp -f ${BASEDIR}/config.yaml ${TEMPPATH}/config_old.yaml >/dev/null 2>&1 # create backup of old config file
+cp -f "${BASEDIR}/flybys.csv" "${TEMPPATH}/flybys.csv" >/dev/null 2>&1 # copy flyby stats file if present
+cp -f "${BASEDIR}/config.yaml" "${TEMPPATH}/config_old.yaml" >/dev/null 2>&1 # create backup of old config file
 echo -e "${NC}${GREEN}>>> Installing latest version of FlightGazer... ${NC}${FADE}"
-rm -f ${VENVPATH}/first_run_complete >/dev/null 2>&1 # force the init script to update the venv for any changes
+rm -f "${VENVPATH}/first_run_complete" >/dev/null 2>&1 # force the init script to update the venv for any changes
 # if there are additonal files in the install directory that aren't in the latest commit,
 # simply leave them be in the install directory (they could be user files)
-chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${TEMPPATH} # need to do this as we are running as root
+chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$TEMPPATH" # need to do this as we are running as root
 echo -e "${FADE}Copying ${TEMPPATH} to ${BASEDIR}..."
-cp -afT ${TEMPPATH} ${BASEDIR}
-chmod -f 644 ${BASEDIR}/config.yaml
+cp -afT "$TEMPPATH" "$BASEDIR"
+chmod -f 644 "${BASEDIR}/config.yaml"
 # chown -fR ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR} >/dev/null 2>&1
-chmod -f 644 ${BASEDIR}/flybys.csv >/dev/null 2>&1
-rm -f ${BASEDIR}/../emulator_config.json >/dev/null 2>&1 # for older installs
+chmod -f 644 "${BASEDIR}/flybys.csv" >/dev/null 2>&1
+rm -f "${BASEDIR}/../emulator_config.json" >/dev/null 2>&1 # for older installs
 echo "> Copy complete."
 echo -e "${NC}${GREEN}>>> Restarting FlightGazer...${NC}${FADE}"
 systemctl is-enabled flightgazer.service >/dev/null 2>&1
@@ -284,7 +308,7 @@ else
 	disown # orphan the above process once the script exits so that the web interface knows this script is actually done
 	echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
 fi
-rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
+rm -rf "$TEMPPATH" >/dev/null 2>&1 # clean up after ourselves
 if [ $WEB_UPDATE -eq 1 ]; then
 	echo -e "${FADE}"
 	echo "*************** Web Interface Info *****************"
@@ -296,7 +320,7 @@ if [ $WEB_UPDATE -eq 1 ]; then
 	echo "*          Please wait a few minutes for           *"
 	echo "*          the install to fully complete.          *"
 	echo "****************************************************"
-	nohup bash $BASEDIR/web-app/update-webapp.sh >/dev/null 2>&1 &
+	nohup bash "${BASEDIR}/web-app/update-webapp.sh" >/dev/null 2>&1 &
 	disown
 fi
 echo -e "${NC}${GREEN}>>> Update complete.${NC}"

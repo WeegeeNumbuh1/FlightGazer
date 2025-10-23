@@ -5,6 +5,39 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.0.0 - 2025-10-22
+    - BREAKING CHANGE: Updated some internal methods which now require Python 3.10.
+      Python 3.9's EOL is 2025-10-30. Consider upgrading to a modern version of Python.
+
+      *** Updating to this version of FlightGazer or newer on systems running Python 3.9 will cause FlightGazer to no longer load. ***
+      Future updates will check this minimum before installing, however, with the current update system in place on v.8.4.0 and older, it is possible
+      to update from an older version to this version (or newer) and break the currently working install.
+
+    - Added new framework for both update and initialization scripts to check and enforce a minimum Python version
+        - This will help prevent working installs from updating to newer versions in the future that might require
+          newer Python versions and also prevent running FlightGazer on systems with unsupported Python versions
+    - API usage and journey detail improvements:
+        - When an aircraft does not have an API result, "N/A" will be used as the origin airport instead of the default "---"
+        - If an API call fails (ex: no connection or the API service fails) the display will show the type of error
+        - When using SHOW_EVEN_MORE_INFO:
+            - If there's an API error, there is an additional description for the error
+            - If ENHANCED_READOUT_AS_FALLBACK is not enabled and any of the API limits are reached,
+              the display will show the reason
+            - TIS-B contacts (ICAO's starting with "~") now have a description for what they are
+    - Logging tweaks
+        - If the designated RANGE and HEIGHT_LIMIT is too large for the local aircraft activity, FlightGazer will log a warning
+        - Reduce logging messages when using RGBMatrixEmulator
+    - Numerous improvements to the initialization, update, uninstall, and webapp install scripts for better resilience
+    - The selection algorithm now has more performance metrics that can be monitored
+    - Slight FPS increase from 24 to 25 when SHOW_EVEN_MORE_INFO is enabled
+    - Fix emulator config that was updated in v.8.3.1
+    - Fix issue where display will show "N/A" for the "FLGTS" counter if using NO_FILTER mode but location is not set
+    - Improved callsign rendering when it cannot fit on the display
+    - Minor internal code optimizations when doing time delta checking
+    - Minor interactive mode output tweaks
+    - Changelog cleanup
+    - Previously was meant to be v.8.5.0
+
 v.8.4.0 - 2025-10-18
     - Handle situations when the base OS is upgraded (ex: Debian 12 to Debian 13)
         - Initialization script will now test if the modules in the virtual environment can actually be loaded
@@ -442,7 +475,7 @@ v.4.2.4 - 2025-05-10
     - Added message in init script explaining what to do when there is a running instance of FlightGazer
     - Minor log output change, now there is a message when all checks have passed
     - Added easter egg
-    
+
 v.4.2.3 - 2025-05-06
     - Fix the edge case fix from the last release (it didn't actually work)
     - More code cleanups
@@ -484,13 +517,13 @@ v.4.1.0 - 2025-04-18
         - This functionality is enabled by default with the setting WRITE_STATE
     - Another refactoring for the Interactive print display routine
         - It's finally pythonic for the nerds out there
-    - The 'rare event' message counter (if you've never seen it yet, then your ADS-B site isn't that active) will reset itself 
+    - The 'rare event' message counter (if you've never seen it yet, then your ADS-B site isn't that active) will reset itself
       at the end of the day instead of when it occurs again, which could happen anywhere between the next day and never
         - Updated log output for this change as well
     - FlightGazer will now no longer run if it can neither find dump1090 or load the display upon startup
     - The feature creep has hit a milestone: the main python script is now >200 KiB in size
         - How does this all still work? lmao
-    
+
 v.4.0.0 - 2025-04-15
     - Refactoring for significantly faster dump1090 data processing
         - Anywhere from 3-8x speedup versus the original processing methods used since the v.0.x days
@@ -619,7 +652,7 @@ v.3.2.0 - 2025-03-17
     - Added JOURNEY_PLUS setting (does nothing at the moment)
     - Refined out-of-bounds range and height limiting
     - Minor tweaks to footer formatting in Interactive readout
-   
+
 v.3.1.0 - 2025-03-13
     - NEW: New option to use an alternative font for all the small text on the display
         - This 3x5 font is less squared-off and maximizes differences between homoglyphs (eg: '5' vs 'S', 'O' vs '0', etc)
@@ -728,7 +761,7 @@ v.2.7.3 - 2025-02-28
 v.2.7.2 - 2025-02-27
     - Updater script checks if service is disabled and does not automatically restart the service
     - Initialization script accepts new flags: an install-only/check dependencies mode and enabling verbose mode
-    
+
 v.2.7.1 - 2025-02-26
     - Apply tweaks to both updater and uninstaller scripts that should make them more robust to changes in the future
     - Fix tmux checking in main python script
@@ -738,7 +771,7 @@ v.2.7.0 - 2025-02-26
     - Speed readout moved 1 pixel to the right for better spacing
     - Limit Flyby, Tracking, and Range readout on display if the values exceed what can fit in their sections
         - These limits will almost always never be hit, but they're there now
-    - Increased pause length when FlightGazer encounters a dump1090 timeout 
+    - Increased pause length when FlightGazer encounters a dump1090 timeout
     - Main python script now detects if it's running inside tmux
     - Interactive mode now has a reminder in the footer on how to exit
     - Smoothed splash screen scroll
@@ -799,7 +832,7 @@ v.2.4.1 - 2025-02-01
 
 v.2.4.0 - 2025-02-01
     - Refactored systemd service and init script to handle system shutdowns more gracefully
-        - Important: If you already have FlightGazer (v.1.5.0 - v.2.3.0) installed as a service, 
+        - Important: If you already have FlightGazer (v.1.5.0 - v.2.3.0) installed as a service,
           you must remove the service file at /etc/systemd/system/flightgazer.service before updating
           to this release. Not doing so will cause the service to report a startup failure!
     - Tweaked plane selection algorithm for cases when a next plane was planned to be selected but
@@ -837,7 +870,7 @@ v.2.1.2 - 2025-01-22
 
 v.2.1.1 - 2025-01-21
     - Fix permissions of files to owner of FlightGazer install directory when running updater
-    
+
 v.2.1.0 - 2025-01-20
     - NEW: New logo
     - NEW: Splash screen (to show off the new logo)

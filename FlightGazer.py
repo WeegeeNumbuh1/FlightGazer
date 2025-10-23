@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.8.4.0 --- 2025-10-18'
+VERSION: str = 'v.9.0.0 --- 2025-10-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -202,6 +202,7 @@ if PATH_OWNER:
 else:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
 main_logger.info(f"Using: \'{CURRENT_EXE}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+main_logger.debug(">>> Verbose mode enabled. <<<")
 main_logger.debug(f"Python version: {sys.version}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
@@ -256,12 +257,6 @@ RGB_ROWS: int = 32
 API_COST_PER_CALL: float = 0.005
 """ How much it costs to do a single API call (may change in the future).
 Current as of `VERSION` """
-if VERBOSE_MODE:
-    main_logger.debug(">>> Verbose mode enabled. <<<")
-    main_logger.debug(f"Load-in time: {((time.monotonic() - START_TIME) * 1000):.3f} ms")
-    # main_logger.debug("Connected loggers:")
-    # for key in logging.Logger.manager.loggerDict:
-    #     main_logger.debug(f"{key}")
 BEYOND_LOS_LIMIT = 290
 """ Criteria for determining if a plane is detected beyond typical LOS limits for ADS-B, in nautical miles. """
 
@@ -306,6 +301,8 @@ if not NODISPLAY_MODE:
                 # the below line monkey patches imports to use the emulator even if rgbmatrix is installed
                 sys.modules['rgbmatrix'] = types.SimpleNamespace(graphics=graphics)
                 from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+                logging.getLogger("tornado.access").setLevel(logging.WARNING) # suppress some of the access logging details
+                logging.getLogger("PIL.Image").setLevel(logging.INFO)
             except ImportError:
                 DISPLAY_IS_VALID = False
                 main_logger.error("Display module \'RGBMatrixEmulator\' not found or failed to load. There will be no display output!")
@@ -342,11 +339,18 @@ if not NODISPLAY_MODE:
 else:
     DISPLAY_IS_VALID = False
     main_logger.info("Display output disabled. Running in console-only mode.")
+main_logger.debug(f"Bootstrap time: {((time.monotonic() - START_TIME) * 1000):.3f} ms")
 
 # If we invoked this script by terminal and we forgot to set any flags, set this flag.
 # This affects how to handle our exit signals (previously)
 if not INTERACTIVE and sys.__stdin__.isatty():
     FORGOT_TO_SET_INTERACTIVE = True
+
+# if VERBOSE_MODE:
+#     connected_loggers = []
+#     for key in logging.Logger.manager.loggerDict:
+#         connected_loggers.append(key)
+#     main_logger.debug(f"Connected loggers: {", ".join(connected_loggers)}")
 
 # make additional use for psutil
 this_process = psutil.Process()
@@ -590,10 +594,10 @@ plane_latch_times: list = [
     int(15 // LOOP_INTERVAL),
 ]
 """ Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
-focus_plane_api_results = deque([None] * 100, maxlen=100)
+focus_plane_api_results = deque([None] * 200, maxlen=200)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
 With a successful API call, the result is appended at the end of this deque.
-Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `APIAccessed`}.
+Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `Status`, `APIAccessed`}.
 `OriginInfo` and `DestinationInfo` are lists in the order of [name, city] either as strings or None. """
 unique_planes_seen: list = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
@@ -613,6 +617,9 @@ super_far_plane: dict = {}
 This is a dictionary with the same keys in `relevant_planes` with an added datetime
 accessible with the `Datetime` key. This dictionary remains empty if nothing meets the required criteria.
 This dictionary is reset at the end of the day with the `runtime_accumulators_reset()` function. """
+plane_load: list = [0., 0.]
+""" Average amount of relevant planes as tracked by the selection algorithm [0],
+and average duration the algorithm is in an active state in seconds [1] """
 
 # display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
@@ -690,6 +697,8 @@ state_json: str | None = None
 """ Path to the state file as a `Path` object. None if `export_FlightGazer_state()` thread is not running. """
 DATABASE_CONNECTED: bool = False
 """ True if the connection to the database is valid, False otherwise. """
+range_too_large: bool = False
+""" True if the designated combination of `RANGE` and `HEIGHT_LIMIT` is too large for the traffic in the area. """
 #--- API stuff
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
@@ -768,28 +777,23 @@ distance_multiplier: float = 1
 altitude_multiplier: float = 1
 speed_multiplier: float = 1
 
-if (
-    UNITS is None
-    or not isinstance(UNITS, int)
-    or UNITS == 0
-    or UNITS < 0
-    or UNITS > 2
-   ):
-    main_logger.info("Using default aeronautical units (nmi, ft, kt)")
-elif UNITS == 1: # metric
-    distance_unit = "km"
-    altitude_unit = "m"
-    speed_unit = "km/h"
-    distance_multiplier = 1.852
-    altitude_multiplier = 0.3048
-    speed_multiplier = 1.85184
-    main_logger.info("Using metric units (km, m, km/h)")
-elif UNITS == 2: # imperial
-    distance_unit = "mi"
-    speed_unit = "mph"
-    distance_multiplier = 1.150779
-    speed_multiplier = 1.150783
-    main_logger.info("Using imperial units (mi, ft, mph)")
+match UNITS:
+    case 1: # metric
+        distance_unit = "km"
+        altitude_unit = "m"
+        speed_unit = "km/h"
+        distance_multiplier = 1.852
+        altitude_multiplier = 0.3048
+        speed_multiplier = 1.85184
+        main_logger.info("Using metric units (km, m, km/h)")
+    case 2: # imperial
+        distance_unit = "mi"
+        speed_unit = "mph"
+        distance_multiplier = 1.150779
+        speed_multiplier = 1.150783
+        main_logger.info("Using imperial units (mi, ft, mph)")
+    case _:
+        main_logger.info("Using default aeronautical units (nmi, ft, kt)")
 
 # =========== Program Setup I ==============
 # =============( Utilities )================
@@ -1218,21 +1222,19 @@ def configuration_check() -> None:
             if len(CLOCK_CENTER_ROW) != 2:
                 raise KeyError
             for key in CLOCK_CENTER_ROW:
-                if (
-                    CLOCK_CENTER_ROW[key] is not None
-                    and not isinstance(CLOCK_CENTER_ROW[key], int)
-                ) or (CLOCK_CENTER_ROW[key] is None or CLOCK_CENTER_ROW[key] == 0):
-                    main_logger.info(f"{key} for Clock center readout is disabled.")
-                    CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
-                elif CLOCK_CENTER_ROW[key] == 1:
-                    main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
-                elif CLOCK_CENTER_ROW[key] == 2:
-                    main_logger.info(f"{key} for Clock center will display Receiver Stats.")
-                elif CLOCK_CENTER_ROW[key] == 3:
-                    main_logger.info(f"{key} for Clock center will display extended calendar info.")
-                else:
-                    main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
-                    CLOCK_CENTER_ROW[key] = None
+                match CLOCK_CENTER_ROW[key]:
+                    case 0 | None:
+                        main_logger.info(f"{key} for Clock center readout is disabled.")
+                        CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
+                    case 1:
+                        main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
+                    case 2:
+                        main_logger.info(f"{key} for Clock center will display Receiver Stats.")
+                    case 3:
+                        main_logger.info(f"{key} for Clock center will display extended calendar info.")
+                    case _:
+                        main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
+                        CLOCK_CENTER_ROW[key] = None
         except KeyError:
             main_logger.warning("Clock center readout is not properly configured.")
             CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
@@ -1243,13 +1245,7 @@ def configuration_check() -> None:
         else:
             CLOCK_CENTER_ENABLED = True
 
-        if (
-            isinstance(CLOCK_CENTER_ROW["ROW1"], int)
-            and isinstance(CLOCK_CENTER_ROW["ROW2"], int)
-        ) or (
-            CLOCK_CENTER_ROW["ROW1"] is None
-            and isinstance(CLOCK_CENTER_ROW["ROW2"], int)
-        ):
+        if CLOCK_CENTER_ROW["ROW2"]:
             main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
             CLOCK_CENTER_ROW_2ROWS = True
 
@@ -1263,7 +1259,7 @@ def configuration_check() -> None:
         if (
             LED_PWM_BITS is None
             or not isinstance(LED_PWM_BITS, int)
-            or (LED_PWM_BITS < 1 or LED_PWM_BITS > 11)
+            or (1 < LED_PWM_BITS > 11)
         ):
             main_logger.warning("LED_PWM_BITS is out of bounds or not an integer.")
             main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
@@ -1279,7 +1275,7 @@ def configuration_check() -> None:
                                 f"({default_settings['HEIGHT_LIMIT'] * altitude_multiplier}{altitude_unit}).")
             globals()['HEIGHT_LIMIT'] = round(default_settings['HEIGHT_LIMIT'] * altitude_multiplier, 2)
 
-        if not isinstance(LOCATION_TIMEOUT, int) or (LOCATION_TIMEOUT < 15 or LOCATION_TIMEOUT > 60):
+        if not isinstance(LOCATION_TIMEOUT, int) or (15 < LOCATION_TIMEOUT > 60):
             main_logger.warning("LOCATION TIMEOUT is out of bounds or not an integer.")
             main_logger.info(f">>> Setting to default ({default_settings['LOCATION_TIMEOUT']})")
             LOCATION_TIMEOUT = default_settings['LOCATION_TIMEOUT']
@@ -1305,7 +1301,7 @@ def configuration_check() -> None:
             main_logger.warning(f"{height_warning} beyond the theoretical limit for flight.")
             main_logger.info(f">>> Setting to a reasonable value:{75000 * altitude_multiplier:.2f}{altitude_unit}")
             HEIGHT_LIMIT = round(75000 * altitude_multiplier, 2)
-        elif HEIGHT_LIMIT > (75000 * altitude_multiplier) and HEIGHT_LIMIT < (275000 * altitude_multiplier):
+        elif (75000 * altitude_multiplier) < HEIGHT_LIMIT < (275000 * altitude_multiplier):
             main_logger.warning(f"{height_warning} beyond typical aviation flight levels.")
             main_logger.info(f">>> Limiting to {75000 * altitude_multiplier:.2f}{altitude_unit}.")
             HEIGHT_LIMIT = round(75000 * altitude_multiplier, 2)
@@ -1323,7 +1319,7 @@ def configuration_check() -> None:
         HEIGHT_LIMIT = 275000
         LOCATION_TIMEOUT = 60
 
-    if not isinstance(FLYBY_STALENESS, int) or (FLYBY_STALENESS < 2 or FLYBY_STALENESS > 1440):
+    if not isinstance(FLYBY_STALENESS, int) or (2 < FLYBY_STALENESS > 1440):
         main_logger.warning("Desired flyby staleness is out of bounds.")
         main_logger.info(f">>> Setting to default ({default_settings['FLYBY_STALENESS']})")
         FLYBY_STALENESS = default_settings['FLYBY_STALENESS']
@@ -1671,7 +1667,7 @@ def runtime_accumulators_reset() -> None:
     daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
     if not NOFILTER_MODE:
         if high_priority_events > 0:
-            daily_stats_str.append(f" {high_priority_events} high priority overrides occurred.")
+            daily_stats_str.append(f" {high_priority_events} high-priority overrides occurred.")
         daily_stats_str.append(f" {selection_events} selection events")
         if algorithm_rare_events_now > 0:
             daily_stats_str.append(f", of which {algorithm_rare_events_now} were rare selection events.")
@@ -1896,7 +1892,8 @@ class PrintToConsole:
         global process_time2
         print_time_start = time.perf_counter()
         plane_count = len(relevant_planes)
-        run_time = time.monotonic() - START_TIME
+        reference_time = time.monotonic()
+        run_time = reference_time - START_TIME
         time_print = f"{datetime.datetime.now()}".split(".")[0]
         ver_str = VERSION.split(" --- ")[0]
 
@@ -1914,7 +1911,7 @@ class PrintToConsole:
         # header section
         print(f"{rst}{green_highlight}===== FlightGazer {ver_str} Console Output ====={rst} {fade}Time now: {time_print} | Runtime: {timedelta_clean(run_time)}{rst}")
         if really_really_active_adsb_site:
-            print(f"{fade}Achievement Unlocked! ({achievement_time}) --- {rst}////// {italic}I heard you like planes.{rst} \\\\\\\\\\\\{fade} (Have >1300 flybys in a day)")
+            print(f"{fade}Achievement Unlocked! ({achievement_time}) --- {rst}////// {italic}I heard you like planes.{rst} \\\\\\\\\\\\{fade} (Have >1250 flybys in a day)")
         if not DUMP1090_IS_AVAILABLE:
             if watchdog_triggers == 0:
                 print(f"{red_warning}********** dump1090 did not successfully load. There will be no data! **********{rst}\n")
@@ -1945,6 +1942,8 @@ class PrintToConsole:
                     print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******{rst}\n")
                 else:
                     print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} and dump978 shown. *******{rst}\n")
+        if range_too_large:
+            print(f"{yellow_warning}***** Aircraft activity is too high. Consider lowering RANGE and HEIGHT_LIMIT *****{rst}\n")
 
         if focus_plane_iter != 0:
             # reflects plane selection algorithm
@@ -2080,7 +2079,7 @@ class PrintToConsole:
                     if aircraft['CategoryDesc'] != 'None':
                         print_info.append(f" ({aircraft['CategoryDesc']})")
                 elif aircraft['CategoryDesc'] != 'None':
-                    print_info.append(f" | Aircraft Type: {aircraft['CategoryDesc']})")
+                    print_info.append(f" | Aircraft Type: {aircraft['CategoryDesc']}")
 
                 # finally, print it all
                 print_info.append(rst)
@@ -2095,7 +2094,7 @@ class PrintToConsole:
         for result in reversed(focus_plane_api_results): # only shows if API has something to show
             try:
                 if result is not None and focus_plane == result['ID']:
-                    if (time.monotonic() - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
+                    if (reference_time - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
                         api_str = []
                         api_flight = result['Flight']
                         api_orig = result['Origin']
@@ -2122,11 +2121,15 @@ class PrintToConsole:
                                 api_str.append(f"{api_orig_name} ({api_orig_city}) to {api_dest_name} ({api_dest_city})")
                             else: # position-only, no given destination
                                 api_str.append(f"Departed from {api_orig_name} ({api_orig_city})")
-                        else: # coordinate-based origin, always has a nearby city as a result
+                        else: # coordinate-based origin, almost always has a nearby city as a result
                             if api_orig_city:
                                 api_str.append(f"First seen near {api_orig_city}")
-                            else:
-                                api_str.append("(No API result)")
+                        if result['Status'] == 1:
+                            api_str.append("(No API result)")
+                        elif result['Status'] == 2:
+                            api_str.append("Error: This API call returned a non HTTP-200 code, check the logs.")
+                        elif result['Status'] == 3:
+                            api_str.append("Error: This API call encountered a connection error or timeout, check the logs.")
                         api_str.append(f"{rst}")
                         print("".join(api_str))
                         break
@@ -2218,14 +2221,20 @@ class PrintToConsole:
 
         # flyby stats line
         flyby_str = []
-        flybytext = "flybys" if not NOFILTER_MODE else "flights"
-        flyby_str.append(f"> Total {flybytext} today: {len(unique_planes_seen)} | Aircraft selections: {selection_events}")
+        flybytext = "flybys" if not NOFILTER_MODE else "flights tracked"
+        flyby_str.append(f"> Total {flybytext} today: {len(unique_planes_seen)}")
+        if not NOFILTER_MODE:
+            flyby_str.append(f" | Aircraft selections: {selection_events}")
         if VERBOSE_MODE or algorithm_rare_events > 0:
-            flyby_str.append(f" | Rare events from algorithm: {algorithm_rare_events}")
+            flyby_str.append(f" | Rare selection events: {algorithm_rare_events}")
         if VERBOSE_MODE:
             flyby_str.append(f" | High-Priority events: {high_priority_events}")
         elif not VERBOSE_MODE and high_priority_events > 0:
             flyby_str.append(f" | High-Priority overrides: {high_priority_events}")
+        if not NOFILTER_MODE:
+            flyby_str.append(f" | Plane load: {plane_load[0]:.3f}")
+            if VERBOSE_MODE:
+                flyby_str.append(f", {plane_load[1]:.3f}s")
         print("".join(flyby_str))
 
         # process info line
@@ -2262,11 +2271,11 @@ class PrintToConsole:
                 json_details_2.append(f", dump978 age {dump1090_json_age[1]:.3f}s")
             json_details_2.append(f" | Drift correction next loop: {lockstep_corrector * 1000:.3f}ms")
             json_details_2.append(f" | Detected time offset: {determined_time_offset:.3f}s")
-        print("".join(json_details_2))
+            print("".join(json_details_2))
 
         # verbose stats line 4 (database stuff)
         db_stuff = []
-        if VERBOSE_MODE and DATABASE_CONNECTED:
+        if (VERBOSE_MODE or NOFILTER_MODE) and DATABASE_CONNECTED:
             db_stuff.append("> Database stats since start: ")
             db_stuff.append(f"Total queries: {database_stats[0]}, empty results: {database_stats[1]},")
             db_stuff.append(f" errors: {database_stats[2]} | Retrieval times:")
@@ -3065,12 +3074,17 @@ class AirplaneParser:
         """ Count of planes in `relevant_planes` from the previous loop """
         self.rare_occurrences: int = 0
         self._date_of_last_rare_message: str = ""
+        self.plane_count_avg: float = 0. # average amount of planes tracked when `focus_plane_iter` > 0
+        self.algorithm_active_time_avg: float = 0. # average duration the algorithm is in an active state before it resets
+        self._plane_counts = deque(maxlen=500)
+        self._active_loop_count = deque(maxlen=50)
+        self._range_too_large = False
         self.run_loop()
 
     def plane_selector(self, message):
         """ Select a plane! """
         global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
-        global process_time, selection_events, algorithm_rare_events, selection_override, high_priority_events
+        global process_time, selection_events, algorithm_rare_events, selection_override, high_priority_events, plane_load, range_too_large
         start_time = time.perf_counter()
         with threading.Lock():
             relevant_planes_local_copy = relevant_planes.copy()
@@ -3078,6 +3092,7 @@ class AirplaneParser:
         get_plane_list: list = []
         focus_plane_i: str = ""
         override_plane: bool = False
+        follow_flag: bool = False
         """ Internal flag to indicate a plane is within the `high_priority_dome` """
         high_priority_dome: float = 0.4 * distance_multiplier
         override_init: bool = selection_override
@@ -3109,7 +3124,7 @@ class AirplaneParser:
 
         def select():
             """ Our main plane selection algorithm. """
-            """
+            """ tl;dr this code is cooked, bro. Must've been an Italian in a past life with how much spaghetti is in here.
             Programmer's Notes: The following selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
             and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
             It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
@@ -3126,6 +3141,13 @@ class AirplaneParser:
             The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
             were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitialized to the last saved flyby count (more likely).
             A much higher value (1.5x-3x) is reflective of a very active area being monitored as the rate of switching increases to accommodate for increased traffic.
+
+            An additional metric, "plane load", was also introduced in v.8.5.0, which measures the average amount of relevant planes the selection algorithm has to choose from
+            when active over a sliding window of the last 500 loop cycles. When using the default RANGE and HEIGHT_LIMIT, along with a site deemed "really really active"
+            (see `runtime_accumulators_reset()`), this value has been emperically seen to hover around 1.8-2.3. If a site is sized too large for the aircraft activity in the area,
+            this value will be higher than this value range and the algorithm has to switch faster to handle the traffic.
+            Index 1 of `plane_load` is a measure of how long the algorithm is active on average; with the default RANGE and HEIGHT_LIMIT, a jetliner inside this zone takes about 1 minute
+            and a general aviation plane takes roughly 2.5 minutes to traverse the area. Being inline with parallel runways at a busy airport this average can go up to 5-8 minutes.
             """
             global focus_plane, focus_plane_ids_discard, focus_plane_ids_scratch
             def prioritizer(available_ids: list | set) -> str:
@@ -3176,20 +3198,22 @@ class AirplaneParser:
                     for entry in relevant_planes_local_copy:
                         get_plane_list.append(entry['ID']) # current planes in this loop
                         focus_plane_ids_scratch.add(entry['ID']) # add the above to the global set (rebuilds each loop)
-                        if (entry['SlantRange'] <= high_priority_dome
-                            and entry['SlantRange'] > 0
+                        if (0 < entry['SlantRange'] <= high_priority_dome
                             and entry['Altitude'] != 0
                         ): # there is a plane inside this dome
                             override_plane = True # no need for an else statement, `override_plane` is reset to False every loop
-                        if (FOLLOW_THIS_AIRCRAFT
-                            and not FOLLOW_THIS_AIRCRAFT_SPOTTED
-                            and entry['ID'] == FOLLOW_THIS_AIRCRAFT
-                        ):
-                            main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
-                            freeze_frame_packet(entry, show_distance=True)
-                            FOLLOW_THIS_AIRCRAFT_SPOTTED = True
+                        if entry['ID'] == FOLLOW_THIS_AIRCRAFT:
+                            follow_flag = True
+                            if FOLLOW_THIS_AIRCRAFT and not FOLLOW_THIS_AIRCRAFT_SPOTTED:
+                                main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
+                                freeze_frame_packet(entry, show_distance=True)
+                                FOLLOW_THIS_AIRCRAFT_SPOTTED = True
 
                 focus_plane_iter += 1
+                if follow_flag and plane_count > 1:
+                    self._plane_counts.append(plane_count - 1) # don't count the FOLLOW_THIS_AIRCRAFT plane
+                else:
+                    self._plane_counts.append(plane_count)
 
                 # if this block of code is awoken, get the first plane from this loop's copy and declare it our focus plane
                 if not focus_plane_i:
@@ -3295,8 +3319,46 @@ class AirplaneParser:
                     if VERBOSE_MODE:
                         print('\a', end='') # ring the bell just to drive the user crazy (if the terminal supports it)
 
+                # do some analysis on how the algorithm is handling the traffic in the area
+                # these cutoff values/criteria may be adjusted in future updates, who knows
+                self.plane_count_avg = sum(self._plane_counts) / len(self._plane_counts)
+                plane_load[0] = self.plane_count_avg
+                iter_time = focus_plane_iter * LOOP_INTERVAL
+                busy_flag = False
+                if (
+                    (self.plane_count_avg > 2.75 and iter_time > 600)
+                    # short-term, traffic-based over 10 min
+                    or
+                    (self.plane_count_avg > 5 and iter_time > 240)
+                    or
+                    (self.algorithm_active_time_avg * LOOP_INTERVAL > 720 and len(self._active_loop_count) > 4)
+                    # long-term; algorithm is kept working for 12 minutes or more on average
+                ):
+                    busy_flag = True
+                if not self._range_too_large:
+                    if (not follow_flag
+                        and (busy_flag or iter_time > 1800)
+                        ) or self.plane_count_avg >= 8:
+                        main_logger.warning("************************************************************")
+                        main_logger.warning(f"*** The desired focus region (<{RANGE:.2f}{distance_unit}, <{HEIGHT_LIMIT:.2f}{altitude_unit})"
+                                            " might be too large for the aircraft activity in your area. ***")
+                        main_logger.warning("************************************************************")
+                        main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT.")
+                        main_logger.debug(f"Current average tracking load: {self.plane_count_avg:.3f} planes,"
+                                        f" {self.algorithm_active_time_avg:.3f} iterations (current loop: {focus_plane_iter})")
+                        self._range_too_large = True
+                        range_too_large = self._range_too_large
+
             else: # when there are no planes
                 if focus_plane_iter > 0:# clean-up variables
+                    if focus_plane_iter * LOOP_INTERVAL < 1800: # don't count algorithm times >30 minutes (for cases when `follow_flag` is True)
+                        self._active_loop_count.append(focus_plane_iter)
+                    else:
+                        # super edge-case: tracking the FOLLOW_THIS_AIRCRAFT right at startup and tracking >30min
+                        if len(self._active_loop_count) == 0:
+                            self._active_loop_count.append(0)
+                    self.algorithm_active_time_avg = sum(self._active_loop_count) / len(self._active_loop_count)
+                    plane_load[1] = self.algorithm_active_time_avg * LOOP_INTERVAL
                     with threading.Lock():
                         focus_plane = ""
                         focus_plane_iter = 0
@@ -3336,6 +3398,29 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
+        """ API results to output table:
+
+           --- API Result ---   |  O  |  D  |  on  |  oc  |  dn  |  dc  |  t  |  S  | --- Notes ---
+        ______________________________________________________________________________________________________
+        Full                    |  X  |  X  |  X   |  X   |  X   |  X   |  X  |  0  |
+        Chartered/location only |  X  |     |  X   |  X   |      |      |  X  |  0  |
+        Coordinate origin only  |  X  |  m  |      |  X   |      |      |  X  |  0  | O = latitude coordinate, D = longitude coordinate
+        No result/blocked plane |  m  |     |      |      |      |      |     |  1  | O = "N/A"
+        Non HTTP-200 result     |     |     |      |      |      |      |     |  2  |
+        Any other failure       |     |     |      |      |      |      |     |  3  |
+
+        Key:
+        O  = origin airport code
+        D  = destination airport code
+        on = origin airport name
+        oc = origin airport city/location
+        dn = destination airport name
+        dc = destination airport city/location
+        t  = time flight took off or was first tracked
+        S  = API_status value
+        X  = Uses API result
+        m  = Modifies/overloads the normal output
+        """
         global process_time, focus_plane_api_results, api_hits
         global API_daily_limit_reached, estimated_api_cost, API_KEY, API_cost_limit_reached
         if API_KEY is None or not API_KEY: return
@@ -3354,6 +3439,7 @@ class APIFetcher:
         origin_name: str | None = None
         destination_city: str | None = None
         destination_name: str | None = None
+        API_status = 0
         stale_age = FLYBY_STALENESS * 60 # seconds
 
         flight_id = focus_plane_stats.get('Flight', "")
@@ -3368,14 +3454,18 @@ class APIFetcher:
         if focus_plane_stats.get('Altitude', 0) == 0: return
 
         # check if we already have results
+        reference_time = time.monotonic()
         for result in reversed(focus_plane_api_results):
             try:
-                if (result is not None
-                    and focus_plane == result['ID']
-                    ): # cache hit...
-                    if time.monotonic() - result['APIAccessed'] < stale_age:
+                access_time_delta = reference_time - result['APIAccessed']
+                last_status = result['Status']
+                if result is not None and focus_plane == result['ID']: # cache hit...
+                    if access_time_delta < stale_age and last_status <= 1:
                         api_hits[3] += 1
                         return # no need to query the API, API result is still valid
+                    elif access_time_delta < 300 and last_status >= 2:
+                        api_hits[3] += 1
+                        return # only try to poll the API again after 5 minutes
                     else: # API result is stale, continue on
                         break
                 elif result is None:
@@ -3422,7 +3512,6 @@ class APIFetcher:
             start_time = time.perf_counter()
             response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
             process_time[2] = round((time.perf_counter() - start_time) * 1000, 3)
-            response.raise_for_status()
             if response.status_code == 200: # check if service to the API call was valid
                 response_json = response.json()
                 # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
@@ -3441,7 +3530,7 @@ class APIFetcher:
                                     origin = flight['origin'].get('code')
                                 # airport name, not always present if coordinate-based origin
                                 origin_name = flight['origin'].get('name')
-                                # origin city, always present even with coordinate-based origin
+                                # origin city, almost always present even with coordinate-based origin
                                 origin_city = flight['origin'].get('city')
 
                             # with position-only flights, the `destination` key will be None
@@ -3459,15 +3548,36 @@ class APIFetcher:
                                 # API returns UTC time in the form of yyyy-mm-ddThh:mm:ssZ; need to format for .fromisoformat()
                                 departure_time = datetime.datetime.fromisoformat(depart_iso[:-1] + "+00:00")
 
+                            API_status = 0
                             break
+                    else: # can happen for general aviation and we detected a new flight before the API does
+                        api_hits[2] += 1
+                        main_logger.debug(f"Could not find currently operating flight for \'{flight_id}. Took {process_time[2]}ms")
+                        origin = "N/A"
+                        API_status = 1
                 else:
                     api_hits[2] += 1
                     main_logger.debug(f"API call for \'{flight_id}\' returned no useful data. Took {process_time[2]}ms")
+                    origin = "N/A"
+                    API_status = 1
             else:
-                raise requests.HTTPError(f"Received non-200 HTTP status ({response.status_code})")
+                raise requests.exceptions.HTTPError(f"Received non-200 HTTP status, {response.status_code}")
+        except requests.exceptions.HTTPError as e:
+            api_hits[1] += 1
+            API_status = 2
+            main_logger.warning(f"API call for \'{flight_id}\' failed ({e})")
+        except requests.exceptions.ConnectionError as e:
+            api_hits[1] += 1
+            API_status = 3
+            main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error. ({e})")
+        except requests.exceptions.Timeout as e:
+            api_hits[1] += 1
+            API_status = 3
+            main_logger.warning(f"API call for \'{flight_id}\' failed due connection timeout. ({e})")
         except Exception as e:
             api_hits[1] += 1
-            main_logger.debug(f"API call for \'{flight_id}\' failed or invalid. ({e})")
+            API_status = 3
+            main_logger.exception(f"API call for \'{flight_id}\' failed or invalid.")
         finally:
             # special case when the API returns a coordinate instead of an airport
             # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
@@ -3493,6 +3603,7 @@ class APIFetcher:
                 'OriginInfo': [origin_name, origin_city],
                 'DestinationInfo': [destination_name, destination_city],
                 'Departure': departure_time,
+                'Status': API_status,
                 'APIAccessed': time.monotonic()
                 }
             with threading.Lock():
@@ -3548,7 +3659,7 @@ class DisplayFeeder:
         total_planes = "0"
         current_range = "0"
         if general_stats: # should always exist but just in case
-            if LOCATION_IS_SET:
+            if LOCATION_IS_SET or NOFILTER_MODE:
                 p_count = len(unique_planes_seen)
                 if p_count <= 9999:
                     total_flybys = f"{p_count}"
@@ -3659,7 +3770,11 @@ class DisplayFeeder:
             if focus_plane == FOLLOW_THIS_AIRCRAFT:
                 flight_name = flight_name + "*"
             # flight name readout is limited to 8 characters
-            if len(flight_name) > 8: flight_name = flight_name[:8]
+            if len(flight_name) > 8:
+                if flight_name.endswith("*"):
+                    flight_name = flight_name[:7] + "*."
+                else:
+                    flight_name = flight_name[:8] + "."
             iso = f"{focus_plane_stats['Country']}"
             # speed readout is limited to 4 characters;
             # if speed >= 100, truncate to just the integers
@@ -3726,11 +3841,15 @@ class DisplayFeeder:
             api_orig_city = None
             api_dest_name = None
             api_dest_city = None
-            if focus_plane_stats['Altitude'] != 0: # don't use API results if the plane is on the ground after it was airborne
+            API_status = 0
+            # don't use API results if the plane is on the ground after it was airborne or
+            # we hit any of the API limiters
+            if focus_plane_stats['Altitude'] != 0 or not api_limiter_reached():
+                reference_time = time.monotonic()
                 for result in reversed(focus_plane_api_results):
                     try:
-                        if result is not None and focus_plane == result['ID']:
-                            if (time.monotonic() - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
+                        if result is not None and focus_plane == result['ID']: # get the latest result
+                            if (reference_time - result['APIAccessed'] < (FLYBY_STALENESS * 60)):
                                 api_orig = result['Origin']
                                 if api_orig is None: api_orig = filler_text
                                 api_dest = result['Destination']
@@ -3744,6 +3863,7 @@ class DisplayFeeder:
                                 api_orig_city = result['OriginInfo'][1]
                                 api_dest_name = result['DestinationInfo'][0]
                                 api_dest_city = result['DestinationInfo'][1]
+                                API_status = result['Status']
                                 break
                             else: # don't use stale API results
                                 break
@@ -3751,6 +3871,14 @@ class DisplayFeeder:
                             break
                     except Exception: # if we bump something else
                         break
+
+            # API error indicators
+            if API_status == 2:
+                api_orig = "!API"
+                api_dest = "FAIL"
+            if API_status == 3:
+                api_orig = "!CON"
+                api_dest = "FAIL"
 
             # Get all the other info from the focus plane provided by the database (if available)
             # Example outputs (non-exhaustive):
@@ -3800,20 +3928,40 @@ class DisplayFeeder:
                         aircraft_str_.append(f" ({focus_plane_stats['TrackingFlag']} aircraft)")
                 else: # no aircraft details nor owner/operator available
                     pass # don't do anything
+            if not aircraft_str_ and focus_plane_stats['ID'].startswith("~"):
+                aircraft_str_ = ["NO ADD'L INFO (TIS-B Contact)"]
 
-            # Generate more detailed journey detail
+            # Generate more detailed journey detail/provide API error messages
             # Examples:
             # "San Francisco to Singapore (San Francisco Intl to Singapore Changi)"
             # "Departed from Hollywood Burbank Airport (Burbank)"
             # "First seen near Broadus"
             journey_str = ""
-            if api_orig_name and api_dest_name:
-                journey_str = (f"{api_orig_city} to {api_dest_city} "
-                               f"({api_orig_name} to {api_dest_name})")
-            elif api_orig_name and not api_dest_name: # position-only flight
-                journey_str = f"Departed from {api_orig_name} ({api_orig_city})"
-            elif api_orig_city and not api_orig_name: # instance where an origin airport is unknown
-                journey_str = f"First seen near {api_orig_city}"
+            if not api_limiter_reached():
+                if API_status == 0:
+                    if api_orig_name and api_dest_name:
+                        journey_str = (f"{api_orig_city} to {api_dest_city} "
+                                    f"({api_orig_name} to {api_dest_name})")
+                    elif api_orig_name and not api_dest_name: # position-only flight
+                        journey_str = f"Departed from {api_orig_name} ({api_orig_city})"
+                    elif api_orig_city and not api_orig_name: # instance where an origin airport is unknown
+                        journey_str = f"First seen near {api_orig_city}"
+                elif API_status == 1:
+                    journey_str = "No API result for this flight."
+                elif API_status == 2:
+                    journey_str = "API call for this flight failed."
+                elif API_status == 3:
+                    journey_str = "Connection error, check network."
+            if not ENHANCED_READOUT_AS_FALLBACK: # only show the below if ENHANCED_READOUT isn't used
+                if api_limiter_reached():
+                    if API_cost_limit_reached:
+                        journey_str = "API cost limit reached."
+                    elif API_schedule_triggered:
+                        journey_str = "No API calls this hour."
+                    elif API_daily_limit_reached:
+                        journey_str = "API daily call limit reached."
+                elif not API_KEY:
+                    journey_str = "API disabled, route info unavailable."
 
             # Finally, concatenate it all
             aircraft_str = ""
@@ -4110,6 +4258,8 @@ class WriteState:
                 'aircraft_selections': selection_events,
                 'rare_selection_events': algorithm_rare_events,
                 'high_priority_events': high_priority_events,
+                'average_relevant_planes_in_area': round(plane_load[0], 3),
+                'average_algorithm_active_time_sec': round(plane_load[1], 3),
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
                 'focus_plane_ids_discard': list(focus_plane_ids_discard),
@@ -4179,6 +4329,7 @@ class WriteState:
                 'watchdog_triggers': watchdog_triggers,
                 'really_active_adsb_site': really_active_adsb_site,
                 'really_really_active_adsb_site': really_really_active_adsb_site,
+                'range_too_large': range_too_large,
                 'display_failures': None if NODISPLAY_MODE else display_failures,
                 'cpu_percent': resource_usage[0],
                 'cpu_temp_C': resource_usage[2],
@@ -5027,7 +5178,7 @@ class Display(
             and SHOW_EVEN_MORE_INFO
         ):
             self._last_framerate = self.framerate
-            self.framerate = 24
+            self.framerate = 25
             self.delay = adaptive_speed(self.framerate, process_time[3] / 1000)
         else:
             self._last_framerate = self.framerate

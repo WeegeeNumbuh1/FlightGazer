@@ -34,6 +34,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
   - [Shutting Down \& Restarting](#-shutting-down--restarting)
+  - [Output Reference \& Meanings](#️-output-reference--meanings)
   - [Misc](#-misc)
 - [How to Update](#️-how-to-update)
 - [Uninstall](#-uninstall)
@@ -75,7 +76,6 @@ If you want one, I can also build one for you. (also Coming Soon™)
 
 ## 💪 Features
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
-<details><summary><b>Show/Hide</b></summary>
 
 ### Summary
 - Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
@@ -87,6 +87,10 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
+- Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
+- Easily configured, controlled, monitored, and updated within a web browser
+
+<details><summary><b>More Features</b></summary>
 
 ### Adaptive & flexible
 - Automatically switches to other aircraft if more than one is within the area
@@ -112,7 +116,6 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Highly optimized and fast
   - Worst case takes ~25ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
     - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99.9th percentile (worldwide) ADS-B+UAT receiver at peak traffic while sending data to multiple ADS-B aggregators with MLAT
-- Useful and detailed console output that shows the inner workings of FlightGazer
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
   - The python script has been verified to run in both Linux (Debian) and Windows. (MacOS untested)
@@ -121,7 +124,6 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Set up to automatically start on boot via `systemd`
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
-- A web interface that makes it easier to configure, check, and update FlightGazer (as a separate project)
 - Program state is available in a json file for use elsewhere
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Robust and hard-to-break
@@ -159,7 +161,7 @@ Using this project assumes you have the following:
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
   - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
-- The latest Python (>=3.9)
+- The latest Python (>=3.10)
 - At least 100 MB of available disk space
 - A working internet connection for setup
 - `git` needs to be installed
@@ -188,7 +190,7 @@ Using this project assumes you have the following:
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
   - It is highly recommended to generate a key that will only be used for FlightGazer for accurate cost tracking
-- a running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
+- A running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>
 <br>
@@ -426,6 +428,26 @@ sudo systemctl restart flightgazer &
 sudo systemctl start flightgazer &
 ```
 or, you may [start it manually](#️-interactive-mode).
+</details>
+
+### 🖼️ Output Reference & Meanings
+
+<details><summary>Table of display outputs</summary>
+
+*Taken directly from the web-app*
+
+| Output | Meaning / Cause | Remedy / Information |
+|---|---|---|
+| **Show Even More Info**<br>"LADD Aircraft" | Limiting Aircraft Data Displayed \- *"Please don't track me*\." | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
+| **Show Even More Info**<br>"PIA Aircraft" | \(U\.S\. only\) Privacy ICAO Address \- *"Good luck figuring out who I am\."* | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
+| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   N/A  N/A</code><br>\- or \-<br><code>FLYBY TRKG RNGE</code><br><code>123   N/A  N/A</code> | - Failed to connect to receiver at startup\.<br>- Communication with the receiver has temporarily stopped due to instability\. | - Receiver service (<code>dump1090</code>) is not running/stopped\. Check for errors for that service\.<br>- The current system may be overloaded\. Check on the system\.<br>- If operating on a remote instance of dump1090, check the network or remote system\.<br>- Additionally, check the FlightGazer logs\.<br>- After fixing the underlying issue, restart FlightGazer\. |
+| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   123  N/A</code> | Location is not set in receiver\. | - Set your location for dump1090\. Then, restart FlightGazer\.<br>- Advanced: if using a GPS receiver on the system, check to see if the service is running and has obtained a GPS fix\. |
+| **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
+| **Journey**<br><code>N/A ▶ ---</code> | - Aircraft blocked from tracking\.<br>- Aircraft detected before API was able to\. | For aircraft that are not blocked from tracking: try using a smaller RANGE\. |
+| **Journey**<br><code>latitude ▶ longitude</code> | API returned a result that could not be associated with an airport\. | Rare, but normal occurrence\. |
+| **Journey**<br><code>!API ▶ FAIL</code> | API call for this flight failed\. | - API service may be down, wait until the service is restored\.<br>- You may have an issue with your API key\. Contact FlightAware\. |
+| **Journey**<br><code>\!CON ▶ FAIL</code> | Could not connect to the API\. | Check your network connection\. |
+
 </details>
 
 ### 👓 Misc

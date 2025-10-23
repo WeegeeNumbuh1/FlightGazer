@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.8.0.2
+# Last updated: v.9.0.0
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -64,10 +64,10 @@ fi
 venv_install() {
 	VENVCMD="${VENVPATH}/bin/pip3"
 	echo -e "${FADE}> Flask..."
-	${VENVCMD} install --upgrade Flask >/dev/null
+	"${VENVCMD}" install --upgrade Flask >/dev/null
 	echo "Done."
 	echo -e "${FADE}> gunicorn..."
-	${VENVCMD} install --upgrade gunicorn >/dev/null
+	"${VENVCMD}" install --upgrade gunicorn >/dev/null
 	echo -e "Done.${NC}"
 }
 
@@ -80,8 +80,8 @@ if [ $? -ne 0 ] && [ ! -d "${BASEDIR}/web-app" ]; then
 			"y" | "Y" | "yes" | "Yes" | "YES")
 				break
 				;;
-			"n" | "N" | "No" | "NO")
-				echo "> Install canceled. No changes have been made."
+			"n" | "N" | "no" | "No" | "NO")
+				echo "> Install cancelled. No changes have been made."
 				exit 0
 				;;
 			*)
@@ -98,14 +98,14 @@ else
 	echo -e "${GREEN}>>> The web interface is already installed!${NC}"
 	echo "Checking for updates..."
 	if [ -f "${BASEDIR}/web-app/version-webapp" ]; then
-		VER_STR=$(head -c 12 ${BASEDIR}/web-app/version-webapp)
+		VER_STR=$(head -c 12 "${BASEDIR}/web-app/version-webapp")
 		echo -e "> Currently installed version:        ${VER_STR}"
 	else
 		VER_STR=""
 		echo -e "> ${ORANGE}Could not determine installed version!${NC}"
 	fi
 	LATEST_VER="$(wget -q -O - "https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer-webapp/refs/heads/master/version-webapp")"
-	if [ -z $LATEST_VER ]; then
+	if [ -z "$LATEST_VER" ]; then
 		echo -e "> ${ORANGE}Could not determine latest version!${NC}"
 	else
 		echo -e "> Latest version available on GitHub: ${LATEST_VER}"
@@ -121,8 +121,8 @@ else
 			"y" | "Y" | "yes" | "Yes" | "YES")
 				break
 				;;
-			"n" | "N" | "No" | "NO")
-				echo "> Update canceled. No changes have been made."
+			"n" | "N" | "no" | "No" | "NO")
+				echo "> Update cancelled. No changes have been made."
 				exit 0
 				;;
 			*)
@@ -141,7 +141,7 @@ else
 		systemctl stop flightgazer-webapp >/dev/null 2>&1
 		echo -e "${FADE}The web interface has been shut down."
 		venv_install
-		bash ${BASEDIR}/web-app/update-webapp.sh
+		bash "${BASEDIR}/web-app/update-webapp.sh"
 		if [ $? -ne 0 ]; then
 			>&2 echo -e "${NC}${RED}>>> ERROR: Update failed.${NC}"
 			exit 1
@@ -155,26 +155,26 @@ else
 	fi
 fi
 # continue the install
-rm -rf ${TEMPPATH} >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
+rm -rf "$TEMPPATH" >/dev/null 2>&1 # make sure the temp directory doesn't exist before we start
 echo -e "${GREEN}>>> Downloading latest version...${NC}${FADE}"
-git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer-webapp $TEMPPATH
+git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer-webapp "$TEMPPATH"
 if [ $? -ne 0 ]; then
-	rm -rf ${TEMPPATH} >/dev/null 2>&1
+	rm -rf "$TEMPPATH" >/dev/null 2>&1
 	echo -e "${RED}>>> ERROR: Failed to download from GitHub. Installer cannot continue.${NC}"
 	exit 1
 fi
-rm -rf ${TEMPPATH}/.git >/dev/null 2>&1
+rm -rf "${TEMPPATH}/.git" >/dev/null 2>&1
 find "${TEMPPATH}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
 if [ -f "${TEMPPATH}/version-webapp" ]; then
-	VER_STR=$(head -c 12 ${TEMPPATH}/version-webapp)
+	VER_STR=$(head -c 12 "${TEMPPATH}/version-webapp")
 	echo -e "${NC}> Downloaded FlightGazer-webapp version: ${VER_STR}"
 fi
 
-read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
-chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${TEMPPATH} # need to do this as we are running as root
+read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
+chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$TEMPPATH" # need to do this as we are running as root
 echo -e "${FADE}Copying ${TEMPPATH} to ${BASEDIR}/web-app..."
-cp -afT ${TEMPPATH} ${BASEDIR}/web-app
-rm -rf ${TEMPPATH} >/dev/null 2>&1 # clean up after ourselves
+cp -afT "$TEMPPATH" "${BASEDIR}/web-app"
+rm -rf "$TEMPPATH" >/dev/null 2>&1 # clean up after ourselves
 echo -e "Done.${NC}"
 
 echo -e "${GREEN}>>> Installing dependencies in existing FlightGazer venv...${NC}"
@@ -269,7 +269,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	[Service]
 	# yeah we use root for this, but this web app isn't something you expose to the rest of the internet anyway (if you do, then gg)
 	User=root
-	ExecStart=$VENVPATH/bin/gunicorn -w 1 -b 0.0.0.0:9898 --worker-connections 3 --chdir "$BASEDIR/web-app/" "FG-webapp:app"
+	ExecStart="${VENVPATH}/bin/gunicorn" -w 1 -b 0.0.0.0:9898 --worker-connections 3 --chdir "${BASEDIR}/web-app/" "FG-webapp:app"
 	Type=simple
 	# Note: the below is required to handle the case when the web interface updates itself and needs to restart the service.
 	# Without this, this service will fail to restart as the process that sent the restart command is killed once the command is initiated.
@@ -284,7 +284,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	[Install]
 	WantedBy=multi-user.target
 	EOF
-	
+
 	systemctl daemon-reload 2>&1
 	systemctl enable flightgazer-webapp.service 2>&1
 	echo "Starting service..."
@@ -301,3 +301,4 @@ echo "> Service already exists."
 fi
 
 echo -e "${GREEN}>>> Install complete.${NC}"
+exit 0

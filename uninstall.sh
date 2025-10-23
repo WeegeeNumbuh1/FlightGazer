@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.7.2.0
+# Last updated: v.9.0.0
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -23,10 +23,11 @@ if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	sleep 2s
 	exit 1
 fi
+sleep 2s
 echo -e "${GREEN}>>> Transferring execution to /tmp...${NC}"
 set -o noclobber
 echo '#!/bin/bash' >| $TEMPPATH
-echo "FGDIR=$BASEDIR" >> $TEMPPATH
+echo "FGDIR=\"$BASEDIR\"" >> $TEMPPATH
 echo "FADE='\033[2m'" >> $TEMPPATH
 echo "ORANGE='\033[0;33m'" >> $TEMPPATH
 echo "RED='\033[0;31m'" >> $TEMPPATH
@@ -71,19 +72,21 @@ systemctl daemon-reload 2>&1
 systemctl reset-failed 2>&1
 ' >> $TEMPPATH
 echo 'echo "Uninstalling web interface (if present)..."' >> $TEMPPATH
-echo 'if [ -f ${FGDIR}/web-app/uninstall-webapp.sh ]; then
-	bash ${FGDIR}/web-app/uninstall-webapp.sh
+echo 'if [ -f "${FGDIR}/web-app/uninstall-webapp.sh" ]; then
+	bash "${FGDIR}/web-app/uninstall-webapp.sh"
 fi' >> $TEMPPATH
 echo 'echo "Removing virtual Python environment..."
 rm -rf /etc/FlightGazer-pyvenv
 echo -e "Removing FlightGazer directory ${FGDIR}..."
-rm -rf ${FGDIR}
-rm -f ${FGDIR}/../emulator_config.json 2>&1 # for older installs
+rm -rf "${FGDIR}"
+rm -f "${FGDIR}/../emulator_config.json" 2>&1 # for older installs
 sleep 2s
 echo -e "${NC}\nDone. FlightGazer has been fully removed from your system."
 exit 0' >> $TEMPPATH
 chmod +x $TEMPPATH
+sleep 2s
 echo -e "${GREEN}>>> Thanks for using FlightGazer!${NC}"
+sleep 2s
 bash $TEMPPATH
 rm -f $TEMPPATH
 exit 0

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.8.4.0
+# Version = v.9.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -15,10 +15,10 @@ ORANGE='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 FADE='\033[2m'
-CHECK_FILE=${VENVPATH}/first_run_complete
-THIS_FILE=${BASEDIR}/FlightGazer-init.sh
-LOGFILE=${BASEDIR}/FlightGazer-log.log
-DB_DOWNLOADER=${BASEDIR}/utilities/aircraft_db_fetcher.py
+CHECK_FILE="${VENVPATH}/first_run_complete"
+THIS_FILE="${BASEDIR}/FlightGazer-init.sh"
+LOGFILE="${BASEDIR}/FlightGazer-log.log"
+DB_DOWNLOADER="${BASEDIR}/utilities/aircraft_db_fetcher.py"
 INTERNET_STAT=0 # think return codes
 SKIP_CHECK=0 # 0 = do not skip dependency checks, 1 = skip
 WEB_INT=0 # 1 = web interface is present
@@ -42,7 +42,7 @@ interrupt() {
 
 help_str(){
 	echo ""
-	echo "Usage: sudo bash $BASEDIR/$(basename $0) [options]"
+	echo "Usage: sudo bash \"${BASEDIR}/$(basename $0)\" [options]"
 	echo "[-h]     Print this help message."
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
@@ -78,6 +78,33 @@ cleanup() {
 	# https://old.reddit.com/r/bash/comments/1e8plnu/leddyee/
 	trap - INT
 	kill -INT "$$"
+}
+
+emulator_heredoc() {
+	cat << EOF > "${BASEDIR}/emulator_config.json"
+{
+    "pixel_outline": 0,
+    "pixel_size": 16,
+    "pixel_style": "real",
+    "pixel_glow": 8,
+    "display_adapter": "browser",
+    "suppress_font_warnings": true,
+    "suppress_adapter_load_errors": true,
+    "browser": {
+        "_comment": "For use with the browser adapter only.",
+        "port": 8888,
+        "target_fps": 25,
+        "fps_display": true,
+        "quality": 50,
+        "image_border": true,
+        "debug_text": false,
+        "image_format": "JPEG"
+    },
+    "log_level": "info",
+    "icon_path": null,
+    "emulator_title": "FlightGazer - Emulated"
+}
+EOF
 }
 
 DFLAG=""
@@ -133,7 +160,8 @@ fi
 echo -ne "\033]0;FlightGazer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to FlightGazer!${NC}"
 if [ -f "${BASEDIR}/version" ]; then
-	VER_STR=$(head -c 12 ${BASEDIR}/version)
+	VER_STR=$(head -c 12 "${BASEDIR}/version")
+	# VERSION_MAJOR=$(echo "$VER_STR" | cut -d '.' -f1)
 	echo -e "    Version: ${VER_STR}"
 fi
 if [ `id -u` -ne 0 ]; then
@@ -168,9 +196,25 @@ if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	exit 1
 fi
 
-command -v python3 >/dev/null 2>&1
-if [ $? -ne 0 ]; then
+REQUIRED_PYTHON_MAJOR=3
+REQUIRED_PYTHON_MINOR=10
+if ! command -v python3 >/dev/null 2>&1; then
 	echo -e "\n${NC}${RED}>>> ERROR: Python is not installed. Please install it on this system first.${NC}"
+	exit 1
+fi
+
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+INSTALLED_MAJOR=$(echo "$PYTHON_VERSION" | cut -d '.' -f1)
+INSTALLED_MINOR=$(echo "$PYTHON_VERSION" | cut -d '.' -f2)
+if [ -f "${BASEDIR}/setup/min_python_version" ]; then
+	REQUIRED_PYTHON_NOW=$(head -c 8 "${BASEDIR}/setup/min_python_version")
+	REQUIRED_PYTHON_MAJOR=$(echo "$REQUIRED_PYTHON_NOW" | cut -d '.' -f1)
+	REQUIRED_PYTHON_MINOR=$(echo "$REQUIRED_PYTHON_NOW" | cut -d '.' -f2)
+fi
+if (( INSTALLED_MAJOR < REQUIRED_PYTHON_MAJOR )) || \
+   (( INSTALLED_MAJOR == REQUIRED_PYTHON_MAJOR && INSTALLED_MINOR < REQUIRED_PYTHON_MINOR )); then
+	echo -e "\n${NC}${RED}>>> ERROR: Python version too old. Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}${NC}"
+	echo "Python must be updated to a newer version on your system before you can run FlightGazer."
 	exit 1
 fi
 
@@ -194,12 +238,12 @@ fi
 CORECOUNT=$(grep -c ^processor /proc/cpuinfo)
 
 if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv_check.py" ]; then
-	${VENVPATH}/bin/python3 ${BASEDIR}/utilities/venv_check.py
+	"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/venv_check.py"
 	if [ $? -ne 0 ]; then
 		echo -e "\n${NC}${RED}>>> WARNING: The virtual environment is broken.${NC}"
 		echo "    It will be rebuilt this session."
 		echo ""
-		rm -rf ${VENVPATH}
+		rm -rf "$VENVPATH"
 	fi
 fi
 
@@ -209,15 +253,15 @@ then
   This may take some time, depending on how fast your system is.${FADE}"
 
 	echo "================== System Info ===================="
-	if [ ! -z "${DEV_TYPE}" ]; then
+	if [ -n "$DEV_TYPE" ]; then
 		echo -e "> Running on a ${DEV_TYPE}"
 	else
 		echo -e "> Running on $(uname -a)"
 	fi
-	if [ $CORECOUNT -eq 1 ] && [ -z "${DEV_TYPE}" ]; then
+	if [ $CORECOUNT -eq 1 ]; then
 		echo "> WARNING: Only one CPU core detected!"
 		echo "  Installation might take a very long time!"
-		if [ "$DFLAG" != "-d" ]; then
+		if [ "$DFLAG" != "-d" ] && [ -n "$DEV_TYPE" ]; then
 			echo "> WARNING: It is highly recommended to *NOT* run the rgb-matrix display or its emulator on this system!"
 			echo "  Performance may be extremely poor due to only having a single core."
 		fi
@@ -239,9 +283,13 @@ then
 
 	if [ "$LFLAG" = true ]; then
 		echo "****************************************************************************"
-		echo "> We are currently running in Live/Demo mode; no permanent changes to"
-		echo "  the system will occur. FlightGazer will run using dependencies in '/tmp'."
+		echo "> We are currently running in Live/Demo mode; FlightGazer will run"
+		echo "  using dependencies in '/tmp' and not install itself onto the system."
+		echo ""
+		echo "> Once this is set up, if you would like to run FlightGazer again,"
+		echo "  don't forget to use the '-l' flag. Not using that implies a full install."
 		echo "****************************************************************************"
+		sleep 5s
 	fi
 	if [ $WEB_INT -ne 1 ]; then
 		echo ""
@@ -257,15 +305,15 @@ then
 	VERB_TEXT='Installing: '
 else
 	echo -n "> Last dependencies check: "
-	date -r $CHECK_FILE
-	last_check_time=$(date -r $CHECK_FILE '+%s')
+	date -r "$CHECK_FILE"
+	last_check_time=$(date -r "$CHECK_FILE" '+%s')
 	# 1 month = 2592000 seconds
 	if [ $((STARTTIME - last_check_time)) -lt 7776000 ]; then
 		echo "> Last check was less than 3 months ago, skipping tests."
 		SKIP_CHECK=1
 	fi
 	VERB_TEXT='Checking: '
-	if [ $CORECOUNT -eq 1 ] && [ -z "${DEV_TYPE}" ] && [ "$DFLAG" != "-d" ]; then
+	if [ $CORECOUNT -eq 1 ] && [ -z "$DEV_TYPE" ] && [ "$DFLAG" != "-d" ]; then
 		echo "> WARNING: It is highly recommended to *NOT* run the rgb-matrix display or its emulator on this system!"
 		echo "  Performance may be extremely poor. Please re-run this script with the '-d' flag."
 	fi
@@ -275,20 +323,18 @@ trap cleanup SIGINT
 if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo -e "${NC}> Checking system image...${FADE}"
 	# get rid of git tracking stuff
-	rm -rf ${BASEDIR}/.git >/dev/null 2>&1
+	rm -rf "${BASEDIR}/.git" >/dev/null 2>&1
 	find "${BASEDIR}" -type f -name '.*' -exec rm '{}' \; >/dev/null 2>&1
 
 	# check if this system uses apt
-	command -v apt >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if ! command -v apt >/dev/null 2>&1; then
 		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use apt.${NC}"
 		sleep 2s
 		exit 1
 	fi
 
 	# check if this is a systemd system
-	command -v systemctl --version >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if ! command -v systemctl --version >/dev/null 2>&1; then
 		echo -e "${NC}${RED}>>> ERROR: Initial setup cannot continue. This system does not use systemd.${NC}"
 		sleep 2s
 		exit 1
@@ -311,7 +357,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo "  > Internet connectivity available, initial setup can continue."
 	fi
 
-	read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" ${BASEDIR})
+	read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
 	echo "  > Determining the home directory..."
 	USER_HOME=$(sudo -u "$OWNER_OF_FGDIR" sh -c 'echo $HOME') >/dev/null 2>&1
 	# https://superuser.com/a/1613980
@@ -324,15 +370,15 @@ if [ "$DFLAG" != "-d" ]; then
 	if [ ! -d "$VENVPATH" ]; then
 		# if the rgbmatrix library is already installed on first install, this may run
 		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
-			nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+			nohup python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u >/dev/null 2>&1 &
 		else
-			nohup python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+			nohup python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" >/dev/null 2>&1 &
 		fi
 	else
 		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
-			nohup ${VENVPATH}/bin/python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm -u >/dev/null 2>&1 &
+			nohup "${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u >/dev/null 2>&1 &
 		else
-			nohup ${VENVPATH}/bin/python3 $BASEDIR/utilities/splash.py $BASEDIR/FG-Splash.ppm >/dev/null 2>&1 &
+			nohup "${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" >/dev/null 2>&1 &
 		fi
 	fi
 fi
@@ -370,7 +416,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		[Service]
 		User=root
 		# Note: unless the -t flag is used, DO NOT use interactive flags unless you want to spam the logs
-		ExecStart=bash $THIS_FILE -t
+		ExecStart=bash "${THIS_FILE}" -t
 		ExecStop=-tmux send-keys -t FlightGazer C-c || true
 		ExecStop=sleep 1s
 		Type=forking
@@ -393,7 +439,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 
 		[Service]
 		User=root
-		ExecStart=$VENVPATH/bin/python3 $BASEDIR/utilities/splash-sysinit.py
+		ExecStart="${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash-sysinit.py"
 		Type=simple
 		Restart=no
 
@@ -426,51 +472,33 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 	# make a config file for the emulator to prevent harmless error spam and to
 	# take advantage of the emulator's other rendering options
 	if [ ! -f "${BASEDIR}/emulator_config.json" ]; then
-	echo "  > Creating RGBMatrixEmulator settings..."
-	cat << EOF > ${BASEDIR}/emulator_config.json
-{
-    "pixel_outline": 0,
-    "pixel_size": 16,
-    "pixel_style": "real",
-    "pixel_glow": 8,
-    "display_adapter": "browser",
-    "suppress_font_warnings": true,
-    "suppress_adapter_load_errors": true,
-    "browser": {
-        "_comment": "For use with the browser adapter only.",
-        "port": 8888,
-        "target_fps": 24,
-        "fps_display": true,
-        "quality": 50,
-        "image_border": true,
-        "debug_text": false,
-        "image_format": "JPEG"
-    },
-    "log_level": "info",
-    "icon_path": null,
-    "emulator_title: "FlightGazer - Emulated"
-}
-EOF
-	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/emulator_config.json >/dev/null 2>&1
-	echo "    > RGBMatrixEmulator settings created."
+		echo "  > Creating RGBMatrixEmulator settings..."
+		emulator_heredoc
+		chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/emulator_config.json" >/dev/null 2>&1
+		echo "    > RGBMatrixEmulator settings created."
+	elif [ $(wc -l < "${BASEDIR}/emulator_config.json") -ne 22 ]; then # count the lines in the heredoc in this script
+		echo "  > Updating RGBMatrixEmulator settings..."
+		emulator_heredoc
+		chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/emulator_config.json" >/dev/null 2>&1
+		echo "    > RGBMatrixEmulator settings updated."
 	fi
 fi
 if [ ! -d "$VENVPATH" ]; then
-	mkdir ${VENVPATH}
+	mkdir "${VENVPATH}"
 	echo ""
 	echo "  > Making virtual environment... (this may take awhile)"
-	python3 -m venv --system-site-packages ${VENVPATH}
+	python3 -m venv --system-site-packages "$VENVPATH"
 	echo "  > Initializing the virtual environment..."
-	${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
+	"${VENVPATH}/bin/python3" -m pip install --upgrade pip >/dev/null
 	# Note: `uv` does python package installs much faster, but as of now
 	# it doesn't support the use of --system-site-packages.
 	# See: https://github.com/astral-sh/uv/issues/4466
 	# The framework in this script exists to switch to using `uv` once that happens.
 	# It's as simple as uncommenting the below.
-	# ${VENVPATH}/bin/pip3 install --upgrade uv >/dev/null
+	# "${VENVPATH}/bin/pip3" install --upgrade uv >/dev/null
 	# if [ -f "${VENVPATH}/bin/activate" ];then
 	# 	export VIRTUAL_ENV=$VENVPATH
-	# 	source .${VENVPATH}/bin/activate >/dev/null
+	# 	source ."${VENVPATH}/bin/activate" >/dev/null
 	# fi
 fi
 echo ""
@@ -490,7 +518,7 @@ fi
 
 echo -e "${NC}> System image ready.${FADE}"
 echo -n "> We have: "
-${VENVPATH}/bin/python3 -VV
+"${VENVPATH}/bin/python3" -VV
 
 CHECKMARK='\e[1F\e[30C[ Done ]\n' # move cursor up to the beginning one line up then move 30 spaces right
 # install dependencies
@@ -504,25 +532,25 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo -e "${FADE}${VERB_TEXT}pip"
-		${VENVPATH}/bin/python3 -m pip install --upgrade pip >/dev/null
+		"${VENVPATH}/bin/python3" -m pip install --upgrade pip >/dev/null
 		if [ $RGBMATRIX_PRESENT -eq 3 ]; then
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}rgbmatrix"
-			${VENVCMD} install -e ${USER_HOME}/rpi-rgb-led-matrix/bindings/python --use-pep517 >/dev/null
+			"${VENVCMD}" install -e "${USER_HOME}/rpi-rgb-led-matrix/bindings/python" --use-pep517 >/dev/null
 		fi
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}requests"
-		${VENVCMD} install --upgrade requests >/dev/null
+		"${VENVCMD}" install --upgrade requests >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}pydispatcher"
-		${VENVCMD} install --upgrade pydispatcher >/dev/null
+		"${VENVCMD}" install --upgrade pydispatcher >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}schedule"
-		${VENVCMD} install --upgrade schedule >/dev/null
+		"${VENVCMD}" install --upgrade schedule >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}suntime"
-		${VENVCMD} install --upgrade suntime >/dev/null
+		"${VENVCMD}" install --upgrade suntime >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}psutil"
-		${VENVCMD} install --upgrade psutil >/dev/null
+		"${VENVCMD}" install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}yaml"
-		${VENVCMD} install --upgrade ruamel.yaml >/dev/null
+		"${VENVCMD}" install --upgrade ruamel.yaml >/dev/null
 		echo -e "${CHECKMARK}${FADE}${VERB_TEXT}orjson"
-		${VENVCMD} install --upgrade orjson >/dev/null
+		"${VENVCMD}" install --upgrade orjson >/dev/null
 		if [ "$VERB_TEXT" == "Installing: " ]; then
 			echo -e "${CHECKMARK}${FADE}"
 			echo "(The next install may take some time, please be patient.)"
@@ -530,30 +558,30 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		else
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}RGBMatrixEmulator"
 		fi
-		${VENVCMD} install --upgrade RGBMatrixEmulator >/dev/null
+		"${VENVCMD}" install --upgrade RGBMatrixEmulator >/dev/null
 		if [ $WEB_INT -eq 1 ]; then
 			systemctl stop flightgazer-webapp >/dev/null 2>&1
 			echo -e "${CHECKMARK}${FADE}"
 			echo "Web-app components:"
 			echo "${VERB_TEXT}Flask"
-			${VENVCMD} install --upgrade Flask >/dev/null
+			"${VENVCMD}" install --upgrade Flask >/dev/null
 			echo -e "${CHECKMARK}${FADE}${VERB_TEXT}gunicorn"
-			${VENVCMD} install --upgrade gunicorn >/dev/null
+			"${VENVCMD}" install --upgrade gunicorn >/dev/null
 			systemctl start flightgazer-webapp >/dev/null 2>&1
 		fi
 		echo -e "${CHECKMARK}${NC}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n${FADE}"
 	else
 		echo "  Skipping due to no internet."
 	fi
-	touch $LOGFILE
-	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${LOGFILE} >/dev/null 2>&1
-	chmod -f 777 ${LOGFILE} >/dev/null 2>&1
+	touch "$LOGFILE"
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$LOGFILE" >/dev/null 2>&1
+	chmod -f 777 "${LOGFILE}" >/dev/null 2>&1
 	STAGEB=$(date '+%s')
 	echo -e "${NC}Stage 2 of setup took $((STAGEB - STAGEA)) seconds.${FADE}"
 	# start the database updater/generator
 	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
-	if [ $INTERNET_STAT -eq 0 ] && [ -f $DB_DOWNLOADER ]; then
-		${VENVPATH}/bin/python3 ${DB_DOWNLOADER}
+	if [ $INTERNET_STAT -eq 0 ] && [ -f "$DB_DOWNLOADER" ]; then
+		"${VENVPATH}/bin/python3" "$DB_DOWNLOADER"
 		if [ $? -ne 0 ]; then
 			echo -e "${NC}${ORANGE}> Failed to generate database.${NC}"
 			echo "You can try again at a later time by running"
@@ -562,7 +590,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		else
 			echo -e "${NC}> Success."
 			if [ -f "${BASEDIR}/utilities/database.db" ]; then
-				chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} ${BASEDIR}/utilities/database.db >/dev/null 2>&1
+				chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/utilities/database.db" >/dev/null 2>&1
 			fi
 		fi
 	else
@@ -575,11 +603,11 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 fi
 
 if [ -f "$LOGFILE" ]; then
-	LOGLENGTH=$(wc -l < $LOGFILE)
+	LOGLENGTH=$(wc -l < "$LOGFILE")
 	if [ $LOGLENGTH -gt 2000 ]; then
 		time_now=$(date '+%Y-%m-%d %H:%M')
-		echo "$(tail -n 2000 $LOGFILE)" > $LOGFILE
-		sed -i -e "1i********** $time_now --- This logfile has been truncated to the latest 2000 lines. (was $LOGLENGTH) **********\\" $LOGFILE
+		echo "$(tail -n 2000 $LOGFILE)" > "$LOGFILE"
+		sed -i -e "1i********** $time_now --- This logfile has been truncated to the latest 2000 lines. (was $LOGLENGTH) **********\\" "$LOGFILE"
 		echo "> Logfile housekeeping: truncated logfile to latest 2000 lines. (was $LOGLENGTH)"
 	fi
 fi
@@ -623,7 +651,7 @@ else
 		# always have the -i interactive flag in use if no other options are given
 		echo -e "${GREEN}> We're running in an interactive shell. Program output will be shown.${NC}${FADE}"
 		if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
+			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 \"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
 			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
 			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
 			sleep 1s
@@ -637,14 +665,14 @@ else
 				sleep 2s
 			fi
 			TRADITIONAL_START=true
-			nice -n -4 ionice -c 2 -n 2 ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} & child_pid=$!
+			nice -n -4 ionice -c 2 -n 2 "${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} & child_pid=$!
 			wait "$child_pid"
 		fi
 	else
 		# edit the entry in /etc/systemd/system/flightgazer.service manually if you want to start with additional flags
 		# then use `systemctl daemon-reload` to use the updated settings
 		if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
+			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 \"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
 			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
 			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
 			# keep-alive, assuming this is a simple systemd service
@@ -660,7 +688,7 @@ else
 			trap terminate SIGTERM
 			TRADITIONAL_START=true
 			# don't parse arguments that enable interactive modes
-			nice -n -4 ionice -c 2 -n 2 ${VENVPATH}/bin/python3 ${BASEDIR}/FlightGazer.py ${EFLAG} ${VFLAG} & child_pid=$!
+			nice -n -4 ionice -c 2 -n 2 "${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" ${EFLAG} ${VFLAG} & child_pid=$!
 			wait "$child_pid"
 		fi
 	fi
