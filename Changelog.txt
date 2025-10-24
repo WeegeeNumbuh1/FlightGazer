@@ -5,6 +5,14 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.0.1 - 2025-10-24
+    - Added logging when tracking a PIA aircraft as these encounters are rare
+    - Small optimization tweak when using NO_FILTER mode
+    - Made the 'Q' glyphs between the 3x5 fonts to look the same (uses the alt style)
+    - Other small code cleanups in the main python script
+    - FlightGazer is now at 7000 lines long
+        - How this all still works is crazy
+
 v.9.0.0 - 2025-10-22
     - BREAKING CHANGE: Updated some internal methods which now require Python 3.10.
       Python 3.9's EOL is 2025-10-30. Consider upgrading to a modern version of Python.

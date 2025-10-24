@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.0.0 # do not modify this
+CONFIG_VERSION: v.9.0.1 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -114,7 +114,7 @@ CLOCK_CENTER_ROW:
 # Having ROW1 equal to zero or blank, but ROW2 filled will force using the smaller font on the Clock display.
 # Options:
 # 0, null, or blank = Don't use this option
-# 1 = Sunset/Sunrise
+# 1 = Sunrise/Sunset
 # 2 = ADS-B receiver stats (gain, noise, % loud signals)
 # 3 = Extended calendar info (month, week number, day of the year)
 

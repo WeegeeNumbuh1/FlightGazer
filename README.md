@@ -10,7 +10,7 @@
 <!-- end title section -->
 
 ## 🚩 About
-This is a personal project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
+This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
 nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
@@ -89,24 +89,22 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
 - Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated within a web browser
+- Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 
 <details><summary><b>More Features</b></summary>
 
 ### Adaptive & flexible
 - Automatically switches to other aircraft if more than one is within the area
-- Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
 - Customizable features such as:
-  - Range of which aircraft need to be in for detailed tracking
-  - Height filtering
+  - Range and height ceiling that aircraft need to be in for detailed tracking
   - Units (aeronautical, metric, or imperial)
   - Clock style (12 hour or 24 hour)
   - Brightness based on time of day or when there's an active aircraft shown
   - API limiting per day, by monthly cost, or even by the hour (those API calls can get expensive)
-  - Writing to a stats file that keeps count of number of aircraft flying by per day (and API usage as well)
   - Track a specific aircraft once it's detected by your ADS-B receiver
-  - Colors 🌈
+  - Colors 🌈 for every element on the display
   - Switch between font styles
   - and more
 - Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
@@ -127,7 +125,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Program state is available in a json file for use elsewhere
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Robust and hard-to-break
-- Unique tools and fonts that can be used in other projects (don't forget to credit me)
+- Unique tools and custom-developed fonts that can be used in other projects (don't forget to credit me)
 - Constant development
 - Adequate documentation
 
@@ -455,6 +453,7 @@ or, you may [start it manually](#️-interactive-mode).
 <details><summary>What the initialization script does</summary>
 
 - Checks if there is an internet connection
+- Checks if Python is installed and also checks its version with the minimum requirements
 - Checks if `first_run_complete` exists
   - Checks last modified date: if greater than 3 months, runs updates for installed dependencies
   - If file exists and is new-ish, then this isn't an initial installation and we just run the main python script
@@ -471,6 +470,7 @@ or, you may [start it manually](#️-interactive-mode).
 - Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
+  - rgbmatrix (if it's not installed globally and is present in the user's folder)
   - requests
   - pydispatcher
   - schedule
@@ -531,13 +531,7 @@ Disabling startup at boot
 ```bash
 sudo systemctl disable flightgazer.service
 ```
-Deploy the full FlightGazer package in one go:
-```bash
-sudo bash /path/to/FlightGazer/FlightGazer-init.sh -c \
-&& echo y | sudo bash /path/to/FlightGazer/install-FlightGazer-webapp.sh \
-&& sudo systemctl start flightgazer
-# :D
-```
+
 </details>
 
 <details><summary>Cool python modules you can use in other projects</summary>
@@ -595,6 +589,9 @@ Getting the RGB display to work is beyond the scope of this project if it wasn't
 
 **Q:** I broke it 🥺<br>
 **A:** Try running the updater first. If it's still broken, uninstall then reinstall FlightGazer.
+
+**Q:** Can I run the physical display *and* the emulator at the same time? I'd like to see the display in a web browser while the main display is still working.<br>
+**A:** No. It's one or the other. The emulator is meant as a fallback/for development, or to try out FlightGazer before fully committing to using a real display.
 
 **Q:** I restarted/updated my system but it took longer for FlightGazer to start. What's going on?<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.<br>

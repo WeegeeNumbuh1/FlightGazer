@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.0.0 --- 2025-10-22'
+VERSION: str = 'v.9.0.1 --- 2025-10-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2060,14 +2060,15 @@ class PrintToConsole:
                         if aircraft['TrackingFlag'] != "None":
                             print_info.append(f" ({aircraft['TrackingFlag']} aircraft)")
                     else:
-                        if aircraft['TrackingFlag'] == "None":
-                            print_info.append(" | Private/Unknown")
-                        elif aircraft['TrackingFlag'] == "LADD":
-                            print_info.append(" | Private (LADD aircraft)")
-                        elif aircraft['TrackingFlag'] == "Military":
-                            print_info.append(" | Military aircraft")
-                        else: # note, PIA aircraft are not handled here because they always have an Operator (callsign)
-                            print_info.append(" | Other kind of aircraft")
+                        match aircraft['TrackingFlag']:
+                            case "None":
+                                print_info.append(" | Private/Unknown")
+                            case "LADD":
+                                print_info.append(" | Private (LADD aircraft)")
+                            case "Military":
+                                print_info.append(" | Military aircraft")
+                            case _: # note, PIA aircraft are not handled here because they always have an Operator (callsign)
+                                print_info.append(" | Other kind of aircraft")
                 if aircraft['AircraftDesc']:
                     print_info.append(f" | {aircraft['AircraftDesc']} (Type: {aircraft['ICAOType']}")
                     if aircraft['CategoryDesc'] != 'None':
@@ -2709,6 +2710,12 @@ def main_loop_generator() -> None:
         ranges = []
         planes = []
         farplanes = []
+        # Optimization tweak when using NOFILTER_MODE to reduce function calls:
+        # recall that NOFILTER_MODE may track hundreds of planes; we'd rather do this once instead
+        # of having to do this for each plane on every refresh. Plus the timing info no longer needs
+        # to be as precise or as accurate as the selection algorithm
+        # (approach rate and future position calculations) isn't used
+        reference_time = time.monotonic()
 
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
@@ -2918,7 +2925,7 @@ def main_loop_generator() -> None:
                             "FutureDistance": futdis,
                             "Flyby": flyby,
                             "Staleness": round(true_data_age, 3),
-                            "Timestamp": time.monotonic(),
+                            "Timestamp": time.monotonic() if not NOFILTER_MODE else reference_time,
                             }
 
                         if DATABASE_CONNECTED:
@@ -3079,6 +3086,7 @@ class AirplaneParser:
         self._plane_counts = deque(maxlen=500)
         self._active_loop_count = deque(maxlen=50)
         self._range_too_large = False
+        self._PIA_latch = False
         self.run_loop()
 
     def plane_selector(self, message):
@@ -3142,12 +3150,12 @@ class AirplaneParser:
             were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitialized to the last saved flyby count (more likely).
             A much higher value (1.5x-3x) is reflective of a very active area being monitored as the rate of switching increases to accommodate for increased traffic.
 
-            An additional metric, "plane load", was also introduced in v.8.5.0, which measures the average amount of relevant planes the selection algorithm has to choose from
+            An additional metric, "plane load", was also introduced in v.9.0.0, which measures the average amount of relevant planes the selection algorithm has to choose from
             when active over a sliding window of the last 500 loop cycles. When using the default RANGE and HEIGHT_LIMIT, along with a site deemed "really really active"
             (see `runtime_accumulators_reset()`), this value has been emperically seen to hover around 1.8-2.3. If a site is sized too large for the aircraft activity in the area,
             this value will be higher than this value range and the algorithm has to switch faster to handle the traffic.
             Index 1 of `plane_load` is a measure of how long the algorithm is active on average; with the default RANGE and HEIGHT_LIMIT, a jetliner inside this zone takes about 1 minute
-            and a general aviation plane takes roughly 2.5 minutes to traverse the area. Being inline with parallel runways at a busy airport this average can go up to 5-8 minutes.
+            and a general aviation plane takes roughly 2.5 minutes to traverse the area. Being inline with parallel runways at a busy airport this average can go up to 3-5 minutes.
             """
             global focus_plane, focus_plane_ids_discard, focus_plane_ids_scratch
             def prioritizer(available_ids: list | set) -> str:
@@ -3208,6 +3216,14 @@ class AirplaneParser:
                                 main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
                                 freeze_frame_packet(entry, show_distance=True)
                                 FOLLOW_THIS_AIRCRAFT_SPOTTED = True
+                        if entry['TrackingFlag'] == 'PIA' and not NOFILTER_MODE:
+                            if not self._PIA_latch:
+                                self._PIA_latch = True
+                                main_logger.info(f"Rare event! Tracking PIA aircraft \'{entry['Flight']}\' ",
+                                                 f"(ID: {entry['ID']}, aircraft type: {entry['CategoryDesc']})")
+                        else:
+                            if self._PIA_latch:
+                                self._PIA_latch = False
 
                 focus_plane_iter += 1
                 if follow_flag and plane_count > 1:
@@ -3552,7 +3568,7 @@ class APIFetcher:
                             break
                     else: # can happen for general aviation and we detected a new flight before the API does
                         api_hits[2] += 1
-                        main_logger.debug(f"Could not find currently operating flight for \'{flight_id}. Took {process_time[2]}ms")
+                        main_logger.debug(f"Could not find currently operating flight for \'{flight_id}\'. Took {process_time[2]}ms")
                         origin = "N/A"
                         API_status = 1
                 else:
@@ -3679,15 +3695,16 @@ class DisplayFeeder:
                 total_planes = "N/A"
 
             if DUMP1090_IS_AVAILABLE and LOCATION_IS_SET:
-                if general_stats['Range'] >= 999.5:
+                r_now = general_stats['Range']
+                if r_now >= 999.5:
                     current_range = ">999"
-                elif general_stats['Range'] >= 99.5 and general_stats['Range'] < 999.5: # just get us the integer values
-                    current_range = f"{general_stats['Range']:.0f}"
-                elif general_stats['Range'] >=9.95 and general_stats['Range'] < 99.5:
-                    current_range = f"{general_stats['Range']:.1f}"
-                elif general_stats['Range'] > 0 and general_stats['Range'] < 9.95:
-                    current_range = f"{general_stats['Range']:.2f}"
-                elif general_stats['Range'] == 0:
+                elif 99.5 <= r_now < 999.5: # just get us the integer values
+                    current_range = f"{r_now:.0f}"
+                elif 9.95 <= r_now < 99.5:
+                    current_range = f"{r_now:.1f}"
+                elif 0 < r_now < 9.95:
+                    current_range = f"{r_now:.2f}"
+                elif r_now == 0:
                     current_range = "0"
             else:
                 current_range = "N/A"
@@ -3778,25 +3795,25 @@ class DisplayFeeder:
             iso = f"{focus_plane_stats['Country']}"
             # speed readout is limited to 4 characters;
             # if speed >= 100, truncate to just the integers
-            if focus_plane_stats['Speed'] >= 99.5 or focus_plane_stats['Speed'] == 0:
-                gs = f"{focus_plane_stats['Speed']:.0f}"
-            elif focus_plane_stats['Speed'] > 0 and focus_plane_stats['Speed'] < 99.5:
-                gs = f"{focus_plane_stats['Speed']:.1f}"
+            s_now = focus_plane_stats['Speed']
+            if s_now >= 99.5 or s_now == 0:
+                gs = f"{s_now:.0f}"
+            elif 0 < s_now < 99.5:
+                gs = f"{s_now:.1f}"
             else:
                 gs = "0"
             alt = f"{focus_plane_stats['Altitude']:.0f}"
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
             if LOCATION_IS_SET:
-                if focus_plane_stats['Distance'] >= 0 and focus_plane_stats['Distance'] < 0.095:
-                    dist = f"{focus_plane_stats['Distance']:.2f}"[1:]
-                elif focus_plane_stats['Distance'] >= 0.095 and focus_plane_stats['Distance'] < 9.95:
-                    dist = f"{focus_plane_stats['Distance']:.1f}"
-                elif focus_plane_stats['Distance'] >= 9.95 and focus_plane_stats['Distance'] < 99.5:
-                    dist = f"{focus_plane_stats['Distance']:.0f}"
-                elif focus_plane_stats['Distance'] >= 99.5 and focus_plane_stats['Distance'] < 999.5:
-                    dist = f"{focus_plane_stats['Distance']:.0f}"
-                elif focus_plane_stats['Distance'] >= 999.5:
+                d_now = focus_plane_stats['Distance']
+                if 0 <= d_now < 0.095:
+                    dist = f"{d_now:.2f}"[1:] # no leading zero
+                elif 0.095 <= d_now < 9.95:
+                    dist = f"{d_now:.1f}"
+                elif 9.95 <= d_now < 999.5:
+                    dist = f"{d_now:.0f}"
+                elif d_now >= 999.5:
                     dist = "999"
                 else: dist = "0"
                 distance = focus_plane_stats['Direction'] + dist
@@ -3938,6 +3955,7 @@ class DisplayFeeder:
             # "First seen near Broadus"
             journey_str = ""
             if not api_limiter_reached():
+                # no need to use a match statement here, elif good enough
                 if API_status == 0:
                     if api_orig_name and api_dest_name:
                         journey_str = (f"{api_orig_city} to {api_dest_city} "
@@ -6886,6 +6904,8 @@ if LOCATION_IS_SET:
 session = requests.Session()
 """ Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
 
+suntimes()
+
 if DATABASE_FILE.exists():
     main_logger.info("Aircraft database is present.")
     try:
@@ -6900,8 +6920,6 @@ if DATABASE_FILE.exists():
         main_logger.warning("Failed to load required database handler. Some additional aircraft info may not be available.")
 else:
     main_logger.info("Aircraft database is unavailable.")
-
-suntimes()
 
 def main() -> None:
     """ Enters the main loop. """
