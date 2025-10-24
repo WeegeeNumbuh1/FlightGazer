@@ -53,7 +53,7 @@ def still_alive():
         sleep(30)
         indicator += 30
         print(f"--- Script is still working. ({indicator} seconds have passed) ---", flush=True)
-    
+
 current_db_ver = None
 threading.Thread(target=still_alive, daemon=True).start()
 if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
@@ -61,7 +61,7 @@ if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
     "out the database. To maintain a consistent state, the database will be fully rebuilt.\n")
     jrnl.unlink(missing_ok=True)
     OUTPUT_FILE.unlink(missing_ok=True)
-    
+
 if OUTPUT_FILE.exists():
     _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}?mode=ro", uri=True)
     _connection.row_factory = sqlite3.Row
@@ -146,11 +146,9 @@ if LOW_MEM:
     print("\n*** Warning: This is a low memory system! "
           f"({(mem.total / (1024 ** 2)):.1f} MiB) ***")
     print("Your device may struggle to complete the next tasks.")
-    sleep(2)
     print("If the device locks up, use this script to generate\n"
           "the database on another computer, and then transfer the\n"
           f"database to \'{CURRENT_DIR}\'\n")
-    sleep(2)
 
 print("Loading CSV file...")
 # Read in the csv file (no header row)
@@ -225,9 +223,10 @@ except OSError:
     username = "< Unknown >"
 machine = uname()
 machine_name = f"\'{machine.node}\', running {machine.system} {machine.release} [ {machine.version} on {machine.machine} ]"
-license_type = "Open Data Commons Attribution License"
+license_string = "Open Data Commons Attribution License"
 
 write_start = perf_counter()
+rows_in_db = len(parsed)
 # Write to a sqlite database
 # Each table will be named after the first character of the ICAO code
 with sqlite3.connect(OUTPUT_FILE) as conn:
@@ -246,66 +245,48 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
             );
         """)
         cursor.execute(f"DELETE FROM ICAO_{char}")
+
+    # check if we're using an older database that doesn't have this column
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='DB_INFO';")
+    info_table_exists = cursor.fetchone()
+    if info_table_exists:
+        cursor.execute(f"PRAGMA table_info(DB_INFO);")
+        db_info_cols = [col[1] for col in cursor.fetchall()]
+        if 'license' not in db_info_cols:
+            cursor.execute("DROP TABLE IF EXISTS DB_INFO;")
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS DB_INFO (
             version TEXT PRIMARY KEY,
             created_date TEXT,
             created_by TEXT,
-            machine TEXT
+            machine TEXT,
+            license TEXT
         );
     """)
-    
+
     # Insert the data into the respective tables
-    for row in parsed:
+    last_percentage = 0
+    for i, row in enumerate(parsed):
+        current_percentage = ((i + 1) / rows_in_db) * 100
         icao = row['icao']
         if icao[0] in leading_icao_chars:
             cursor.execute(f"""
                 INSERT OR REPLACE INTO ICAO_{icao[0]} (icao, reg, type, flags, desc, year, ownop)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (row['icao'], row['reg'], row['type'], row['flags'], row['desc'], row['year'], row['ownop']))
+        if current_percentage >= last_percentage + 10:
+            print(f"{last_percentage + 10}% complete ({i + 1}/{rows_in_db})")
+            last_percentage += 10
 
     cursor.execute("DELETE FROM DB_INFO")
     cursor.execute("""
         INSERT INTO DB_INFO (version, created_date, created_by, machine, license)
         VALUES (?, ?, ?, ?, ?)
-        """, (db_ver, date_now, username, machine_name, license_type))
-    
+        """, (db_ver, date_now, username, machine_name, license_string))
+
     conn.commit()
 conn.close()
-
-""" This section is left here if you're a madman and want to write the data to a python module instead of a sqlite database. """
-# header_str = """\"\"\" Importable python module of aircraft data used by tar1090/readsb.
-# Designed for the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
-# Loading in this module will increase memory usage by at least 90MB.
-# Graciously kept up to date by Mictronics and wiedehopf from: https://github.com/wiedehopf/tar1090-db/tree/csv """
-# import datetime
-# INPUT = Path(f"{CURRENT_DIR}/aircraft.csv")
-# OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.py")
-# with open(INPUT, 'r', encoding='utf-8') as csvfile:
-#     reader = csv.DictReader(csvfile,
-#                             fieldnames=['icao', 'reg', 'type', 'flags', 'desc', 'year', 'ownop', 'blank'],
-#                             delimiter=';')
-#     for row in reader:
-#         parsed.append(row)
-# with open(OUTPUT_FILE, 'w', encoding='utf-8') as pyfile:
-#     pyfile.write(header_str)
-#     pyfile.write(f"# Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-#     pyfile.write(f"\n# Total rows: {total_rows}\n\n")
-#     pyfile.write("from typing import Dict, Any\n\n")
-#     for char in leading_icao_chars:
-#         pyfile.write(f"{char}_ICAO: Dict[str, Dict[str, Any]] = {{\n")
-#         section_count = 0
-#         for row in parsed:
-#             if row['icao'].startswith(char):
-#                 # Remove the blank field
-#                 del row['blank']
-#                 # Write the ICAO code and the rest of the fields as a dict
-#                 pyfile.write(f"    '{row['icao']}': {row},\n")
-#                 section_count += 1
-#         pyfile.write(f"}} # {section_count} entries.\n\n")
-#         print(f"Wrote section '{char}_ICAO' with {section_count} entries.")
-#         # Reset the reader for the next character
-#     pyfile.write(f"\n# {total_rows} entries in total.")
 
 print(f"{(OUTPUT_FILE.stat().st_size) / (1024 * 1024):.3f} MiB of records "
       f"written to database in {perf_counter() - write_start:.2f} seconds.")

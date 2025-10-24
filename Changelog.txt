@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.0.2 - 2025-10-24
+    - FIX: Fix aircraft database generator when updating to the newer format
+        - The database generator now shows its progress when writing the database
+
 v.9.0.1 - 2025-10-24
     - Added logging when tracking a PIA aircraft as these encounters are rare
     - Small optimization tweak when using NO_FILTER mode
