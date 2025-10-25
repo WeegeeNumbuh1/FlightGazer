@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.0.2
+# Version = v.9.0.3
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -61,7 +61,7 @@ help_str(){
 }
 
 cleanup() {
-	echo -e "${RED}\n>>> Ctrl+C pressed. Setup or startup canceled.${NC}"
+	echo -e "${RED}\n>>> Ctrl+C pressed. Setup or startup cancelled.${NC}"
 	# kill splash screen if started
 	kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') >/dev/null 2>&1
 	if [ $SKIP_CHECK -eq 0 ]; then
@@ -240,7 +240,7 @@ CORECOUNT=$(grep -c ^processor /proc/cpuinfo)
 if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv_check.py" ]; then
 	"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/venv_check.py"
 	if [ $? -ne 0 ]; then
-		echo -e "\n${NC}${RED}>>> WARNING: The virtual environment is broken.${NC}"
+		>&2 echo -e "\n${NC}${RED}>>> WARNING: The virtual environment is broken.${NC}"
 		echo "    It will be rebuilt this session."
 		echo ""
 		rm -rf "$VENVPATH"
@@ -341,10 +341,11 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 
 	# check internet connection
-	wget -q --timeout=10 --spider http://google.com
+	wget -q --timeout=5 --spider http://google.com && wget -q --connect-timeout=5 --tries=1 --spider http://pypi.org
 	if [ $? -ne 0 ]; then
 		INTERNET_STAT=1
-		>&2 echo -e "${NC}${RED}>>> Warning: Failed to connect to internet. File checking will be skipped.${FADE}"
+		>&2 echo -e "${NC}${RED}>>> Warning: Failed to connect to internet or pypi.org (Python packages)."
+		echo -e "Dependency checking will be skipped, but will be checked when this is run again.${FADE}"
 	fi
 
 	if [ ! -f "$CHECK_FILE" ] && [ $INTERNET_STAT -eq 1 ] && [ ! -d "$VENVPATH" ]; then
@@ -571,7 +572,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		fi
 		echo -e "${CHECKMARK}${NC}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n${FADE}"
 	else
-		echo "  Skipping due to no internet."
+		echo -e "${ORANGE}  Skipping due to no internet.${NC}${FADE}"
 	fi
 	touch "$LOGFILE"
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$LOGFILE" >/dev/null 2>&1
@@ -580,7 +581,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo -e "${NC}Stage 2 of setup took $((STAGEB - STAGEA)) seconds.${FADE}"
 	# start the database updater/generator
 	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
-	if [ $INTERNET_STAT -eq 0 ] && [ -f "$DB_DOWNLOADER" ]; then
+	if [ -f "$DB_DOWNLOADER" ]; then
 		"${VENVPATH}/bin/python3" "$DB_DOWNLOADER"
 		if [ $? -ne 0 ]; then
 			echo -e "${NC}${ORANGE}> Failed to generate database.${NC}"
@@ -594,8 +595,8 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			fi
 		fi
 	else
-		echo "> Unable to check or generate aircraft database"
-		echo "  either due to no internet or downloader script is missing."
+		echo -e "${NC}${ORANGE}> Unable to check or generate aircraft database"
+		echo "  due to downloader script missing.${NC}${FADE}"
 	fi
 	if [ $INTERNET_STAT -eq 0 ]; then
 		touch $CHECK_FILE

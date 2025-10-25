@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.0.3 - 2025-10-25
+    - If the initialization script cannot connect to pypi.org to install the Python packages, it will treat the setup as if
+      there is no internet connection
+        - This allows for the initialization/service to continue instead of being hung-up trying to connect (as long as the virtual environment
+          already exists)
+
 v.9.0.2 - 2025-10-24
     - FIX: Fix aircraft database generator when updating to the newer format
         - The database generator now shows its progress when writing the database
