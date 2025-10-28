@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.0.3
+# Version = v.9.1.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -175,7 +175,7 @@ fi
 kill -15 $(ps aux | grep 'splash-sysinit.py' | awk '{print $2}') >/dev/null 2>&1
 
 if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
-	echo -e "\n${NC}${RED}>>> ERROR: FlightGazer is already running.${NC}"
+	>&2 echo -e "\n${NC}${RED}>>> ERROR: FlightGazer is already running.${NC}"
 	echo "These are the process IDs detected:"
 	ps aux | grep '[F]lightGazer.py' | awk '{print $2}'
 	echo -e "\n${ORANGE}>>> FlightGazer can only have one running instance at a time.${NC}"
@@ -191,7 +191,7 @@ echo -e "${GREEN}>>> Checking dependencies, let's begin.${NC}"
 echo -e "${FADE}"
 
 if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
-	echo -e "\n${NC}${RED}>>> ERROR: Cannot find ${BASEDIR}/FlightGazer.py.${NC}"
+	>&2 echo -e "\n${NC}${RED}>>> ERROR: Cannot find ${BASEDIR}/FlightGazer.py.${NC}"
 	sleep 2s
 	exit 1
 fi
@@ -199,7 +199,7 @@ fi
 REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=10
 if ! command -v python3 >/dev/null 2>&1; then
-	echo -e "\n${NC}${RED}>>> ERROR: Python is not installed. Please install it on this system first.${NC}"
+	>&2 echo -e "\n${NC}${RED}>>> ERROR: Python is not installed. Please install it on this system first.${NC}"
 	exit 1
 fi
 
@@ -344,7 +344,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	wget -q --timeout=5 --spider http://google.com && wget -q --connect-timeout=5 --tries=1 --spider http://pypi.org
 	if [ $? -ne 0 ]; then
 		INTERNET_STAT=1
-		>&2 echo -e "${NC}${RED}>>> Warning: Failed to connect to internet or pypi.org (Python packages)."
+		>&2 echo -e "${NC}${RED}>>> WARNING: Failed to connect to internet or pypi.org (Python packages)."
 		echo -e "Dependency checking will be skipped, but will be checked when this is run again.${FADE}"
 	fi
 
@@ -355,7 +355,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 
 	if [ $INTERNET_STAT -eq 0 ]; then
-		echo "  > Internet connectivity available, initial setup can continue."
+		echo "  > Internet connectivity available, setup can continue."
 	fi
 
 	read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
@@ -696,7 +696,7 @@ else
 fi
 # the following will only run if the python script exits with an error
 if [ "$TRADITIONAL_START" = true ]; then
-	>&2 echo -e "\n${NC}${RED}>>> Warning: Script exited unexpectedly.
+	>&2 echo -e "\n${NC}${RED}>>> WARNING: Script exited unexpectedly.
              Please review the output above for error details.${NC}"
 	exit 1
 fi

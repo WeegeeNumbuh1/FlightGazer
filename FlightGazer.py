@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.0.3 --- 2025-10-25'
+VERSION: str = 'v.9.1.0 --- 2025-10-28'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -259,6 +259,13 @@ API_COST_PER_CALL: float = 0.005
 Current as of `VERSION` """
 BEYOND_LOS_LIMIT = 290
 """ Criteria for determining if a plane is detected beyond typical LOS limits for ADS-B, in nautical miles. """
+BAD_SEMAPHORE_FILE = Path("/run/FlightGazer/not_good")
+
+# check if the last shutdown was caused by an error
+if BAD_SEMAPHORE_FILE.exists():
+    main_logger.error("FlightGazer's last shutdown was caused by a critical error or was running in a degraded state and not shut down properly.")
+    main_logger.error("If this error keeps appearing in the log, please report this problem to the developer.")
+    BAD_SEMAPHORE_FILE.unlink(missing_ok=True)
 
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
@@ -681,7 +688,7 @@ is_readsb: bool = False
 """ Tweak text output if we're connected to wiedehopf's readsb instead of dump1090 """
 really_active_adsb_site: bool = False
 """ Indicates that the currently connected dump1090 instance encounters a lot of traffic.
-Controls the rare event log printout. """
+Controls the rare event log printout. Set by `runtime_accumulators_reset()` """
 really_really_active_adsb_site: bool = False
 """ You like planes, bro? """
 dump1090_receiver_version: str = ''
@@ -698,7 +705,11 @@ state_json: str | None = None
 DATABASE_CONNECTED: bool = False
 """ True if the connection to the database is valid, False otherwise. """
 range_too_large: bool = False
-""" True if the designated combination of `RANGE` and `HEIGHT_LIMIT` is too large for the traffic in the area. """
+""" True if the designated combination of `RANGE` and `HEIGHT_LIMIT` is too large for the traffic in the area.
+Controlled by `AirplaneParser()` """
+combined_feed: bool = False
+""" True if it's determined this dump1090 instance is being used with multiple sites.
+Controlled by `DistantDeterminator()` """
 #--- API stuff
 api_hits: list = [0,0,0,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
@@ -722,6 +733,9 @@ algorithm_rare_events: int = 0
 Controlled by `AirplaneParser`. """
 high_priority_events: int = 0
 """ Count of how many selection overrides were triggered """
+algorithm_daily_runtime: int = 0
+""" Time in seconds the algorithm has been in use today, based on cumulative loop counts.
+As reference, a `really_really_active_adsb_site` can have a value up to 16 hours. """
 process_time2: list = [0.,0.,0.,0.]
 """ [time to print last console output, format data, json deserializing, json serializing] ms """
 runtime_sizes: list = [0,0,0]
@@ -768,6 +782,7 @@ END_THREADS: str = "terminate"
 KICK_DUMP1090_WATCHDOG: str = "kick-watchdog"
 REALLY_FAR_PLANE: str = "woah-faraway"
 REALLY_FAR_PLANE2: str = "back-to-normal"
+MIDNIGHT_RESET: str = "midnight"
 
 # define our units and multiplication factors (based on aeronautical units)
 distance_unit: str = "nmi"
@@ -808,7 +823,9 @@ def sigterm_handler(signum, frame):
     end_time = round(time.monotonic() - START_TIME, 3)
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
     if DATABASE_CONNECTED: db.close()
-    if state_json: state_json.unlink(missing_ok=True)
+    if state_json:
+        state_json.unlink(missing_ok=True)
+        write_bad_state_semaphore(False)
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
     if super_far_plane: dxing_log()
     os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
@@ -854,7 +871,7 @@ def timedelta_clean(timeinput: datetime.datetime) -> str:
 def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelta') -> str:
     """Convert a datetime.timedelta object or a regular number to a custom-
     formatted string, just like the stftime() method does for datetime.datetime
-    objects. Sourced from https://stackoverflow.com/a/42320260
+    objects. Modified from https://stackoverflow.com/a/42320260
 
     The fmt argument allows custom formatting to be specified.  Fields can
     include seconds, minutes, hours, days, and weeks.  Each field is optional.
@@ -875,18 +892,19 @@ def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelt
     """
 
     # Convert tdelta to integer seconds.
-    if inputtype == 'timedelta':
-        remainder = int(tdelta.total_seconds())
-    elif inputtype in ['s', 'seconds']:
-        remainder = int(tdelta)
-    elif inputtype in ['m', 'minutes']:
-        remainder = int(tdelta)*60
-    elif inputtype in ['h', 'hours']:
-        remainder = int(tdelta)*3600
-    elif inputtype in ['d', 'days']:
-        remainder = int(tdelta)*86400
-    elif inputtype in ['w', 'weeks']:
-        remainder = int(tdelta)*604800
+    match inputtype:
+        case 'timedelta':
+            remainder = int(tdelta.total_seconds())
+        case 's' | 'seconds':
+            remainder = int(tdelta)
+        case 'm' | 'minutes':
+            remainder = int(tdelta)*60
+        case 'h' | 'hours':
+            remainder = int(tdelta)*3600
+        case 'd' | 'days':
+            remainder = int(tdelta)*86400
+        case 'w' | 'weeks':
+            remainder = int(tdelta)*604800
 
     f = Formatter()
     desired_fields = [field_tuple[1] for field_tuple in f.parse(fmt)]
@@ -972,18 +990,22 @@ def dxing_log() -> None:
     if not super_far_plane: return
     data0 = []
     dis = super_far_plane['Distance'] / distance_multiplier
-    if dis >= 400:
-        data0.append("*** Frame this and tell everyone!*** ")
-    elif 350 < dis < 400:
-        data0.append("Absolutely insane! ")
-    else:
-        data0.append("Exciting! ")
+    if not combined_feed:
+        if dis >= 400:
+            data0.append("*** Frame this and tell everyone! *** ")
+        elif 350 < dis < 400:
+            data0.append("Absolutely insane! ")
+        else:
+            data0.append("Exciting! ")
     data0.append(f"\'{super_far_plane['Flight']}\' ({super_far_plane['ID']}, {super_far_plane['Country']}) ")
     data0.append(f"was detected {round(super_far_plane['Distance'], 3)} {distance_unit} away ")
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
     main_logger.info(f"{''.join(data0)}")
-    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today. Tropospheric propagation may have enabled this.")
+    if not combined_feed:
+        main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
+    else:
+        main_logger.info("This ADS-B site might be using a combined feed. This data is not an accurate representation of the site's ADS-B capabilities.")
     freeze_frame_packet(super_far_plane, show_distance=False)
 
 def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
@@ -1022,6 +1044,21 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
                     f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
                     f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
                     )
+
+def write_bad_state_semaphore(write_the_file: bool = False) -> None:
+    """ If FlightGazer ends up in a degraded state, send a signal for external apps.
+    This only works if `state_file` is not None.
+    Pass `True` to write the file, `False` to delete it. It's safe to pass `False`
+    even if the file doesn't exist. """
+    if not state_json:
+        return
+    try:
+        if write_the_file:
+            BAD_SEMAPHORE_FILE.touch(exist_ok=True)
+        else:
+            BAD_SEMAPHORE_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -1657,29 +1694,39 @@ def runtime_accumulators_reset() -> None:
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
+    global algorithm_daily_runtime
     extra_text = False
 
     daily_stats_str = []
+    daily_stats_str_2 = []
+    algorithm_time = strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')
     if NOFILTER_MODE:
         d_txt = "flights observed"
     else:
         d_txt = "flybys"
     daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
     if not NOFILTER_MODE:
-        if high_priority_events > 0:
-            daily_stats_str.append(f" {high_priority_events} high-priority overrides occurred.")
-        daily_stats_str.append(f" {selection_events} selection events")
-        if algorithm_rare_events_now > 0:
-            daily_stats_str.append(f", of which {algorithm_rare_events_now} were rare selection events.")
-        else:
-            daily_stats_str.append(".")
+        daily_stats_str.append(f" Time that there were aircraft in the area: {algorithm_time}")
+        if (time.monotonic() - START_TIME) > 86400:
+            daily_stats_str.append(f" ({(algorithm_daily_runtime / 86400) * 100:.1f}% of the day)")
     main_logger.info(f"{''.join(daily_stats_str)}")
+    if not NOFILTER_MODE:
+        daily_stats_str_2.append("Events:")
+        if high_priority_events > 0:
+            daily_stats_str_2.append(f" {high_priority_events} high-priority overrides occurred.")
+        daily_stats_str_2.append(f" {selection_events} aircraft selections")
+        if algorithm_rare_events_now > 0:
+            daily_stats_str_2.append(f", of which {algorithm_rare_events_now} were rare selections.")
+        else:
+            daily_stats_str_2.append(".")
+        main_logger.info(f"{''.join(daily_stats_str_2)}")
 
     if (
         (selection_events >= 1000
          or (len(unique_planes_seen) >= 700
              and not NOFILTER_MODE
              )
+         or (algorithm_daily_runtime > 36000) # 10 hours
         )
          and not really_active_adsb_site
     ):
@@ -1745,9 +1792,10 @@ def runtime_accumulators_reset() -> None:
             main_logger.debug("API calls for the day have been reset.")
         selection_events = 0
         high_priority_events = 0
+        algorithm_daily_runtime = 0
         super_far_plane.clear()
         # reset the distance tracker for `DistantDeterminator`
-        dispatcher.send(message='', signal=REALLY_FAR_PLANE, sender=runtime_accumulators_reset)
+        dispatcher.send(message='', signal=MIDNIGHT_RESET, sender=runtime_accumulators_reset)
         if FOLLOW_THIS_AIRCRAFT_SPOTTED:
             FOLLOW_THIS_AIRCRAFT_SPOTTED = False
 
@@ -1931,12 +1979,15 @@ class PrintToConsole:
             print(f"{white_highlight}**********      Console-only mode      **********{rst}")
 
         # filters status
+        filt_algo_str = []
         if DUMP1090_IS_AVAILABLE:
             if not NOFILTER_MODE:
-                if not FOLLOW_THIS_AIRCRAFT:
-                    print(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}{rst}")
-                else:
-                    print(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}, or \'{FOLLOW_THIS_AIRCRAFT}\'{rst}")
+                filt_algo_str.append(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}")
+                if FOLLOW_THIS_AIRCRAFT:
+                    filt_algo_str.append(f", or \'{FOLLOW_THIS_AIRCRAFT}\'")
+                filt_algo_str.append(f" | Active time today: {strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
+                filt_algo_str.append(f"{rst}")
+                print("".join(filt_algo_str))
             else:
                 if DUMP978_JSON is None:
                     print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} shown. *******{rst}\n")
@@ -1944,6 +1995,8 @@ class PrintToConsole:
                     print(f"{white_highlight}******* No Filters mode enabled. All aircraft with locations detected by {dump1090} and dump978 shown. *******{rst}\n")
         if range_too_large:
             print(f"{yellow_warning}***** Aircraft activity is too high. Consider lowering RANGE and HEIGHT_LIMIT *****{rst}\n")
+        if combined_feed:
+            print(f"{yellow_warning}***** FlightGazer is only meant for single sites. This might be a combined feed. *****{rst}\n")
 
         if focus_plane_iter != 0:
             # reflects plane selection algorithm
@@ -2201,10 +2254,14 @@ class PrintToConsole:
             print("".join(verbose_stats))
 
         # plane/receiver stats line
-        print((f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, "
-               f"max range: {general_stats['Range']:.2f} {distance_unit} | "
-               f"Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
-        )
+        plane_stats = []
+        plane_stats.append(f"> Detected {general_stats['Tracking']} aircraft, {plane_count} aircraft in range, ")
+        plane_stats.append(f"max range: {general_stats['Range']:.2f}")
+        if combined_feed:
+            plane_stats.append("*")
+        plane_stats.append(f" {distance_unit} | ")
+        plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
+        print("".join(plane_stats))
 
         # API status line
         if API_KEY:
@@ -2226,16 +2283,11 @@ class PrintToConsole:
         flyby_str.append(f"> Total {flybytext} today: {len(unique_planes_seen)}")
         if not NOFILTER_MODE:
             flyby_str.append(f" | Aircraft selections: {selection_events}")
-        if VERBOSE_MODE or algorithm_rare_events > 0:
-            flyby_str.append(f" | Rare selection events: {algorithm_rare_events}")
-        if VERBOSE_MODE:
-            flyby_str.append(f" | High-Priority events: {high_priority_events}")
-        elif not VERBOSE_MODE and high_priority_events > 0:
-            flyby_str.append(f" | High-Priority overrides: {high_priority_events}")
-        if not NOFILTER_MODE:
-            flyby_str.append(f" | Plane load: {plane_load[0]:.3f}")
-            if VERBOSE_MODE:
-                flyby_str.append(f", {plane_load[1]:.3f}s")
+            if VERBOSE_MODE or algorithm_rare_events > 0 or high_priority_events > 0:
+                flyby_str.append(f" | Events: {algorithm_rare_events} rare selections, {high_priority_events} High-Priority")
+                flyby_str.append(f" | Plane load: {plane_load[0]:.3f}")
+                if VERBOSE_MODE:
+                    flyby_str.append(f", {plane_load[1]:.1f}s")
         print("".join(flyby_str))
 
         # process info line
@@ -3093,6 +3145,7 @@ class AirplaneParser:
         """ Select a plane! """
         global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
         global process_time, selection_events, algorithm_rare_events, selection_override, high_priority_events, plane_load, range_too_large
+        global algorithm_daily_runtime
         start_time = time.perf_counter()
         with threading.Lock():
             relevant_planes_local_copy = relevant_planes.copy()
@@ -3226,6 +3279,8 @@ class AirplaneParser:
                                 self._PIA_latch = False
 
                 focus_plane_iter += 1
+                if focus_plane_iter > 1:
+                    algorithm_daily_runtime += LOOP_INTERVAL
                 if follow_flag and plane_count > 1:
                     self._plane_counts.append(plane_count - 1) # don't count the FOLLOW_THIS_AIRCRAFT plane
                 else:
@@ -3706,6 +3761,8 @@ class DisplayFeeder:
                     current_range = f"{r_now:.2f}"
                 elif r_now == 0:
                     current_range = "0"
+                if combined_feed and r_now / distance_multiplier >= 300:
+                    current_range = f"{(300 * distance_multiplier):.0f}*"
             else:
                 current_range = "N/A"
 
@@ -4069,6 +4126,7 @@ class dump1090Watchdog:
         with threading.Lock(): # indirectly let the other threads know that dump1090 is not available
             relevant_planes.clear()
         watchdog_triggers += 1
+        write_bad_state_semaphore(True)
         if watchdog_triggers > (watchdog_setpoint - 1):
             main_logger.error(f"{dump1090} watchdog has been triggered too many times ({watchdog_setpoint}).")
             main_logger.error(">>> Permanently disabling dump1090 readout for this session.")
@@ -4079,6 +4137,7 @@ class dump1090Watchdog:
         main_logger.error(f">>> Suspending checking {dump1090} for 10 minutes. This is occurrence: {watchdog_triggers}.")
         time.sleep(600)
         main_logger.info(f"Re-enabling {dump1090} readout.")
+        write_bad_state_semaphore(False)
         DUMP1090_IS_AVAILABLE = True
 
     def run_loop(self):
@@ -4215,6 +4274,7 @@ class WriteState:
                 return
 
         state_json = self.json_file
+        main_logger.debug(f"State file will be written to \'{self.run_dir}\' and writing thread is now running.")
         self.run_loop()
 
     def export_FlightGazer_state(self, message) -> None:
@@ -4277,7 +4337,8 @@ class WriteState:
                 'rare_selection_events': algorithm_rare_events,
                 'high_priority_events': high_priority_events,
                 'average_relevant_planes_in_area': round(plane_load[0], 3),
-                'average_algorithm_active_time_sec': round(plane_load[1], 3),
+                'average_algorithm_active_time_sec': round(plane_load[1], 1),
+                'algorithm_use_today': strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s'),
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
                 'focus_plane_ids_discard': list(focus_plane_ids_discard),
@@ -4857,20 +4918,22 @@ class DistantDeterminator():
     """ Thread that watches when we encounter a plane that has been detected
     way beyond the typical LOS limit (`BEYOND_LOS_LIMIT`) for ADS-B signals.
     Gets triggered by `main_loop_generator.dump1090_loop()`, reads the data packet sent by the function,
-    determines if this is the furthest plane in the day, and writes to the global `super_far_plane`. """
+    determines if this is the furthest plane in the day, and writes to the global `super_far_plane`.
+    Also handles when the `combined_feed` flag is triggered. """
     def __init__(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.comparator, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
-        register_signal_handler(self.loop, self.reset_distance, signal=REALLY_FAR_PLANE, sender=runtime_accumulators_reset)
+        register_signal_handler(self.loop, self.reset_distance, signal=MIDNIGHT_RESET, sender=runtime_accumulators_reset)
         register_signal_handler(self.loop, self.debug_switch, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.last_max_distance = 0
+        self._far_time_increment = 0
         self._detected = False
         self.run_loop()
 
     def comparator(self, message: list):
-        global super_far_plane
+        global super_far_plane, combined_feed
         if not message or not isinstance(message, list):
             self._detected = False
             return
@@ -4886,14 +4949,26 @@ class DistantDeterminator():
             break
         else:
             return
+        self._far_time_increment =+ 1
+        if (self._far_time_increment * LOOP_INTERVAL >= 21600 # if we've detected really distant aircraft for longer than 6 hours
+            and not combined_feed
+            ):
+            main_logger.warning(f"{dump1090} might be configured as a combined feed. FlightGazer is only meant for single site feeds.")
+            if DISPLAY_IS_VALID:
+                main_logger.warning("Maximum range shown on the display will be capped to 300nmi or the equivalent.")
+            combined_feed = True
+        super_far_plane = farthest
         if farthest['Distance'] > self.last_max_distance:
             farthest.update({'Datetime': datetime.datetime.now()})
             self.last_max_distance = farthest['Distance']
-            super_far_plane = farthest
 
     def reset_distance(self, message):
-        main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
+        if self.last_max_distance != 0:
+            main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
+        else:
+            main_logger.debug("No distant aircraft detected today.")
         self.last_max_distance = 0
+        self._far_time_increment = 0
 
     def debug_switch(self, message):
         if self._detected:
@@ -6757,12 +6832,13 @@ class Display(
                 self.itbroke_count += 1
                 self.a_clear_screen()
                 msg = str(e)
-                main_logger.critical("*************************************************")
-                main_logger.critical("*    The colors.py file is missing an entry.    *")
-                main_logger.critical(f"{msg}")
-                main_logger.critical("*                                               *")
-                main_logger.critical("*          The display will not start.          *")
-                main_logger.critical("*************************************************")
+                main_logger.error("*************************************************")
+                main_logger.error("*    The colors.py file is missing an entry.    *")
+                main_logger.error(f"{msg}")
+                main_logger.error("*                                               *")
+                main_logger.error("*          The display will not start.          *")
+                main_logger.error("*************************************************")
+                write_bad_state_semaphore(True)
                 DISPLAY_IS_VALID = False
                 return
 
@@ -6771,11 +6847,12 @@ class Display(
                 if self.itbroke_count > 5:
                     self.a_clear_screen()
                     DISPLAY_IS_VALID = False
-                    main_logger.critical("*************************************************")
-                    main_logger.critical("*   Display thread has failed too many times.   *")
-                    main_logger.critical("*        Display will no longer be seen!        *")
-                    main_logger.critical("*  Please raise this issue with the developer.  *")
-                    main_logger.critical("*************************************************")
+                    main_logger.error("*************************************************")
+                    main_logger.error("*   Display thread has failed too many times.   *")
+                    main_logger.error("*        Display will no longer be seen!        *")
+                    main_logger.error("*  Please raise this issue with the developer.  *")
+                    main_logger.error("*************************************************")
+                    write_bad_state_semaphore(True)
                     return
                 main_logger.exception(f"Display thread error ({e}), count {self.itbroke_count}:\n")
                 time.sleep(5)
@@ -6814,6 +6891,9 @@ else:
 
 procmon = threading.Thread(target=perf_monitoring, name='Resource-Monitor', daemon=True)
 procmon.start()
+json_writer = threading.Thread(target=WriteState, name='JSON-Writer', daemon=True)
+if WRITE_STATE:
+    json_writer.start() # recall, the state file isn't written until the main loop starts, this just initializes it
 configuration_check() # very important
 
 # start all the display-related threads before the API check and dump1090 load-in
@@ -6835,6 +6915,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         main_logger.critical("*   Display driver 'rgbmatrix' requires root!   *")
         main_logger.critical("*      Please run FlightGazer using sudo.       *")
         main_logger.critical("*************************************************")
+        write_bad_state_semaphore(True)
         main_logger.critical("FlightGazer has exited.")
         sys.exit(1)
     try:
@@ -6855,6 +6936,10 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         DISPLAY_IS_VALID = False
         main_logger.exception(f"Display failed to start: {e}.")
         time.sleep(5)
+# we don't do this when we do the display module load-in at the beginning because the json writer isn't
+# initialized yet and `state_json` would still be `None`
+if not DISPLAY_IS_VALID and not NODISPLAY_MODE:
+    write_bad_state_semaphore(True)
 
 get_ip()
 HOSTNAME = socket.gethostname()
@@ -6862,6 +6947,7 @@ main_logger.info(f"Running from {CURRENT_IP} ({HOSTNAME})")
 if not CURRENT_IP:
     main_logger.warning("Could not determine the current IP address at startup! Some functionality may be limited or unavailable.")
     main_logger.info(">>> If this device is normally connected to a network, it is recommended to restart FlightGazer to restore functionality.")
+    write_bad_state_semaphore(True)
 
 configuration_check_api()
 if API_KEY:
@@ -6895,6 +6981,7 @@ if DUMP1090_JSON and DUMP978_JSON:
 if DUMP1090_JSON is None and not DISPLAY_IS_VALID:
     main_logger.critical("Unable to successfully connect to dump1090 and no display is available.")
     main_logger.critical("FlightGazer will now exit.")
+    write_bad_state_semaphore(True)
     time.sleep(3)
     sys.exit(1)
 
@@ -6931,13 +7018,10 @@ def main() -> None:
     api_getter = threading.Thread(target=APIFetcher, name='API-Fetch-Thread', daemon=True)
     receiver_stuff = threading.Thread(target=read_receiver_stats, name='Receiver-Poller', daemon=True)
     watchdog_stuff = threading.Thread(target=dump1090Watchdog, name='Dump1090-Watchdog', daemon=True)
-    json_writer = threading.Thread(target=WriteState, name='JSON-Writer', daemon=True)
     console_stuff = threading.Thread(target=PrintToConsole, name='Console-Printer', daemon=True)
     syncing_stuff = threading.Thread(target=synchronizer, name='Synchronization-Thread', daemon=True)
     dxing_stuff = threading.Thread(target=DistantDeterminator, name='Distance-Watcher', daemon=True)
     # DXing -> https://en.wikipedia.org/wiki/DXing
-    if WRITE_STATE:
-        json_writer.start()
     main_logger.info("Cleared for takeoff.")
 
     if INTERACTIVE:

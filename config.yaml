@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.0.3 # do not modify this
+CONFIG_VERSION: v.9.1.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -230,7 +230,7 @@ WRITE_STATE: true
 # (Linux only) When FlightGazer is running, write a json file of its current operating state (variable values) in /run/FlightGazer/.
 # This is useful if you wish to use the data that FlightGazer generates for itself in other applications.
 # Writing to /run should be safe as dump1090 (and its derivatives) also do the same, and for most Linux systems
-# /run lives entirely in RAM, leading to zero disk writes. It is recommended to leave this enabled.
+# /run lives entirely in RAM, leading to zero disk writes. It is HIGHLY recommended to leave this enabled.
 
 # ============== RGB-Matrix settings ===============
 # ==================================================

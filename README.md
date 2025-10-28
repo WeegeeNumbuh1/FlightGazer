@@ -107,7 +107,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Colors 🌈 for every element on the display
   - Switch between font styles
   - and more
-- Known to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
+- Built to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
   - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 
 ### Other good stuff
@@ -206,7 +206,7 @@ Other ADS-B decoders will not work. Your site location needs to be set for most 
    2. Copy the password and press the Accept button
    3. With your SSH client, log into the device at `root@adsb-feeder.local`
 3. Continue the below steps and install the web interface as well
-4. You can add the RGB Matrix hardware later, expand the prerequisites above for the hardware set-up
+4. You can add the RGB Matrix hardware later, expand the prerequisites above for the hardware+software set-up
 
 </details>
 
@@ -438,6 +438,7 @@ or, you may [start it manually](#️-interactive-mode).
 |---|---|---|
 | **Show Even More Info**<br>"LADD Aircraft" | Limiting Aircraft Data Displayed \- *"Please don't track me*\." | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
 | **Show Even More Info**<br>"PIA Aircraft" | \(U\.S\. only\) Privacy ICAO Address \- *"Good luck figuring out who I am\."* | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
+| **Show Even More Info**<br>"TIS-B Contact" | Traffic Information Service – Broadcast - broadcast information sent by ground stations corresponding to an aircraft; cannot be tied to a registration or aircraft type and is used for collision avoidance. | [More Information](https://en.wikipedia.org/wiki/Traffic_information_service_%E2%80%93_broadcast) |
 | **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   N/A  N/A</code><br>\- or \-<br><code>FLYBY TRKG RNGE</code><br><code>123   N/A  N/A</code> | - Failed to connect to receiver at startup\.<br>- Communication with the receiver has temporarily stopped due to instability\. | - Receiver service (<code>dump1090</code>) is not running/stopped\. Check for errors for that service\.<br>- The current system may be overloaded\. Check on the system\.<br>- If operating on a remote instance of dump1090, check the network or remote system\.<br>- Additionally, check the FlightGazer logs\.<br>- After fixing the underlying issue, restart FlightGazer\. |
 | **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   123  N/A</code> | Location is not set in receiver\. | - Set your location for dump1090\. Then, restart FlightGazer\.<br>- Advanced: if using a GPS receiver on the system, check to see if the service is running and has obtained a GPS fix\. |
 | **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
@@ -581,49 +582,52 @@ Simply delete the folder (and the virtual python environment if you set that up 
 ## ❔ Frequently Asked Questions (not really but they could pop up)
 <details><summary><b>FAQ's (Open these before raising an issue)</b></summary>
 
-**Q:** My RGB display is blank when running this, what broke?<br>
+**Q: My RGB display is blank when running this, what broke?**<br>
 **A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
 This project assumes the use of the adafruit rgbmatrix bonnet and only 1 HUB75-based RGB panel.<br>
 Other setups are not guaranteed to work but they might work by using the Advanced RGB Matrix options in the config file.<br>
 Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
 
-**Q:** I broke it 🥺<br>
+**Q: I broke it 🥺**<br>
 **A:** Try running the updater first. If it's still broken, uninstall then reinstall FlightGazer.
 
-**Q:** Can I run the physical display *and* the emulator at the same time? I'd like to see the display in a web browser while the main display is still working.<br>
+**Q: Can I run the physical display *and* the emulator at the same time? I'd like to see the display in a web browser while the main display is still working.**<br>
 **A:** No. It's one or the other. The emulator is meant as a fallback/for development, or to try out FlightGazer before fully committing to using a real display.
 
-**Q:** I restarted/updated my system but it took longer for FlightGazer to start. What's going on?<br>
+**Q: I restarted/updated my system but it took longer for FlightGazer to start. What's going on?**<br>
 **A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.<br>
 If it has been over three (3) months since it last checked, then the next time it restarts, it will run these checks. It usually takes a few minutes to do this, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
 
-**Q:** Okay, but this update is taking a *really long* time. Then, it just stops after awhile. Is it broken?<br>
+**Q: Okay, but this update is taking a *really long* time. Then, it just stops after awhile. Is it broken?**<br>
 **A:** First, restart the whole system. Then, let FlightGazer do the update again (it should do this automatically at system startup). If it stops again, try starting FlightGazer one more time. It should succeed at this point.<br>
 
-**Q:** I see a dot on the right of the aircraft readout display. What is it?<br>
+**Q: I see a dot on the right of the aircraft readout display. What is it?**<br>
 **A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
 
-**Q:** Can I customize the colors?<br>
+**Q: Can I customize the colors?**<br>
 **A:** [Click here](#adjusting-colors)
 
-**Q:** Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?<br>
+**Q: Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?**<br>
 **A:** Sure, just change some things in the script. Have fun. (also, you can just fork this project)<br>
 (note: any changes done to the main script will be overwritten if you update with the updater)
 
-**Q:** Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?<br>
+**Q: Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?**<br>
 **A:** In my experience, adsbdb/adsb.lol cannot handle chartered/position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
 
-**Q:** FlightGazer detected a plane and it couldn't determine a journey. This same plane showed up again a few minutes later and the result didn't change. What happened?<br>
+**Q: FlightGazer detected a plane and it couldn't determine a journey. This same plane showed up again a few minutes later and the result didn't change. What happened?**<br>
 **A:** If this plane is blocked from public tracking, there will never be a result. If you know it isn't, try lowering the value for `FLYBY_STALENESS`.<br>
 This situation has been seen when a plane just takes off and the API FlightGazer uses hasn't begun tracking the plane just yet, therefore there isn't a result that the API can give. When this plane shows up again, FlightGazer will reuse the same API result since it would not count this as a new flyby, a metric controlled by `FLYBY_STALENESS`.<br>
 
-**Q:** Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.<br>
+**Q: I found an error with some of the aircraft info (type, owner, airline, etc.)**<br>
+**A:** FlightGazer relies on external databases in order to provide this information without the need for API calls. Since the information contained within those databases is outside of the author's control, you will basically have to wait and see if the data is corrected at some point in the future.
+
+**Q: Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.**<br>
 **A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
 Reasoning: The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
 The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.
 Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
 
-**Q:** Some of your code is not pythonic!!!1!!111 ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
+**Q: Some of your code is not pythonic!!!1!!111** ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
 **A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)<br>
 (it should be >98% pythonic at this point)
 
@@ -650,9 +654,9 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
 
 - On rare occasions are times when there will be two entries of the same aircraft (only when using `No Filter` mode)
   - This is an edge case that's been noted since the v.0.x days, mainly due to a dual receiver setup
-  - It has been associated with aircraft that uses a dual mode transponder or there is TIS-B contact of the same aircraft on UAT while it's present over ADS-B
+  - It has been associated with aircraft that uses a dual mode transponder or there is ADS-R contact of the same aircraft on UAT while it's present over ADS-B
   - ~~So far there is no fix planned for this as this does not break core functionality~~
-    - At worst it confuses the aircraft selector algorithm but even then it still selects normally
+    - ~~At worst it confuses the aircraft selector algorithm but even then it still selects normally~~
     - ~~May be mitigated in the far future~~
   - **This has been mitigated in v.2.6.3 and newer, fully fixed in v.5.0.0; FlightGazer will use the best entry it encounters when not using `No Filter` mode**
 
@@ -660,12 +664,14 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
   - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd
   - ~~May not actually get fixed (simply just code better, smh)~~
   - **I think it's okay now**
+  - **Versions v.9.1.0 and newer now write a file in `/run/FlightGazer` if FlightGazer ends up in a degraded state or quits due to an uncorrectable error.**
 
 </details>
 <br>
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
-If you do encounter an issue, provide a copy of `FlightGazer-log.log` (and `settings_migrate.log` if present) which can be found in the FlightGazer directory.
+If you do encounter an issue, provide a copy of `FlightGazer-log.log` which can be found in the FlightGazer directory.<br>
+If using the web-app, also provide the `FlightGazer-initialization.log` which can be downloaded from "Details and Logs".
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 💬 Support & Discussion
@@ -680,7 +686,7 @@ Faraway ideas:
 - [ ] Support display output to a [FlightFeeder Pro](https://flightaware.store/products/flightfeeder-pro-ads-b-flight-tracker-1090-mhz-piaware)?
 
 As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
-Suggestions, comments, and bug reports are always welcomed and encouraged.<br>
+Suggestions, comments, and bug reports are always welcomed and encouraged. If the idea is good enough, I may even build the feature.<br>
 Additionally, word-of-mouth helps plenty!<br>
 If you'd like to make your own edits that changes the way the project operates, please fork this project.<br>
 If there's something not addressed here, please reach out to me directly.
@@ -694,6 +700,8 @@ If there's something not addressed here, please reach out to me directly.
   - Uses all the same core components that this project relies on at a surface-level: FlightAware's API (the older `Firehose` one), `dump1090`, `rgbmatrix`
 - [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the aircraft that flyby your location
   - Inspired the functionality of the stats file FlightGazer writes out
+-  [Skystats](https://github.com/tomcarman/skystats), a fancier way to show aircraft stats
+   - FlightGazer does aircraft stats via the log, but the above is a prettier way to see similar data (FlightGazer still tracks different aspects not covered by Skystats)
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🎖️ Highlights Across Media
