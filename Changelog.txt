@@ -5,6 +5,23 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.2.0 - 2025-11-01
+    - Quite a lot of internal code cleanups and some refactoring done for this Release
+    - FlightGazer now filters out aircraft (or ground vehicles) that have both an altitude and speed of zero
+        - This also covers the very rare edge case a user lives near a an ADS-B tower or unknown but permanently stationary
+          ground implement broadcasting its location which would result in the display remaining active
+    - Moved the 'time_now' key to the end of the json file for the web-app
+    - Refactored the dump1090/dump978 probers
+        - dump978 now is only searched if dump1090 was successfully found
+    - Sporadic communication errors with dump1090 (on the order 1-2 per week) no longer contribute to triggering the watchdog,
+      as long as the watchdog was never triggered in the first place
+    - Interactive mode changes:
+        - If there's enough aircraft being tracked which causes the header to scroll out of view (eg. NO_FILTER mode)
+          some alerts that would be in the header are repeated at the footer
+        - Reordered the lines in the footer, with some output tweaks as well
+    - The configuration for RGBMatrixEmulator no longer enables the FPS display (only affects new installs)
+    - Updated help string in main script
+
 v.9.1.0 - 2025-10-28
     - Added new statistic for tracking the total time that there are aircraft being tracked in a day
     - If any component of FlightGazer runs into an issue (watchdog is triggered, the display fails, no IP address, etc), FlightGazer will now

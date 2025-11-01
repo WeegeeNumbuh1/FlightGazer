@@ -33,6 +33,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 - [Usage](#️-usage)
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
+  - [The Emulator](#-the-emulator)
   - [Shutting Down \& Restarting](#-shutting-down--restarting)
   - [Output Reference \& Meanings](#️-output-reference--meanings)
   - [Misc](#-misc)
@@ -89,7 +90,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
 - Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated within a web browser
-- Can emulate an RGB Matrix display in a browser if you don't have the actual hardware
+- Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware
 
 <details><summary><b>More Features</b></summary>
 
@@ -364,9 +365,9 @@ The script automatically detects that you're running interactively and will disp
 
 | Flag | Enables<br>interactive<br>mode in<br>FlightGazer? | What it does |
 |---|:---:|:---:|
-| (no flag) | ❌ | Default operating mode when not run as a service.<br>Minimizes console output when running non-interactively.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
+| (no flag) | ❌ | Default operating mode when not run as a service.<br>Only prints log entries to `stdout`.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
 |`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
-|`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the Tip below)
+|`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the next section)
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
 |`-c`| ❌ | Only install/force-check dependencies and don't start the main script.
@@ -375,18 +376,6 @@ The script automatically detects that you're running interactively and will disp
 |`-h`| ❌ | Print the help message.
 
 </details>
-<br>
-
-> [!TIP]
-> An important one is `-e`, which switches the display renderer from `rgbmatrix` to `RGBMatrixEmulator`. This is useful in case you are not able to run the display output on physical hardware and is the fallback when actual hardware is not available.
-> <br><b>Note: Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
-> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
-> <br>
-> <br>By default, `RGBMatrixEmulator` can be viewed through a web browser:
-> - `http://<IP-address-of-device-running-FlightGazer>:8888`
-> - `http://localhost:8888` (on the device running FlightGazer)
-
-
 <details><summary>Advanced use</summary>
 
 There's nothing stopping you from calling the python file directly. However `FlightGazer-init.sh` was designed to make running it smoother by handling the initial setup, making sure all the dependencies are there before running the actual python script, and automatically using the full paths for both the virtual python environment binaries and for the script itself, along with handling any arguments/flags that need to be passed.
@@ -397,6 +386,24 @@ sudo /etc/FlightGazer-pyvenv/bin/python3 /path/to/FlightGazer/FlightGazer.py
 ```
 The main python file accepts almost all the same arguments as the initialization script, but you can always pass `-h` to see all possible operating modes.
 </details>
+
+### 🎮 The Emulator
+
+When FlightGazer does not detect the physical RGB Matrix hardware/software, it falls back to using the display emulator.<br>
+To see the display, you can:
+- Navigate to the web-app and follow the link to it, or
+- Go directly to `http://<IP-address-of-device-running-FlightGazer>:8888`
+
+A viable setup if not using an RGB Matrix display is to:
+- Use a second device (laptop, tablet, smart fridge, smart home display, etc.)
+- Setting the display to never sleep
+- Going to the emulator page in a web browser
+- Set the window to full screen
+
+> [!IMPORTANT]
+> <b>Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
+> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
+
 
 ### 🔕 Shutting Down & Restarting
 It's easier with the web-app.<br>
@@ -444,7 +451,7 @@ or, you may [start it manually](#️-interactive-mode).
 | **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
 | **Journey**<br><code>N/A ▶ ---</code> | - Aircraft blocked from tracking\.<br>- Aircraft detected before API was able to\. | For aircraft that are not blocked from tracking: try using a smaller RANGE\. |
 | **Journey**<br><code>latitude ▶ longitude</code> | API returned a result that could not be associated with an airport\. | Rare, but normal occurrence\. |
-| **Journey**<br><code>!API ▶ FAIL</code> | API call for this flight failed\. | - API service may be down, wait until the service is restored\.<br>- You may have an issue with your API key\. Contact FlightAware\. |
+| **Journey**<br><code>!API ▶ FAIL</code> | API call for this flight failed\. | - API service may be down, wait until the service is restored\.<br>-You might have been rate limited. If this keeps happening, try using a smaller RANGE\.<br>- You may have an issue with your API key\. Contact FlightAware\. |
 | **Journey**<br><code>\!CON ▶ FAIL</code> | Could not connect to the API\. | Check your network connection\. |
 
 </details>

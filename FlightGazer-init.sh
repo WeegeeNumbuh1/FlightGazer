@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.1.0
+# Version = v.9.2.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -94,7 +94,7 @@ emulator_heredoc() {
         "_comment": "For use with the browser adapter only.",
         "port": 8888,
         "target_fps": 25,
-        "fps_display": true,
+        "fps_display": false,
         "quality": 50,
         "image_border": true,
         "debug_text": false,
