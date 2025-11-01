@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.2.0 --- 2025-11-01'
+VERSION: str = 'v.9.2.1 --- 2025-11-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -855,20 +855,24 @@ def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
     exit_time = datetime.datetime.now()
     end_time = round(time.monotonic() - START_TIME, 3)
+    # write to the console (done this way to prevent reentrancy (is that even a word?))
+    os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
+    os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
+    os.write(sys.stdout.fileno(), str.encode("Shutting down... "))
+    # shutdown all threads
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
+    if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
+    # final cleanup
+    flyby_stats()
     if DATABASE_CONNECTED: db.close()
     if state_json:
         state_json.unlink(missing_ok=True)
         write_bad_state_semaphore(False)
-    if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
-    if super_far_plane: dxing_log()
-    os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
-    os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
-    os.write(sys.stdout.fileno(), str.encode("Shutting down... "))
-    # write the above message to the console
+    if super_far_plane:
+        main_logger.info("Before exiting, there's this:")
+        dxing_log()
     main_logger.info(f"- Exit signal commanded at {exit_time}")
     main_logger.info(f"  Script ran for {timedelta_clean(end_time)}")
-    flyby_stats()
     os.write(sys.stdout.fileno(), b"Done.\n")
     main_logger.info("FlightGazer is shutdown.")
     sys.exit(0)
@@ -1969,15 +1973,17 @@ def flyby_stats() -> None:
                 api_hits[1] = int(last_line.split(",")[3])
                 api_hits[2] = int(last_line.split(",")[4])
                 estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
-                for i in range(planes_seen): # fill the set with filler values, we don't recall the last contents of `unique_planes_seen`
+                for i in range(planes_seen):
+                    # fill the set with filler values, we don't recall the last contents of `unique_planes_seen`
                     unique_planes_seen.append(
                         {
                             "ID": i+1,
                             "Time": time.monotonic(),
                             "Flyby": len(unique_planes_seen) + 1
                         }
-                        )
-                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. Flybys: {planes_seen}. API calls: {api_hits[0] + api_hits[2]}")
+                    )
+                main_logger.info(f"Successfully reloaded last written data for {date_now_str}. "
+                                 f"Flybys: {planes_seen}. API calls: {api_hits[0] + api_hits[2]}")
         return
 
     elif not FLYBY_STATS_FILE.is_file():
@@ -5177,17 +5183,18 @@ class DistantDeterminator():
         else:
             return
         self._far_time_increment =+ 1
-        if (self._far_time_increment * LOOP_INTERVAL >= 21600 # if we've detected really distant aircraft for longer than 6 hours
+        if (
+            self._far_time_increment * LOOP_INTERVAL >= 21600 # if we've detected really distant aircraft for longer than 6 hours
             and not combined_feed
-            ):
+        ):
             main_logger.warning(f"{dump1090} might be configured as a combined feed. FlightGazer is only meant for single site feeds.")
             if DISPLAY_IS_VALID:
                 main_logger.warning("Maximum range shown on the display will be capped to 300nmi or the equivalent.")
             combined_feed = True
-        super_far_plane = farthest
         if farthest['Distance'] > self.last_max_distance:
             farthest.update({'Datetime': datetime.datetime.now()})
             self.last_max_distance = farthest['Distance']
+            super_far_plane = farthest
 
     def reset_distance(self, message):
         if self.last_max_distance != 0:

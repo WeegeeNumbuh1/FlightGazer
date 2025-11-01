@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.2.1 - 2025-11-01
+    - FIX: bug which was introduced in v.9.1.0 that causes the dxing logging to fail and subsequently would
+      cause the stats write-out upon exit to also fail
+    - Reordered some of the shutdown/cleanup procedures
+
 v.9.2.0 - 2025-11-01
     - Quite a lot of internal code cleanups and some refactoring done for this Release
     - FlightGazer now filters out aircraft (or ground vehicles) that have both an altitude and speed of zero
