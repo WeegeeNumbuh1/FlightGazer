@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.2.2 - 2025-11-02
+    - Fix issue with Interactive mode when dump1090 is not found, leading to the log being spammed for as long as FlightGazer is running
+    - Tweaked some of the output with the update and webapp install scripts
+
 v.9.2.1 - 2025-11-01
     - FIX: bug which was introduced in v.9.1.0 that causes the dxing logging to fail and subsequently would
       cause the stats write-out upon exit to also fail

@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.2.1 --- 2025-11-01'
+VERSION: str = 'v.9.2.2 --- 2025-11-02'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1231,6 +1231,8 @@ def dump1090_check() -> None:
         DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
         if CUSTOM_DUMP978_LOCATION and DUMP978_JSON is None:
             main_logger.warning("Could not find dump978.")
+    else:
+        DUMP978_JSON = None
 
 def read_1090_config() -> None:
     """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to. """

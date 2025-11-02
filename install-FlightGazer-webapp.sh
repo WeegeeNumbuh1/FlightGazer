@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.9.0.0
+# Last updated: v.9.2.2
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -256,8 +256,10 @@ EOF
 	echo -e "  or via http://$HOSTNAME.local/flightgazer"
 else
 	echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
-	echo "Please configure your web server manually to proxy /flightgazer to 127.0.0.1:9898."
-	echo -e "You can still access the web interface with http://$NET_IP:9898/flightgazer or http://$HOSTNAME.local:9898/flightgazer"
+	echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
+	echo "You can still access the web interface at:"
+	echo -e "http://$NET_IP:9898/flightgazer or"
+	echo -e "http://$HOSTNAME.local:9898/flightgazer"
 fi
 
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
@@ -280,7 +282,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	StartLimitIntervalSec=30
 	StartLimitBurst=2
 	RestartSec=10s
-	
+
 	[Install]
 	WantedBy=multi-user.target
 	EOF

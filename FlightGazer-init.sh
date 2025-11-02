@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.2.1
+# Version = v.9.2.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -213,7 +213,8 @@ if [ -f "${BASEDIR}/setup/min_python_version" ]; then
 fi
 if (( INSTALLED_MAJOR < REQUIRED_PYTHON_MAJOR )) || \
    (( INSTALLED_MAJOR == REQUIRED_PYTHON_MAJOR && INSTALLED_MINOR < REQUIRED_PYTHON_MINOR )); then
-	echo -e "\n${NC}${RED}>>> ERROR: Python version too old. Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}${NC}"
+	echo -e "\n${NC}${RED}>>> ERROR: Python version too old.${NC}"
+	echo -e "Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}${NC}"
 	echo "Python must be updated to a newer version on your system before you can run FlightGazer."
 	exit 1
 fi
@@ -576,7 +577,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	fi
 	touch "$LOGFILE"
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$LOGFILE" >/dev/null 2>&1
-	chmod -f 777 "${LOGFILE}" >/dev/null 2>&1
+	chmod -f 644 "${LOGFILE}" >/dev/null 2>&1
 	STAGEB=$(date '+%s')
 	echo -e "${NC}Stage 2 of setup took $((STAGEB - STAGEA)) seconds.${FADE}"
 	# start the database updater/generator

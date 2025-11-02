@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.9.0.0
+# Last updated: v.9.2.2
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -206,10 +206,14 @@ if [ -f "${TEMPPATH}/setup/min_python_version" ]; then
 fi
 if (( INSTALLED_MAJOR < REQUIRED_PYTHON_MAJOR )) || \
    (( INSTALLED_MAJOR == REQUIRED_PYTHON_MAJOR && INSTALLED_MINOR < REQUIRED_PYTHON_MINOR )); then
-	echo -e "\n${NC}${RED}>>> ERROR: Python version too old. Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}${NC}"
+	echo -e "\n${NC}${RED}>>> ERROR: Python version too old.${NC}"
+	echo -e "Required: ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR} or higher. Found: ${PYTHON_VERSION}"
 	echo ""
-	echo "To prevent breaking a working FlightGazer install, please upgrade to a newer Python version before updating."
-	echo "If you're viewing this in the web-app, it's safe to leave this page."
+	echo "To prevent breaking a working FlightGazer install, this update will not be installed."
+	echo -e "Please update to a newer Python version to use FlightGazer ${VER_STR}"
+	if [ $WEB_INF -eq 1 ]; then
+		echo "If you're viewing this in the web-app, it's safe to leave this page."
+	fi
 	rm -rf "$TEMPPATH" >/dev/null 2>&1
 	echo -e "${NC}${GREEN}>>> Update complete.${NC}" # for the web-app
 	exit 1
@@ -323,7 +327,6 @@ if [ $WEB_UPDATE -eq 1 ]; then
 	nohup bash "${BASEDIR}/web-app/update-webapp.sh" >/dev/null 2>&1 &
 	disown
 fi
-echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 echo ""
 if [ $MIGRATE_FLAG -eq 1 ]; then
 	echo -e "${ORANGE}>>> Warning: Settings migrator failed during the update process.${NC}"
@@ -331,14 +334,15 @@ if [ $MIGRATE_FLAG -eq 1 ]; then
 	echo "    If 'config.yaml' was present, your previous settings"
 	echo -e "    are in a file named 'config_old.yaml' in ${BASEDIR}"
 	echo "    You must migrate your settings manually, then restart FlightGazer."
-	sleep 5s
+	sleep 1s
 fi
 if [ $OLDER_BUILD -eq 1 ]; then
 	echo -e "${ORANGE}>>> Notice: FlightGazer is currently running on default settings.${NC}"
 	echo -e "    Your previous configuration file has been renamed 'config_old.py' in ${BASEDIR}"
 	echo "    Please update your settings in the new configuration file 'config.yaml',"
 	echo "    then restart FlightGazer."
-	sleep 5s
+	sleep 1s
 fi
+echo -e "${NC}${GREEN}>>> Update complete.${NC}"
 exit 0
 }
