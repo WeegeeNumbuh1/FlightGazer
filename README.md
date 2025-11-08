@@ -11,7 +11,7 @@
 
 ## 🚩 About
 This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby aircraft with real-time ADS-B ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
+nearby aircraft with <u>real-time ADS-B</u> ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
 
@@ -34,6 +34,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
   - [Interactive Mode](#️-interactive-mode)
   - [Optional Behaviors](#-optional-behaviors)
   - [The Emulator](#-the-emulator)
+  - [Using FlightGazer's Data](#-using-flightgazers-data)
   - [Shutting Down \& Restarting](#-shutting-down--restarting)
   - [Output Reference \& Meanings](#️-output-reference--meanings)
   - [Misc](#-misc)
@@ -91,6 +92,8 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated within a web browser
 - Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware
+- Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
+- Designed to run 24/7
 
 <details><summary><b>More Features</b></summary>
 
@@ -105,7 +108,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Brightness based on time of day or when there's an active aircraft shown
   - API limiting per day, by monthly cost, or even by the hour (those API calls can get expensive)
   - Track a specific aircraft once it's detected by your ADS-B receiver
-  - Colors 🌈 for every element on the display
+  - Every element on the display can have its color set
   - Switch between font styles
   - and more
 - Built to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
@@ -172,8 +175,9 @@ Using this project assumes you have the following:
   - `systemd` based system
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
-  - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
-  - If the `rgbmatrix` library is installed:
+  - You can use the initialization script to install this, see [this section](#-optional-behaviors) after reading through the setup
+  - If you did not use the built-in install method above, the below points need to be followed:
+    - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
     - It needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
     - Must be built using the adafruit script
     - Note: if using a Raspberry Pi, the core `rgbmatrix` library [doesn't run on a Pi 5 or newer](https://github.com/hzeller/rpi-rgb-led-matrix/issues/1603). Use a Pi 4 or older.
@@ -192,7 +196,6 @@ Using this project assumes you have the following:
 - A running `dump978` instance if you're in the US and live near airports that handle general aviation more than commercial flights
 
 </details>
-<br>
 
 **tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
 You don't actually need a physical RGB display, but it's recommended. You can install this hardware later if you choose to do so.<br>
@@ -365,15 +368,16 @@ The script automatically detects that you're running interactively and will disp
 
 | Flag | Enables<br>interactive<br>mode in<br>FlightGazer? | What it does |
 |---|:---:|:---:|
-| (no flag) | ❌ | Default operating mode when not run as a service.<br>Only prints log entries to `stdout`.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.
-|`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`. |
-|`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the next section)
+| (no flag) | ❌ | Default operating mode when not run as a service.<br>Only prints log entries to `stdout`.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.|
+|`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`.|
+|`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the next section)|
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
-|`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.
-|`-c`| ❌ | Only install/force-check dependencies and don't start the main script.
-|`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.
-|`-l`| ❌ | Live/Demo mode.<br>Does not install service and runs FlightGazer from dependencies in `/tmp`.
-|`-h`| ❌ | Print the help message.
+|`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.|
+|`-c`| ❌ | Only install/force-check dependencies and don't start the main script.|
+|`-v`| ❌ | Enable verbose/debug messages to be displayed/logged from the main script.|
+|`-l`| ❌ | Live/Demo mode.<br>Does not install service and runs FlightGazer from dependencies in `/tmp`.|
+|`-m`| ❌ | Run the `rgbmatrix` install/update script only.<br>Does not start FlightGazer. Overrides all other options.|
+|`-h`| ❌ | Print the help message.|
 
 </details>
 <details><summary>Advanced use</summary>
@@ -403,6 +407,84 @@ A viable setup if not using an RGB Matrix display is to:
 > [!IMPORTANT]
 > <b>Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
 > <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
+
+### 📈 Using FlightGazer's Data
+
+When FlightGazer is running, it writes a JSON to `/run/FlightGazer/current_state.json` and updates every `LOOP_INTERVAL` (2 seconds by default).<br>
+Additionally, if you're using the web-app, this same JSON is also available at the `/data/current_state.json` endpoint.<br>
+You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
+
+<details><summary>Excerpt from the JSON</summary>
+
+```JSON
+"plane_stats": {
+    "currently_tracking": 93,
+    "current_range": 216.06,
+    "flybys_today": 600,
+    "last_unique_plane": {
+        "ID": "aa26c8",
+        "Time": 2669405.459399352,
+        "Flyby": 600
+    },
+    "aircraft_selections": 923,
+    "rare_selection_events": 10,
+    "high_priority_events": 1,
+    "average_relevant_planes_in_area": 1,
+    "average_algorithm_active_time_sec": 67,
+    "algorithm_use_today": "09:14:06",
+    "no_filter": false,
+    "focus_plane_iter": 11,
+    "focus_plane_ids_discard": [
+    ],
+    "focus_plane_ids_scratch": [
+        "aa26c8"
+    ],
+    "focus_plane": "aa26c8",
+    "high_priority_plane": false,
+    "in_range": 1,
+    "relevant_planes": [
+        {
+            "ID": "aa26c8",
+            "Flight": "SKW6325",
+            "Country": "US",
+            "Altitude": 3900,
+            "Speed": 239.8,
+            "Distance": 1.001,
+            "Direction": "S ",
+            "DirectionDegrees": 193,
+            "Latitude": 41.979489,
+            "Longitude": -87.907667,
+            "Track": 83.05,
+            "VertSpeed": -768,
+            "RSSI": -2.9,
+            "Elevation": 32.662746,
+            "SlantRange": 1.18911,
+            "Operator": "SKY WEST AVIATION, INC. (ST. GEORGE, UT)",
+            "Telephony": "SKYWEST",
+            "OperatorAKA": "SkyWest Airlines",
+            "Owner": "SKYWEST AIRLINES INC",
+            "AircraftDesc": "2005 BOMBARDIER Regional Jet CRJ-700",
+            "ICAOType": "CRJ7",
+            "CategoryDesc": "Small (15500-75000 lbs)",
+            "TrackingFlag": "None",
+            "Registration": "N753SK",
+            "Priority": 1,
+            "Source": "ADS-B",
+            "OnGround": false,
+            "ApproachRate": 64.186,
+            "FutureLatitude": 41.980467,
+            "FutureLongitude": -87.905124,
+            "FutureDistance": 0.946504,
+            "Flyby": 600,
+            "Staleness": 1.36,
+            "Timestamp": 2669425.457545116
+        }
+    ]
+}
+```
+</details>
+
+There's also an additional file `flybys.csv` in the same directory that FlightGazer resides in, which tracks hourly cumulative counts of aircraft flybys and API stats. This file is also used by FlightGazer to maintain its daily counts whenever it's restarted.
 
 
 ### 🔕 Shutting Down & Restarting
@@ -542,7 +624,7 @@ sudo systemctl disable flightgazer.service
 
 </details>
 
-<details><summary>Cool python modules you can use in other projects</summary>
+<details><summary>Want to use the same aircraft databases this project uses?</summary>
 
 Check the [`utilities`](./utilities/) directory.
 
@@ -565,6 +647,13 @@ cd /path/to/FlightGazer
 wget -O update.sh https://raw.githubusercontent.com/WeegeeNumbuh1/FlightGazer/refs/heads/main/update.sh
 sudo bash update.sh
 ```
+
+>[!NOTE]
+> FlightGazer will *never* implement any self-updating mechanism or any form of push updates.<br>
+> An update must be run explicitly by the end user.<br>
+> The initialization script, every 3 months after the last update, will check for updates to the aircraft database and other system components required to run, at startup.<br>
+> When running the update script, it will pull data only from this repository and nowhere else.
+
 <details><summary>Windows</summary>
 
 You can run `git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer \a\different\directory` and manually migrate your config.
@@ -634,6 +723,9 @@ Reasoning: The original/default font is perfect with numerical readouts that upd
 The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.
 Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
 
+**Q: Why are your commits so *huge*?**<br>
+**A:** Yes.<br>
+
 **Q: Some of your code is not pythonic!!!1!!111** ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
 **A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)<br>
 (it should be >98% pythonic at this point)
@@ -644,8 +736,18 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🐛 Known Issues, Shortcomings, and Reporting Issues
-
-<details><summary><b>Show/Hide</b></summary>
+>[!WARNING]
+> FlightGazer must constantly run as root.
+- This is unavoidable due to the need to interact with low-level hardware to drive the RGB display.
+  - The rgbmatrix library is capable of dropping root privleges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
+    - Additionally, not running as root will reduce performance, which we need the most of since this is all based on Python.
+  - The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority.
+  - Related processes like the web-app must also run as root since it needs to be able to start or stop the FlightGazer service.
+  - Even though the emulator does not need to run as root, it will still inherit root permissions due to the way FlightGazer runs.
+    - Same goes for running in `NO_DISPLAY` mode (`-d`).
+- If you're not comfortable with this, do not use this project.
+  - *or*, suggest code changes which may reduce the attack surface.
+<details><summary><b>Other Quirks & Features™</b></summary>
 
 - Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in your config)
   - This stat relies on the number of *unique aircraft seen*, not each occurrence of an actual flyby
@@ -674,7 +776,7 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
   - **Versions v.9.1.0 and newer now write a file in `/run/FlightGazer` if FlightGazer ends up in a degraded state or quits due to an uncorrectable error.**
 
 </details>
-<br>
+
 Found a bug? Want to suggest a new feature? Open an issue here on Github.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` which can be found in the FlightGazer directory.<br>
@@ -685,16 +787,18 @@ If using the web-app, also provide the `FlightGazer-initialization.log` which ca
 \* (dust) \*
 
 ## ✏️ Changelog, Planned Features, and Contributing
-Read: [`Changelog.txt`](./Changelog.txt).
+Catch up on lore: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [ ] ~~Docker image?~~ (unlikely)
 - [x] Settings management from webpage → [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 - [ ] Support display output to a [FlightFeeder Pro](https://flightaware.store/products/flightfeeder-pro-ads-b-flight-tracker-1090-mhz-piaware)?
 
-As FlightGazer is mainly a personal project, it is **currently not open to contributions**. Pull requests will be rejected.<br>
-Suggestions, comments, and bug reports are always welcomed and encouraged. If the idea is good enough, I may even build the feature.<br>
-Additionally, word-of-mouth helps plenty!<br>
+>[!IMPORTANT]
+> As FlightGazer is developed primarily as a personal project, it is **currently not open to contributions**.<br>Pull requests will be rejected.
+
+Suggestions, comments, and bug reports are always welcomed and encouraged.<br>
+Additionally, word-of-mouth helps plenty! If you're already this far into the readme, spread the word!<br>
 If you'd like to make your own edits that changes the way the project operates, please fork this project.<br>
 If there's something not addressed here, please reach out to me directly.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -706,9 +810,10 @@ If there's something not addressed here, please reach out to me directly.
 - This [All About Circuits Article](https://www.allaboutcircuits.com/projects/track-overhead-flights-raspberry-pi-zero-w-software-defined-radio/) from 2017
   - Uses all the same core components that this project relies on at a surface-level: FlightAware's API (the older `Firehose` one), `dump1090`, `rgbmatrix`
 - [Planefence](https://github.com/sdr-enthusiasts/docker-planefence), a logger for all the aircraft that flyby your location
-  - Inspired the functionality of the stats file FlightGazer writes out
--  [Skystats](https://github.com/tomcarman/skystats), a fancier way to show aircraft stats
+  - Inspired the base functionality of FlightGazer
+- [Skystats](https://github.com/tomcarman/skystats), a fancier way to show aircraft stats
    - FlightGazer does aircraft stats via the log, but the above is a prettier way to see similar data (FlightGazer still tracks different aspects not covered by Skystats)
+- [MLB-LED-Scoreboard](https://github.com/MLB-LED-Scoreboard/mlb-led-scoreboard), instead of planes, track baseballs (another project that uses these RGB matrix panels)
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## 🎖️ Highlights Across Media
@@ -723,6 +828,7 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ```
+If you intend to use this project, the code must remain open source.
 
 ## ✅ Acknowledgements
 Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator). This tool was invaluable for getting the layout dialed in and figuring out the logic needed to update the display correctly, all while avoiding having to program directly on the Raspberry Pi itself (VSCode Remote on a Zero 2W is literally impossible, I've tried).

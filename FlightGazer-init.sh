@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.2.2
+# Version = v.9.3.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -56,6 +56,7 @@ help_str(){
 	echo "[-t]     Run in tmux, if available."
 	echo "[-c]     Install/force-check dependencies only. Do not start main script."
 	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
+	echo "[-m]     Run the rgbmatrix install/update script only."
 	echo ""
 	echo "Report bugs to WeegeeNumbuh1 <https://github.com/WeegeeNumbuh1/FlightGazer>"
 }
@@ -114,7 +115,8 @@ TFLAG=""
 CFLAG=false
 VFLAG=""
 LFLAG=false
-while getopts ':cdefhltv' opt; do
+MFLAG=false
+while getopts ':cdefhlmtv' opt; do
 	case "$opt" in
 		d)
 		DFLAG="-d"
@@ -139,10 +141,13 @@ while getopts ':cdefhltv' opt; do
 		VENVPATH=/tmp/FlightGazer-pyvenv
 		CHECK_FILE=${VENVPATH}/first_run_complete
 		;;
+		m)
+		MFLAG=true
+		;;
 		h)
 		echo "This is the FlightGazer initialization script."
 		help_str
-		exit 1
+		exit 0
 		;;
 		\?)
 		INVALID_FLAG=true
@@ -185,6 +190,28 @@ if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
 	echo 'sudo kill -15 $(ps aux | grep '"'"'[F]lightGazer\.py'"'"' | awk '"'"'{print $2}'"'"')'
 	sleep 2s
 	exit 1
+fi
+
+if [ "$MFLAG" = true ]; then
+	if [ -f "${BASEDIR}/utilities/rgbmatrix_install.sh" ]; then
+		echo -e "${GREEN}>>> Starting the rgbmatrix install script.${NC}"
+		bash "${BASEDIR}/utilities/rgbmatrix_install.sh"
+		if [ $? -eq 0 ]; then
+			echo "\n> Install was successful. Re-run this initialization script"
+			echo "  without the -m flag to start FlightGazer."
+			exit 0
+		else
+			echo "\n> rgbmatrix install failed. FlightGazer can still run"
+			echo "  without this software, via the emulator."
+			echo "Please re-run this initialization script without the -m flag."
+			exit 1
+		fi
+	else
+		echo -e "\n${RED}>>> ERROR: The rgbmatrix install script is missing.${NC}"
+		echo "> FlightGazer can still run without this software, via the emulator."
+		echo "Please re-run this initialization script without the -m flag."
+		exit 1
+	fi
 fi
 
 echo -e "${GREEN}>>> Checking dependencies, let's begin.${NC}"
@@ -230,9 +257,10 @@ systemctl list-unit-files flightgazer-webapp.service >/dev/null
 if [ $? -eq 0 ]; then
 	WEB_INT=1
 fi
-if [ -f '/proc/device-tree/model' ]; then # probably a Raspberry Pi
-	DEV_TYPE=$(tr -d '\0' < /proc/device-tree/model) >/dev/null 2>&1
+if [ -f '/sys/firmware/devicetree/base/model' ] && grep -q 'Raspberry Pi' /proc/cpuinfo; then # probably a Raspberry Pi
+	DEV_TYPE=$(tr -d '\0' < /sys/firmware/devicetree/base/model) >/dev/null 2>&1
 	# https://stackoverflow.com/a/46163928
+	# https://raspberrypi.stackexchange.com/a/61071
 else
 	DEV_TYPE=''
 fi
@@ -244,7 +272,7 @@ if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv
 		>&2 echo -e "\n${NC}${RED}>>> WARNING: The virtual environment is broken.${NC}"
 		echo "    It will be rebuilt this session."
 		echo ""
-		rm -rf "$VENVPATH"
+		rm -rf "$VENVPATH" >/dev/null 2>&1
 	fi
 fi
 
@@ -590,7 +618,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			echo -e "${VENVPATH}/bin/python3 ${DB_DOWNLOADER}"
 			echo "in your console."
 		else
-			echo -e "${NC}> Success."
+			echo -e "${NC}> Database management successfully completed."
 			if [ -f "${BASEDIR}/utilities/database.db" ]; then
 				chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/utilities/database.db" >/dev/null 2>&1
 			fi

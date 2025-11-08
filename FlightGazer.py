@@ -33,7 +33,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.2.2 --- 2025-11-02'
+VERSION: str = 'v.9.3.0 --- 2025-11-08'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -819,6 +819,7 @@ REALLY_FAR_PLANE2: str = "back-to-normal"
 MIDNIGHT_RESET: str = "midnight"
 
 # define our units and multiplication factors (based on aeronautical units)
+# this has to be done right after reading the config file
 distance_unit: str = "nmi"
 altitude_unit: str = "ft"
 speed_unit: str = "kt"
@@ -1786,7 +1787,7 @@ def runtime_accumulators_reset() -> None:
         d_txt = "flights observed"
     else:
         d_txt = "flybys"
-    daily_stats_str.append(f"DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
+    daily_stats_str.append(f"> DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
     if not NOFILTER_MODE:
         daily_stats_str.append(f" Time that there were aircraft in the area: {algorithm_time}")
         if (time.monotonic() - START_TIME) > 86400:
@@ -2277,7 +2278,7 @@ class PrintToConsole:
             api_dest_name = result['DestinationInfo'][0]
             api_dest_city = result['DestinationInfo'][1]
             api_str.append("\n") # add space between the last plane info and this section
-            if focus_plane_stats['Altitude'] == 0:
+            if focus_plane_stats['OnGround']:
                 api_str.append(f"{rst}{italic}Note: The below aircraft "
                                 f"may have landed since the API was checked.{rst}\n")
             api_str.append(f"{blue_highlight}API results for "
@@ -2825,6 +2826,7 @@ def main_loop_generator() -> None:
             - Registration: Plane's registration (if available), defaults None
             - Priority: Value representing how "good" the data is. Closer to 0 = best, defaults to 0
             - Source: Source of the data, either 'ADS-B' or 'UAT'
+            - OnGround: Additional context for when Altitude is 0; True if actually on the ground, False if the altitude could not be determined.
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
             - FutureLatitude: Estimated next latitude of the plane based on heading, speed, and LOOP_INTERVAL. Defaults None, always None when NOFILTER_MODE is enabled
             - FutureLongitude: Same as above, but for longitude
@@ -2833,6 +2835,9 @@ def main_loop_generator() -> None:
             - Staleness: Age of the position data of the plane, in seconds
             - Timestamp: Timestamp of this data packet
         """
+        """ **NOTE** In a future release, this may be replaced by a dataclass object for maintainablity.
+        This will require a significant rewrite with many other parts of this script within a single update.
+        This comment should remain here until it is decided to move along with this direction or scrapping the idea. """
         # refer to https://github.com/wiedehopf/readsb/blob/dev/README-json.md on relevant json keys
         # auxiliary info: https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder?tab=readme-ov-file#tar1090-core-configuration
 
@@ -2980,21 +2985,25 @@ def main_loop_generator() -> None:
                 ):
                     alt_g = a.get('alt_geom') # more accurate
                     alt_b = a.get('alt_baro') # baseline altitude
+                    is_on_ground = False
                     if alt_g:
                         # override the geometric altitude when on the ground
                         if alt_b and alt_b == "ground":
                             alt = 0
+                            is_on_ground = True
                         else:
                             alt = alt_g
                     else:
                         alt = alt_b
                     # always give alt a numerical value
                     if alt is None or alt == "ground":
+                        if alt == "ground":
+                            is_on_ground = True
                         alt = 0
                     alt = alt * altitude_multiplier
                     gs = a.get('gs', 0)
                     # don't consider grounded planes/ground implements which are stationary
-                    if gs == alt == 0:
+                    if gs == 0 and is_on_ground:
                         continue
                     # below is the last filter; if a plane passes this, we grab all the info and append to
                     # the relevant planes list
@@ -3130,6 +3139,7 @@ def main_loop_generator() -> None:
                             "Registration": registration,
                             "Priority": priority_value,
                             "Source": source,
+                            "OnGround": is_on_ground,
                             "ApproachRate": 0.0, # this is not calculated in this loop, check below
                             "FutureLatitude": futlat,
                             "FutureLongitude": futlon,
@@ -3167,7 +3177,7 @@ def main_loop_generator() -> None:
                                 plane['ApproachRate'] = round(
                                     ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
                                     (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
-                                    )
+                                )
                                 break
                     except KeyError: # shouldn't happen, but just in case
                         main_logger.debug("KeyError in approach rate calculation")
@@ -3323,6 +3333,7 @@ class AirplaneParser:
         # when midnight comes around
         date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=5)).strftime('%Y-%m-%d')
         last_rare_occurrences = self.rare_occurrences
+        rare_message_cutoff = 5
         # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
         next_select_table = [0,0,0]
         loops_to_next_select = [0,0,0]
@@ -3332,19 +3343,20 @@ class AirplaneParser:
 
         def rare_message():
             """ Print a 'rare message' in the log.
-            Under very specific conditions in real-world testing, this occurs up to 3% of the time. """
+            Under very specific conditions in real-world testing, this occurs up to 3% of the time.
+            v.9.3.0 and newer: this now just triggers the the 'high usage' message under normal working conditions. """
             self.rare_occurrences += 1
             if not really_active_adsb_site:
-                if self.rare_occurrences <= 4:
-                    main_logger.info(f"Rare event! Aircraft count changed from {self._last_plane_count} "
+                if self.rare_occurrences <= rare_message_cutoff:
+                    main_logger.debug(f"Rare event! Aircraft count changed from {self._last_plane_count} "
                                      f"to {plane_count} as we were about to select another one.")
                     main_logger.debug(f">>> Occured on loop {focus_plane_iter} "
                                       f"(selection event {selection_events + 1}) -> "
                                       f"selection tables: {next_select_table} {loops_to_next_select}")
-                if self.rare_occurrences == 4 and date_now_str == self._date_of_last_rare_message:
+                if self.rare_occurrences == rare_message_cutoff and date_now_str == self._date_of_last_rare_message:
                     main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
-                    main_logger.info(">>> Suppressing further \'rare event\' messages for the rest of the day.")
-                    main_logger.info("    (Aircraft selection is still working normally)")
+                    main_logger.debug(">>> Suppressing further \'rare event\' messages for the rest of the day.")
+                    main_logger.debug("    (Aircraft selection is still working normally)")
             self._date_of_last_rare_message = date_now_str
 
         def select():
@@ -3415,8 +3427,8 @@ class AirplaneParser:
         if not NOFILTER_MODE:
             if plane_count > 0:
                 if self._date_of_last_rare_message and date_now_str != self._date_of_last_rare_message: # reset count
-                    if self.rare_occurrences >= 4 and not really_active_adsb_site:
-                        main_logger.info("Re-enabling \'rare message\' printout (this marks the first flyby of the day).")
+                    if self.rare_occurrences >= rare_message_cutoff and not really_active_adsb_site:
+                        main_logger.debug("Re-enabling \'rare message\' printout (this marks the first flyby of the day).")
                     self.rare_occurrences = 0
 
                 with threading.Lock(): # our initial pre-filter
@@ -3637,7 +3649,8 @@ class APIFetcher:
         self.run_loop()
 
     def get_API_results(self, message):
-        """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results` with any attempt to query the API. """
+        """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results`
+        with any attempt to query the API, failures included. """
         """ API results to output table:
 
            --- API Result ---   |  O  |  D  |  on  |  oc  |  dn  |  dc  |  t  |  S  | --- Notes ---
@@ -3663,9 +3676,13 @@ class APIFetcher:
         """
         global process_time, focus_plane_api_results, api_hits
         global API_daily_limit_reached, estimated_api_cost, API_KEY, API_cost_limit_reached
-        if API_KEY is None or not API_KEY: return
-        if NOFILTER_MODE: return
-        if api_limiter_reached(): return
+        if (
+            API_KEY is None
+            or not API_KEY
+            or NOFILTER_MODE
+            or api_limiter_reached()
+        ):
+            return
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
         time_delta_yesterday = date_now - datetime.timedelta(days=1)
@@ -3691,7 +3708,7 @@ class APIFetcher:
         if focus_plane_stats.get('ID', '~').startswith('~'): return
 
         # if the plane is on the ground, don't query the API either
-        if focus_plane_stats.get('Altitude', 0) == 0: return
+        if focus_plane_stats.get('OnGround', True): return
 
         # check if we already have results
         reference_time = time.monotonic()
@@ -3804,19 +3821,25 @@ class APIFetcher:
                     origin = "N/A"
                     API_status = 1
             else:
-                raise requests.exceptions.HTTPError(f"Received non-200 HTTP status, {response.status_code}")
+                raise requests.exceptions.HTTPError(f"Received non-200 HTTP status, {response.status_code}") from None
         except requests.exceptions.HTTPError as e:
             api_hits[1] += 1
             API_status = 2
-            main_logger.warning(f"API call for \'{flight_id}\' failed ({e})")
+            main_logger.warning(f"API call for \'{flight_id}\' failed. {e}")
         except requests.exceptions.ConnectionError as e:
             api_hits[1] += 1
             API_status = 3
-            main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error. ({e})")
+            if not VERBOSE_MODE:
+                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error.")
+            else:
+                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error. [ {e} ]")
         except requests.exceptions.Timeout as e:
             api_hits[1] += 1
             API_status = 3
-            main_logger.warning(f"API call for \'{flight_id}\' failed due connection timeout. ({e})")
+            if not VERBOSE_MODE:
+                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection timeout.")
+            else:
+                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection timeout. [ {e} ]")
         except Exception as e:
             api_hits[1] += 1
             API_status = 3
@@ -3852,6 +3875,26 @@ class APIFetcher:
             with threading.Lock():
                 estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
                 focus_plane_api_results.append(api_results)
+
+    """
+    def get_API_results_adsbdb():
+        \"\"\" Use the adsbdb API instead. How to integrate this is left as an exercise to the reader.
+        Do note that this API *cannot* handle general aviation or chartered flights, tends to have route
+        data that is outdated, incorrect, or missing, and sometimes will completely miss a few smaller regional airlines
+        (and their flights). This comes from the author's experience when trying to pick which
+        API was appropriate for use with this project. As having accurate API data along with being able to track general
+        aviation was a primary goal for this project, adsbdb was not rigorous enough to be used.
+        However, if you do want to use it in your own fork, this block of dead code remains here for you
+        to build upon. Have fun. \"\"\"
+
+        API_URL_adsbdb = "https://api.adsbdb.com/v0/callsign/"
+        flight_id = focus_plane_stats.get('Flight', "")
+        auth_header = {'Accept':"application/json; charset=UTF-8"}
+        query_string = API_URL_adsbdb + flight_id
+        response = requests.get(query_string, headers=auth_header, timeout=5)
+        response_json = response.json()
+        # do the rest :)
+    """
 
     def run_loop(self):
         def keep_alive():

@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.3.0 - 2025-11-08
+    - NEW: Added an option to install the rgbmatrix software from the initialization script
+        - This is useful for updating an existing install of rgbmatrix to the latest available
+        - This install process also makes its directory structure compatable with FlightGazer
+    - Significant performance refactoring of the database fetcher optimized for low memory systems
+        - It no longer causes memory issues or system lockups (uses almost 8x less memory)
+        - 2-10x speedup compared to the previous version on a Raspberry Pi Zero 2W
+        - Slight performance regression (about 10% slower) for more capable systems which have more memory
+        - The script is now CPU-bound
+    - Update ISO codes lookup table
+    - Reduce logging verbosity when API fetching fails
+    - Rare selection events are now no longer logged
+    - Improved internal handling for aircraft which report an unknown altitude or are actually on the ground
+        - This improves the reliablity of sending API calls when an aircraft passes by but doesn't report its altitude
+
 v.9.2.2 - 2025-11-02
     - Fix issue with Interactive mode when dump1090 is not found, leading to the log being spammed for as long as FlightGazer is running
     - Tweaked some of the output with the update and webapp install scripts
