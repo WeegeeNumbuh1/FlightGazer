@@ -1817,7 +1817,7 @@ def runtime_accumulators_reset() -> None:
     ):
         main_logger.info("This appears to be a rather active ADS-B site. "
                          "Very nice setup you have here, hopefully you're sharing your data!")
-        main_logger.info(">>> To prevent spamming the log any further, rare selection event "
+        main_logger.debug(">>> To prevent spamming the log any further, rare selection event "
                          "logging will be disabled until FlightGazer is restarted.")
         really_active_adsb_site = True
 
