@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.3.0
+# Version = v.9.4.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -197,11 +197,11 @@ if [ "$MFLAG" = true ]; then
 		echo -e "${GREEN}>>> Starting the rgbmatrix install script.${NC}"
 		bash "${BASEDIR}/utilities/rgbmatrix_install.sh"
 		if [ $? -eq 0 ]; then
-			echo "\n> Install was successful. Re-run this initialization script"
+			echo -e "\n> Install was successful. Re-run this initialization script"
 			echo "  without the -m flag to start FlightGazer."
 			exit 0
 		else
-			echo "\n> rgbmatrix install failed. FlightGazer can still run"
+			echo -e "\n> rgbmatrix install failed. FlightGazer can still run"
 			echo "  without this software, via the emulator."
 			echo "Please re-run this initialization script without the -m flag."
 			exit 1

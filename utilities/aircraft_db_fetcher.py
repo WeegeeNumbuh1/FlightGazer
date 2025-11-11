@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.9.3.0
+# Last updated: v.9.4.0
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -321,8 +321,8 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
 
     print(f"Writing to \'{OUTPUT_FILE}\'.")
     print("Estimated time: "
-          f"{round(csv_time * 2.5, 1)}-"
-          f"{round(csv_time * 3.3, 1)} seconds.") # from testing
+          f"{round(csv_time * 2.6, 1)}-"
+          f"{round(csv_time * 5.5, 1)} seconds.") # from testing
     write_start = perf_counter() # actually start the timing from here
     # process aircraft data straight from the gzipped files (this is CPU-bound)
     for batch, leading_char in process_aircraft_data(response.content, types_map):

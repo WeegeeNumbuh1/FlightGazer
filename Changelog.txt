@@ -5,6 +5,25 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.4.0 - 2025-11-11
+    - Wow, it's been (slightly over) a year since this project hit v.1.0.0
+        - This update will mark 109 updates since then
+        - It's estimated I spent approximately ~1000 hours coding, testing, and debugging every aspect of this project since v.pre-alpha
+        - How I find ways to constantly change things in this project, idk
+        - No unit tests, no modular abstractions, become the anti-pattern Michelin Star chef you're born to be
+            - Only the best of code lasagna here
+        - Shout out to all the users that have used, are using, or will use this project
+
+    - NEW: New setting: NO_GROUND_TRACKING
+        - This setting, when enabled, ignores all ADS-B equipped vehicles which report that they're on the ground
+        - Note: NO_FILTER mode overrides this setting
+        - Fun fact: a new setting hasn't been added since v.6.0.0
+    - When an aircraft is on the ground, the display will show "GRND" instead of 0
+        - This change also extends to Interactive mode as well and reports "Ground" for an altitude
+    - Extended watchdog timeout to 15 minutes from 10
+    - Fix some minor output strings in initialization script and database fetcher
+    - Fully remove rare selection logging events
+
 v.9.3.0 - 2025-11-08
     - NEW: Added an option to install the rgbmatrix software from the initialization script
         - This is useful for updating an existing install of rgbmatrix to the latest available

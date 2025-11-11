@@ -27,13 +27,19 @@ Uses the FlightAware API for info outside what ADS-B can provide.
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+"""
+Author's comments:
+
+**This code is cooked**
+Pray your IDE can help you, ye who enter here.
+"""
 # =============== Imports ==================
 # ==========================================
 import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.3.0 --- 2025-11-08'
+VERSION: str = 'v.9.4.0 --- 2025-11-11'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -467,6 +473,7 @@ API_SCHEDULE: dict = {
     }
 }
 SHOW_EVEN_MORE_INFO: bool = True
+NO_GROUND_TRACKING: bool = False # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -530,6 +537,7 @@ default_settings: dict = {
     "WRITE_STATE": WRITE_STATE,
     "API_SCHEDULE": API_SCHEDULE,
     "SHOW_EVEN_MORE_INFO": SHOW_EVEN_MORE_INFO,
+    "NO_GROUND_TRACKING": NO_GROUND_TRACKING,
 }
 """ Dict of default settings """
 
@@ -1479,6 +1487,9 @@ def configuration_check() -> None:
     if FASTER_REFRESH:
         main_logger.info("FASTER_REFRESH enabled, dump1090 polling rate is now 1 second.")
 
+    if NO_GROUND_TRACKING and not NOFILTER_MODE:
+        main_logger.info("NO_GROUND_TRACKING is enabled, FlightGazer will ignore aircraft on the ground.")
+
     if ORJSON_IMPORTED:
         main_logger.debug("orjson module imported and will be used for faster dump1090 json decoding.")
 
@@ -2164,8 +2175,15 @@ class PrintToConsole:
                 print_info.append(" | ")
                 # altitude section
                 print_info.append("ALT: ")
-                print_info.append(f"{aircraft['Altitude']:.1f}".rjust(7))
-                print_info.append(f"{altitude_unit}, ")
+                alt_i = aircraft['Altitude']
+                if alt_i == 0 and aircraft['OnGround']:
+                    # "ALT: 40000.0ft, "
+                    # "ALT:    Ground, "
+                    print_info.append(f"".rjust(len(altitude_unit) + 1))
+                    print_info.append("Ground, ")
+                else:
+                    print_info.append(f"{alt_i:.1f}".rjust(7))
+                    print_info.append(f"{altitude_unit}, ")
                 print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(7))
                 print_info.append(f"{altitude_unit}/min, ")
                 print_info.append(f"{aircraft['Elevation']:.2f}°".rjust(6))
@@ -3000,6 +3018,10 @@ def main_loop_generator() -> None:
                         if alt == "ground":
                             is_on_ground = True
                         alt = 0
+                    if not NOFILTER_MODE and NO_GROUND_TRACKING and is_on_ground:
+                        if total > 0: # don't count this aircraft
+                            total -= 1
+                        continue
                     alt = alt * altitude_multiplier
                     gs = a.get('gs', 0)
                     # don't consider grounded planes/ground implements which are stationary
@@ -4074,7 +4096,12 @@ class DisplayFeeder:
                 gs = f"{s_now:.1f}"
             else:
                 gs = "0"
-            alt = f"{focus_plane_stats['Altitude']:.0f}"
+            # do some checking for the altitude when an aircraft is on the ground
+            alt_i = focus_plane_stats['Altitude']
+            if alt_i == 0 and focus_plane_stats['OnGround']:
+                alt = "GRND"
+            else:
+                alt = f"{alt_i:.0f}"
             # distance readout is limited to 5 characters (2 direction, 3 value);
             # if distance >= 10, just get us the integers
             if LOCATION_IS_SET:
@@ -4347,8 +4374,8 @@ class dump1090Watchdog:
             main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
             main_logger.error("Please correct the underlying issue and restart FlightGazer.")
             return
-        main_logger.error(f">>> Suspending checking {dump1090} for 10 minutes. This is occurrence: {watchdog_triggers}.")
-        time.sleep(600)
+        main_logger.error(f">>> Suspending checking {dump1090} for 15 minutes. This is occurrence: {watchdog_triggers}.")
+        time.sleep(900)
         main_logger.info(f"Re-enabling {dump1090} readout.")
         write_bad_state_semaphore(False)
         DUMP1090_IS_AVAILABLE = True
