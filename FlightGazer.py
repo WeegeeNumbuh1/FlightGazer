@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.4.0 --- 2025-11-11'
+VERSION: str = 'v.9.5.0 --- 2025-11-15'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -410,7 +410,7 @@ if psutil.LINUX:
 # ==========================================
 
 # Define our settings and initialize to defaults
-FLYBY_STATS_ENABLED: bool = False
+FLYBY_STATS_ENABLED: bool = True
 HEIGHT_LIMIT: int|float = 15000
 RANGE: int|float = 2
 API_KEY: str|None = ""
@@ -423,18 +423,18 @@ GPIO_SLOWDOWN: int = 2
 HAT_PWM_ENABLED: bool = False
 LED_PWM_BITS: int = 8
 UNITS: int = 0
-FLYBY_STALENESS: int = 60
+FLYBY_STALENESS: int = 30
 ENHANCED_READOUT: bool = False
 ENABLE_TWO_BRIGHTNESS: bool = True
 BRIGHTNESS_2: int = 50
-BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise":"06:00","Sunset":"18:00"}
+BRIGHTNESS_SWITCH_TIME: dict = {"Sunrise": "06:00", "Sunset": "18:00"}
 USE_SUNRISE_SUNSET: bool = True
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: int|None = None
 LOCATION_TIMEOUT: int = 60
 ENHANCED_READOUT_AS_FALLBACK: bool = False
 FOLLOW_THIS_AIRCRAFT: str = ""
 DISPLAY_SWITCH_PROGRESS_BAR: bool = True
-CLOCK_CENTER_ROW: dict = {"ROW1":None,"ROW2":None}
+CLOCK_CENTER_ROW: dict = {"ROW1": 1, "ROW2": None}
 ALTERNATIVE_FONT: bool = False
 API_COST_LIMIT: float|None = None
 JOURNEY_PLUS: bool = False
@@ -473,7 +473,7 @@ API_SCHEDULE: dict = {
     }
 }
 SHOW_EVEN_MORE_INFO: bool = True
-NO_GROUND_TRACKING: bool = False # new setting!
+NO_GROUND_TRACKING: bool = False
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -1096,7 +1096,8 @@ def extract_API_results(API_results: list, ID: str) -> dict | None:
     """ Extract the API result corresponding to the given `ID` and with a
     timestamp no older than `FLYBY_STALENESS`.
     Returns `None` if no match, encounters some kind of error, or `ID`
-    is Falsy. """
+    is Falsy. This function will also trigger the API fetcher if it encounters
+    a stale API result. """
     if not ID:
         return None
     reference_time = time.monotonic()
@@ -1106,6 +1107,12 @@ def extract_API_results(API_results: list, ID: str) -> dict | None:
                 if (reference_time - result_['APIAccessed'] < (FLYBY_STALENESS * 60)):
                     return result_
                 else: # don't use stale API results
+                    # force the API fetcher to refresh the result
+                    # see the "Thread Signaling Layout" docstring on how this is handled
+                    if not api_limiter_reached():
+                        dispatcher.send(message='', signal=PLANE_SELECTED, sender=extract_API_results)
+                        main_logger.debug("Encountered stale API result for "
+                                      f"\'{ID}\', triggering API fetcher.")
                     return None
             elif result_ is None:
                 return None
@@ -1283,7 +1290,8 @@ def read_1090_config() -> None:
             else:
                 rlat = rlon = None
                 LOCATION_IS_SET = False
-                main_logger.warning("Location has not been set! This program will not be able to determine any nearby aircraft or calculate range!")
+                main_logger.warning("Location has not been set! "
+                                    "This program will not be able to determine any nearby aircraft or calculate range!")
                 main_logger.warning(">>> Please set location in dump1090 to disable this message.")
     except Exception:
         main_logger.error("Cannot load receiver config.")
@@ -1436,7 +1444,7 @@ def configuration_check() -> None:
         HEIGHT_LIMIT = 275000
         LOCATION_TIMEOUT = 60
 
-    if not isinstance(FLYBY_STALENESS, int) or (2 < FLYBY_STALENESS > 1440):
+    if not isinstance(FLYBY_STALENESS, int) or (2 < FLYBY_STALENESS > 720):
         main_logger.warning("Desired flyby staleness is out of bounds.")
         main_logger.info(f">>> Setting to default ({default_settings['FLYBY_STALENESS']})")
         FLYBY_STALENESS = default_settings['FLYBY_STALENESS']
@@ -1756,11 +1764,13 @@ def perf_monitoring() -> None:
             ▼                ▼              ▼            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
     [AirplaneParser]   [synchronizer]   [DistantDeterminator]      [dump1090Watchdog]
             |
-            ├────────────────┬──────────────────┐
-            ▼                ▼                  ▼
-      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
-            ▲                |4                 ▼
-            └- - - - - - - - ┘             [WriteState]
+            ├────────────────┬──────────────────┐               extract_API_results()
+            ▼                ▼                  ▼                         |
+      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3                |
+         5▲ ▲                |4                 ▼                         |
+          | └- - - - - - - - ┘             [WriteState]                   |
+          |                                                               |
+          └ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ┘
 
 1 = Only executes completely when the following are true:
     - API_KEY exists                 | set only on startup
@@ -1778,6 +1788,21 @@ def perf_monitoring() -> None:
 4 = If ENHANCED_READOUT_AS_FALLBACK is True, there exists a Condition
     so that APIFetcher can wait until DisplayFeeder is done and evaluate
     the value of ENHANCED_READOUT
+
+5 = If extract_API_results() encounters a stale result, it will trigger
+    the API fetcher outside of the normal signaling path. This occurs
+    when the API result expires while the focus plane is selected and there
+    are no other planes in the area to naturally cause AirplaneParser to
+    initiate the normal work chain. When running normally, both DisplayFeeder
+    and PrintToConsole will try to trigger the API fetcher almost simultaneously,
+    however, as signal calls are queued, only the first call will succeed. The
+    subsequent call will then cause the handler to finish early as there is now
+    a result from the previous call. With the lasagna architecture in place,
+    the next loop or two (depending on how fast the API responds) will read
+    the result of this forced API refresh, as designed. Additional note:
+    when the normal signal chain is traversed with a stale entry in the results deque,
+    the API fetcher will handle the signal from AirplaneParser first, then
+    the calls from extract_API_results() will follow.
 
 """
 
@@ -1839,21 +1864,22 @@ def runtime_accumulators_reset() -> None:
             RANGE <= (2 * distance_multiplier)
             and HEIGHT_LIMIT <= (15000 * altitude_multiplier)
         )
-        and FLYBY_STALENESS >= 60
+        and FLYBY_STALENESS >= 30
         and (time.monotonic() - START_TIME) > 72000
     ): # little easter egg only very few will see in the logs (if you're reading this from the source then lmao)
         if not really_really_active_adsb_site:
             achievement_time = date_now_str
         really_really_active_adsb_site = True
         congrats = [
-            "Actually, wow, this is a really, REALLY active site. Do you live in front of multiple runways or something???",
+            "Actually, wow, this is a really, REALLY active site. Do you live in front of multiple runways or something?",
             "in a day is crazy. How are the property values looking like over there?",
             "I bet you don't even hear all those planes anymore at this point. Heard ATC need some staff...",
             "in a day is wild. Is there a holiday coming up or something?",
             "full respect for your local controllers. Managing all those planes is serious work.",
             "your local major airport probably just hates your location today. Good numbers though.",
             "They say that \"steel jets can't melt beam fuel\" or \"beam melts can't fuel steel jets\" or however that meme goes.",
-            "the winds have decided your fate: become one with an approach lighting system."
+            "the winds have decided your fate: become one with an approach lighting system.",
+            "do you like planes?????",
         ]
         main_logger.info(f"{len(unique_planes_seen)} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
 
@@ -1865,6 +1891,7 @@ def runtime_accumulators_reset() -> None:
             "The airports gave you a break this time. Hope you enjoyed the day.",
             "Serenity and sonorous silence -- stillness suffuses the sky as the machines of air slumber.",
             "Hopefully this isn't affecting your rankings on some leaderboards (if you're into that).",
+            "What happened to all the planes???",
         ]
         main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
 
@@ -2948,273 +2975,269 @@ def main_loop_generator() -> None:
         else:
             dump1090data_ = dump1090_data
 
-        try:
-            for a in dump1090data_:
-                seen_pos = a.get('seen_pos')
-                broadcast_type = a.get('type', 'None')
-                hex = a.get('hex', "?")
-                priority_value = a.get(
-                    'priority',
-                    priority_lookup.get(broadcast_type)
-                )
-                # filter planes that have valid tracking data and were seen recently
-                if (
-                    seen_pos is None
-                    or seen_pos > LOCATION_TIMEOUT
-                    or (not NOFILTER_MODE
-                        and priority_value > 10)
-                ):
-                    continue
-                total += 1
-                lat = a.get('lat')
-                lon = a.get('lon')
-                if lat == lon == 0: # prefilter for case when there's an invalid location
-                    lat = None
-                    lon = None
-                if LOCATION_IS_SET and lat is not None:
-                    # readsb does this calculation already, try to use it first
-                    distance = a.get('r_dst')
-                    # NB: doing `distance = a.get('r_dst', greatcircle())` is slower as `get()` needs to
-                    # calculate the fallback value even when 'r_dst' is a valid key. Checking if the key exists
-                    # beforehand prevents having to make unnessary function calls as this would lead to having to calculate
-                    # distance for each plane on every loop.
-                    # From testing, using the current layout is now up to 1.5x faster over time, as long as we're connected to readsb.
-                    if distance is None:
-                        distance = greatcircle(rlat, rlon, lat, lon)
-                    else: # don't forget to scale to the selected units if we're reading directly from readsb
-                        distance = distance * distance_multiplier
-                else:
-                    distance = 0
-                ranges.append(distance)
-                really_far = False # flag for indicating if a plane is worthy of being tracked by the dxing logic
-                if distance >= BEYOND_LOS_LIMIT / distance_multiplier:
-                    really_far = True
-                normal_operation = False
-                if (
-                    not NOFILTER_MODE
-                    and (0 < distance < RANGE)
-                    or really_far
-                ):
-                    normal_operation = True
-                if (
-                    NOFILTER_MODE
-                    or hex == FOLLOW_THIS_AIRCRAFT
-                    or normal_operation
-                ):
-                    alt_g = a.get('alt_geom') # more accurate
-                    alt_b = a.get('alt_baro') # baseline altitude
-                    is_on_ground = False
-                    if alt_g:
-                        # override the geometric altitude when on the ground
-                        if alt_b and alt_b == "ground":
-                            alt = 0
-                            is_on_ground = True
-                        else:
-                            alt = alt_g
-                    else:
-                        alt = alt_b
-                    # always give alt a numerical value
-                    if alt is None or alt == "ground":
-                        if alt == "ground":
-                            is_on_ground = True
-                        alt = 0
-                    if not NOFILTER_MODE and NO_GROUND_TRACKING and is_on_ground:
-                        if total > 0: # don't count this aircraft
-                            total -= 1
-                        continue
-                    alt = alt * altitude_multiplier
-                    gs = a.get('gs', 0)
-                    # don't consider grounded planes/ground implements which are stationary
-                    if gs == 0 and is_on_ground:
-                        continue
-                    # below is the last filter; if a plane passes this, we grab all the info and append to
-                    # the relevant planes list
-                    if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT or really_far:
-                        flight = a.get('flight')
-                        rssi = a.get('rssi', 0)
-                        vs = a.get('geom_rate', a.get('baro_rate', 0))
-                        vs = round(vs * altitude_multiplier, 3)
-                        track = a.get('track', 0)
-                        gs = round(gs * speed_multiplier, 3)
-                        if has_key(a, 'uat_version'):
-                            source = 'UAT'
-                        else:
-                            source = 'ADS-B'
-                        if LOCATION_IS_SET:
-                            # readsb also does this calculation, try to use it first and have the fallback ready
-                            direc, direcd = relative_direction(
-                                rdir = a.get('r_dir'),
-                                lat0 = rlat,
-                                lon0 = rlon,
-                                lat1 = lat,
-                                lon1 = lon
-                            )
-                        else:
-                            direc = ""
-                            direcd = 0.
-                        elevation, slant_range_dist = elevation_and_slant(distance, alt)
-                        if abs(determined_time_offset) > 5 or USING_FILESYSTEM:
-                            dt = 0
-                        else: dt = determined_time_offset
-                        if source == 'ADS-B':
-                            true_data_age = (
-                                (seen_pos
-                                + (dump1090_json_age[0] - abs(dt)))
-                                - (process_time[0] + process_time2[2]) / 1000
-                            )
-                        else:
-                            true_data_age = (
-                                (seen_pos
-                                + (dump1090_json_age[1] - abs(dt)))
-                                - (process_time[0] + process_time2[2]) / 1000
-                            )
-                        if not NOFILTER_MODE:
-                            futlat, futlon = future_position(
-                                lat,
-                                lon,
-                                gs,
-                                track,
-                                true_data_age,
-                                a.get('track_rate', 0)
-                            )
-                        else:
-                            futlat = futlon = None
-                        if futlat is not None and futlon is not None:
-                            futdis = greatcircle(rlat, rlon, futlat, futlon)
-                            futlat = round(futlat, 6)
-                            futlon = round(futlon, 6)
-                        else:
-                            futdis = None
-                        emitter = category_description.get(a.get('category'), "None")
-                        iso_code = getICAO(hex).upper()
-                        # This key is sometimes present in some readsb setups (eg: adsb.im images).
-                        # Because it reads from a much more updated database, we try to use it first
-                        registration = a.get('r')
-                        if registration is None:
-                            registration = reg_lookup(hex)
-                        # see if we can lookup who runs this plane
-                        if (operator_result := operator_lookup(flight)) is not None:
-                            if not (operator := operator_result['Company']):
-                                operator = None
-                            if not (telephony := operator_result['Telephony']):
-                                telephony = None
-                            if not (op_friend := operator_result['FriendlyName']):
-                                op_friend = None
-                        else:
-                            operator = None
-                            telephony = None
-                            op_friend = None
-                        # if tar1090 long database is enabled, grab some of the info
-                        owner = a.get('ownOp')
-                        adesc = a.get('desc')
-                        atype = a.get('t')
-                        if not atype:
-                            atype = "None"
-                        ayear = a.get('year')
-                        if adesc and ayear:
-                            adesc = f"{ayear} {adesc}"
-                        if (
-                            flight is None
-                            or flight == "        " # when dump1090 reports an empty callsign, it's 8 spaces
-                            or (flight.strip() == "VFR"
-                                and priority_value < 4
-                            ) # this usually occurs over UAT
-                        ):
-                            # fallback to registration, then ICAO hex
-                            if registration is not None:
-                                flight = registration
-                            else:
-                                flight = hex
-                        else:
-                            flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
-
-                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
-                            flyby_tracker(hex)
-                            flyby = flyby_extractor(hex)
-                        else: # do not append really far planes when operating normally
-                            flyby = 0
-
-                        loop_packet = {
-                            "ID": hex,
-                            "Flight": flight,
-                            "Country": iso_code,
-                            "Altitude": alt,
-                            "Speed": gs,
-                            "Distance": distance,
-                            "Direction": direc,
-                            "DirectionDegrees": direcd,
-                            "Latitude": lat,
-                            "Longitude": lon,
-                            "Track": track,
-                            "VertSpeed": vs,
-                            "RSSI": rssi,
-                            "Elevation": elevation,
-                            "SlantRange": slant_range_dist,
-                            "Operator": operator,
-                            "Telephony": telephony,
-                            "OperatorAKA": op_friend,
-                            "Owner": owner,
-                            "AircraftDesc": adesc,
-                            "ICAOType": atype,
-                            "CategoryDesc": emitter,
-                            "TrackingFlag": "None",
-                            "Registration": registration,
-                            "Priority": priority_value,
-                            "Source": source,
-                            "OnGround": is_on_ground,
-                            "ApproachRate": 0.0, # this is not calculated in this loop, check below
-                            "FutureLatitude": futlat,
-                            "FutureLongitude": futlon,
-                            "FutureDistance": futdis,
-                            "Flyby": flyby,
-                            "Staleness": round(true_data_age, 3),
-                            "Timestamp": time.monotonic() if not NOFILTER_MODE else reference_time,
-                        }
-
-                        if DATABASE_CONNECTED:
-                            database_data = database_lookup(hex)
-                            if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
-                                planes.append(data_arbitrator(loop_packet, database_data))
-                            if really_far:
-                                farplanes.append(data_arbitrator(loop_packet, database_data))
-                        else:
-                            if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
-                                planes.append(loop_packet)
-                            if really_far:
-                                farplanes.append(loop_packet)
-            # end of the main loop
-
-            if farplanes:
-                dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
-            else: # tell DistantDeterminator that there are no distant planes right now
-                dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
-
-            if not NOFILTER_MODE and relevant_planes_last:
-                # calculate approach rate for each plane based on the last loop's data
-                for plane in planes:
-                    try:
-                        for last_plane in relevant_planes_last:
-                            if plane['ID'] == last_plane['ID']:
-                                # calculate approach rate in speed units (negative = moving away)
-                                plane['ApproachRate'] = round(
-                                    ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
-                                    (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
-                                )
-                                break
-                    except KeyError: # shouldn't happen, but just in case
-                        main_logger.debug("KeyError in approach rate calculation")
-                        plane['ApproachRate'] = 0.0
-                        break
-
-            if not ranges:
-                max_range = 0
+        for a in dump1090data_:
+            seen_pos = a.get('seen_pos')
+            broadcast_type = a.get('type', 'None')
+            hex = a.get('hex', "?")
+            priority_value = a.get(
+                'priority',
+                priority_lookup.get(broadcast_type)
+            )
+            # filter planes that have valid tracking data and were seen recently
+            if (
+                seen_pos is None
+                or seen_pos > LOCATION_TIMEOUT
+                or (not NOFILTER_MODE
+                    and priority_value > 10)
+            ):
+                continue
+            total += 1
+            lat = a.get('lat')
+            lon = a.get('lon')
+            if lat == lon == 0: # prefilter for case when there's an invalid location
+                lat = None
+                lon = None
+            if LOCATION_IS_SET and lat is not None:
+                # readsb does this calculation already, try to use it first
+                distance = a.get('r_dst')
+                # NB: doing `distance = a.get('r_dst', greatcircle())` is slower as `get()` needs to
+                # calculate the fallback value even when 'r_dst' is a valid key. Checking if the key exists
+                # beforehand prevents having to make unnessary function calls as this would lead to having to calculate
+                # distance for each plane on every loop.
+                # From testing, using the current layout is now up to 1.5x faster over time, as long as we're connected to readsb.
+                if distance is None:
+                    distance = greatcircle(rlat, rlon, lat, lon)
+                else: # don't forget to scale to the selected units if we're reading directly from readsb
+                    distance = distance * distance_multiplier
             else:
-                max_range = round(max(ranges), 2)
+                distance = 0
+            ranges.append(distance)
+            really_far = False # flag for indicating if a plane is worthy of being tracked by the dxing logic
+            if distance >= BEYOND_LOS_LIMIT / distance_multiplier:
+                really_far = True
+            normal_operation = False
+            if (
+                not NOFILTER_MODE
+                and (0 < distance < RANGE)
+                or really_far
+            ):
+                normal_operation = True
+            if (
+                NOFILTER_MODE
+                or hex == FOLLOW_THIS_AIRCRAFT
+                or normal_operation
+            ):
+                alt_g = a.get('alt_geom') # more accurate
+                alt_b = a.get('alt_baro') # baseline altitude
+                is_on_ground = False
+                if alt_g:
+                    # override the geometric altitude when on the ground
+                    if alt_b and alt_b == "ground":
+                        alt = 0
+                        is_on_ground = True
+                    else:
+                        alt = alt_g
+                else:
+                    alt = alt_b
+                # always give alt a numerical value
+                if alt is None or alt == "ground":
+                    if alt == "ground":
+                        is_on_ground = True
+                    alt = 0
+                if not NOFILTER_MODE and NO_GROUND_TRACKING and is_on_ground:
+                    if total > 0: # don't count this aircraft
+                        total -= 1
+                    continue
+                alt = alt * altitude_multiplier
+                gs = a.get('gs', 0)
+                # don't consider grounded planes/ground implements which are stationary
+                if gs == 0 and is_on_ground:
+                    continue
+                # below is the last filter; if a plane passes this, we grab all the info and append to
+                # the relevant planes list
+                if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT or really_far:
+                    flight = a.get('flight')
+                    rssi = a.get('rssi', 0)
+                    vs = a.get('geom_rate', a.get('baro_rate', 0))
+                    vs = round(vs * altitude_multiplier, 3)
+                    track = a.get('track', 0)
+                    gs = round(gs * speed_multiplier, 3)
+                    if has_key(a, 'uat_version'):
+                        source = 'UAT'
+                    else:
+                        source = 'ADS-B'
+                    if LOCATION_IS_SET:
+                        # readsb also does this calculation, try to use it first and have the fallback ready
+                        direc, direcd = relative_direction(
+                            rdir = a.get('r_dir'),
+                            lat0 = rlat,
+                            lon0 = rlon,
+                            lat1 = lat,
+                            lon1 = lon
+                        )
+                    else:
+                        direc = ""
+                        direcd = 0.
+                    elevation, slant_range_dist = elevation_and_slant(distance, alt)
+                    if abs(determined_time_offset) > 5 or USING_FILESYSTEM:
+                        dt = 0
+                    else: dt = determined_time_offset
+                    if source == 'ADS-B':
+                        true_data_age = (
+                            (seen_pos
+                            + (dump1090_json_age[0] - abs(dt)))
+                            - (process_time[0] + process_time2[2]) / 1000
+                        )
+                    else:
+                        true_data_age = (
+                            (seen_pos
+                            + (dump1090_json_age[1] - abs(dt)))
+                            - (process_time[0] + process_time2[2]) / 1000
+                        )
+                    if not NOFILTER_MODE:
+                        futlat, futlon = future_position(
+                            lat,
+                            lon,
+                            gs,
+                            track,
+                            true_data_age,
+                            a.get('track_rate', 0)
+                        )
+                    else:
+                        futlat = futlon = None
+                    if futlat is not None and futlon is not None:
+                        futdis = greatcircle(rlat, rlon, futlat, futlon)
+                        futlat = round(futlat, 6)
+                        futlon = round(futlon, 6)
+                    else:
+                        futdis = None
+                    emitter = category_description.get(a.get('category'), "None")
+                    iso_code = getICAO(hex).upper()
+                    # This key is sometimes present in some readsb setups (eg: adsb.im images).
+                    # Because it reads from a much more updated database, we try to use it first
+                    registration = a.get('r')
+                    if registration is None:
+                        registration = reg_lookup(hex)
+                    # see if we can lookup who runs this plane
+                    if (operator_result := operator_lookup(flight)) is not None:
+                        if not (operator := operator_result['Company']):
+                            operator = None
+                        if not (telephony := operator_result['Telephony']):
+                            telephony = None
+                        if not (op_friend := operator_result['FriendlyName']):
+                            op_friend = None
+                    else:
+                        operator = None
+                        telephony = None
+                        op_friend = None
+                    # if tar1090 long database is enabled, grab some of the info
+                    owner = a.get('ownOp')
+                    adesc = a.get('desc')
+                    atype = a.get('t')
+                    if not atype:
+                        atype = "None"
+                    ayear = a.get('year')
+                    if adesc and ayear:
+                        adesc = f"{ayear} {adesc}"
+                    if (
+                        flight is None
+                        or flight == "        " # when dump1090 reports an empty callsign, it's 8 spaces
+                        or (flight.strip() == "VFR"
+                            and priority_value < 4
+                        ) # this usually occurs over UAT
+                    ):
+                        # fallback to registration, then ICAO hex
+                        if registration is not None:
+                            flight = registration
+                        else:
+                            flight = hex
+                    else:
+                        flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
 
-            current_stats = {"Tracking": total, "Range": max_range}
+                    if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                        flyby_tracker(hex)
+                        flyby = flyby_extractor(hex)
+                    else: # do not append really far planes when operating normally
+                        flyby = 0
 
-        except Exception: # raise it up to the next handler
-            raise
+                    loop_packet = {
+                        "ID": hex,
+                        "Flight": flight,
+                        "Country": iso_code,
+                        "Altitude": alt,
+                        "Speed": gs,
+                        "Distance": distance,
+                        "Direction": direc,
+                        "DirectionDegrees": direcd,
+                        "Latitude": lat,
+                        "Longitude": lon,
+                        "Track": track,
+                        "VertSpeed": vs,
+                        "RSSI": rssi,
+                        "Elevation": elevation,
+                        "SlantRange": slant_range_dist,
+                        "Operator": operator,
+                        "Telephony": telephony,
+                        "OperatorAKA": op_friend,
+                        "Owner": owner,
+                        "AircraftDesc": adesc,
+                        "ICAOType": atype,
+                        "CategoryDesc": emitter,
+                        "TrackingFlag": "None",
+                        "Registration": registration,
+                        "Priority": priority_value,
+                        "Source": source,
+                        "OnGround": is_on_ground,
+                        "ApproachRate": 0.0, # this is not calculated in this loop, check below
+                        "FutureLatitude": futlat,
+                        "FutureLongitude": futlon,
+                        "FutureDistance": futdis,
+                        "Flyby": flyby,
+                        "Staleness": round(true_data_age, 3),
+                        "Timestamp": time.monotonic() if not NOFILTER_MODE else reference_time,
+                    }
+
+                    if DATABASE_CONNECTED:
+                        database_data = database_lookup(hex)
+                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                            planes.append(data_arbitrator(loop_packet, database_data))
+                        if really_far:
+                            farplanes.append(data_arbitrator(loop_packet, database_data))
+                    else:
+                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                            planes.append(loop_packet)
+                        if really_far:
+                            farplanes.append(loop_packet)
+        # end of the main loop
+
+        if farplanes:
+            dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
+        else: # tell DistantDeterminator that there are no distant planes right now
+            dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
+
+        if not NOFILTER_MODE and relevant_planes_last:
+            # calculate approach rate for each plane based on the last loop's data
+            for plane in planes:
+                try:
+                    for last_plane in relevant_planes_last:
+                        if plane['ID'] == last_plane['ID']:
+                            # calculate approach rate in speed units (negative = moving away)
+                            plane['ApproachRate'] = round(
+                                ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
+                                (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
+                            )
+                            break
+                except KeyError: # shouldn't happen, but just in case
+                    main_logger.debug("KeyError in approach rate calculation")
+                    plane['ApproachRate'] = 0.0
+                    break
+
+        if not ranges:
+            max_range = 0
+        else:
+            max_range = round(max(ranges), 2)
+
+        current_stats = {"Tracking": total, "Range": max_range}
 
         return current_stats, planes
 
@@ -3247,18 +3270,6 @@ def main_loop_generator() -> None:
                         general_stats, relevant_planes = dump1090_loop(dump1090_data)
                         sequential_failures = 0 # reset to 0 when there is data
                 process_time[1] = round((time.perf_counter() - start_time)*1000, 3)
-
-                # Wake up `AirplaneParser` to continue the work chain
-                dispatcher.send(message='', signal=DATA_UPDATED, sender=main_loop_generator)
-
-                """ Our main loop polling time with adjustment based on how long it took to do the work
-                in order to reduce drift; all other threads that are dependent on this data
-                work in lockstep with this sleep interval, making this our orchestrator/internal tick generator. """
-                lockstep = LOOP_INTERVAL - (time.perf_counter() - loop_start) + lockstep_corrector
-                if (LOOP_INTERVAL * 0.5) < lockstep < (LOOP_INTERVAL * 1.5): # make sure we're calculating realistic times
-                    time.sleep(lockstep)
-                else:
-                    time.sleep(LOOP_INTERVAL)
 
             except TimeoutError:
                 dump1090_failures += 1
@@ -3307,6 +3318,20 @@ def main_loop_generator() -> None:
                 print("If this continues, please shutdown FlightGazer and report this error (with the logs) to the developer.")
                 time.sleep(LOOP_INTERVAL * 2)
                 continue
+
+            else:
+                # Wake up `AirplaneParser` to continue the work chain
+                # This also signals to `synchronizer` that this loop processing was successful
+                dispatcher.send(message='', signal=DATA_UPDATED, sender=main_loop_generator)
+
+                """ Our main loop polling time with adjustment based on how long it took to do the work
+                in order to reduce drift; all other threads that are dependent on this data
+                work in lockstep with this sleep interval, making this our orchestrator/internal tick generator. """
+                lockstep = LOOP_INTERVAL - (time.perf_counter() - loop_start) + lockstep_corrector
+                if (LOOP_INTERVAL * 0.5) < lockstep < (LOOP_INTERVAL * 1.5): # make sure we're calculating realistic times
+                    time.sleep(lockstep)
+                else:
+                    time.sleep(LOOP_INTERVAL)
 
     # Enter here
     loop()
@@ -3667,6 +3692,7 @@ class APIFetcher:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
+        register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=extract_API_results)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_loop()
 
@@ -3705,6 +3731,7 @@ class APIFetcher:
             or api_limiter_reached()
         ):
             return
+        focus_plane_stats_now = focus_plane_stats.copy()
         # get us our dates to narrow down how many results the API will give us
         date_now = datetime.datetime.now()
         time_delta_yesterday = date_now - datetime.timedelta(days=1)
@@ -3721,16 +3748,16 @@ class APIFetcher:
         API_status = 0
         stale_age = FLYBY_STALENESS * 60 # seconds
 
-        flight_id = focus_plane_stats.get('Flight', "")
+        flight_name = focus_plane_stats_now.get('Flight', "")
 
         # if for some reason there is no flight ID, don't bother trying to query the API
-        if not flight_id or flight_id.startswith('~') or flight_id == '?': return
+        if not flight_name or flight_name.startswith('~') or flight_name == '?': return
 
         # sometimes non-ICAO hex addresses will have a callsign, we filter those too
-        if focus_plane_stats.get('ID', '~').startswith('~'): return
+        if focus_plane_stats_now.get('ID', '~').startswith('~'): return
 
         # if the plane is on the ground, don't query the API either
-        if focus_plane_stats.get('OnGround', True): return
+        if focus_plane_stats_now.get('OnGround', True): return
 
         # check if we already have results
         reference_time = time.monotonic()
@@ -3756,7 +3783,8 @@ class APIFetcher:
         if API_DAILY_LIMIT is not None and (api_hits[0] + api_hits[2]) >= API_DAILY_LIMIT:
             if not API_daily_limit_reached:
                 # send this message only once until the limit is reset
-                main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. No more API calls will occur until the next day.")
+                main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. "
+                                 "No more API calls will occur until the next day.")
                 API_daily_limit_reached = True
                 process_time[2] = 0
             return
@@ -3780,10 +3808,9 @@ class APIFetcher:
                 enhanced_readout_wait_condition.wait()
             # main_logger.debug(f"Wait complete, ENHANCED_READOUT: {ENHANCED_READOUT}")
         if ENHANCED_READOUT: return
-        focus_plane_now = focus_plane # store in case focus plane changes while we wait for API result
 
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
-        base_url = API_URL + f"flights/{flight_id}"
+        base_url = API_URL + f"flights/{flight_name}"
         params = {
             'start': date_yesterday_iso,
             'end': date_tomorrow_iso,
@@ -3799,7 +3826,7 @@ class APIFetcher:
                 # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
                 if response_json['flights']: # if no results (ex: invalid flight_id or plane is blocked from tracking) this key will be empty
                     api_hits[0] += 1
-                    main_logger.debug(f"API call for \'{flight_id}\' successful. Took {process_time[2]}ms")
+                    main_logger.debug(f"API call for \'{flight_name}\' successful. Took {process_time[2]}ms")
                     for flight in response_json['flights']:
                         if "En Route" in flight.get('status', ''): # check we're reading current flight information
                             if flight['origin']:
@@ -3834,12 +3861,12 @@ class APIFetcher:
                             break
                     else: # can happen for general aviation and we detected a new flight before the API does
                         api_hits[2] += 1
-                        main_logger.debug(f"Could not find currently operating flight for \'{flight_id}\'. Took {process_time[2]}ms")
+                        main_logger.debug(f"Could not find currently operating flight for \'{flight_name}\'. Took {process_time[2]}ms")
                         origin = "N/A"
                         API_status = 1
                 else:
                     api_hits[2] += 1
-                    main_logger.debug(f"API call for \'{flight_id}\' returned no useful data. Took {process_time[2]}ms")
+                    main_logger.debug(f"API call for \'{flight_name}\' returned no useful data. Took {process_time[2]}ms")
                     origin = "N/A"
                     API_status = 1
             else:
@@ -3847,30 +3874,30 @@ class APIFetcher:
         except requests.exceptions.HTTPError as e:
             api_hits[1] += 1
             API_status = 2
-            main_logger.warning(f"API call for \'{flight_id}\' failed. {e}")
+            main_logger.warning(f"API call for \'{flight_name}\' failed. {e}")
         except requests.exceptions.ConnectionError as e:
             api_hits[1] += 1
             API_status = 3
             if not VERBOSE_MODE:
-                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error.")
+                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error.")
             else:
-                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection error. [ {e} ]")
+                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error. [ {e} ]")
         except requests.exceptions.Timeout as e:
             api_hits[1] += 1
             API_status = 3
             if not VERBOSE_MODE:
-                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection timeout.")
+                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout.")
             else:
-                main_logger.warning(f"API call for \'{flight_id}\' failed due to a connection timeout. [ {e} ]")
+                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout. [ {e} ]")
         except Exception as e:
             api_hits[1] += 1
             API_status = 3
-            main_logger.exception(f"API call for \'{flight_id}\' failed or invalid.")
+            main_logger.exception(f"API call for \'{flight_name}\' failed or invalid.")
         finally:
             # special case when the API returns a coordinate instead of an airport
             # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
             if origin is not None and origin.startswith("L "):
-                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}, near {origin_city}) for \'{flight_id}\'.")
+                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}, near {origin_city}) for \'{flight_name}\'.")
                 orig_coord = origin[2:].split(" ")
                 lat = float(orig_coord[0])
                 lon = float(orig_coord[1])
@@ -3884,8 +3911,8 @@ class APIFetcher:
                 destination = f"{abs(lon):.1f}{lon_str}"
 
             api_results = {
-                'ID': focus_plane_now,
-                'Flight': flight_id,
+                'ID': focus_plane_stats_now.get('ID'),
+                'Flight': flight_name,
                 'Origin': origin,
                 'Destination': destination,
                 'OriginInfo': [origin_name, origin_city],
@@ -4158,9 +4185,9 @@ class DisplayFeeder:
             api_dest_name = None
             api_dest_city = None
             API_status = 0
-            # don't use API results if the plane is on the ground after it was airborne or
+            # don't use API results if the plane is on the ground or
             # we hit any of the API limiters
-            if focus_plane_stats['Altitude'] != 0 or not api_limiter_reached():
+            if not focus_plane_stats['OnGround'] or not api_limiter_reached():
                 result = extract_API_results(focus_plane_api_results, focus_plane)
                 if result:
                     api_orig = result['Origin']
@@ -5223,7 +5250,7 @@ class DistantDeterminator():
     """ Thread that watches when we encounter a plane that has been detected
     way beyond the typical LOS limit (`BEYOND_LOS_LIMIT`) for ADS-B signals.
     Gets triggered by `main_loop_generator.dump1090_loop()`, reads the data packet sent by the function,
-    determines if this is the furthest plane in the day, and writes to the global `super_far_plane`.
+    determines if this is the farthest plane in the day, and writes to the global `super_far_plane`.
     Also handles when the `combined_feed` flag is triggered. """
     def __init__(self):
         self.loop = asyncio.new_event_loop()

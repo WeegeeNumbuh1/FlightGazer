@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.4.0 # do not modify this
+CONFIG_VERSION: v.9.5.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -96,7 +96,9 @@ ENHANCED_READOUT_AS_FALLBACK: true
 # [true/false]
 # When true, switch to using ENHANCED_READOUT if the API Key fails at startup or when any API limits are reached.
 # When the API can be used again, the display will switch back to the other layouts.
-# This setting only works if ENHANCED_READOUT is false. Recommended to be left as true.
+# This setting only works if ENHANCED_READOUT is false.
+# It's recommended for this setting to be left as true unless
+# you prefer the other layouts even when the API is unavailable.
 
 SHOW_EVEN_MORE_INFO: true
 # [true/false]
@@ -136,7 +138,7 @@ DISPLAY_SWITCH_PROGRESS_BAR: true
 # ============== Brightness settings ===============
 # ==================================================
 
-BRIGHTNESS: 75
+BRIGHTNESS: 65
 # [Integer: 0 ~ 100]
 # Set the default LED brightness.
 
@@ -151,7 +153,7 @@ ENABLE_TWO_BRIGHTNESS: true
 # [true/false]
 # If true, enables dynamically switching brightness based on time of day. If false, only BRIGHTNESS will be used.
 
-BRIGHTNESS_2: 40
+BRIGHTNESS_2: 35
 # [Integer: 0 ~ 100]
 # Secondary LED brightness.
 # BRIGHTNESS_2 will be used from sunset to sunrise ("night") and BRIGHTNESS will be used for all other times.
@@ -170,10 +172,10 @@ BRIGHTNESS_SWITCH_TIME:
 # ============== Advanced settings =================
 # ==================================================
 
-FLYBY_STALENESS: 60
-# [Integer: 2 ~ 1440] (minutes)
+FLYBY_STALENESS: 30
+# [Integer: 2 ~ 720] (minutes)
 # If the same aircraft appears again before this time, do not consider it as a flyby
-# and reuse the same API results (when enabled).
+# and reuse the same API results (when API is enabled).
 
 LOCATION_TIMEOUT: 60
 # [Integer: 15 ~ 60] (seconds)

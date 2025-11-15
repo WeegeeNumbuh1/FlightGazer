@@ -5,6 +5,14 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.5.0 - 2025-11-15
+    - If an aircraft's API result expires while the aircraft is being tracked, the API will be fetched again
+    - Changed some settings defaults and limits:
+        - Brightness values in configuration lowered to promote display longevity
+        - FLYBY_STALENESS lowered to 30 minutes for more accurate API results for general aviation
+        - FLYBY_STALENESS is now capped to 12 hours instead of 24
+    - Minor code cleanups
+
 v.9.4.0 - 2025-11-11
     - Wow, it's been (slightly over) a year since this project hit v.1.0.0
         - This update will mark 109 updates since then
