@@ -88,7 +88,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
-  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, and/or extended calendar info
+  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
 - Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated within a web browser
 - Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware

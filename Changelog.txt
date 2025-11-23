@@ -5,6 +5,26 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.6.0 - 2025-11-23
+    - NEW: Add support for current weather readout on the clock
+        - This is provided by OpenWeather's API
+            - No need for the One Call API 3.0, the weather data only requires the basic free tier
+        - Added two additional options for the clock center readout:
+            - Display current temperature, prevailing weather condition, wind direction and speed
+            - Dew point, visibility, and estimated ceiling
+        - Weather units are selectable and are separate from the main units
+        - FlightGazer has come full circle with its original inspiration from the 'its-a-plane' project
+          and essentially has all of its features (that project also showed weather data on its clock screen)
+    - NEW: Option to cycle through the options for the center readout on the clock
+        - When enabled, the center readout will change every 10 seconds
+        - If the weather API is available, it will also cycle through those layouts as well
+    - When using NO_FILTER mode, ground vehicles with zero speed are tracked again
+    - The dxing log now evaluates location accuracy as reported by the aircraft
+    - Minor tweaks to some of the symbols in the 3x3 font
+    - One year anniversary for this changelog (was first written in v.1.1.1)
+    - The FlightGazer main script has passed 8000 lines
+        - yeet
+
 v.9.5.0 - 2025-11-15
     - If an aircraft's API result expires while the aircraft is being tracked, the API will be fetched again
     - Changed some settings defaults and limits:

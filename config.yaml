@@ -1,15 +1,15 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.5.0 # do not modify this
+CONFIG_VERSION: v.9.6.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
 UNITS: 0
 # Select which units to use.
-# 0 = aeronautical (nmi, ft, kt)
-# 1 = metric (km, m, km/h)
-# 2 = imperial (mi, ft, mph)
+# 0 = Aeronautical (nmi, ft, kt)
+# 1 = Metric (km, m, km/h)
+# 2 = Imperial (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
 # [Integer: 2500 ~ 75000 feet or 760 ~ 22860 meters] (only supply a number)
@@ -27,7 +27,7 @@ API_KEY: ''
 # Put your FlightAware API key here. Leave as '' to not use the API.
 # Having an API key will enable the journey readout (the origin and departure) data for an aircraft.
 # Don't have an API key?
-# https://www.flightaware.com/commercial/aeroapi/#compare-plans-section
+# https://www.flightaware.com/commercial/aeroapi/#pricing-cards
 
 API_DAILY_LIMIT:
 # [Integer: > 0, null, or empty]
@@ -119,6 +119,14 @@ CLOCK_CENTER_ROW:
 # 1 = Sunrise/Sunset
 # 2 = ADS-B receiver stats (gain, noise, % loud signals)
 # 3 = Extended calendar info (month, week number, day of the year)
+# 4 = Current temperature, prevailing weather condition, wind direction and speed (requires OpenWeatherAPI)
+# 5 = Current dew point, visibility, estimated ceiling (requires OpenWeatherAPI)
+
+CLOCK_CENTER_ROW_CYCLE: false
+# [true/false]
+# Automatically cycle through all available clock ceneter row options every 10 seconds.
+# When this is enabled, only one (1) row will be enabled and ignores the settings for CLOCK_CENTER_ROW.
+# If the Weather API is available, this will cycle through those display options as well.
 
 CLOCK_24HR: false
 # [true/false]
@@ -224,6 +232,22 @@ FOLLOW_THIS_AIRCRAFT: ''
 FASTER_REFRESH: false
 # [true/false]
 # When true, decrease dump1090 polling time to 1 second versus the default 2 seconds. Increases CPU load.
+
+OPENWEATHER_API_KEY: ''
+# [String]
+# If you want to have weather information for your location, put your OpenWeatherMap API key here.
+# Leave as '' to not use this feature. The Weather API will not be used if the clock center row is
+# not configured to display weather data.
+# There's no need to subscribe to the One Call API 3.0, the basic free access version is sufficient.
+# Don't have an API key?
+# https://openweathermap.org/price
+
+UNITS_WX: 0
+# [Integer]
+# Select which weather units to use.
+# 0 = Aeronautical (°C, kt, ft, smi, hPa)
+# 1 = Metric (°C, m/s, m, km, hPa)
+# 2 = Imperial (°F, mph, ft, mi, inHg)
 
 FLYBY_STATS_ENABLED: true
 # [true/false]

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.5.0 --- 2025-11-15'
+VERSION: str = 'v.9.6.0 --- 2025-11-23'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -474,6 +474,9 @@ API_SCHEDULE: dict = {
 }
 SHOW_EVEN_MORE_INFO: bool = True
 NO_GROUND_TRACKING: bool = False
+CLOCK_CENTER_ROW_CYCLE: bool = False # new setting!
+OPENWEATHER_API_KEY: str = '' # new setting!
+UNITS_WX: int|None = 0 # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -538,6 +541,9 @@ default_settings: dict = {
     "API_SCHEDULE": API_SCHEDULE,
     "SHOW_EVEN_MORE_INFO": SHOW_EVEN_MORE_INFO,
     "NO_GROUND_TRACKING": NO_GROUND_TRACKING,
+    "CLOCK_CENTER_ROW_CYCLE": CLOCK_CENTER_ROW_CYCLE,
+    "OPENWEATHER_API_KEY": OPENWEATHER_API_KEY,
+    "UNITS_WX": UNITS_WX,
 }
 """ Dict of default settings """
 
@@ -674,9 +680,19 @@ and average duration the algorithm is in an active state in seconds [1] """
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
 """ Formatted dict for our Display driver.
 `idle_data` = {`Flybys`, `Track`, `Range`} """
-idle_data_2: dict = {'SunriseSunset': "", 'ReceiverStats': ""}
+idle_data_2: dict = {
+    'SunriseSunset': "",
+    'ReceiverStats': "",
+    'WX_1': "",
+    'WX_2': ""
+}
 """ Additional formatted dict for our Display driver.
-`idle_data_2` = {`SunriseSunset`, `ReceiverStats`} """
+`idle_data_2` = {
+    `SunriseSunset`,
+    `ReceiverStats`,
+    `WX_1`,
+    `WX_2`
+} """
 active_data: dict = {}
 """ Formatted dict for our Display driver. All strings unless noted.
 `active_data` = {
@@ -765,6 +781,15 @@ API_cost_limit_reached: bool = False
 """ Flag to indicate we hit the defined cost limit. """
 API_schedule_triggered: bool = False
 """ Flag that indicates that the API should not be called at the current time. (True = no API calls) """
+WX_API_data: dict = {}
+""" Results from the weather API. Empty dict if API is not in use, fails at start, or data gets invalidated.
+Keys (prepare to handle `None` for all of these):
+`site_name`, `condition`, `condition_desc`, `temp`,
+`humidity`, `dew_point`, `wind_speed`, `wind_dir`,
+`ceiling`, `cloudyness`, `visibility`, `altitude`,
+`pressure`, `pressure_raw`, `response_time`, `successful_calls`,
+`failed_calls`, `timestamp`
+"""
 #--- running stats
 process_time: list = [0., 0. ,0. ,0.]
 """ [dump1090 response, filter data, API response, frame render] ms """
@@ -1053,6 +1078,9 @@ def dxing_log() -> None:
         main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     else:
         main_logger.info("This ADS-B site might be using a combined feed. This data is not an accurate representation of the site's ADS-B capabilities.")
+    accuracy = super_far_plane['NavigationAccuracy']
+    if accuracy and accuracy >= 1000:
+        main_logger.info(">>> Note: The aircraft reported an inaccurate position at the time of the following data packet.")
     freeze_frame_packet(super_far_plane, show_distance=False)
 
 def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
@@ -1119,6 +1147,59 @@ def extract_API_results(API_results: list, ID: str) -> dict | None:
         except Exception: # if we bump into something else
             return None
     return None
+
+def clock_center_cycler() -> None:
+    """ Thread that manually controls what the center row of the clock is showing.
+    Cycles through all valid options for `CLOCK_CENTER_ROW` every 10 seconds. """
+    global CLOCK_CENTER_ROW
+    times_cycled = 0
+    def hook_line_and_syncer() -> float:
+        """ Do a rough synchonization so that the changeover occurs when seconds end in 0.
+        Real small detail at least someone might notice. Returns time taken to sync.
+        Note: this can return a few milliseconds before :00 and this is actually somewhat ideal
+        as this switches the center row option before the next frame renders (a ~100ms window). """
+        step = 0.01
+        start = time.perf_counter()
+        time_int = datetime.datetime.now()
+        unsync = 0
+        while round(time_int.second + (time_int.microsecond / 1e6), 1) % 10 != 0:
+            time.sleep(step)
+            unsync += step
+            time_int = datetime.datetime.now()
+            if unsync > 10: # failed to sync, break out
+                return 0.
+        return time.perf_counter() - start
+
+    main_logger.debug("Cycler thread started and synchronizing to trigger when seconds end in zero.")
+    sync_time = hook_line_and_syncer()
+    main_logger.debug(f"Waited {round(sync_time, 3)} seconds. See you in 2 hours.")
+    compensation = 0
+    while True:
+        time.sleep(10 - compensation)
+        start = time.perf_counter()
+        if not DISPLAY_IS_VALID:
+            main_logger.debug("Center row cycler has exited as the display is no longer valid.")
+            return
+        current_row = CLOCK_CENTER_ROW["ROW1"]
+        if WX_API_data:
+            limit = 5
+        else:
+            limit = 3
+        desired = current_row + 1
+        if desired > limit:
+            desired = 1 # recall, lowest valid option is this
+        with threading.Lock():
+            CLOCK_CENTER_ROW['ROW1'] = desired
+        times_cycled += 1
+        compensation = time.perf_counter() - start # try to reduce drift
+        if compensation >= 10:
+            compensation = 0
+        # drift will naturally occur; every 2 hours, resync to keep us
+        # within the animation frame window and any updates to the system clock
+        if times_cycled % 720 == 0:
+            sync_time = hook_line_and_syncer()
+            main_logger.debug("Resynced the center row cycler, waited "
+                              f"{round(sync_time, 3)} seconds")
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -1339,46 +1420,58 @@ def configuration_check() -> None:
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS
+    global UNITS_WX
 
     main_logger.info("Checking settings configuration...")
 
     if not NODISPLAY_MODE:
-        try:
-            if len(CLOCK_CENTER_ROW) != 2:
-                raise KeyError
-            for key in CLOCK_CENTER_ROW:
-                match CLOCK_CENTER_ROW[key]:
-                    case 0 | None:
-                        main_logger.info(f"{key} for Clock center readout is disabled.")
-                        CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
-                    case 1:
-                        main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
-                    case 2:
-                        main_logger.info(f"{key} for Clock center will display Receiver Stats.")
-                    case 3:
-                        main_logger.info(f"{key} for Clock center will display extended calendar info.")
-                    case _:
-                        main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
-                        CLOCK_CENTER_ROW[key] = None
-        except KeyError:
-            main_logger.warning("Clock center readout is not properly configured.")
-            CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
+        if not CLOCK_CENTER_ROW_CYCLE:
+            try:
+                if len(CLOCK_CENTER_ROW) != 2:
+                    raise KeyError
+                for key in CLOCK_CENTER_ROW:
+                    match CLOCK_CENTER_ROW[key]:
+                        case 0 | None:
+                            main_logger.info(f"{key} for Clock center readout is disabled.")
+                            CLOCK_CENTER_ROW[key] = None # make it simple for us down the line
+                        case 1:
+                            main_logger.info(f"{key} for Clock center will display Sunrise/Sunset times.")
+                        case 2:
+                            main_logger.info(f"{key} for Clock center will display Receiver Stats.")
+                        case 3:
+                            main_logger.info(f"{key} for Clock center will display extended calendar info.")
+                        case 4:
+                            main_logger.info(f"{key} for Clock center will display current weather info.")
+                        case 5:
+                            main_logger.info(f"{key} for Clock center will display extended weather info.")
+                        case _:
+                            main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
+                            CLOCK_CENTER_ROW[key] = None
+            except KeyError:
+                main_logger.warning("Clock center readout is not properly configured.")
+                CLOCK_CENTER_ROW = default_settings['CLOCK_CENTER_ROW']
 
-        if CLOCK_CENTER_ROW['ROW1'] is None and CLOCK_CENTER_ROW['ROW2'] is None:
-            CLOCK_CENTER_ENABLED = False
-            main_logger.info("Clock center readout is disabled.")
+            if CLOCK_CENTER_ROW['ROW1'] is None and CLOCK_CENTER_ROW['ROW2'] is None:
+                CLOCK_CENTER_ENABLED = False
+                main_logger.info("Clock center readout is disabled.")
+            else:
+                CLOCK_CENTER_ENABLED = True
+
+            if CLOCK_CENTER_ROW["ROW2"]:
+                main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
+                CLOCK_CENTER_ROW_2ROWS = True
+
+            if CLOCK_CENTER_ENABLED and (
+                CLOCK_CENTER_ROW["ROW1"] == CLOCK_CENTER_ROW["ROW2"]
+            ):
+                main_logger.warning("Clock center readout options are the same. Reverting to only one row.")
+                CLOCK_CENTER_ROW_2ROWS = False
+                CLOCK_CENTER_ROW['ROW2'] = None
         else:
+            main_logger.info("CLOCK_CENTER_ROW_CYCLE enabled, center readout will cycle through all available options.")
             CLOCK_CENTER_ENABLED = True
-
-        if CLOCK_CENTER_ROW["ROW2"]:
-            main_logger.info("Clock center readout has two rows enabled, using smaller font size.")
-            CLOCK_CENTER_ROW_2ROWS = True
-
-        if CLOCK_CENTER_ENABLED and (
-            CLOCK_CENTER_ROW["ROW1"] == CLOCK_CENTER_ROW["ROW2"]
-        ):
-            main_logger.warning("Clock center readout options are the same. Reverting to only one row.")
             CLOCK_CENTER_ROW_2ROWS = False
+            CLOCK_CENTER_ROW['ROW1'] = 1
             CLOCK_CENTER_ROW['ROW2'] = None
 
         if (
@@ -1503,6 +1596,10 @@ def configuration_check() -> None:
 
     if not WRITE_STATE:
         main_logger.info("FlightGazer will not write its state to a file.")
+
+    if not isinstance(UNITS_WX, int):
+        main_logger.warning("UNITS_WX is invalid. Setting to default.")
+        UNITS_WX = 0
 
     main_logger.info("Settings check complete.")
 
@@ -2218,6 +2315,8 @@ class PrintToConsole:
                 # distance section
                 print_info.append(f"DIST: {aircraft['Direction']}")
                 print_info.append(f"{aircraft['Distance']:.2f}".rjust(6))
+                if aircraft['NavigationAccuracy'] and aircraft['NavigationAccuracy'] >= 1000:
+                    print_info.append("*")
                 print_info.append(f"{distance_unit} ")
                 print_info.append("LOS")
                 print_info.append(f"{aircraft['SlantRange']:.2f}".rjust(6))
@@ -2442,6 +2541,39 @@ class PrintToConsole:
         if API_KEY:
             main_stat.append(f" | Last API response {process_time[2]:.3f} ms")
         print("".join(main_stat))
+
+        # weather stuff
+        wx_str = []
+        if WX_API_data:
+            wx_str.append(f"> Weather at {WX_API_data['site_name']}: ")
+            wx_str.append(f"{WX_API_data['condition_desc']}, ")
+            if (temp_ := WX_API_data['temp']):
+                wx_str.append(f"{temp_:.1f}° | ")
+            else:
+                wx_str.append("N/A° | ")
+            wx_str.append("winds ")
+            if (winds_ := WX_API_data['wind_speed']) > 0:
+                wx_str.append(f"{winds_:.2f} @ {WX_API_data['wind_dir']}° | ")
+            else:
+                wx_str.append("Calm | ")
+            wx_str.append("vis ")
+            if (vis_ := WX_API_data['visibility']):
+                wx_str.append(f"{vis_:.3f}")
+            else:
+                wx_str.append("N/A")
+            wx_str.append(", ceil ")
+            if (ceil_ := WX_API_data['ceiling']):
+                wx_str.append(f"{ceil_:.0f}, ")
+            else:
+                wx_str.append("N/A, ")
+            if (dew_p := WX_API_data['dew_point']):
+                wx_str.append(f"dew point {dew_p:.1f}°")
+            else:
+                wx_str.append("N/A°")
+            if VERBOSE_MODE:
+                wx_str.append(f" | S:{WX_API_data['successful_calls']} F:{WX_API_data['failed_calls']}")
+                wx_str.append(f" R:{WX_API_data['response_time']}ms")
+            print("".join(wx_str))
 
         # verbose stats line 1
         verbose_stats = []
@@ -2872,6 +3004,7 @@ def main_loop_generator() -> None:
             - Priority: Value representing how "good" the data is. Closer to 0 = best, defaults to 0
             - Source: Source of the data, either 'ADS-B' or 'UAT'
             - OnGround: Additional context for when Altitude is 0; True if actually on the ground, False if the altitude could not be determined.
+            - NavigationAccuracy: Navigation accuracy of the position, in meters. Defaults None
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
             - FutureLatitude: Estimated next latitude of the plane based on heading, speed, and LOOP_INTERVAL. Defaults None, always None when NOFILTER_MODE is enabled
             - FutureLongitude: Same as above, but for longitude
@@ -2994,6 +3127,7 @@ def main_loop_generator() -> None:
             total += 1
             lat = a.get('lat')
             lon = a.get('lon')
+            nac_p = a.get('nac_p')
             if lat == lon == 0: # prefilter for case when there's an invalid location
                 lat = None
                 lon = None
@@ -3051,7 +3185,7 @@ def main_loop_generator() -> None:
                 alt = alt * altitude_multiplier
                 gs = a.get('gs', 0)
                 # don't consider grounded planes/ground implements which are stationary
-                if gs == 0 and is_on_ground:
+                if not NOFILTER_MODE and gs == 0 and is_on_ground:
                     continue
                 # below is the last filter; if a plane passes this, we grab all the info and append to
                 # the relevant planes list
@@ -3188,6 +3322,7 @@ def main_loop_generator() -> None:
                         "Priority": priority_value,
                         "Source": source,
                         "OnGround": is_on_ground,
+                        "NavigationAccuracy": nac_p,
                         "ApproachRate": 0.0, # this is not calculated in this loop, check below
                         "FutureLatitude": futlat,
                         "FutureLongitude": futlon,
@@ -3969,7 +4104,7 @@ class DisplayFeeder:
         into a coalesed data packet for the Display. We also control scene switching here and which scene to display.
         Outputs three dicts, `idle_stats`, `idle_stats_2`, and `active_stats`.
         `idle_stats` = {'Flybys', 'Track', 'Range'}
-        `idle_stats_2` = {'SunriseSunset', 'ReceiverStats'}
+        `idle_stats_2` = {'SunriseSunset', 'ReceiverStats', 'WX_1', 'WX_2'}
         `active_stats` = {'Callsign', 'Origin', 'Destination', 'FlightTime',
                           'Altitude', 'Speed', 'Distance', 'Country',
                           'Latitude', 'Longitude', 'Track', 'VertSpeed', 'RSSI',
@@ -4096,9 +4231,55 @@ class DisplayFeeder:
             recv_str.append(filler_text)
         receiver_string = "".join(recv_str)
 
+        if WX_API_data:
+            # Current conditions (temp, prevailing weather, wind dir + speed)
+            # Example: "47.3° OVRC ▼9 "
+            if (temp_ := WX_API_data.get('temp')):
+                temp_now = f'{round(temp_, 1):.1f}'
+            else:
+                temp_now = "---"
+            cond_str: str = WX_API_data.get('condition')
+            if (wind_ := WX_API_data.get('wind_speed')):
+                wind_now = f'{round(wind_, 0):.0f}'
+            else:
+                wind_now = "--"
+            if (wind_d_ := WX_API_data.get('wind_dir')):
+                wind_dir = track_arrow(wind_d_)
+            else:
+                wind_dir = " "
+            wx1_str = f"{temp_now.rjust(4)}° {cond_str.rjust(4)} {wind_dir}{wind_now.ljust(2)}"
+
+            # Extended observations (dew point, visibility, ceiling)
+            # Example: "D43° V6+  C1000"
+            if (dew_p_ := WX_API_data.get('dew_point')):
+                dew_point_now = f'{round(dew_p_, 0):.0f}'
+            else:
+                dew_point_now = "--"
+            if (vis_ := WX_API_data.get('visibility')):
+                if UNITS_WX == 2 and vis_ > 6:
+                    vis_str = "6+"
+                elif UNITS_WX == 1 and round(vis_, 1) == 10:
+                    vis_str = "10+"
+                else:
+                    vis_str = f'{round(vis_, 1)}'
+            else:
+                vis_str = "---"
+            if (ceil_ := WX_API_data.get('ceiling')):
+                if ceil_ >= 10000:
+                    ceil_str = "10k+"
+                else:
+                    ceil_str = f'{round(ceil_ / 100, 0):.0f}00' # ex: 1984 -> 20.0 -> '2000'
+            else:
+                ceil_str = "---"
+            wx2_str = f"D{dew_point_now}° V{vis_str.ljust(3)} C{ceil_str.ljust(4)}"
+        else:
+            wx1_str = wx2_str = "NO WEATHER DATA"
+
         idle_stats_2 = {
             'SunriseSunset': "".join(rise_set),
-            'ReceiverStats': receiver_string
+            'ReceiverStats': receiver_string,
+            'WX_1': wx1_str,
+            'WX_2': wx2_str
             }
 
         # active_stats
@@ -4737,16 +4918,29 @@ class WriteState:
                 'pid': this_process.pid,
             }
 
-            output = {
+            if WX_API_data:
+                output = {
                 'FlightGazer': FlightGazer,
                 'receivers': receivers,
                 'plane_stats': plane_stats,
                 'api_stats': api_stats,
+                'weather_data': WX_API_data,
                 'database_stats': database_info,
                 'display_status': display_status,
                 'runtime_status': runtime_status,
                 'time_now': time_now.strftime("%Y-%m-%dT%H:%M:%S"),
-            }
+                }
+            else:
+                output = {
+                    'FlightGazer': FlightGazer,
+                    'receivers': receivers,
+                    'plane_stats': plane_stats,
+                    'api_stats': api_stats,
+                    'database_stats': database_info,
+                    'display_status': display_status,
+                    'runtime_status': runtime_status,
+                    'time_now': time_now.strftime("%Y-%m-%dT%H:%M:%S"),
+                }
 
             with open(self.json_file, 'w') as f:
                 if ORJSON_IMPORTED:
@@ -5317,6 +5511,429 @@ class DistantDeterminator():
     def end_thread(self, message):
         self.loop.stop()
 
+class wx_API():
+    """ Get weather info from OpenWeatherMap. """
+    # This class could probably live as a separate module...
+    # ...but think of the (code) lasagna!
+    def __init__(self):
+        self.API_URL = 'https://api.openweathermap.org/data/2.5/weather'
+        self.successful_calls = 0
+        self.failed_calls = 0
+        self._API_session = requests.Session()
+
+    def get_weather(self) -> bool:
+        """ Get our weather information. Writes to the global `WX_API_data`.
+        Returns `True` on success, `False` on any failure.
+        Handles conversion from the API's units to the desired `UNITS_WX` values. """
+        global WX_API_data
+        time_now_unix = time.time()
+
+        def invalidator():
+            """ Invalidates last weather data if we continually fail to
+            get API results after 3 hours. """
+            global WX_API_data
+            if WX_API_data:
+                last_timestamp: int = WX_API_data.get('timestamp')
+                if last_timestamp and (
+                    time_now_unix - last_timestamp > 10800
+                ):
+                    main_logger.warning("Unable to update weather data after 3 hours.")
+                    WX_API_data.clear()
+
+        if not LOCATION_IS_SET:
+            WX_API_data.clear()
+            return False
+
+        def wx_id_to_string(id: int) -> str:
+            """ Match the weather ID to a shortened (<=4 characters) description.
+            https://openweathermap.org/weather-conditions """
+            category = f'{id}'[0] if id else None
+            # stage 1, match specific ID codes
+            match id:
+                case 200 | 210 | 230:
+                    return "-TSM"
+                case 201 | 211 | 231:
+                    return "TSTM"
+                case 202 | 212 | 221 | 232:
+                    return "+TSM"
+                case 300 | 310:
+                    return "-DZL"
+                case 302 | 312 | 314:
+                    return "+DZL"
+                case 500:
+                    return "-RN"
+                case 502:
+                    return "+RN"
+                case 503 | 504:
+                    return "++RN"
+                case 511:
+                    return "FZRN"
+                case 520:
+                    return "-SHR"
+                case 521:
+                    return "SHWR"
+                case 522 | 531:
+                    return "+SHR"
+                case 600:
+                    return "-SNW"
+                case 602:
+                    return "+SNW"
+                case 611 | 613:
+                    return "SLT"
+                case 612 | 615:
+                    return "-SLT"
+                case 615 | 616 :
+                    return "RSMX"
+                case 620 | 621 | 622:
+                    return "SSHR"
+                case 701:
+                    return "MIST"
+                case 711:
+                    return "SMKE"
+                case 721:
+                    return "HAZE"
+                case 731 | 761:
+                    return "DUST"
+                case 741:
+                    return "FOG"
+                case 751:
+                    return "SAND"
+                case 762:
+                    return "ASH"
+                case 771:
+                    return "SQLL"
+                case 781: # lmao, crazy they support reporting tornadoes as a weather condition
+                    return "!TRN"
+                case 800:
+                    return "CLR"
+                case 801:
+                    return "cFEW"
+                case 802:
+                    return "cSCT"
+                case 803:
+                    return "cBKN"
+                case 804:
+                    return "OVRC"
+                case _:
+                    pass
+
+            # fallback
+            match category:
+                case '2':
+                    return "TSTM"
+                case '3':
+                    return "DRZL"
+                case '5':
+                    return "RAIN"
+                case '6':
+                    return "SNOW"
+                case _: # note: all of category 7 and 8 are covered above
+                    return "UKWN"
+
+        def calc_dew_point(temp_c: float, humidity: float | int) -> float | None:
+            """ Calculate dew point, given temperature (in Celcius) and relative humidity (as percent).
+            Returns dew point in Celcius. Returns `None` if input temp or humidity is unavailable.
+            Uses the Bögel modification for accuracy.
+            See: https://en.wikipedia.org/wiki/Dew_point#Calculating_the_dew_point """
+            if not temp_c or not humidity:
+                return None
+            # no 'a' term as it drops out when simplifying the calculation
+            b = 18.678 # unitless
+            c = 257.14 # Celcius
+            d = 234.5  # Celcius
+            exponent = (b - (temp_c / d)) * (temp_c / (c + temp_c))
+            gamma = math.log(
+                (humidity / 100)
+                * math.exp(exponent)
+            )
+            return round((c * gamma) / (b - gamma), 2)
+
+        def cloudbase(surface_temp_c: float, dew_point_c: float) -> int | None:
+            """ Calculates the estimated cloud base.
+            Returns value in meters. `surface_temp_c` must be greater than `dew_point_c`.
+            Returns `None` if input values are invalid.
+            The results of this calculation becomes less meaningful when the sky is <50% cloudy.
+            This is not exactly the ceiling, but this gets us close without
+            having to resort to polling a nearby METAR. Note that traditionally the
+            cloud base is expressed in units above mean sea level, but here this calculation just
+            gives us height above ground level.
+            Uses the Tom Bradbury method as used by the FAA.
+            Additional info: https://github.com/weewx/weewx/blob/master/src/weewx/wxformulas.py """
+            if not surface_temp_c or not dew_point_c or surface_temp_c < dew_point_c:
+                return None
+            try:
+                spread = surface_temp_c - dew_point_c
+                return int((spread / 8) * 1000)
+            except ValueError:
+                return None
+
+        def temp_convert(input_temp: float | int, scale: str = 'c') -> float | None:
+            """ Convert an input temperature to the desired `scale`.
+            Assumes input temperature is in Kelvin for most scales.
+            Rounds to two decimal places.
+            Acceptable `scale` values:
+            - `c`: Celcius
+            - `f`: Fahrenheit
+            - `c-f`: Converts input Celcius to Fahrenheit """
+            if not input_temp: return None
+            try:
+                match scale:
+                    case 'c' | 'C':
+                        return round(input_temp - 273.15, 2)
+                    case 'f' | 'F':
+                        return round((input_temp * 1.8) - 459.67, 2)
+                    case 'c-f':
+                        return round((input_temp * 1.8) + 32, 2)
+                    case _:
+                        return input_temp
+            except ValueError:
+                return None
+
+        def ms_convert(ms: float | int, scale: str = 'mph') -> float | None:
+            """ Convert an input velocity in m/s to the desired `scale`.
+            Acceptable `scale` values:
+            - `mph`: miles per hour
+            - `kt`: knots
+            - `kmh`: kilometers per hour """
+            if not ms: return None
+            try:
+                match scale:
+                    case 'mph' | 'MPH' | 'imperial':
+                        return round(ms * 2.236936, 3)
+                    case 'kt' | 'KT' | 'knot' | 'aeronautical':
+                        return round(ms * 1.944012, 3)
+                    case 'kmh' | 'KMH' | 'km/h':
+                        return round(ms * 3.6, 3)
+                    case _:
+                        return ms
+            except ValueError:
+                return None
+
+        def hPa_to_inHg(input: float) -> float | None:
+            if not input: return None
+            try:
+                return round(input / 33.864, 3)
+            except ValueError:
+                return None
+
+        def elevation_estimator(
+            sea_level_pressure_hPa: float | int,
+            ground_level_pressure_hPa: float | int,
+            reference_temp_k: float | int
+        ) -> float | None:
+            """ Derives elevation based on pressure at ground level, the corrected
+            pressure (sea level, the pressure as reported on weather maps), and the
+            current temperature, in K.
+            Returns elevation in meters.
+            https://en.wikipedia.org/wiki/Barometric_formula """
+            if (
+                not sea_level_pressure_hPa
+                or not ground_level_pressure_hPa
+                or not reference_temp_k
+            ):
+                return None
+
+            R = 8.31432 * 1000 # universal gas constant, N * m / (kmol * K)
+            g_0 = 9.80665 # gravitational acceleration, m/s^2
+            M_0 = 28.9644 # mean molecular weight of air at sea level, kg/kmol
+            P = sea_level_pressure_hPa * 100 # convert to Pascals
+            P_b = ground_level_pressure_hPa * 100
+            return round(
+                (math.log(P / P_b) * (R * reference_temp_k)) / (g_0 * M_0)
+                , 3
+                )
+
+        def meter_convert(meter: float | int, scale: str = 'ft') -> float | None:
+            """ Convert an input distance in meters to the desired `scale`.
+            Acceptable `scale` values:
+            - `ft`: feet
+            - `mi`: miles
+            - `nmi`: nautical miles
+            - `km`: kilometers
+            """
+            if not meter: return None
+            try:
+                match scale:
+                    case 'ft' | 'FT' | 'feet':
+                        return round(meter / 0.3048, 3)
+                    case 'mi' | 'MI' | 'miles' | 'mile':
+                        return round(meter / 1609.344, 3)
+                    case 'nmi' | 'NM' | 'nm':
+                        return round(meter / 1852, 3)
+                    case 'km' | 'KM':
+                        return round(meter / 1000, 3)
+                    case _:
+                        return meter
+            except ValueError:
+                return None
+
+        auth_header = {'Accept':"application/json; charset=UTF-8"}
+        params = {
+            'appid': OPENWEATHER_API_KEY,
+            'lat': rlat,
+            'lon': rlon,
+            'units': 'standard',
+        }
+        start = time.perf_counter()
+        try:
+            response = self._API_session.get(self.API_URL, headers=auth_header, params=params, timeout=5)
+            end = time.perf_counter() - start
+            match response.status_code:
+                case 200:
+                    pass
+                case 401:
+                    raise requests.exceptions.HTTPError(
+                        f"{response.status_code}: API key did not work."
+                    ) from None
+                case 404:
+                    raise requests.exceptions.HTTPError(
+                        f"{response.status_code}: API could not find requested query."
+                    ) from None
+                case 429:
+                    raise requests.exceptions.HTTPError(
+                        f"{response.status_code}: Rate limited."
+                    ) from None
+            response.raise_for_status() # still do this to catch other errors
+
+        except requests.exceptions.HTTPError as e:
+            self.failed_calls += 1
+            main_logger.warning(f"Weather API call failed. {e}")
+            invalidator()
+            return False
+        except requests.exceptions.ConnectionError as e:
+            self.failed_calls += 1
+            if not VERBOSE_MODE:
+                main_logger.warning(f"Weather API call failed due to a connection error.")
+            else:
+                main_logger.warning(f"Weather API call failed due to a connection error. {e}")
+            invalidator()
+            return False
+        except requests.exceptions.Timeout as e:
+            self.failed_calls += 1
+            if not VERBOSE_MODE:
+                main_logger.warning(f"Weather API call failed due to a connection timeout.")
+            else:
+                main_logger.warning(f"Weather API call failed due to a connection timeout. {e}")
+            invalidator()
+            return False
+        except Exception as e:
+            self.failed_calls += 1
+            print(f"Weather API call failed: {e}")
+            invalidator()
+            return False
+        else:
+            response_output: dict = response.json()
+            self.successful_calls += 1
+
+        timestamp: int = response_output.get('dt') # unix time
+        site_name: str = response_output.get('name')
+        current_measurements: dict = response_output.get('main')
+        try:
+            current_weather: dict = response_output.get('weather')[0]
+        except AttributeError:
+            current_weather = {}
+        current_wind: dict = response_output.get('wind')
+        current_visibility: int = response_output.get('visibility') # in meters
+        try:
+            current_clouds: int = response_output.get('clouds').get('all') # percentage
+        except AttributeError:
+            current_clouds = None
+        pressure_corrected: int = current_measurements.get('sea_level')
+        pressure_actual: int = current_measurements.get('grnd_level')
+        humidity: int = current_measurements.get('humidity')
+        conditions_desc = current_weather.get('description')
+
+        conditions = wx_id_to_string(current_weather.get('id'))
+
+        # Recall units:
+        # 0 = Aeronautical (°C, kt, ft, mi, hPa)
+        # 1 = Metric (°C, m/s, m, km, hPa)
+        # 2 = Imperial (°F, mph, ft, mi, inHg)
+        # The API returns units in: K, m/s, m, hPa
+
+        if (temp_ := current_measurements.get('temp')):
+            temp_c = temp_convert(temp_, 'c')
+            match UNITS_WX:
+                case 2:
+                    temp_now = temp_convert(temp_, 'f')
+                case _:
+                    temp_now = temp_c
+
+            dew_point = calc_dew_point(temp_c, humidity)
+            ceiling = cloudbase(temp_c, dew_point)
+            elevation = elevation_estimator(
+                pressure_corrected,
+                pressure_actual,
+                temp_
+            )
+            # Why calculate elevation? usually the ceiling refers to "above sea level".
+            # If needed, a more true-to-tradition result can be used by adding
+            # elevation to ceiling. For now, this is calculated because we can.
+        else:
+            temp_now = temp_
+            dew_point = None
+            ceiling = None
+            elevation = None
+
+        if (wind_spd_now := current_wind.get('speed')):
+            match UNITS_WX:
+                case 0:
+                    wspd = ms_convert(wind_spd_now, 'kt')
+                case 2:
+                    wspd = ms_convert(wind_spd_now, 'mph')
+                case _:
+                    wspd = wind_spd_now
+            win_dir = current_wind.get('deg')
+        else:
+            wspd = wind_spd_now
+            win_dir = None
+
+        # handle some filtering and the rest of the conversion here
+        if wspd == 0:
+            win_dir = None
+        match UNITS_WX:
+            case 0:
+                ceiling = meter_convert(ceiling, 'ft')
+                current_visibility = meter_convert(current_visibility, 'mi')
+            case 2:
+                dew_point = temp_convert(dew_point, 'c-f')
+                ceiling = meter_convert(ceiling, 'ft')
+                elevation = meter_convert(elevation, 'ft')
+                current_visibility = meter_convert(current_visibility, 'mi')
+                pressure_corrected = hPa_to_inHg(pressure_corrected)
+                pressure_actual = hPa_to_inHg(pressure_actual)
+            case _:
+                current_visibility = meter_convert(current_visibility, 'km')
+
+        main_logger.debug(f"Weather API call for \'{site_name}\' successful. Current weather conditions: "
+                          f"\'{conditions_desc}\' at {temp_now:.1f} degrees. Response: {round(end * 1000, 1)}ms.")
+
+        data = {
+            'site_name': site_name,
+            'condition': conditions,
+            'condition_desc': conditions_desc,
+            'temp': temp_now,
+            'humidity': humidity,
+            'dew_point': dew_point,
+            'wind_speed': wspd,
+            'wind_dir': win_dir,
+            'ceiling': ceiling if (current_clouds and current_clouds > 30) else None,
+            'cloudyness': current_clouds,
+            'visibility': current_visibility,
+            'elevation': elevation,
+            'pressure': pressure_corrected,
+            'pressure_raw': pressure_actual,
+            'response_time': round(end * 1000, 1),
+            'successful_calls': self.successful_calls,
+            'failed_calls': self.failed_calls,
+            'timestamp': timestamp,
+        }
+
+        with threading.Lock():
+            WX_API_data = data.copy()
+
+        return True
+
 # ========== Display Superclass ============
 # ==========================================
 
@@ -5384,6 +6001,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.9.6.0: Add support for weather information
     - v.8.2.1: More "flexible" attribute setting
     - v.8.2.0: Add support for additional rgbmatrix options for different setups
     - v.8.1.0: In JOURNEY_PLUS and with SHOW_EVEN_MORE_INFO, the Time/RSSI section now shows ground track instead
@@ -6021,6 +6639,8 @@ class Display(
         sunrise_sunset_now = idle_data_2.get('SunriseSunset', "▲--:-- ▼--:--")
         receiver_stats_now = idle_data_2.get('ReceiverStats', "G --- N --- L--")
         calendar_info_now = 'CALENDAR'
+        wx1_now = idle_data_2.get('WX_1', 'NO WEATHER DATA')
+        wx2_now = idle_data_2.get('WX_2', 'NO WEATHER DATA')
         if CLOCK_CENTER_ROW['ROW1'] == 3 or CLOCK_CENTER_ROW['ROW2'] == 3:
             month_name = strip_accents(self.time_now.strftime('%b')[:3])
             if not month_name.isascii():
@@ -6037,6 +6657,10 @@ class Display(
                 row1_data = receiver_stats_now
             case 3:
                 row1_data = calendar_info_now
+            case 4:
+                row1_data = wx1_now
+            case 5:
+                row1_data = wx2_now
             case _:
                 row1_data = ""
         match CLOCK_CENTER_ROW['ROW2']:
@@ -6046,6 +6670,10 @@ class Display(
                 row2_data = receiver_stats_now
             case 3:
                 row2_data = calendar_info_now
+            case 4:
+                row2_data = wx1_now
+            case 5:
+                row2_data = wx2_now
             case _:
                 row2_data = ""
 
@@ -7284,6 +7912,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         display_fps_thread = threading.Thread(target=display_FPS_counter, name='FPS-Counter', args=(display,), daemon=True)
         brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
         display_sender = threading.Thread(target=DisplayFeeder, name='Display-Feeder', daemon=True)
+        center_row_control = threading.Thread(target=clock_center_cycler, name='Clock-Center-Cycler', daemon=True)
         display_stuff.start()
         display_fps_thread.start()
         brightness_stuff.start()
@@ -7318,7 +7947,7 @@ api_scheduling_thread.start()
 flyby_stats() # initialize first
 
 # define our scheduled tasks (our "one-shot" functions)
-# NB: order matters in the way they're defined as these run sequentially when run at the same time
+# NB: order matters in how these are registered as these run sequentially when asked to run at the same time
 schedule.every().day.at("00:00").do(suntimes) # do this first since `runtime_accumulators_reset()` takes a few seconds
 schedule.every().day.at("00:00").do(runtime_accumulators_reset)
 schedule.every().hour.at(":00").do(flyby_stats)
@@ -7350,8 +7979,41 @@ if LOCATION_IS_SET:
     schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 session = requests.Session()
 """ Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
-
 suntimes()
+# this must be done after reading the location
+if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
+    if LOCATION_IS_SET:
+        if CLOCK_CENTER_ENABLED and (
+            any(v in (4, 5) for v in CLOCK_CENTER_ROW.values())
+            or CLOCK_CENTER_ROW_CYCLE
+        ):
+            main_logger.info("OpenWeather API key provided, checking its validity...")
+            WX_stuff = wx_API()
+            if WX_stuff.get_weather():
+                main_logger.info(f"API key \'*****{OPENWEATHER_API_KEY[-5:]}\' is valid and weather data successfully received.")
+                match UNITS_WX:
+                    case 1:
+                        main_logger.info("Using metric weather units.")
+                    case 2:
+                        main_logger.info("Using imperial weather units.")
+                    case _:
+                        main_logger.info("Using aeronautical weather units.")
+
+                # recall that since the scheduler handles jobs in the order they're registered
+                # this will be the last job executed at the top of each hour
+                schedule.every().hour.at(":00").do(WX_stuff.get_weather)
+                schedule.every().hour.at(":15").do(WX_stuff.get_weather)
+                schedule.every().hour.at(":30").do(WX_stuff.get_weather)
+                schedule.every().hour.at(":45").do(WX_stuff.get_weather)
+            else:
+                main_logger.info("OpenWeather API failed. Weather information will be unavailable.")
+        else:
+            main_logger.info("OpenWeather API key is present, "
+                            "but the option to show weather information "
+                            "on the clock is not set. Not using the weather API.")
+    else:
+        main_logger.info("OpenWeather API key is present but location is not set. "
+                         "Weather information will be unavailable.")
 
 if DATABASE_FILE.exists():
     main_logger.info("Aircraft database is present.")
@@ -7439,6 +8101,8 @@ def main() -> None:
     watchdog_stuff.start()
     console_stuff.start()
     dxing_stuff.start()
+    if CLOCK_CENTER_ROW_CYCLE:
+        center_row_control.start()
     main_logger.debug(f"Running with {this_process.num_threads()} threads, with CPU priority {this_process.nice()}")
     print()
     main_logger.info("========== Main loop started! ===========")
