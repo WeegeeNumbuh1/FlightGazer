@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.6.1 - 2025-11-24
+    - Updated settings migrator script for better handling of recently added settings
+    - Minor alignment tweaks for the various clock center row readout options
+    - Fix logic evaluations when weather data reports zero values
+    - Fix edge case that was supposed to be fixed in v.8.0.4 regarding non-ASCII characters in the month name
+    - Slight improvement to the system detection methods in the initialization script
+
 v.9.6.0 - 2025-11-23
     - NEW: Add support for current weather readout on the clock
         - This is provided by OpenWeather's API

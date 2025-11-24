@@ -2,7 +2,7 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.8.3.0
+# Last updated: v.9.6.1
 # By WeegeeNumbuh1
 
 import sys
@@ -16,7 +16,7 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 # we need this for programmatic, round-trip updating. It should already be in the venv for use
 try:
     from ruamel.yaml import YAML
-except:
+except Exception:
     print("Error: Migrator failed to load required module \'ruamel.yaml\'. Is it present in the venv?")
     sys.exit(1)
 
@@ -35,18 +35,18 @@ yaml.preserve_quotes = True
 
 try:
     user_settings = yaml.load(open(PATH1, 'r'))
-except:
+except Exception:
     print(f"Error: Could not load config file \'{PATH1}\'.")
     sys.exit(1)
 try:
     new_config = yaml.load(open(PATH2, 'r'))
-except:
+except Exception:
     print(f"Error: Could not load config file \'{PATH2}\'.")
     sys.exit(1)
 try:
     old_version = user_settings['CONFIG_VERSION']
     new_version = new_config['CONFIG_VERSION']
-except:
+except Exception:
     print("Error: Could not read configuration version. Is this a valid FlightGazer configuration file?")
     sys.exit(1)
 
@@ -65,12 +65,15 @@ for settings_key in new_config:
         # never read them anyway
         if settings_key == "CONFIG_VERSION": continue
         if new_config[settings_key] != user_settings[settings_key]:
-            if settings_key == "API_KEY" and user_settings['API_KEY']:
-                print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
-            elif settings_key == "API_SCHEDULE" and user_settings['API_SCHEDULE']: # this is a huge dict (heh), don't print it
-                print(f"Changing {settings_key}: <default schedule> -> <provided schedule>")
-            else:
-                print(f"Changing {settings_key}: {new_config[settings_key]} -> {user_settings[settings_key]}")
+            match settings_key:
+                case "API_KEY" if user_settings["API_KEY"]:
+                    print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
+                case "API_SCHEDULE" if user_settings["API_SCHEDULE"]: # this is a huge dict (heh), don't print it
+                    print(f"Changing {settings_key}: <default schedule> -> <provided schedule>")
+                case "OPENWEATHER_API_KEY" if user_settings["OPENWEATHER_API_KEY"]:
+                    print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
+                case _:
+                    print(f"Changing {settings_key}: {new_config[settings_key]} -> {user_settings[settings_key]}")
             new_config[settings_key] = user_settings[settings_key]
     except KeyError: # settings key in new config does not exist in the older config
         print(f"New setting in this configuration: {settings_key}")
@@ -79,7 +82,7 @@ print("All other settings are the same as the default settings.")
 try:
     with open(PATH2, 'w') as updated_config:
         yaml.dump(new_config, updated_config)
-except:
+except Exception:
     print("Error: Could not write updated configuration file.")
     sys.exit(1)
 else:

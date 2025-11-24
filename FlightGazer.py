@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.6.0 --- 2025-11-23'
+VERSION: str = 'v.9.6.1 --- 2025-11-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1172,7 +1172,7 @@ def clock_center_cycler() -> None:
 
     main_logger.debug("Cycler thread started and synchronizing to trigger when seconds end in zero.")
     sync_time = hook_line_and_syncer()
-    main_logger.debug(f"Waited {round(sync_time, 3)} seconds. See you in 2 hours.")
+    main_logger.debug(f"Waited {round(sync_time, 3)} seconds. See you in an hour (or less).")
     compensation = 0
     while True:
         time.sleep(10 - compensation)
@@ -1194,12 +1194,21 @@ def clock_center_cycler() -> None:
         compensation = time.perf_counter() - start # try to reduce drift
         if compensation >= 10:
             compensation = 0
-        # drift will naturally occur; every 2 hours, resync to keep us
-        # within the animation frame window and any updates to the system clock
-        if times_cycled % 720 == 0:
+        # drift will naturally occur; every hour, resync to keep us
+        # within the animation frame window and account for any updates to the system clock
+        # or, take advantage when the display is in active mode and we can't see the clock
+        if (
+            (
+                times_cycled >= 180
+                and active_plane_display
+            )
+            or times_cycled == 360
+        ):
+            main_logger.debug("Center row cycler resyncing.")
             sync_time = hook_line_and_syncer()
             main_logger.debug("Resynced the center row cycler, waited "
                               f"{round(sync_time, 3)} seconds")
+            times_cycled = 0
 
 # =========== Program Setup II =============
 # ========( Initialization Tools )==========
@@ -2572,7 +2581,7 @@ class PrintToConsole:
                 wx_str.append("N/A°")
             if VERBOSE_MODE:
                 wx_str.append(f" | S:{WX_API_data['successful_calls']} F:{WX_API_data['failed_calls']}")
-                wx_str.append(f" R:{WX_API_data['response_time']}ms")
+                wx_str.append(f" R:{WX_API_data['response_time_ms']}ms")
             print("".join(wx_str))
 
         # verbose stats line 1
@@ -4225,7 +4234,7 @@ class DisplayFeeder:
             if strong_rounded >= 100:
                 recv_str.append("99%") # cap at 99%
             else:
-                recv_str.append(f"{strong_rounded}".rjust(2))
+                recv_str.append(f"{strong_rounded}")
                 recv_str.append("%")
         else:
             recv_str.append(filler_text)
@@ -4234,12 +4243,12 @@ class DisplayFeeder:
         if WX_API_data:
             # Current conditions (temp, prevailing weather, wind dir + speed)
             # Example: "47.3° OVRC ▼9 "
-            if (temp_ := WX_API_data.get('temp')):
+            if (temp_ := WX_API_data.get('temp')) is not None:
                 temp_now = f'{round(temp_, 1):.1f}'
             else:
                 temp_now = "---"
             cond_str: str = WX_API_data.get('condition')
-            if (wind_ := WX_API_data.get('wind_speed')):
+            if (wind_ := WX_API_data.get('wind_speed')) is not None:
                 wind_now = f'{round(wind_, 0):.0f}'
             else:
                 wind_now = "--"
@@ -4250,12 +4259,12 @@ class DisplayFeeder:
             wx1_str = f"{temp_now.rjust(4)}° {cond_str.rjust(4)} {wind_dir}{wind_now.ljust(2)}"
 
             # Extended observations (dew point, visibility, ceiling)
-            # Example: "D43° V6+  C1000"
-            if (dew_p_ := WX_API_data.get('dew_point')):
+            # Example: "D43° V4.5 C1000"
+            if (dew_p_ := WX_API_data.get('dew_point')) is not None:
                 dew_point_now = f'{round(dew_p_, 0):.0f}'
             else:
                 dew_point_now = "--"
-            if (vis_ := WX_API_data.get('visibility')):
+            if (vis_ := WX_API_data.get('visibility')) is not None:
                 if UNITS_WX == 2 and vis_ > 6:
                     vis_str = "6+"
                 elif UNITS_WX == 1 and round(vis_, 1) == 10:
@@ -4264,14 +4273,14 @@ class DisplayFeeder:
                     vis_str = f'{round(vis_, 1)}'
             else:
                 vis_str = "---"
-            if (ceil_ := WX_API_data.get('ceiling')):
+            if (ceil_ := WX_API_data.get('ceiling')) is not None:
                 if ceil_ >= 10000:
                     ceil_str = "10k+"
                 else:
                     ceil_str = f'{round(ceil_ / 100, 0):.0f}00' # ex: 1984 -> 20.0 -> '2000'
             else:
                 ceil_str = "---"
-            wx2_str = f"D{dew_point_now}° V{vis_str.ljust(3)} C{ceil_str.ljust(4)}"
+            wx2_str = f"D{dew_point_now}° V{vis_str.ljust(3)} C{ceil_str}"
         else:
             wx1_str = wx2_str = "NO WEATHER DATA"
 
@@ -5851,7 +5860,7 @@ class wx_API():
         # 2 = Imperial (°F, mph, ft, mi, inHg)
         # The API returns units in: K, m/s, m, hPa
 
-        if (temp_ := current_measurements.get('temp')):
+        if (temp_ := current_measurements.get('temp')) is not None:
             temp_c = temp_convert(temp_, 'c')
             match UNITS_WX:
                 case 2:
@@ -5884,13 +5893,21 @@ class wx_API():
                 case _:
                     wspd = wind_spd_now
             win_dir = current_wind.get('deg')
-        else:
+        else: # note, this can be either int(0) or None; still works as intended
             wspd = wind_spd_now
             win_dir = None
 
         # handle some filtering and the rest of the conversion here
         if wspd == 0:
             win_dir = None
+        if (
+            (
+                current_clouds is not None
+                and current_clouds < 30
+            )
+            or current_clouds is None
+        ):
+            ceiling = None
         match UNITS_WX:
             case 0:
                 ceiling = meter_convert(ceiling, 'ft')
@@ -5917,13 +5934,13 @@ class wx_API():
             'dew_point': dew_point,
             'wind_speed': wspd,
             'wind_dir': win_dir,
-            'ceiling': ceiling if (current_clouds and current_clouds > 30) else None,
-            'cloudyness': current_clouds,
+            'ceiling': ceiling,
+            'cloudiness': current_clouds,
             'visibility': current_visibility,
             'elevation': elevation,
             'pressure': pressure_corrected,
             'pressure_raw': pressure_actual,
-            'response_time': round(end * 1000, 1),
+            'response_time_ms': round(end * 1000, 1),
             'successful_calls': self.successful_calls,
             'failed_calls': self.failed_calls,
             'timestamp': timestamp,
@@ -6644,7 +6661,7 @@ class Display(
         if CLOCK_CENTER_ROW['ROW1'] == 3 or CLOCK_CENTER_ROW['ROW2'] == 3:
             month_name = strip_accents(self.time_now.strftime('%b')[:3])
             if not month_name.isascii():
-                month_name = self.time_now('M%m')
+                month_name = self.time_now.strftime('M%m')
             if CLOCK_CENTER_ROW_2ROWS:
                 calendar_info_now = month_name.upper() + self.time_now.strftime(' WK%V D%j')
             else:

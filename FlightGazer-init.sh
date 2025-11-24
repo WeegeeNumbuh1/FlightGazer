@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.6.0
+# Version = v.9.6.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -265,6 +265,14 @@ else
 	DEV_TYPE=''
 fi
 CORECOUNT=$(grep -c ^processor /proc/cpuinfo)
+if [ -f '/etc/os-release' ]; then
+	OS=$(sed -n 's/^PRETTY_NAME=//p' /etc/os-release)
+else
+	OS=$(uname -a)
+fi
+if [ -z "$OS" ]; then
+	OS=$(uname -a)
+fi
 
 if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv_check.py" ]; then
 	"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/venv_check.py"
@@ -284,9 +292,8 @@ then
 	echo "================== System Info ===================="
 	if [ -n "$DEV_TYPE" ]; then
 		echo -e "> Running on a ${DEV_TYPE}"
-	else
-		echo -e "> Running on $(uname -a)"
 	fi
+	echo -e "> Detected system: ${OS}"
 	if [ $CORECOUNT -eq 1 ]; then
 		echo "> WARNING: Only one CPU core detected!"
 		echo "  Installation might take a very long time!"
