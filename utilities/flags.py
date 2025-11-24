@@ -3,7 +3,8 @@ Retreives relevant ICAO country code based on supplied ICAO.
 Modified from https://github.com/wiedehopf/tar1090/blob/master/html/flags.js by WeegeeNumbuh1
 Mostly generated from the assignment table in the appendix to Chapter 9 of
 Annex 10 Vol III, Second Edition, July 2007 (with amendments through 92, 2024-11-28)
-Matches this commit: https://github.com/wiedehopf/tar1090/commit/38cfa15353f9dcbee4ed1433f6873fe2a4356997
+Matches this commit: https://github.com/wiedehopf/tar1090/commit/28d21edcf86182eb066b569af916feb4085656ac
+Previously: 38cfa15353f9dcbee4ed1433f6873fe2a4356997
 Last update: November 2025
 """
 from functools import lru_cache
@@ -48,7 +49,7 @@ ICAO_Ranges = [
     {"start": 0x076000, "end": 0x0767FF, "country": "Sierra Leone", "country_code": "sl"},
     {"start": 0x078000, "end": 0x078FFF, "country": "Somalia", "country_code": "so"},
     {"start": 0x07A000, "end": 0x07A7FF, "country": "Eswatini", "country_code": "sz"},
-    {"start": 0x07C000, "end": 0x07C3FF, "country": "Sudan", "country_code": "sd"},
+    {"start": 0x07C000, "end": 0x07CFFF, "country": "Sudan", "country_code": "sd"},
     {"start": 0x080000, "end": 0x080FFF, "country": "Tanzania", "country_code": "tz"},
     {"start": 0x084000, "end": 0x084FFF, "country": "Chad", "country_code": "td"},
     {"start": 0x088000, "end": 0x088FFF, "country": "Togo", "country_code": "tg"},
@@ -60,12 +61,12 @@ ICAO_Ranges = [
     {"start": 0x098000, "end": 0x0987FF, "country": "Djibouti", "country_code": "dj"},
     {"start": 0x09A000, "end": 0x09AFFF, "country": "Gambia", "country_code": "gm"},
     {"start": 0x09C000, "end": 0x09CFFF, "country": "Burkina Faso", "country_code": "bf"},
-    {"start": 0x09E000, "end": 0x09E3FF, "country": "São Tomé and Príncipe", "country_code": "st"},
+    {"start": 0x09E000, "end": 0x09E7FF, "country": "São Tomé and Príncipe", "country_code": "st"},
     {"start": 0x0A0000, "end": 0x0A7FFF, "country": "Algeria", "country_code": "dz"},
     {"start": 0x0A8000, "end": 0x0A8FFF, "country": "Bahamas", "country_code": "bs"},
     {"start": 0x0AA000, "end": 0x0AA7FF, "country": "Barbados", "country_code": "bb"},
     {"start": 0x0AB000, "end": 0x0AB7FF, "country": "Belize", "country_code": "bz"},
-    {"start": 0x0AC000, "end": 0x0ACFFF, "country": "Colombia", "country_code": "co"},
+    {"start": 0x0AC000, "end": 0x0ADFFF, "country": "Colombia", "country_code": "co"},
     {"start": 0x0AE000, "end": 0x0AEFFF, "country": "Costa Rica", "country_code": "cr"},
     {"start": 0x0B0000, "end": 0x0B0FFF, "country": "Cuba", "country_code": "cu"},
     {"start": 0x0B2000, "end": 0x0B2FFF, "country": "El Salvador", "country_code": "sv"},
@@ -129,14 +130,14 @@ ICAO_Ranges = [
     {"start": 0x4D2000, "end": 0x4D27FF, "country": "Malta", "country_code": "mt"},
     {"start": 0x4D4000, "end": 0x4D47FF, "country": "Monaco", "country_code": "mc"},
     {"start": 0x500000, "end": 0x5007FF, "country": "San Marino", "country_code": "sm"},
-    {"start": 0x501000, "end": 0x5013FF, "country": "Albania", "country_code": "al"},
+    {"start": 0x501000, "end": 0x5017FF, "country": "Albania", "country_code": "al"},
     {"start": 0x501800, "end": 0x501FFF, "country": "Croatia", "country_code": "hr"},
     {"start": 0x502800, "end": 0x502FFF, "country": "Latvia", "country_code": "lv"},
     {"start": 0x503800, "end": 0x503FFF, "country": "Lithuania", "country_code": "lt"},
     {"start": 0x504800, "end": 0x504FFF, "country": "Moldova", "country_code": "md"},
-    {"start": 0x505000, "end": 0x505FFF, "country": "Slovakia", "country_code": "sk"},
-    {"start": 0x506000, "end": 0x506FFF, "country": "Slovenia", "country_code": "si"},
-    {"start": 0x507000, "end": 0x507FFF, "country": "Uzbekistan", "country_code": "uz"},
+    {"start": 0x505800, "end": 0x505FFF, "country": "Slovakia", "country_code": "sk"},
+    {"start": 0x506800, "end": 0x506FFF, "country": "Slovenia", "country_code": "si"},
+    {"start": 0x507800, "end": 0x507FFF, "country": "Uzbekistan", "country_code": "uz"},
     {"start": 0x508000, "end": 0x50FFFF, "country": "Ukraine", "country_code": "ua"},
     {"start": 0x510000, "end": 0x5107FF, "country": "Belarus", "country_code": "by"},
     {"start": 0x511000, "end": 0x5117FF, "country": "Estonia", "country_code": "ee"},
@@ -194,14 +195,13 @@ ICAO_Ranges = [
     {"start": 0x900000, "end": 0x9007FF, "country": "Marshall Islands", "country_code": "mh"},
     {"start": 0x901000, "end": 0x9017FF, "country": "Cook Islands", "country_code": "sk"},
     {"start": 0x902000, "end": 0x9027FF, "country": "Samoa", "country_code": "ws"},
-    {"start": 0x9e0000, "end": 0x9e07FF, "country": "Sao Tome and Principe", "country_code": "st"},
     {"start": 0xA00000, "end": 0xAFFFFF, "country": "United States", "country_code": "us"},
     {"start": 0xC00000, "end": 0xC3FFFF, "country": "Canada", "country_code": "ca"},
     {"start": 0xC80000, "end": 0xC87FFF, "country": "New Zealand", "country_code": "nz"},
     {"start": 0xC88000, "end": 0xC88FFF, "country": "Fiji", "country_code": "fj"},
     {"start": 0xC8A000, "end": 0xC8A7FF, "country": "Nauru", "country_code": "nr"},
     {"start": 0xC8C000, "end": 0xC8C7FF, "country": "Saint Lucia", "country_code": "lc"},
-    {"start": 0xC8D000, "end": 0xC8D3FF, "country": "Tonga", "country_code": "to"},
+    {"start": 0xC8D000, "end": 0xC8D7FF, "country": "Tonga", "country_code": "to"},
     {"start": 0xC8E000, "end": 0xC8E7FF, "country": "Kiribati", "country_code": "ki"},
     {"start": 0xC90000, "end": 0xC907FF, "country": "Vanuatu", "country_code": "vu"},
     {"start": 0xC91000, "end": 0xC917FF, "country": "Andorra", "country_code": "ad"},
@@ -229,10 +229,10 @@ ICAO_Ranges = [
     # {"start": 0x600000, "end": 0x67FFFF, "country": "Unassigned (MID region)", "country_code": "??"},
     # {"start": 0x680000, "end": 0x6FFFFF, "country": "Unassigned (ASIA region)", "country_code": "??"},
     # {"start": 0x900000, "end": 0x9FFFFF, "country": "Unassigned (NAM / PAC regions)", "country_code": "??"},
-    {"start": 0xB00000, "end": 0xBFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
+    # {"start": 0xB00000, "end": 0xBFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
     # {"start": 0xEC0000, "end": 0xEFFFFF, "country": "Unassigned (CAR region)", "country_code": "??"},
-    {"start": 0xD00000, "end": 0xDFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
-    {"start": 0xF00000, "end": 0xFFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
+    # {"start": 0xD00000, "end": 0xDFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
+    # {"start": 0xF00000, "end": 0xFFFFFF, "country": "Unassigned (reserved for future use)", "country_code": "??"},
 ]
 
 @lru_cache(maxsize=500)

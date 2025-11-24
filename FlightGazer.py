@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.6.1 --- 2025-11-24'
+VERSION: str = 'v.9.6.2 --- 2025-11-24'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1047,10 +1047,15 @@ def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
         return None
 
 def strip_accents(s: str) -> str:
-    """ This is for the display as it cannot handle glyphs outside of ANSI.
+    """ This is for the display as it cannot handle glyphs outside of ASCII.
+    Falls back to substituting an underscore if the resultant string isn't fully ASCII.
     https://stackoverflow.com/a/518232 """
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
+    s = ''.join(c for c in unicodedata.normalize('NFD', s)
                     if unicodedata.category(c) != 'Mn')
+    if s.isascii():
+        return s
+    else:
+        return ''.join([s_ if s_.isascii() else "_" for s_ in s])
 
 def catcher(exctype, value, tb):
     """ Catch unhandled exceptions and dump to log.
@@ -5812,7 +5817,7 @@ class wx_API():
         except requests.exceptions.ConnectionError as e:
             self.failed_calls += 1
             if not VERBOSE_MODE:
-                main_logger.warning(f"Weather API call failed due to a connection error.")
+                main_logger.warning("Weather API call failed due to a connection error.")
             else:
                 main_logger.warning(f"Weather API call failed due to a connection error. {e}")
             invalidator()
@@ -5820,7 +5825,7 @@ class wx_API():
         except requests.exceptions.Timeout as e:
             self.failed_calls += 1
             if not VERBOSE_MODE:
-                main_logger.warning(f"Weather API call failed due to a connection timeout.")
+                main_logger.warning("Weather API call failed due to a connection timeout.")
             else:
                 main_logger.warning(f"Weather API call failed due to a connection timeout. {e}")
             invalidator()
@@ -8007,7 +8012,7 @@ if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
             main_logger.info("OpenWeather API key provided, checking its validity...")
             WX_stuff = wx_API()
             if WX_stuff.get_weather():
-                main_logger.info(f"API key \'*****{OPENWEATHER_API_KEY[-5:]}\' is valid and weather data successfully received.")
+                main_logger.info(f"API key \'***{OPENWEATHER_API_KEY[-5:]}\' is valid and weather data successfully received.")
                 match UNITS_WX:
                     case 1:
                         main_logger.info("Using metric weather units.")

@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.6.2 - 2025-11-24
+    - Minor corrections to ISO lookup table
+    - Improved handling for non-ASCII strings when rendering to the display
+
 v.9.6.1 - 2025-11-24
     - Updated settings migrator script for better handling of recently added settings
     - Minor alignment tweaks for the various clock center row readout options

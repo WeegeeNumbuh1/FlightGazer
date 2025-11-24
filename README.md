@@ -652,7 +652,7 @@ sudo bash update.sh
 > FlightGazer will *never* implement any self-updating mechanism or any form of push updates.<br>
 > An update must be run explicitly by the end user.<br>
 > The initialization script, every 3 months after the last update, will check for updates to the aircraft database and other system components required to run, at startup.<br>
-> When running the update script, it will pull data only from this repository and nowhere else.
+> When running the update script, it will pull data [only from this repository](https://github.com/WeegeeNumbuh1/FlightGazer) and nowhere else.
 
 <details><summary>Windows</summary>
 
