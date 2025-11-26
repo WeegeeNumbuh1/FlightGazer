@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.6.2 --- 2025-11-24'
+VERSION: str = 'v.9.6.3 --- 2025-11-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -104,8 +104,8 @@ argflags.add_argument(
 argflags.add_argument(
     '-v', '--verbose',
     action='store_true',
-    help="Log/display more detailed messages.\n\
-    This flag is useful for debugging."
+    help=("Log/display more detailed messages.\n"
+    "This flag is useful for debugging.")
 )
 args = argflags.parse_args()
 if args.interactive:
@@ -1046,12 +1046,22 @@ def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
     except Exception:
         return None
 
-def strip_accents(s: str) -> str:
-    """ This is for the display as it cannot handle glyphs outside of ASCII.
-    Falls back to substituting an underscore if the resultant string isn't fully ASCII.
+def strip_accents(s: str, skip_fallback: bool = False) -> str:
+    """ This is for the display as it (usually) cannot handle glyphs outside of ASCII.
+    Falls back to substituting an underscore if the resultant string isn't fully ASCII,
+    unless `skip_fallback` is True. This can also de-Zalgo text as a neat side-effect.
+    ### Examples:
+    >>> Manhattan Café -> Manhattan Cafe
+    >>> Matikanetannhäuser -> ̶M̶a̶m̶b̶o̶  Matikanetannhauser
+    >>> bröther may i have some ōâtš -> brother may i have some oats
+    >>> “Peau Vavaʻu” -> _Peau Vava_u_
+
+    ### References
     https://stackoverflow.com/a/518232 """
     s = ''.join(c for c in unicodedata.normalize('NFD', s)
                     if unicodedata.category(c) != 'Mn')
+    if skip_fallback:
+        return s
     if s.isascii():
         return s
     else:
@@ -6352,6 +6362,7 @@ class Display(
                 current_timesec,
             )
             return True
+        return False
 
     """ Hour and minute """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -6394,6 +6405,7 @@ class Display(
                 current_time,
             )
             return True
+        return False
 
     """ AM/PM Indicator """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -6429,6 +6441,7 @@ class Display(
                 current_ampm,
             )
             return True
+        return False
 
     """ Day of the week """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -6439,7 +6452,9 @@ class Display(
         DAY_COLOR = colors.day_of_week_color
         DAY_FONT = fonts.smallest_alt if ALTERNATIVE_FONT else fonts.smallest
         DAY_POSITION = (51, 6)
-        current_day = strip_accents(self.time_now.strftime("%a")[:3]).upper()
+        current_day = strip_accents(
+            self.time_now.strftime("%a")[:3],
+            skip_fallback=True).upper()
         if not current_day.isascii(): # possible if locale returns a string that can't be rendered to ascii
             current_day = f"D-{self.time_now.weekday()}"
 
@@ -6465,6 +6480,7 @@ class Display(
                 current_day,
             )
             return True
+        return False
 
     """ Date """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -6499,6 +6515,7 @@ class Display(
                 current_date,
             )
             return True
+        return False
 
     # ========= Idle Stats Elements ==========
     # ========================================
@@ -6537,6 +6554,7 @@ class Display(
             RANGE_HEADING_COLOR,
             "RNGE",
         )
+        return True
 
     """ Our idle stats readout """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -6664,7 +6682,10 @@ class Display(
         wx1_now = idle_data_2.get('WX_1', 'NO WEATHER DATA')
         wx2_now = idle_data_2.get('WX_2', 'NO WEATHER DATA')
         if CLOCK_CENTER_ROW['ROW1'] == 3 or CLOCK_CENTER_ROW['ROW2'] == 3:
-            month_name = strip_accents(self.time_now.strftime('%b')[:3])
+            month_name = strip_accents(
+                self.time_now.strftime('%b')[:3],
+                skip_fallback=True
+            )
             if not month_name.isascii():
                 month_name = self.time_now.strftime('M%m')
             if CLOCK_CENTER_ROW_2ROWS:
@@ -7148,7 +7169,7 @@ class Display(
     def ll_journeyplus(self, count): # Love Live?
         """ This function is different because we go against the adage that `DisplayFeeder` should be doing
         most of the formatting work. Instead of having to add more functionality to it, we just
-        reuse the results to enable functionality for JOURNEY_PLUS. """
+        reuse the results to enable functionality for `JOURNEY_PLUS`. """
         if not self.active_plane_display or not JOURNEY_PLUS or ENHANCED_READOUT:
             self._last_journey_plus_row = None
             return True
@@ -7464,6 +7485,8 @@ class Display(
                 TIME_HEADING_COLOR,
                 "RSSI"
             )
+
+        return True
 
     """ Our active stats readout. Always includes altitude and speed;
     RSSI and ground track are also handled here, based on what mode is being seen. """
@@ -7801,6 +7824,7 @@ class Display(
                 fill_length
                 )
             return True
+        return False
 
     # ========== Property Controls ===========
     # ========================================

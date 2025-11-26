@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.6.3 - 2025-11-26
+    - Fix issue where the weekday and month names would result in all underscores for non-Latin locales
+    - Minor code touchups
+
 v.9.6.2 - 2025-11-24
     - Minor corrections to ISO lookup table
     - Improved handling for non-ASCII strings when rendering to the display

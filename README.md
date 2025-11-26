@@ -101,6 +101,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 - Automatically switches to other aircraft if more than one is within the area
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
+- Clock uses your system's locale for weekday/month abbreviations
 - Customizable features such as:
   - Range and height ceiling that aircraft need to be in for detailed tracking
   - Units (aeronautical, metric, or imperial)
