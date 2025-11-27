@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.6.4 - 2025-11-27
+    - Add unit keys for the weather info section in the json
+    - Add rudimentary parsing for the OpenWeather API key to make sure it's in the right format
+    - If the weather API fails enough times it will no longer spam the log
+    - Fix visibility limit for weather readout when using default aeronautical units
+    - Rename references to "Imperial" units to "U.S. customary"
+
 v.9.6.3 - 2025-11-26
     - Fix issue where the weekday and month names would result in all underscores for non-Latin locales
     - Minor code touchups

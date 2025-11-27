@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.6.3 # do not modify this
+CONFIG_VERSION: v.9.6.4 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -9,7 +9,7 @@ UNITS: 0
 # Select which units to use.
 # 0 = Aeronautical (nmi, ft, kt)
 # 1 = Metric (km, m, km/h)
-# 2 = Imperial (mi, ft, mph)
+# 2 = U.S. customary (mi, ft, mph)
 
 HEIGHT_LIMIT: 15000
 # [Integer: 2500 ~ 75000 feet or 760 ~ 22860 meters] (only supply a number)
@@ -247,7 +247,7 @@ UNITS_WX: 0
 # Select which weather units to use.
 # 0 = Aeronautical (°C, kt, ft, smi, hPa)
 # 1 = Metric (°C, m/s, m, km, hPa)
-# 2 = Imperial (°F, mph, ft, mi, inHg)
+# 2 = U.S. customary (°F, mph, ft, mi, inHg)
 
 FLYBY_STATS_ENABLED: true
 # [true/false]

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.6.3 --- 2025-11-26'
+VERSION: str = 'v.9.6.4 --- 2025-11-27'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -688,19 +688,17 @@ idle_data_2: dict = {
 }
 """ Additional formatted dict for our Display driver.
 `idle_data_2` = {
-    `SunriseSunset`,
-    `ReceiverStats`,
-    `WX_1`,
-    `WX_2`
+    `SunriseSunset`, `ReceiverStats`,
+    `WX_1`,`WX_2`
 } """
 active_data: dict = {}
 """ Formatted dict for our Display driver. All strings unless noted.
 `active_data` = {
-`Callsign`, `Origin`, `Destination`, `FlightTime`,
-`Altitude`, `Speed`, `Distance`, `Country`,
-`Latitude`, `Longitude`, `Track`, `VertSpeed`, `RSSI`
-`AircraftInfo`, `is_UAT` (bool)
-} or {} """
+    `Callsign`, `Origin`, `Destination`, `FlightTime`,
+    `Altitude`, `Speed`, `Distance`, `Country`,
+    `Latitude`, `Longitude`, `Track`, `VertSpeed`, `RSSI`
+    `AircraftInfo`, `is_UAT` (bool)
+} or `{}` """
 active_plane_display: bool = False
 """ Which scene to put on the display. False = clock/idle, True = active plane """
 current_brightness: int = BRIGHTNESS
@@ -784,11 +782,13 @@ API_schedule_triggered: bool = False
 WX_API_data: dict = {}
 """ Results from the weather API. Empty dict if API is not in use, fails at start, or data gets invalidated.
 Keys (prepare to handle `None` for all of these):
-`site_name`, `condition`, `condition_desc`, `temp`,
-`humidity`, `dew_point`, `wind_speed`, `wind_dir`,
-`ceiling`, `cloudyness`, `visibility`, `altitude`,
-`pressure`, `pressure_raw`, `response_time`, `successful_calls`,
-`failed_calls`, `timestamp`
+    `site_name`, `condition`, `condition_desc`, `temp`,
+    `humidity`, `dew_point`, `wind_speed`, `wind_dir`, `wind_gust`,
+    `ceiling`, `cloudiness`, `visibility`, `altitude`,
+    `pressure`, `pressure_raw`, `response_time`,
+    `temp_unit`, `wind_speed_unit`, `distance_unit`,
+    `pressure_unit`, `ceiling_elevation_unit`,
+    `API_key`, `successful_calls`, `failed_calls`, `timestamp`
 """
 #--- running stats
 process_time: list = [0., 0. ,0. ,0.]
@@ -869,12 +869,12 @@ match UNITS:
         altitude_multiplier = 0.3048
         speed_multiplier = 1.85184
         main_logger.info("Using metric units (km, m, km/h)")
-    case 2: # imperial
+    case 2: # U.S customary
         distance_unit = "mi"
         speed_unit = "mph"
         distance_multiplier = 1.150779
         speed_multiplier = 1.150783
-        main_logger.info("Using imperial units (mi, ft, mph)")
+        main_logger.info("Using U.S. customary units (mi, ft, mph)")
     case _:
         main_logger.info("Using default aeronautical units (nmi, ft, kt)")
 
@@ -1444,7 +1444,7 @@ def configuration_check() -> None:
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS
-    global UNITS_WX
+    global UNITS_WX, OPENWEATHER_API_KEY
 
     main_logger.info("Checking settings configuration...")
 
@@ -1620,6 +1620,10 @@ def configuration_check() -> None:
 
     if not WRITE_STATE:
         main_logger.info("FlightGazer will not write its state to a file.")
+
+    if OPENWEATHER_API_KEY and not isinstance(OPENWEATHER_API_KEY, str):
+        main_logger.warning("Provided OpenWeatherMap API key is not a string. Weather data will be unavailable.")
+        OPENWEATHER_API_KEY = ''
 
     if not isinstance(UNITS_WX, int):
         main_logger.warning("UNITS_WX is invalid. Setting to default.")
@@ -2572,26 +2576,27 @@ class PrintToConsole:
             wx_str.append(f"> Weather at {WX_API_data['site_name']}: ")
             wx_str.append(f"{WX_API_data['condition_desc']}, ")
             if (temp_ := WX_API_data['temp']):
-                wx_str.append(f"{temp_:.1f}° | ")
+                wx_str.append(f"{temp_:.1f}°{WX_API_data['temp_unit']} | ")
             else:
                 wx_str.append("N/A° | ")
             wx_str.append("winds ")
             if (winds_ := WX_API_data['wind_speed']) > 0:
-                wx_str.append(f"{winds_:.2f} @ {WX_API_data['wind_dir']}° | ")
+                wx_str.append(f"{winds_:.2f}{WX_API_data['wind_speed_unit']} "
+                              f"@ {WX_API_data['wind_dir']}° | ")
             else:
                 wx_str.append("Calm | ")
             wx_str.append("vis ")
             if (vis_ := WX_API_data['visibility']):
-                wx_str.append(f"{vis_:.3f}")
+                wx_str.append(f"{vis_:.3f}{WX_API_data['distance_unit']}")
             else:
                 wx_str.append("N/A")
             wx_str.append(", ceil ")
             if (ceil_ := WX_API_data['ceiling']):
-                wx_str.append(f"{ceil_:.0f}, ")
+                wx_str.append(f"{ceil_:.0f}{WX_API_data['ceiling_elevation_unit']}, ")
             else:
                 wx_str.append("N/A, ")
             if (dew_p := WX_API_data['dew_point']):
-                wx_str.append(f"dew point {dew_p:.1f}°")
+                wx_str.append(f"dew point {dew_p:.1f}°{WX_API_data['temp_unit']}")
             else:
                 wx_str.append("N/A°")
             if VERBOSE_MODE:
@@ -4279,8 +4284,9 @@ class DisplayFeeder:
                 dew_point_now = f'{round(dew_p_, 0):.0f}'
             else:
                 dew_point_now = "--"
+            # limit characters after the 'V' to 3
             if (vis_ := WX_API_data.get('visibility')) is not None:
-                if UNITS_WX == 2 and vis_ > 6:
+                if (UNITS_WX == 2 or UNITS_WX == 0) and vis_ > 6:
                     vis_str = "6+"
                 elif UNITS_WX == 1 and round(vis_, 1) == 10:
                     vis_str = "10+"
@@ -4288,6 +4294,7 @@ class DisplayFeeder:
                     vis_str = f'{round(vis_, 1)}'
             else:
                 vis_str = "---"
+            # limit characters after the 'C' to 4
             if (ceil_ := WX_API_data.get('ceiling')) is not None:
                 if ceil_ >= 10000:
                     ceil_str = "10k+"
@@ -5551,6 +5558,7 @@ class wx_API():
         Handles conversion from the API's units to the desired `UNITS_WX` values. """
         global WX_API_data
         time_now_unix = time.time()
+        failed_call_cutoff = 30
 
         def invalidator():
             """ Invalidates last weather data if we continually fail to
@@ -5694,7 +5702,7 @@ class wx_API():
         def temp_convert(input_temp: float | int, scale: str = 'c') -> float | None:
             """ Convert an input temperature to the desired `scale`.
             Assumes input temperature is in Kelvin for most scales.
-            Rounds to two decimal places.
+            Rounds to two decimal places. Returns `None` for invalid inputs.
             Acceptable `scale` values:
             - `c`: Celcius
             - `f`: Fahrenheit
@@ -5714,7 +5722,9 @@ class wx_API():
                 return None
 
         def ms_convert(ms: float | int, scale: str = 'mph') -> float | None:
-            """ Convert an input velocity in m/s to the desired `scale`.
+            """ Convert an input velocity in `m/s` to the desired `scale`.
+            Rounds to 3 decimal places. Falls back to returning
+            `None` for invalid inputs.
             Acceptable `scale` values:
             - `mph`: miles per hour
             - `kt`: knots
@@ -5734,6 +5744,8 @@ class wx_API():
                 return None
 
         def hPa_to_inHg(input: float) -> float | None:
+            """ Convert an input pressure in hectopascals to inches of mercury.
+            Returns `None` for invalid values. """
             if not input: return None
             try:
                 return round(input / 33.864, 3)
@@ -5821,13 +5833,21 @@ class wx_API():
 
         except requests.exceptions.HTTPError as e:
             self.failed_calls += 1
-            main_logger.warning(f"Weather API call failed. {e}")
+            if self.failed_calls < failed_call_cutoff:
+                main_logger.warning(f"Weather API call failed. {e}")
+            elif self.failed_calls == failed_call_cutoff:
+                main_logger.error("Weather API has continually failed. "
+                                  "Please correct the underlying issue.")
             invalidator()
             return False
         except requests.exceptions.ConnectionError as e:
             self.failed_calls += 1
             if not VERBOSE_MODE:
-                main_logger.warning("Weather API call failed due to a connection error.")
+                if self.failed_calls < failed_call_cutoff:
+                    main_logger.warning("Weather API call failed due to a connection error.")
+                elif self.failed_calls == failed_call_cutoff:
+                    main_logger.error("Weather API has continually failed. "
+                                      "Please correct the underlying issue.")
             else:
                 main_logger.warning(f"Weather API call failed due to a connection error. {e}")
             invalidator()
@@ -5835,14 +5855,22 @@ class wx_API():
         except requests.exceptions.Timeout as e:
             self.failed_calls += 1
             if not VERBOSE_MODE:
-                main_logger.warning("Weather API call failed due to a connection timeout.")
+                if self.failed_calls < failed_call_cutoff:
+                    main_logger.warning("Weather API call failed due to a connection timeout.")
+                elif self.failed_calls == failed_call_cutoff:
+                    main_logger.error("Weather API has continually failed. "
+                                      "Please correct the underlying issue.")
             else:
                 main_logger.warning(f"Weather API call failed due to a connection timeout. {e}")
             invalidator()
             return False
         except Exception as e:
             self.failed_calls += 1
-            print(f"Weather API call failed: {e}")
+            if self.failed_calls < failed_call_cutoff:
+                main_logger.exception(f"Weather API call failed.")
+            elif self.failed_calls == failed_call_cutoff:
+                main_logger.error("Weather API has continually failed. "
+                                  "Please correct the underlying issue.")
             invalidator()
             return False
         else:
@@ -5874,6 +5902,12 @@ class wx_API():
         # 1 = Metric (°C, m/s, m, km, hPa)
         # 2 = Imperial (°F, mph, ft, mi, inHg)
         # The API returns units in: K, m/s, m, hPa
+        # Define the unit strings here for the json
+        temp_unit = 'C'
+        wind_speed_unit = 'm/s'
+        visibility_unit = 'km'
+        pressure_unit = 'hPa'
+        ceiling_elevation_unit = 'm'
 
         if (temp_ := current_measurements.get('temp')) is not None:
             temp_c = temp_convert(temp_, 'c')
@@ -5900,16 +5934,21 @@ class wx_API():
             elevation = None
 
         if (wind_spd_now := current_wind.get('speed')):
+            gust_now = current_wind.get('gust')
             match UNITS_WX:
                 case 0:
                     wspd = ms_convert(wind_spd_now, 'kt')
+                    gust_spd = ms_convert(gust_now, 'kt')
                 case 2:
                     wspd = ms_convert(wind_spd_now, 'mph')
+                    gust_spd = ms_convert(gust_now, 'mph')
                 case _:
                     wspd = wind_spd_now
+                    gust_spd = gust_now
             win_dir = current_wind.get('deg')
         else: # note, this can be either int(0) or None; still works as intended
             wspd = wind_spd_now
+            gust_spd = None
             win_dir = None
 
         # handle some filtering and the rest of the conversion here
@@ -5927,6 +5966,9 @@ class wx_API():
             case 0:
                 ceiling = meter_convert(ceiling, 'ft')
                 current_visibility = meter_convert(current_visibility, 'mi')
+                ceiling_elevation_unit = 'ft'
+                visibility_unit = 'mi'
+                wind_speed_unit = 'kt'
             case 2:
                 dew_point = temp_convert(dew_point, 'c-f')
                 ceiling = meter_convert(ceiling, 'ft')
@@ -5934,6 +5976,11 @@ class wx_API():
                 current_visibility = meter_convert(current_visibility, 'mi')
                 pressure_corrected = hPa_to_inHg(pressure_corrected)
                 pressure_actual = hPa_to_inHg(pressure_actual)
+                temp_unit = 'F'
+                ceiling_elevation_unit = 'ft'
+                visibility_unit = 'mi'
+                pressure_unit = 'inHg'
+                wind_speed_unit = 'mph'
             case _:
                 current_visibility = meter_convert(current_visibility, 'km')
 
@@ -5949,12 +5996,19 @@ class wx_API():
             'dew_point': dew_point,
             'wind_speed': wspd,
             'wind_dir': win_dir,
+            'wind_gust': gust_spd,
             'ceiling': ceiling,
             'cloudiness': current_clouds,
             'visibility': current_visibility,
             'elevation': elevation,
             'pressure': pressure_corrected,
             'pressure_raw': pressure_actual,
+            'temp_unit': temp_unit,
+            'wind_speed_unit': wind_speed_unit,
+            'distance_unit': visibility_unit,
+            'pressure_unit': pressure_unit,
+            'ceiling_elevation_unit': ceiling_elevation_unit,
+            'API_key': f'*****{OPENWEATHER_API_KEY[-5:]}',
             'response_time_ms': round(end * 1000, 1),
             'successful_calls': self.successful_calls,
             'failed_calls': self.failed_calls,
@@ -8041,7 +8095,7 @@ if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
                     case 1:
                         main_logger.info("Using metric weather units.")
                     case 2:
-                        main_logger.info("Using imperial weather units.")
+                        main_logger.info("Using U.S. customary weather units.")
                     case _:
                         main_logger.info("Using aeronautical weather units.")
 
