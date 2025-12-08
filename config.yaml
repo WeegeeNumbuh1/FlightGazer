@@ -1,15 +1,15 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.6.4 # do not modify this
+CONFIG_VERSION: v.9.7.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
 
 UNITS: 0
 # Select which units to use.
-# 0 = Aeronautical (nmi, ft, kt)
-# 1 = Metric (km, m, km/h)
-# 2 = U.S. customary (mi, ft, mph)
+# 0 = Aeronautical (nmi, ft, kt, ft/min)
+# 1 = Metric (km, m, km/h, m/s)
+# 2 = U.S. customary (mi, ft, mph, ft/min)
 
 HEIGHT_LIMIT: 15000
 # [Integer: 2500 ~ 75000 feet or 760 ~ 22860 meters] (only supply a number)
@@ -107,6 +107,12 @@ SHOW_EVEN_MORE_INFO: true
 # If using JOURNEY_PLUS, this information will replace the default center readout
 # and relocate RSSI in the bottom right with the aircraft track (vertical speed is no longer shown).
 
+EXTENDED_DETAILS: false
+# [true/false]
+# When SHOW_EVEN_MORE_INFO is enabled, add an aircraft's registration and its current transponder code to
+# the readout. The aircraft's registration is only shown when the aircraft is not using its registration
+# as its callsign.
+
 CLOCK_CENTER_ROW:
   ROW1: 1
   ROW2: 0
@@ -137,6 +143,10 @@ ALTERNATIVE_FONT: false
 # When true, use a less squared-off font for the majority of the display's output.
 # This alternative font also maximizes the difference between homoglyphs (ex: '5' vs 'S', '0' vs 'O', etc.)
 
+PREFER_ICAO_CODES: false
+# [true/false]
+# When true, use ICAO codes instead of the default IATA codes for airports.
+
 DISPLAY_SWITCH_PROGRESS_BAR: true
 # [true/false]
 # When true, display a progress bar at the bottom of the aircraft info screen to indicate how long
@@ -156,6 +166,12 @@ ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
 # Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
 # ENABLE_TWO_BRIGHTNESS is enabled.
 # If you do not want the brightness to change, set this to null or an empty value.
+
+DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: false
+# [true/false]
+# Set to true to reduce disturbances at night while retaining the ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+# functionality during the daytime.
+# This setting only works when both ACTIVE_PLANE_DISPLAY_BRIGHTNESS and ENABLE_TWO_BRIGHTNESS are enabled.
 
 ENABLE_TWO_BRIGHTNESS: true
 # [true/false]

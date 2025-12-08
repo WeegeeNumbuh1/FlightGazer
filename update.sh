@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.9.2.2
+# Last updated: v.9.7.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -333,7 +333,7 @@ if [ $MIGRATE_FLAG -eq 1 ]; then
 	echo "    FlightGazer is currently running with default settings."
 	echo "    If 'config.yaml' was present, your previous settings"
 	echo -e "    are in a file named 'config_old.yaml' in ${BASEDIR}"
-	echo "    You must migrate your settings manually, then restart FlightGazer."
+	echo "    You must migrate/update your settings manually, then restart FlightGazer."
 	sleep 1s
 fi
 if [ $OLDER_BUILD -eq 1 ]; then

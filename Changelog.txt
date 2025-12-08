@@ -5,6 +5,23 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.0 - 2025-12-08
+    - NEW: New setting to use ICAO airport codes instead of the default IATA codes, with PREFER_ICAO_CODES
+    - NEW: Setting to display registration and squawk when SHOW_EVEN_MORE_INFO is used, with EXTENDED_DETAILS
+        - The registration will only be shown if the callsign is not already using the registration
+    - NEW: Track when an aircraft declares an in-flight emergency (squawking 7500, 7600, or 7700)
+        - This prepends a "!" in front of the callsign and functions like Track Mode;
+          if your ADS-B receiver detects an aircraft squawking any of these codes it will keep track of the
+          aircraft until it lands or is no longer detected by your ADS-B receiver
+            - The callsign color is also overriden to be red when this aircraft is on display
+        - Additionally this will also be logged and show freeze frame data like how the dxing log and
+          FOLLOW_MODE modes already do
+        - Interactive mode will also highlight this aircraft in red, regardless of NO_FILTER mode
+    - NEW: New setting: DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT (does exactly what it says)
+    - Tweak the "tracking area is too large" algorithm introduced in v.9.0.0
+        - It now displays the reason as to why it was triggered
+    - When using metric units, vertical speed is now shown in meters per second instead of per minute
+
 v.9.6.4 - 2025-11-27
     - Add unit keys for the weather info section in the json
     - Add rudimentary parsing for the OpenWeather API key to make sure it's in the right format

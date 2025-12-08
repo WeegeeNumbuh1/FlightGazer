@@ -129,6 +129,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Program state is available in a json file for use elsewhere
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
+- Automatically tracks aircraft which report distress signals
 - Robust and hard-to-break
 - Unique tools and custom-developed fonts that can be used in other projects (don't forget to credit me)
 - Constant development
@@ -469,9 +470,12 @@ You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack)
             "CategoryDesc": "Small (15500-75000 lbs)",
             "TrackingFlag": "None",
             "Registration": "N753SK",
+            "Squawk": 4321,
             "Priority": 1,
             "Source": "ADS-B",
             "OnGround": false,
+            "Distressed": false,
+            "NavigationAccuracy": 9,
             "ApproachRate": 64.186,
             "FutureLatitude": 41.980467,
             "FutureLongitude": -87.905124,

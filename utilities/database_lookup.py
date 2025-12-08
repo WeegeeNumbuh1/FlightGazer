@@ -11,7 +11,7 @@ class DatabaseHandler:
     """ Handles the database querying. Pass a path for the database location and a timeout in seconds.
     Once this class is instantiated, use `.connect()` to initiate the database connection. Don't forget
     to call `.close()` at some point! (preferably during shutdown) """
-    def __init__(self, database_location, timeout: float):
+    def __init__(self, database_location, timeout: float = 1):
         self.database_path = Path(database_location).as_posix()
         self.queries = 0
         self.query_misses = 0
@@ -41,10 +41,12 @@ class DatabaseHandler:
                 cursor.close()
                 if result is not None:
                     result = dict(result)
-                    database_logger.info("Connected to database. "
-                                         f"Version: {result['version']}, "
-                                         f"created on: {result['created_date']}"
-                                         )
+                    self.database_version = result['version']
+                    database_logger.info(
+                        "Connected to database. "
+                        f"Version: {self.database_version}, "
+                        f"created on: {result['created_date']}"
+                    )
                 else:
                     raise KeyError
                 return True

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.6.4 --- 2025-11-27'
+VERSION: str = 'v.9.7.0 --- 2025-12-08'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -474,9 +474,12 @@ API_SCHEDULE: dict = {
 }
 SHOW_EVEN_MORE_INFO: bool = True
 NO_GROUND_TRACKING: bool = False
-CLOCK_CENTER_ROW_CYCLE: bool = False # new setting!
-OPENWEATHER_API_KEY: str = '' # new setting!
-UNITS_WX: int|None = 0 # new setting!
+CLOCK_CENTER_ROW_CYCLE: bool = False
+OPENWEATHER_API_KEY: str = ''
+UNITS_WX: int|None = 0
+PREFER_ICAO_CODES: bool = False # new setting!
+EXTENDED_DETAILS: bool = False # new setting!
+DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -544,6 +547,9 @@ default_settings: dict = {
     "CLOCK_CENTER_ROW_CYCLE": CLOCK_CENTER_ROW_CYCLE,
     "OPENWEATHER_API_KEY": OPENWEATHER_API_KEY,
     "UNITS_WX": UNITS_WX,
+    "PREFER_ICAO_CODES": PREFER_ICAO_CODES,
+    "EXTENDED_DETAILS": EXTENDED_DETAILS,
+    "DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT": DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT,
 }
 """ Dict of default settings """
 
@@ -675,6 +681,10 @@ This dictionary is reset at the end of the day with the `runtime_accumulators_re
 plane_load: list = [0., 0.]
 """ Average amount of relevant planes as tracked by the selection algorithm [0],
 and average duration the algorithm is in an active state in seconds [1] """
+tracking_distress_call: str = ''
+""" ICAO hex of a plane using squawk code 7500, 7600, or 7700.
+By default this is an empty string. Controlled by `AirplaneParser`.
+Used by the Display to override the callsign color. """
 
 # display stuff
 idle_data: dict = {'Flybys': "0", 'Track': "0", 'Range': "0"}
@@ -704,6 +714,11 @@ active_plane_display: bool = False
 current_brightness: int = BRIGHTNESS
 """ Commanded brightness level for the display; may be changed depending on settings
 and altered by `brightness_controller()` """
+is_night: bool = False
+""" Flag to determine what brightness mode we're using.
+Modified by `brightness_controller()` and only if that thread is running.
+Read by the Display to control when to use the `ACTIVE_BRIGHTNESS` value based on
+the `DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT` setting. """
 
 # location stuff
 rlat: float | None = None
@@ -1609,6 +1624,9 @@ def configuration_check() -> None:
         else:
             main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
 
+    if SHOW_EVEN_MORE_INFO and EXTENDED_DETAILS:
+        main_logger.info("EXTENDED_DETAILS is enabled, aircraft registration and squawk will be shown in the marquee.")
+
     if FASTER_REFRESH:
         main_logger.info("FASTER_REFRESH enabled, dump1090 polling rate is now 1 second.")
 
@@ -2253,11 +2271,11 @@ class PrintToConsole:
                 print("".join(filt_algo_str))
             else:
                 if DUMP978_JSON is None:
-                    filter_stat_str_1 = (f"{white_highlight}******* No Filters mode enabled. "
+                    filter_stat_str_1 = (f"{white_highlight}******* No Filter mode enabled. "
                                          f"All aircraft with locations detected by {dump1090} shown. *******{rst}\n")
                     print(filter_stat_str_1)
                 else:
-                    filter_stat_str_1 = (f"{white_highlight}******* No Filters mode enabled. "
+                    filter_stat_str_1 = (f"{white_highlight}******* No Filter mode enabled. "
                                          f"All aircraft with locations detected by {dump1090} and dump978 shown. *******{rst}\n")
                     print(filter_stat_str_1)
         if range_too_large:
@@ -2307,6 +2325,9 @@ class PrintToConsole:
                     if focus_plane_ids_discard:
                         if aircraft['ID'] in focus_plane_ids_discard:
                             print_info.append(italic)
+                if aircraft['Distressed']:
+                    # this overrides the above colors
+                    print_info.append(red_warning)
 
                 if FOLLOW_THIS_AIRCRAFT == aircraft['ID']:
                     print_info.append("--> ")
@@ -2317,11 +2338,16 @@ class PrintToConsole:
                 print_info.append(f" ({aircraft['Country']}, ")
                 print_info.append(f"{aircraft['ID']}".ljust(6))
                 print_info.append(")")
+                if aircraft['Distressed']:
+                    print_info.append(" ***EMERGENCY*** ")
                 print_info.append(" | ")
 
                 # speed section
                 print_info.append("SPD: ")
-                print_info.append(f"{aircraft['Speed']:.1f}".rjust(5))
+                if altitude_multiplier != 1:
+                    print_info.append(f"{aircraft['Speed']:.1f}".rjust(6))
+                else:
+                    print_info.append(f"{aircraft['Speed']:.1f}".rjust(5))
                 print_info.append(f"{speed_unit} @ ")
                 print_info.append(f"{aircraft['Track']:.1f}°".rjust(6))
                 print_info.append(" | ")
@@ -2336,8 +2362,11 @@ class PrintToConsole:
                 else:
                     print_info.append(f"{alt_i:.1f}".rjust(7))
                     print_info.append(f"{altitude_unit}, ")
-                print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(7))
-                print_info.append(f"{altitude_unit}/min, ")
+                print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(6))
+                if altitude_multiplier != 1: # don't rely on `UNITS`
+                    print_info.append("m/s, ")
+                else:
+                    print_info.append("ft/min, ")
                 print_info.append(f"{aircraft['Elevation']:.2f}°".rjust(6))
                 print_info.append(" | ")
                 # distance section
@@ -2381,6 +2410,7 @@ class PrintToConsole:
                         print_info.append(f" | REG: {aircraft['Registration'].ljust(10)}")
                     else:
                         print_info.append(" | REG: Unknown   ")
+                    print_info.append(f" | SQWK: {aircraft['Squawk']}")
                 # append operator info and aircraft type
                 if aircraft['Operator']:
                     print_info.append(f" | {aircraft['Operator']}")
@@ -3030,9 +3060,11 @@ def main_loop_generator() -> None:
             - AircraftDesc: The type of plane (if available, includes year if available), defaults None
             - TrackingFlag: What the plane is operating as (eg: LADD, military), represented as a string, defaults as string "None"
             - Registration: Plane's registration (if available), defaults None
+            - Squawk: 4 digit octal code assigned to the plane by ATC
             - Priority: Value representing how "good" the data is. Closer to 0 = best, defaults to 0
             - Source: Source of the data, either 'ADS-B' or 'UAT'
             - OnGround: Additional context for when Altitude is 0; True if actually on the ground, False if the altitude could not be determined.
+            - Distressed: True if an aircraft is emitting a distress code (squawking 7500, 7600, 7700), False otherwise.
             - NavigationAccuracy: Navigation accuracy of the position, in meters. Defaults None
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
             - FutureLatitude: Estimated next latitude of the plane based on heading, speed, and LOOP_INTERVAL. Defaults None, always None when NOFILTER_MODE is enabled
@@ -3141,6 +3173,7 @@ def main_loop_generator() -> None:
             seen_pos = a.get('seen_pos')
             broadcast_type = a.get('type', 'None')
             hex = a.get('hex', "?")
+            squawk = a.get('squawk')
             priority_value = a.get(
                 'priority',
                 priority_lookup.get(broadcast_type)
@@ -3185,9 +3218,16 @@ def main_loop_generator() -> None:
                 or really_far
             ):
                 normal_operation = True
+            is_distressed = False # flag if a plane is squawking a distress code (7500, 7600, or 7700)
+            match squawk:
+                case 7500 | 7600 | 7700:
+                    is_distressed = True
+                case _:
+                    is_distressed = False
             if (
                 NOFILTER_MODE
                 or hex == FOLLOW_THIS_AIRCRAFT
+                or is_distressed
                 or normal_operation
             ):
                 alt_g = a.get('alt_geom') # more accurate
@@ -3218,11 +3258,18 @@ def main_loop_generator() -> None:
                     continue
                 # below is the last filter; if a plane passes this, we grab all the info and append to
                 # the relevant planes list
-                if alt < HEIGHT_LIMIT or hex == FOLLOW_THIS_AIRCRAFT or really_far:
+                if (
+                    alt < HEIGHT_LIMIT
+                    or hex == FOLLOW_THIS_AIRCRAFT
+                    or really_far
+                    or is_distressed
+                ):
                     flight = a.get('flight')
                     rssi = a.get('rssi', 0)
                     vs = a.get('geom_rate', a.get('baro_rate', 0))
-                    vs = round(vs * altitude_multiplier, 3)
+                    # special case for vertical speed: feet/min -> m/s
+                    if altitude_multiplier != 1: # don't rely on `UNITS`
+                        vs = round(vs * 0.00508, 1)
                     track = a.get('track', 0)
                     gs = round(gs * speed_multiplier, 3)
                     if has_key(a, 'uat_version'):
@@ -3348,9 +3395,11 @@ def main_loop_generator() -> None:
                         "CategoryDesc": emitter,
                         "TrackingFlag": "None",
                         "Registration": registration,
+                        "Squawk": squawk,
                         "Priority": priority_value,
                         "Source": source,
                         "OnGround": is_on_ground,
+                        "Distressed": is_distressed,
                         "NavigationAccuracy": nac_p,
                         "ApproachRate": 0.0, # this is not calculated in this loop, check below
                         "FutureLatitude": futlat,
@@ -3520,12 +3569,15 @@ class AirplaneParser:
         self._active_loop_count = deque(maxlen=50)
         self._range_too_large = False
         self._PIA_latch = False
+        self._distressed_latch = False
         self.run_loop()
 
     def plane_selector(self, message):
         """ Select a plane! """
-        global focus_plane, focus_plane_stats, focus_plane_iter, focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
-        global process_time, selection_events, algorithm_rare_events, selection_override, high_priority_events, plane_load, range_too_large
+        global focus_plane, focus_plane_stats, focus_plane_iter
+        global focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
+        global process_time, selection_events, algorithm_rare_events, selection_override
+        global high_priority_events, plane_load, range_too_large, tracking_distress_call
         global algorithm_daily_runtime
         start_time = time.perf_counter()
         with threading.Lock():
@@ -3658,6 +3710,14 @@ class AirplaneParser:
                                 main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
                                 freeze_frame_packet(entry, show_distance=True)
                                 FOLLOW_THIS_AIRCRAFT_SPOTTED = True
+                        if entry['Distressed']:
+                            if not self._distressed_latch:
+                                self._distressed_latch = True # note, this latch will only reset once there are no more planes
+                                tracking_distress_call = entry['ID']
+                                main_logger.warning(f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
+                                                    "has been detected by your ADS-B site and declared an emergency. "
+                                                    f"(Squawking {entry['Squawk']})")
+                                freeze_frame_packet(entry, show_distance=True)
                         if entry['TrackingFlag'] == 'PIA' and not NOFILTER_MODE:
                             if not self._PIA_latch:
                                 self._PIA_latch = True
@@ -3785,32 +3845,33 @@ class AirplaneParser:
                 self.plane_count_avg = sum(self._plane_counts) / len(self._plane_counts)
                 plane_load[0] = self.plane_count_avg
                 iter_time = focus_plane_iter * LOOP_INTERVAL
-                busy_flag = False
-                if (
-                    (self.plane_count_avg > 2.75 and iter_time > 600)
-                    # short-term, traffic-based over 10 min
-                    or
-                    (self.plane_count_avg > 5 and iter_time > 240)
-                    or
-                    (self.algorithm_active_time_avg * LOOP_INTERVAL > 720 and len(self._active_loop_count) > 4)
+                warn_reason = ''
+                if self.plane_count_avg >= 8:
+                    warn_reason = f'Too many aircraft in area (Average: {self.plane_count_avg:.2f})'
+                elif self.plane_count_avg > 5 and iter_time > 240:
+                    warn_reason = f'Very high short-term traffic (Average: {self.plane_count_avg:.2f} aircraft) over 4 minutes'
+                elif self.plane_count_avg > 2.9 and iter_time > 600:
+                    # short-term; traffic-based over 10 min
+                    warn_reason = f'High short-term traffic (Average: {self.plane_count_avg:.2f} aircraft) over 10 minutes'
+                if self.algorithm_active_time_avg * LOOP_INTERVAL > 720 and len(self._active_loop_count) > 5:
                     # long-term; algorithm is kept working for 12 minutes or more on average
+                    warn_reason = f'Constant long-term usage ({self.algorithm_active_time_avg:.1f} sec)'
+                if (
+                    iter_time > 1800
+                    and not follow_flag
+                    and not self._distressed_latch
                 ):
-                    busy_flag = True
-                if not self._range_too_large:
-                    if (
-                        not follow_flag
-                        and (busy_flag or iter_time > 1800)
-                        ) or self.plane_count_avg >= 8:
-                        main_logger.warning("************************************************************")
-                        main_logger.warning(f"*** The desired focus region (<{RANGE:.2f}{distance_unit}, "
-                                            f"<{HEIGHT_LIMIT:.2f}{altitude_unit})")
-                        main_logger.warning("might be too large for the aircraft activity in your area. ***")
-                        main_logger.warning("************************************************************")
-                        main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT.")
-                        main_logger.debug(f"Current average tracking load: {self.plane_count_avg:.3f} planes,"
-                                        f" {self.algorithm_active_time_avg:.3f} iterations (current loop: {focus_plane_iter})")
-                        self._range_too_large = True
-                        range_too_large = self._range_too_large
+                    warn_reason = 'Tracking for longer than 30 minutes'
+                if not self._range_too_large and warn_reason:
+                    main_logger.warning("************************************************************")
+                    main_logger.warning(f"*** The desired focus region (<{RANGE:.2f}{distance_unit}, "
+                                        f"<{HEIGHT_LIMIT:.2f}{altitude_unit})")
+                    main_logger.warning("might be too large for the aircraft activity in your area. ***")
+                    main_logger.warning(f"Reason: {warn_reason}")
+                    main_logger.warning("************************************************************")
+                    main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT.")
+                    self._range_too_large = True
+                    range_too_large = self._range_too_large
 
             else: # when there are no planes
                 if focus_plane_iter > 0:# clean-up variables
@@ -3828,15 +3889,20 @@ class AirplaneParser:
                         focus_plane_stats.clear()
                         focus_plane_ids_scratch.clear()
                         focus_plane_ids_discard.clear()
-                        self._last_plane_count = 0
                         selection_override = False
                         operator_lookup.cache_clear()
                         database_lookup.cache_clear()
 
+                    self._last_plane_count = 0
+                    if self._distressed_latch:
+                        main_logger.info("No longer detecting aircraft emergency (hopefully everyone involved is safe).")
+                        tracking_distress_call = ''
+                    self._distressed_latch = False # always reset once there are no more planes
+
         with threading.Lock():
             process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
             if last_rare_occurrences != self.rare_occurrences:
-                algorithm_rare_events = self.rare_occurrences
+                algorithm_rare_events = self.rare_occurrences # export this value
 
         # this triggers the DisplayFeeder and PrintToConsole
         dispatcher.send(message='', signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
@@ -3994,12 +4060,16 @@ class APIFetcher:
                     for flight in response_json['flights']:
                         if "En Route" in flight.get('status', ''): # check we're reading current flight information
                             if flight['origin']:
-                                # we optimally want the 3 letter airport codes
-                                # cascade through these keys until we have something
-                                origin = flight['origin'].get('code_lid')
-                                if origin is None:
-                                    origin = flight['origin'].get('code_iata')
-                                if origin is None:
+                                if not PREFER_ICAO_CODES:
+                                    # we optimally want the 3 letter airport codes
+                                    # cascade through these keys until we have something
+                                    origin = flight['origin'].get('code_lid')
+                                    if origin is None:
+                                        origin = flight['origin'].get('code_iata')
+                                    if origin is None:
+                                        # note: the `code` key will either use the ICAO or FAA LID code
+                                        origin = flight['origin'].get('code')
+                                else:
                                     origin = flight['origin'].get('code')
                                 # airport name, not always present if coordinate-based origin
                                 origin_name = flight['origin'].get('name')
@@ -4008,10 +4078,13 @@ class APIFetcher:
 
                             # with position-only flights, the `destination` key will be None
                             if flight['destination']:
-                                destination = flight['destination'].get('code_lid')
-                                if destination is None:
-                                    destination = flight['destination'].get('code_iata')
-                                if destination is None:
+                                if not PREFER_ICAO_CODES:
+                                    destination = flight['destination'].get('code_lid')
+                                    if destination is None:
+                                        destination = flight['destination'].get('code_iata')
+                                    if destination is None:
+                                        destination = flight['destination'].get('code')
+                                else:
                                     destination = flight['destination'].get('code')
 
                                 destination_name = flight['destination'].get('name')
@@ -4317,6 +4390,8 @@ class DisplayFeeder:
         active_stats = {}
         if focus_plane and focus_plane_stats:
             flight_name = f"{focus_plane_stats['Flight']}"
+            if focus_plane_stats['Distressed']:
+                flight_name = "!" + flight_name
             if focus_plane == FOLLOW_THIS_AIRCRAFT:
                 flight_name = flight_name + "*"
             # flight name readout is limited to 8 characters
@@ -4376,10 +4451,17 @@ class DisplayFeeder:
             track = "".join(trkstr)
             # vertical speed is an interesting one; we are limited to 6 characters:
             # 1 for indicator, 1 for sign, and 4 for values
-            vs_i = int(round(focus_plane_stats['VertSpeed'], 0))
-            vs_str = f"{vs_i}"
-            if abs(vs_i) >= 10000:
-                vs_str = f"{(vs_i / 1000):.1f}"
+            if altitude_multiplier == 1:
+                vs_i = int(round(focus_plane_stats['VertSpeed'], 0))
+                vs_str = f"{vs_i}"
+                if abs(vs_i) >= 10000:
+                    vs_str = f"{(vs_i / 1000):.1f}"
+            else: # m/s; do something similar like how we display Range
+                vs_i = round(focus_plane_stats['VertSpeed'], 1)
+                if abs(vs_i) >= 100: # covers even the case of supersonic fully vertical ascent
+                    vs_str = f"{vs_i:.0f}"
+                else:
+                    vs_str = f"{vs_i:.1f}"
             if vs_i > 0:
                 vs_str = "+" + vs_str
             elif vs_i == 0:
@@ -4429,6 +4511,12 @@ class DisplayFeeder:
                 api_orig = "!CON"
                 api_dest = "FAIL"
 
+            ext_detail_reg_mismatch = False
+            # used for determining if we should append the registration to the description string
+            if focus_plane_stats['Registration']:
+                if focus_plane_stats['Flight'] != focus_plane_stats['Registration'].replace("-", ""):
+                    ext_detail_reg_mismatch = True
+
             # Get all the other info from the focus plane provided by the database (if available)
             # Example outputs (non-exhaustive):
             # "2025 BOEING 787-8 Dreamliner | United Airlines"
@@ -4436,9 +4524,12 @@ class DisplayFeeder:
             # "2024 BELL 429 GlobalRanger (LADD aircraft) | CITY OF CHICAGO DEPARTMENT OF POLICE"
             # "BOEING-VERTOL CH-47 Chinook (Military aircraft) | AIR MOBILITY COMMAND (AMC)"
             # "BOEING KC-135R/T Stratotanker (Military aircraft)"
+            # "NORTHROP GRUMMAN RQ-4 Global Hawk (Military aircraft) REG:11-2046 SQWK:7400" (only with EXTENDED_DETAILS enabled)
             # "Aircraft type: High Vortex Large (75000-300000 lbs) (PIA aircraft) | ForeFlight"
             # "FlightAware (PIA aircraft)"
             aircraft_str_ = []
+            if focus_plane_stats['Distressed']:
+                aircraft_str.append("This aircraft has declared an emergency. | ")
             if focus_plane_stats['AircraftDesc']:
                 aircraft_str_.append(focus_plane_stats['AircraftDesc'])
             else:
@@ -4451,8 +4542,13 @@ class DisplayFeeder:
                         aircraft_str_.append(f"Aircraft type: {focus_plane_stats['CategoryDesc']}")
             if (part1 := "".join(aircraft_str_)): # if any of the above proved true
                 if focus_plane_stats['TrackingFlag'] != "None":
-                    # recall: PIA aircraft will not have an aircraft description and will never show up here
                     aircraft_str_.append(f" ({focus_plane_stats['TrackingFlag']} aircraft)")
+                if EXTENDED_DETAILS:
+                    if ext_detail_reg_mismatch:
+                        # Only append the registration if the callsign isn't already using it
+                        aircraft_str_.append(f" REG:{focus_plane_stats['Registration']}")
+                    if focus_plane_stats['Squawk']:
+                        aircraft_str_.append(f" SQWK:{focus_plane_stats['Squawk']}")
             if focus_plane_stats['Operator']: # airline
                 if part1: aircraft_str_.append(" | ")
                 if focus_plane_stats['OperatorAKA']:
@@ -4632,7 +4728,7 @@ def brightness_controller() -> None:
     """ Changes desired display brightness based on current environment
     (ex: values of `ENABLE_TWO_BRIGHTNESS` or `sunset_sunrise`)
     Needs to run in its own thread. """
-    global current_brightness
+    global current_brightness, is_night
     if not ENABLE_TWO_BRIGHTNESS:
         main_logger.info("Dynamic brightness is disabled.")
         main_logger.info(f"Display will remain at a static brightness ({BRIGHTNESS}).")
@@ -4648,14 +4744,20 @@ def brightness_controller() -> None:
             current_brightness = BRIGHTNESS
             main_logger.warning(f"Desired sunrise time \'{BRIGHTNESS_SWITCH_TIME['Sunrise']}\' "
                                 f"is after sunset \'{BRIGHTNESS_SWITCH_TIME['Sunset']}\'")
-            main_logger.info(f">>> Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
+            main_logger.info(">>> Display brightness will not dynamically change "
+                             f"based on time-of-day and will remain a static brightness. ({BRIGHTNESS})")
             return
         main_logger.info("Dynamic brightness is enabled.")
         main_logger.info(f"Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
+        if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None and DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT:
+            main_logger.info("DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT is enabled, the display will use brightness"
+                             f" level {BRIGHTNESS_2} when an aircraft is detected after sunset.")
+
     except Exception: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
         current_brightness = BRIGHTNESS
         main_logger.warning("Cound not parse BRIGHTNESS_SWITCH_TIME. This is required as a fallback.")
-        main_logger.info(f">>> Display brightness will not dynamically change and will remain a static brightness. ({BRIGHTNESS})")
+        main_logger.info(">>> Display brightness will not dynamically change "
+                         f"based on time-of-day and will remain a static brightness. ({BRIGHTNESS})")
         return
 
     while True: # if the above tests pass, this thread can go to work
@@ -4677,8 +4779,10 @@ def brightness_controller() -> None:
         else:
             if current_time > sunrise_time and current_time < sunset_time:
                 current_brightness = BRIGHTNESS
+                is_night = False
             else:
                 current_brightness = BRIGHTNESS_2
+                is_night = True
         if current_brightness != brightness_now:
             main_logger.debug(f"Brightness changed from {brightness_now} to {current_brightness}")
 
@@ -4882,13 +4986,16 @@ class WriteState:
                     driver_str = 'rgbmatrix'
                 else:
                     driver_str = 'RGBMatrixEmulator'
-            current_brightness_val: str | None = None
+            current_brightness_val: int | None = None
             if DISPLAY_IS_VALID:
                 if (
                     active_plane_display
                     and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None
                 ):
-                    current_brightness_val = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
+                    if DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT and is_night:
+                        current_brightness_val = current_brightness
+                    else:
+                        current_brightness_val = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
                 else:
                     current_brightness_val = current_brightness
             display_status = {
@@ -6843,6 +6950,15 @@ class Display(
         UAT_INDICATOR_POS = (33, 1)
         return_flag = False
 
+        # special case: if the current plane has declared an emergency, override
+        # the callsign color to red. Recall `self._callsign_blinker_cache` is
+        # the current ID at this frame
+        if (
+            tracking_distress_call
+            and tracking_distress_call == self._callsign_blinker_cache
+        ):
+            CALLSIGN_COLOR = colors.RED
+
         # we want to blink this text
         if not self._callsign_is_blanked:
             callsign_now = active_data.get('Callsign', "")
@@ -7886,7 +8002,14 @@ class Display(
     @Animator.KeyFrame.add(1)
     def aaa_brightness_switcher(self, count):
         self._last_brightness = self.matrix.brightness
-        if active_plane_display and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None:
+        ignore_active_brightness = False
+        if DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT and is_night:
+            ignore_active_brightness = True
+        if (
+            active_plane_display
+            and ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None
+            and not ignore_active_brightness
+        ):
             self.matrix.brightness = ACTIVE_PLANE_DISPLAY_BRIGHTNESS
         else:
             try:
