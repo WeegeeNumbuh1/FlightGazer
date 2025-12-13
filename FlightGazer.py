@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.0 --- 2025-12-08'
+VERSION: str = 'v.9.7.1 --- 2025-12-13'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -477,9 +477,9 @@ NO_GROUND_TRACKING: bool = False
 CLOCK_CENTER_ROW_CYCLE: bool = False
 OPENWEATHER_API_KEY: str = ''
 UNITS_WX: int|None = 0
-PREFER_ICAO_CODES: bool = False # new setting!
-EXTENDED_DETAILS: bool = False # new setting!
-DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False # new setting!
+PREFER_ICAO_CODES: bool = False
+EXTENDED_DETAILS: bool = False
+DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -840,6 +840,8 @@ achievement_time: str | None = None
 database_stats: list = [0, 0, 0, 0., 0.]
 """ Info about how the database is performing.
 [Total queries, queries with no result, failed queries, average response time (ms), last response time (ms)] """
+database_ver: str | None = None
+""" Current version of the database. None if there's no connection to the database. """
 resource_usage: list = [0., 0., None]
 """ [CPU (normalized) and memory usage (MiB) of this running process, along with CPU temp (None if not available)] """
 #--- watchdog control and counters
@@ -3047,7 +3049,7 @@ def main_loop_generator() -> None:
             - Latitude
             - Longitude
             - Track: Plane's track over ground in degrees
-            - VertSpeed: Plane's rate of altitude in units/minute
+            - VertSpeed: Plane's rate of altitude change
             - RSSI: Plane's average signal power in dBFS
             - Elevation: Plane's elevation angle in degrees
             - SlantRange: Plane's direct line-of-sight distance from your location in the selected units.
@@ -3774,7 +3776,6 @@ class AirplaneParser:
                             # due to the values being common multiples of each other
                             # eg: next_select_table = [150, 150, 156]
                             #                          ^    ^
-                            #                          |    |
                             #                          |    +-- last plane count    | 3 planes
                             #                          +------- current plane count | 2 planes
                             last_plane_count_i = 4 if self._last_plane_count > 4 else self._last_plane_count # avoid IndexError
@@ -4751,7 +4752,7 @@ def brightness_controller() -> None:
         main_logger.info(f"Display will change to brightness level {BRIGHTNESS} at sunrise and {BRIGHTNESS_2} at sunset.")
         if ACTIVE_PLANE_DISPLAY_BRIGHTNESS is not None and DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT:
             main_logger.info("DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT is enabled, the display will use brightness"
-                             f" level {BRIGHTNESS_2} when an aircraft is detected after sunset.")
+                             f" level {BRIGHTNESS_2} when an aircraft is detected at night.")
 
     except Exception: # if BRIGHTNESS_SWITCH_TIME cannot be parsed, do not dynamically change brightness
         current_brightness = BRIGHTNESS
@@ -4972,6 +4973,7 @@ class WriteState:
 
             database_info = {
                 'database_connected': DATABASE_CONNECTED,
+                'database_version': database_ver,
                 'total_queries': database_stats[0],
                 'empty_results': database_stats[1],
                 'errors': database_stats[2],
@@ -8246,6 +8248,7 @@ if DATABASE_FILE.exists():
         DATABASE_CONNECTED = db.connect()
         if db.is_connected():
             main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
+            database_ver = db.database_version
         else:
             main_logger.error("Could not connect to the database.")
     except ImportError:

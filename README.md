@@ -69,7 +69,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 
 <details><summary>I like this, how do I build my own?</summary>
 
-Coming Soon™.<br>
+[Coming Soon™](./docs/build-your-own-FlightGazer-tracking-box.md).<br>
 If you want one, I can also build one for you. (also Coming Soon™)
 </details>
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
@@ -416,78 +416,7 @@ When FlightGazer is running, it writes a JSON to `/run/FlightGazer/current_state
 Additionally, if you're using the web-app, this same JSON is also available at the `/data/current_state.json` endpoint.<br>
 You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
 
-<details><summary>Excerpt from the JSON</summary>
-
-```JSON
-"plane_stats": {
-    "currently_tracking": 93,
-    "current_range": 216.06,
-    "flybys_today": 600,
-    "last_unique_plane": {
-        "ID": "aa26c8",
-        "Time": 2669405.459399352,
-        "Flyby": 600
-    },
-    "aircraft_selections": 923,
-    "rare_selection_events": 10,
-    "high_priority_events": 1,
-    "average_relevant_planes_in_area": 1,
-    "average_algorithm_active_time_sec": 67,
-    "algorithm_use_today": "09:14:06",
-    "no_filter": false,
-    "focus_plane_iter": 11,
-    "focus_plane_ids_discard": [
-    ],
-    "focus_plane_ids_scratch": [
-        "aa26c8"
-    ],
-    "focus_plane": "aa26c8",
-    "high_priority_plane": false,
-    "in_range": 1,
-    "relevant_planes": [
-        {
-            "ID": "aa26c8",
-            "Flight": "SKW6325",
-            "Country": "US",
-            "Altitude": 3900,
-            "Speed": 239.8,
-            "Distance": 1.001,
-            "Direction": "S ",
-            "DirectionDegrees": 193,
-            "Latitude": 41.979489,
-            "Longitude": -87.907667,
-            "Track": 83.05,
-            "VertSpeed": -768,
-            "RSSI": -2.9,
-            "Elevation": 32.662746,
-            "SlantRange": 1.18911,
-            "Operator": "SKY WEST AVIATION, INC. (ST. GEORGE, UT)",
-            "Telephony": "SKYWEST",
-            "OperatorAKA": "SkyWest Airlines",
-            "Owner": "SKYWEST AIRLINES INC",
-            "AircraftDesc": "2005 BOMBARDIER Regional Jet CRJ-700",
-            "ICAOType": "CRJ7",
-            "CategoryDesc": "Small (15500-75000 lbs)",
-            "TrackingFlag": "None",
-            "Registration": "N753SK",
-            "Squawk": 4321,
-            "Priority": 1,
-            "Source": "ADS-B",
-            "OnGround": false,
-            "Distressed": false,
-            "NavigationAccuracy": 9,
-            "ApproachRate": 64.186,
-            "FutureLatitude": 41.980467,
-            "FutureLongitude": -87.905124,
-            "FutureDistance": 0.946504,
-            "Flyby": 600,
-            "Staleness": 1.36,
-            "Timestamp": 2669425.457545116
-        }
-    ]
-}
-```
-</details>
+See the [JSON details](./docs/state-file-schema.md) for a full explanation of this data.
 
 There's also an additional file `flybys.csv` in the same directory that FlightGazer resides in, which tracks hourly cumulative counts of aircraft flybys and API stats. This file is also used by FlightGazer to maintain its daily counts whenever it's restarted.
 
@@ -524,24 +453,7 @@ or, you may [start it manually](#️-interactive-mode).
 
 ### 🖼️ Output Reference & Meanings
 
-<details><summary>Table of display outputs</summary>
-
-*Taken directly from the web-app*
-
-| Output | Meaning / Cause | Remedy / Information |
-|---|---|---|
-| **Show Even More Info**<br>"LADD Aircraft" | Limiting Aircraft Data Displayed \- *"Please don't track me*\." | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
-| **Show Even More Info**<br>"PIA Aircraft" | \(U\.S\. only\) Privacy ICAO Address \- *"Good luck figuring out who I am\."* | [More Information](https://www.faa.gov/air_traffic/technology/equipadsb/privacy) |
-| **Show Even More Info**<br>"TIS-B Contact" | Traffic Information Service – Broadcast - broadcast information sent by ground stations corresponding to an aircraft; cannot be tied to a registration or aircraft type and is used for collision avoidance. | [More Information](https://en.wikipedia.org/wiki/Traffic_information_service_%E2%80%93_broadcast) |
-| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   N/A  N/A</code><br>\- or \-<br><code>FLYBY TRKG RNGE</code><br><code>123   N/A  N/A</code> | - Failed to connect to receiver at startup\.<br>- Communication with the receiver has temporarily stopped due to instability\. | - Receiver service (<code>dump1090</code>) is not running/stopped\. Check for errors for that service\.<br>- The current system may be overloaded\. Check on the system\.<br>- If operating on a remote instance of dump1090, check the network or remote system\.<br>- Additionally, check the FlightGazer logs\.<br>- After fixing the underlying issue, restart FlightGazer\. |
-| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   123  N/A</code> | Location is not set in receiver\. | - Set your location for dump1090\. Then, restart FlightGazer\.<br>- Advanced: if using a GPS receiver on the system, check to see if the service is running and has obtained a GPS fix\. |
-| **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
-| **Journey**<br><code>N/A ▶ ---</code> | - Aircraft blocked from tracking\.<br>- Aircraft detected before API was able to\. | For aircraft that are not blocked from tracking: try using a lower FLYBY_STALENESS value\. |
-| **Journey**<br><code>latitude ▶ longitude</code> | API returned a result that could not be associated with an airport\. | Rare, but normal occurrence\. |
-| **Journey**<br><code>!API ▶ FAIL</code> | API call for this flight failed\. | - API service may be down, wait until the service is restored\.<br>-You might have been rate limited. If this keeps happening, try using a smaller RANGE\.<br>- You may have an issue with your API key\. Contact FlightAware\. |
-| **Journey**<br><code>\!CON ▶ FAIL</code> | Could not connect to the API\. | Check your network connection\. |
-
-</details>
+See the [Output Reference](./docs/output-reference.md) document.
 
 ### 👓 Misc
 

@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.1 - 2025-12-13
+    - Slight tweak to database fetcher output
+    - Minor fix to webapp service file (only affects new installs)
+    - Added a documentation folder for this project
+        - Some sections from the main readme have been moved there
+
 v.9.7.0 - 2025-12-08
     - NEW: New setting to use ICAO airport codes instead of the default IATA codes, with PREFER_ICAO_CODES
     - NEW: Setting to display registration and squawk when SHOW_EVEN_MORE_INFO is used, with EXTENDED_DETAILS
@@ -13,7 +19,7 @@ v.9.7.0 - 2025-12-08
         - This prepends a "!" in front of the callsign and functions like Track Mode;
           if your ADS-B receiver detects an aircraft squawking any of these codes it will keep track of the
           aircraft until it lands or is no longer detected by your ADS-B receiver
-            - The callsign color is also overriden to be red when this aircraft is on display
+            - The callsign color is also overridden to be red when this aircraft is on display
         - Additionally this will also be logged and show freeze frame data like how the dxing log and
           FOLLOW_MODE modes already do
         - Interactive mode will also highlight this aircraft in red, regardless of NO_FILTER mode

@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.9.4.0
+# Last updated: v.9.7.1
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -274,6 +274,8 @@ license_string = "Open Data Commons Attribution License"
 with sqlite3.connect(OUTPUT_FILE) as conn:
     cursor = conn.cursor()
 
+    print("Initializing tables...")
+    table_start = perf_counter()
     # Create tables
     for char in leading_icao_chars:
         cursor.execute(f"""
@@ -288,6 +290,7 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
             );
         """)
         cursor.execute(f"DELETE FROM ICAO_{char}")
+    print(f"Table initialization took {perf_counter() - table_start:.2f} seconds.")
 
     # check if we're using an older database that doesn't have this column
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='DB_INFO';")

@@ -47,16 +47,25 @@ class DatabaseHandler:
                         f"Version: {self.database_version}, "
                         f"created on: {result['created_date']}"
                     )
+                    # reset the stats upon connection
+                    self.queries = 0
+                    self.query_misses = 0
+                    self.query_errors = 0
+                    self.last_access_speed = 0.0
+                    self._access_times.clear()
+                    self.average_speed = 0.0
                 else:
                     raise KeyError
                 return True
             except sqlite3.Error as e:
                 database_logger.error(f"{e}")
                 self._connection = None
+                self.database_version = ''
                 return False
             except KeyError:
                 database_logger.error("Could not determine database information. This database may not be valid. Terminating connection.")
                 self._connection.close()
+                self.database_version = ''
                 self._connection = None
                 return False
 
@@ -104,5 +113,6 @@ class DatabaseHandler:
             self._connection.close()
             database_logger.debug("Database successfully closed.")
             self._connection = None
+            self.database_version = ''
         else:
             database_logger.warning("Attempt to close database with no established connection.")
