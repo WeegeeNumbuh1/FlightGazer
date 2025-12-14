@@ -1958,12 +1958,12 @@ def runtime_accumulators_reset() -> None:
     Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
     algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
-    total_plane_count = len(unique_planes_seen)
-    timestamp = time.monotonic()
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
     global algorithm_daily_runtime, dump1090_failures
+    total_plane_count = len(unique_planes_seen)
+    timestamp = time.monotonic()
 
     daily_stats_str = []
     daily_stats_str_2 = []
