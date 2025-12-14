@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.2 - 2025-12-14
+    - Tweak daily stats printout for handling underlying cases which would result in 0 flybys
+    - Further improve watchdog handling when there is a mix of normal timeouts and continuous failures
+
 v.9.7.1 - 2025-12-13
     - Slight tweak to database fetcher output
     - Minor fix to webapp service file (only affects new installs)

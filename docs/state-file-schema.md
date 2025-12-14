@@ -280,7 +280,7 @@ Weather information returned by the OpenWeatherMap API for the site location.
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `site_name` | Location name of the site as reported by the API (usually city or region name) | str, null | "Townsville" |
-| `condition` | Short code for the prevailing weather condition, meant for the display; max length of 4 characters | str | "-RN" |
+| `condition` | Short code for the prevailing weather condition, meant for the display; max length of 4 characters. Refer to the `output-reference` document on these abbreviatons. | str | "-RN" |
 | `condition_desc` | More detailed description of the current weather condition | str | "light rain" |
 | `temp` | Current air temperature (depends on `temp_unit`) or null if unavailable | float, null | 12.1 |
 | `humidity` | Current humidity percent, or null | int, null | 43 |

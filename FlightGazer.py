@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.1 --- 2025-12-13'
+VERSION: str = 'v.9.7.2 --- 2025-12-14'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -727,7 +727,9 @@ rlon: float | None = None
 """ Our location longitude """
 LOCATION_IS_SET: bool = False
 """ Convenience test to check if dump1090 was able to provide a site location.
-(`rlat is not None and rlon is not None`) """
+(`rlat is not None and rlon is not None`). This is also useful to check if dump1090 was
+ever connected at startup, however, other conditions would need to be tested to definitively
+prove this. """
 sunset_sunrise: dict = {"Sunrise": None, "Sunset": None}
 """ Sunrise and sunset times for our location in datetime format.
 Updated every day at midnight via the scheduler. Defaults to None if times cannot be determined. """
@@ -1956,6 +1958,8 @@ def runtime_accumulators_reset() -> None:
     Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
     algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
+    total_plane_count = len(unique_planes_seen)
+    timestamp = time.monotonic()
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
@@ -1964,32 +1968,53 @@ def runtime_accumulators_reset() -> None:
     daily_stats_str = []
     daily_stats_str_2 = []
     algorithm_time = strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')
-    if NOFILTER_MODE:
-        d_txt = "flights observed"
-    else:
-        d_txt = "flybys"
-    daily_stats_str.append(f"> DAILY STATS for {date_now_str}: {len(unique_planes_seen)} {d_txt}.")
-    if not NOFILTER_MODE:
-        daily_stats_str.append(f" Time that there were aircraft in the area: {algorithm_time}")
-        if (time.monotonic() - START_TIME) > 86400:
-            daily_stats_str.append(f" ({(algorithm_daily_runtime / 86400) * 100:.1f}% of the day)")
-    main_logger.info(f"{''.join(daily_stats_str)}")
-    if not NOFILTER_MODE:
-        daily_stats_str_2.append("Events:")
-        if high_priority_events > 0:
-            daily_stats_str_2.append(f" {high_priority_events} high-priority overrides occurred.")
-        daily_stats_str_2.append(f" {selection_events} aircraft selections")
-        if algorithm_rare_events_now > 0:
-            daily_stats_str_2.append(f", of which {algorithm_rare_events_now} were rare selections.")
+    stats_unavailable = ''
+    if total_plane_count == 0: # "why is it zero?"
+        if not DUMP1090_IS_AVAILABLE: # "okay, something's wrong"
+            if (
+                watchdog_triggers >= watchdog_setpoint
+                or not LOCATION_IS_SET
+            ): # we terminated the connection to dump1090 or the connection didn't exist in the first place
+                stats_unavailable = f"> Daily stats are unavailable as there is no connection to {dump1090}."
         else:
-            daily_stats_str_2.append(".")
-        main_logger.info(f"{''.join(daily_stats_str_2)}")
+            if not LOCATION_IS_SET and not NOFILTER_MODE:
+                stats_unavailable = "> Daily stats are unavailable as site location is not set."
+            elif NOFILTER_MODE and timestamp - START_TIME > 10800: # guard against when runtime isn't long enough
+                stats_unavailable = ("> Daily stats are unavailable as no aircraft were detected. "
+                                    "(There might be something wrong with the site setup)")
+
+    if stats_unavailable:
+            main_logger.warning(stats_unavailable)
+            main_logger.info(">>> Please fix the underlying issue and restart FlightGazer.")
+    else:
+        if NOFILTER_MODE:
+            d_txt = "flights observed"
+        else:
+            d_txt = "flybys"
+        daily_stats_str.append(f"> DAILY STATS for {date_now_str}: {total_plane_count} {d_txt}.")
+        if not NOFILTER_MODE:
+            daily_stats_str.append(f" Time that there were aircraft in the area: {algorithm_time}")
+            if (timestamp - START_TIME) >= 86400:
+                daily_stats_str.append(f" ({(algorithm_daily_runtime / 86400) * 100:.1f}% of the day)")
+            else:
+                daily_stats_str.append(" (from program start)")
+        main_logger.info(f"{''.join(daily_stats_str)}")
+        if not NOFILTER_MODE:
+            daily_stats_str_2.append("Events:")
+            if high_priority_events > 0:
+                daily_stats_str_2.append(f" {high_priority_events} high-priority overrides occurred.")
+            daily_stats_str_2.append(f" {selection_events} aircraft selections")
+            if algorithm_rare_events_now > 0:
+                daily_stats_str_2.append(f", of which {algorithm_rare_events_now} were rare selections.")
+            else:
+                daily_stats_str_2.append(".")
+            main_logger.info(f"{''.join(daily_stats_str_2)}")
 
     if (
         (
             selection_events >= 1000
             or (
-                len(unique_planes_seen) >= 700
+                total_plane_count >= 700
                 and not NOFILTER_MODE
             )
             or (algorithm_daily_runtime > 36000) # 10 hours
@@ -2003,14 +2028,14 @@ def runtime_accumulators_reset() -> None:
         really_active_adsb_site = True
 
     if (
-        len(unique_planes_seen) >= 1250
+        total_plane_count >= 1250
         and not NOFILTER_MODE
         and (
             RANGE <= (2 * distance_multiplier)
             and HEIGHT_LIMIT <= (15000 * altitude_multiplier)
         )
         and FLYBY_STALENESS >= 30
-        and (time.monotonic() - START_TIME) > 72000
+        and (timestamp - START_TIME) > 72000
     ): # little easter egg only very few will see in the logs (if you're reading this from the source then lmao)
         if not really_really_active_adsb_site:
             achievement_time = date_now_str
@@ -2026,9 +2051,9 @@ def runtime_accumulators_reset() -> None:
             "the winds have decided your fate: become one with an approach lighting system.",
             "do you like planes?????",
         ]
-        main_logger.info(f"{len(unique_planes_seen)} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
+        main_logger.info(f"{total_plane_count} flybys... {congrats[random.randint(0, len(congrats) - 1)]}")
 
-    if really_really_active_adsb_site and len(unique_planes_seen) <= 300:
+    if really_really_active_adsb_site and 0 < total_plane_count <= 300:
         # opposite direction of congrats (https://i.kym-cdn.com/photos/images/original/002/573/423/ced.jpg)
         mythical = [
             "Quiet day, huh?",
@@ -2038,16 +2063,18 @@ def runtime_accumulators_reset() -> None:
             "Hopefully this isn't affecting your rankings on some leaderboards (if you're into that).",
             "What happened to all the planes???",
         ]
-        main_logger.info(f"{len(unique_planes_seen)} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
+        main_logger.info(f"{total_plane_count} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
 
     if super_far_plane:
         dxing_log()
 
     if sum(api_hits) > 0: # if we used the API at all
-        main_logger.info(f"API STATS for {date_now_str}: {api_hits[0] + api_hits[2]}/"
-                         f"{api_hits[0] + api_hits[1] + api_hits[2]} "
-                         f"successful API calls, of which {api_hits[2]} returned no data. "
-                         f"Estimated cost: ${estimated_api_cost:.2f}")
+        main_logger.info(
+            f"API STATS for {date_now_str}: {api_hits[0] + api_hits[2]}/"
+            f"{api_hits[0] + api_hits[1] + api_hits[2]} "
+            f"successful API calls, of which {api_hits[2]} returned no data. "
+            f"Estimated cost: ${estimated_api_cost:.2f}"
+        )
 
     # do the actual reset
     with threading.Lock():
@@ -2086,7 +2113,7 @@ def runtime_accumulators_reset() -> None:
             safe_to_use_API_cost = False
             try:
                 last_result_time = focus_plane_api_results[-1]['APIAccessed']
-                if (time.monotonic() - last_result_time) > (15 * 60): # the last API call happened more than 15 minutes ago
+                if (timestamp - last_result_time) > (15 * 60): # the last API call happened more than 15 minutes ago
                     safe_to_use_API_cost = True
                     cost_delta = 0
                 else:
@@ -3461,6 +3488,7 @@ def main_loop_generator() -> None:
         global general_stats, relevant_planes, unique_planes_seen, relevant_planes_last
         global process_time, dump1090_failures, process_time2, runtime_sizes
         sequential_failures = 0 # if we don't get processed data, this increments and we can tell the data poller is in a bad state
+        failures_delta = 0 # handle a mix of sequentual failures and normal failures
         while True:
             try:
                 loop_start = time.perf_counter()
@@ -3489,6 +3517,7 @@ def main_loop_generator() -> None:
             except TimeoutError:
                 dump1090_failures += 1
                 sequential_failures += 1
+                failures_delta += 1
                 if INTERACTIVE:
                     cls()
                     print(f"FlightGazer: {dump1090} service timed out. This is occurrence {dump1090_failures}.")
@@ -3499,7 +3528,9 @@ def main_loop_generator() -> None:
                         if FASTER_REFRESH:
                             print("FASTER_REFRESH is enabled. If this message keeps appearing, you might need to disable it.")
 
-                if dump1090_failures % dump1090_failures_to_watchdog_trigger == 0:
+                # when determining when to kick the watchdog, `failures_delta` is kept in
+                # lockstep with `dump1090_failures`, however...
+                if failures_delta % dump1090_failures_to_watchdog_trigger == 0:
                     sequential_failures = 0
                     main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
@@ -3512,6 +3543,13 @@ def main_loop_generator() -> None:
                     else:
                         main_logger.error(f"{dump1090} keeps failing to connect. The network connection may be down.")
                     sequential_failures = 0
+                    failures_delta = 0
+                    # ...if this block gets triggered, then we reset `failures_delta` to make sure the normal
+                    # timeout logic block above doesn't trigger early
+                    # example scenario: (assuming `dump1090_failures_to_watchdog_trigger` = 20)
+                    # `dump1090_failures` = 39 (when this block runs), watchdog does its thing and completes,
+                    # another timeout occurs, `dump1090_failures` = 40 % 20 == 0 -> watchdog triggered by the above block.
+                    # What using `failures_delta` does: assume above scenario, now the above block should trigger at 59 instead
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
 
                 time.sleep(5)
@@ -3523,8 +3561,9 @@ def main_loop_generator() -> None:
             except Exception as e:
                 dump1090_failures += 1
                 sequential_failures += 1
+                failures_delta += 1
                 cls()
-                if sequential_failures > 5:
+                if sequential_failures > 3:
                     sequential_failures = 0
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator) # break out
                 print(f"FlightGazer: LOOP thread caught an exception. ({e}) Trying again...")
