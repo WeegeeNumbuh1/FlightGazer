@@ -18,7 +18,7 @@ Uses the FlightAware API to get an aircraft's departure and destination airports
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
 >[!NOTE]
-> Fun fact: this is also the author's second-only Python project.
+> Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.
 
 <details open>
 <summary><b>Table of Contents</b></summary>
@@ -261,69 +261,7 @@ nano config.yaml
 Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 
 #### Tricks & Tips
-<details><summary>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</summary>
-
-Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
-Example: `http://192.168.xxx.xxx:8080` or `http://192.168.xxx.xxx/skyaware`<br>
-And then set `PREFER_LOCAL` to `false`.
-
-</details>
-<details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
-
-`rbfeeder` and `Pi24` setups don't provide a web interface that FlightGazer can look at.<br>
-FlightGazer can only run directly on those systems and must be installed on those devices (dump1090 data cannot be read remotely).<br>
-Set `PREFER_LOCAL` to `true` so that FlightGazer can read the data from these setups.<br>
-
-If you managed to install a working web interface like `tar1090` with these setups then you're an advanced user and you already know what you're doing.<br>
-
-</details>
-
-<details><summary>Connecting to a separate dump978 feeder (over the network)</summary>
-
-Set `CUSTOM_DUMP978_LOCATION` to the IP address of the dump978 system.<br>
-Example: `http://192.168.xxx.xxx:8978`<br>
-If dump1090 is running on the same system FlightGazer is running off of, leave `PREFER_LOCAL` to `true`.<br>
-FlightGazer was designed to handle reading from both a local dump1090 instance and a remote dump978 system at the same time.<br>
-However, if your network goes down or the dump978 system disconnects, this will cause FlightGazer to pause its processing as if dump1090 failed as well.<br>
-Also important to note, if your dump978 instance uses a different set location than your dump1090 one, the distance data for UAT aircraft will be overridden by your dump1090 location.
-
-</details>
-
-<details><summary>Turning off the screen at night</summary>
-
-`ENABLE_TWO_BRIGHTNESS: true`<br>
-`BRIGHTNESS_2: 0`
-
-If you don't want it to turn off at sunset,<br>
-`USE_SUNRISE_SUNSET: false`<br>
-then set `BRIGHTNESS_SWITCH_TIME` to whatever time you want.
-
-Note that FlightGazer will still be running *and* driving the screen even with a brightness of `0` so CPU usage will remain the same.
-
-</details>
-<details><summary>Only turn on the screen when there's an aircraft nearby (no clock)</summary>
-
-`BRIGHTNESS: 0`<br>
-`ENABLE_TWO_BRIGHTNESS: false`<br>
-`ACTIVE_PLANE_DISPLAY_BRIGHTNESS: <your value here>`
-
-</details>
-
-<details><summary>Hiding elements on the display</summary>
-
-Go to the color config file and set whatever element you don't want to show to `BLACK`.<br>
-Example: `seconds_color = BLACK`
-
-</details>
-
-<details><summary>Reduce flickering on a physical RGB matrix display</summary>
-
-- [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)
-- [Reserve a CPU core solely for the display](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#cpu-use)
-- Lower the value for `LED_PWM_BITS` (though `8` seems good enough)
-- Switch CPU governor to `performance` or add `force_turbo=1` to a Raspberry Pi's `config.txt` file
-
-</details>
+For useful settings with specific setups, see the [tips-n-tricks](./docs/tips-n-tricks.md) document.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -541,7 +479,7 @@ sudo systemctl disable flightgazer.service
 
 </details>
 
-<details><summary>Want to use the same aircraft databases this project uses?</summary>
+<details open><summary>Want to use the same aircraft databases this project uses?</summary>
 
 Check the [`utilities`](./utilities/) directory.
 
@@ -593,64 +531,10 @@ Simply delete the folder (and the virtual python environment if you set that up 
 </details>
 
 ## ❔ Frequently Asked Questions (not really but they could pop up)
-<details><summary><b>FAQ's (Open these before raising an issue)</b></summary>
 
-**Q: My RGB display is blank when running this, what broke?**<br>
-**A:** Check the `HAT_PWM_ENABLED` value in `config.yaml` and make sure it matches your hardware setup.<br>
-This project assumes the use of the adafruit rgbmatrix bonnet and only 1 HUB75-based RGB panel.<br>
-Other setups are not guaranteed to work but they might work by using the Advanced RGB Matrix options in the config file.<br>
-Getting the RGB display to work is beyond the scope of this project if it wasn't working before using FlightGazer.
+👉 [**Read This First**](./docs/FAQs.md)
 
-**Q: I broke it 🥺**<br>
-**A:** Try running the updater first. If it's still broken, uninstall then reinstall FlightGazer.
-
-**Q: Can I run the physical display *and* the emulator at the same time? I'd like to see the display in a web browser while the main display is still working.**<br>
-**A:** No. It's one or the other. The emulator is meant as a fallback/for development, or to try out FlightGazer before fully committing to using a real display.
-
-**Q: I restarted/updated my system but it took longer for FlightGazer to start. What's going on?**<br>
-**A:** The initialization script that starts FlightGazer checks if there are any updates to the dependencies it uses.<br>
-If it has been over three (3) months since it last checked, then the next time it restarts, it will run these checks. It usually takes a few minutes to do this, but if your internet connection is slow or the system is loaded with other processes, then it could take longer.
-
-**Q: Okay, but this update is taking a *really long* time. Then, it just stops after awhile. Is it broken?**<br>
-**A:** First, restart the whole system. Then, let FlightGazer do the update again (it should do this automatically at system startup). If it stops again, try starting FlightGazer one more time. It should succeed at this point.<br>
-
-**Q: I see a dot on the right of the aircraft readout display. What is it?**<br>
-**A:** That is an indicator of how many aircraft are within your defined area. The number of dots lit up indicate how many are present. There will always be at least one lit up, all the way to 6. If the number is greater than 1, FlightGazer will start switching between aircraft to show you what else is flying in your area.
-
-**Q: Can I customize the colors?**<br>
-**A:** [Click here](#adjusting-colors)
-
-**Q: Can I customize the layout beyond what can be done in `config.yaml` (clock, aircraft info, etc)?**<br>
-**A:** Sure, just change some things in the script. Have fun. (also, you can just fork this project)<br>
-(note: any changes done to the main script will be overwritten if you update with the updater)
-
-**Q: Why use the FlightAware API? Why not something more "free" like [adsbdb](https://www.adsbdb.com/) or [adsb.lol](https://api.adsb.lol/docs)?**<br>
-**A:** In my experience, adsbdb/adsb.lol cannot handle chartered/position-only flights (i.e. general aviation, military, etc) and are lacking (correct) information for some flights. Because these open APIs rely on crowdsourcing and are maintained by a small group of people, the data offered by these APIs is prone to being outdated or incorrect. After testing, these APIs just aren't rigorous enough to be used for this project. It's better to have no information than misinformation. Plus, FlightGazer is still useful without having journey info anyway. I do wish FlightAware had a much lighter API endpoint for pulling very basic information like what this project uses.
-
-**Q: FlightGazer detected a plane and it couldn't determine a journey. This same plane showed up again a few minutes later and the result didn't change. What happened?**<br>
-**A:** If this plane is blocked from public tracking, there will never be a result. If you know it isn't, try lowering the value for `FLYBY_STALENESS`.<br>
-This situation has been seen when a plane just takes off and the API FlightGazer uses hasn't begun tracking the plane just yet, therefore there isn't a result that the API can give. When this plane shows up again, FlightGazer will reuse the same API result since it would not count this as a new flyby, a metric controlled by `FLYBY_STALENESS`.<br>
-
-**Q: I found an error with some of the aircraft info (type, owner, airline, etc.)**<br>
-**A:** FlightGazer relies on external databases in order to provide this information without the need for API calls. Since the information contained within those databases is outside of the author's control, you will basically have to wait and see if the data is corrected at some point in the future.
-
-**Q: Why use a different font for the Callsign? I don't like how it looks different by default next to other readouts.**<br>
-**A:** If it's too bothersome, set `ALTERNATIVE_FONT` to `true` in the config file to make it more uniform.<br>
-Reasoning: The original/default font is perfect with numerical readouts that update frequently (eg: speed, RSSI, altitude, seconds, etc) as the general glyph shape doesn't change between updates.<br>
-The alternative font is perfect for the callsign because callsigns are alphanumeric, the readout changes less often, and the alternative font offers quick differentation between between homoglyphs ('0' vs 'O', '5' vs 'S') compared to the default font.
-Additionally, with fields that aren't alphanumeric (country code) or use a limited set of the alphabet (direction + distance), there's less of a need for the alternative font's advantages.<br>
-
-**Q: Why are your commits so *huge*?**<br>
-**A:** Yes.<br>
-
-**Q: Some of your code is not pythonic!!!1!!111** ![](https://cdn.discordapp.com/emojis/359007558532595713.webp?size=20)<br>
-**A:** but it works, does it not? ![](https://cdn.discordapp.com/emojis/389287695903621121.webp?size=20)<br>
-(it should be >98% pythonic at this point)
-
-</details>
-
-<br>If your question isn't listed in the FAQ's, open an issue here on Github.
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+If your question isn't listed in the FAQ's, open an issue here on GitHub.
 
 ## 🐛 Known Issues, Shortcomings, and Reporting Issues
 >[!WARNING]
@@ -664,37 +548,10 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
     - Same goes for running in `NO_DISPLAY` mode (`-d`).
 - If you're not comfortable with this, do not use this project.
   - *or*, suggest code changes which may reduce the attack surface.
-<details><summary><b>Other Quirks & Features™</b></summary>
 
-- Flyby stats are not 100% accurate (but can be close, depending on your `FLYBY_STALENESS` setting in your config)
-  - This stat relies on the number of *unique aircraft seen*, not each occurrence of an actual flyby
-    - This is somewhat by design, covering the case of living near a general aviation airport and having the same plane do numerous touch-and-go landings
-  - ~~For example, if plane with hex ID `abcdef` passes by at 06:00, then passes by again at 18:00, it won't count as a flyby~~ <br>**This has been fixed in v.1.3.0 with the addition of a new parameter, `FLYBY_STALENESS`**
+See also: [Other Quirks & Features™](./docs/known-issues-and-shortcomings.md)
 
-- If using `No Filter` mode and restarting FlightGazer often, we can artifically inflate the flyby count
-  - FlightGazer has a feature where it will write out stats before shutting down so that it can reload those stats upon restart (if it's the same day). The flyby count is simply a number and has no additional information such as the IDs of aircraft
-  - Upon reload, FlightGazer fills in dummy IDs equal to the value of the last written flyby count in its internal list of aircraft IDs it keeps track of for flybys
-  - The flyby count runs under the assumption that the flyby area itself is small, but since `No Filter` removes that restriction, it's a free-for-all
-  - This is not usually a problem, as long as we don't restart often in the same day
-  - May not ever get fixed
-
-- On rare occasions are times when there will be two entries of the same aircraft (only when using `No Filter` mode)
-  - This is an edge case that's been noted since the v.0.x days, mainly due to a dual receiver setup
-  - It has been associated with aircraft that uses a dual mode transponder or there is ADS-R contact of the same aircraft on UAT while it's present over ADS-B
-  - ~~So far there is no fix planned for this as this does not break core functionality~~
-    - ~~At worst it confuses the aircraft selector algorithm but even then it still selects normally~~
-    - ~~May be mitigated in the far future~~
-  - **This has been mitigated in v.2.6.3 and newer, fully fixed in v.5.0.0; FlightGazer will use the best entry it encounters when not using `No Filter` mode**
-
-- ~~If FlightGazer crashes when run in tmux via systemctl, it will always report an exit status of 0~~
-  - Complicated to fix due to all the signal handling between the main script, the initialization script, and systemd
-  - ~~May not actually get fixed (simply just code better, smh)~~
-  - **I think it's okay now**
-  - **Versions v.9.1.0 and newer now write a file in `/run/FlightGazer` if FlightGazer ends up in a degraded state or quits due to an uncorrectable error.**
-
-</details>
-
-Found a bug? Want to suggest a new feature? Open an issue here on Github.
+Found a bug? Want to suggest a new feature? Open an issue here on GitHub.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` which can be found in the FlightGazer directory.<br>
 If using the web-app, also provide the `FlightGazer-initialization.log` which can be downloaded from "Details and Logs".
