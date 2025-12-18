@@ -7,7 +7,7 @@ The following used to be part of the main readme file, but has now been separate
 - signed: WeegeeNumbuh1
 
 ## Try These
-<details><summary>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</summary>
+<details name="tech-tips"><summary><b>Configuration details for a remote dump1090 installation (eg: FlightAware-provided FlightFeeder)</b></summary>
 <br>
 
 Set `CUSTOM_DUMP1090_LOCATION` to the IP address of the device running dump1090.<br>
@@ -15,7 +15,7 @@ Example: `http://192.168.xxx.xxx:8080` or `http://192.168.xxx.xxx/skyaware`<br>
 And then set `PREFER_LOCAL` to `false`.
 
 </details>
-<details><summary>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</summary>
+<details name="tech-tips"><summary><b>If you initially built your ADS-B receiver around RadarBox24/AirNav Radar's rbfeeder or Flightradar24's Pi24 image</b></summary>
 <br>
 
 `rbfeeder` and `Pi24` setups don't provide a web interface that FlightGazer can look at.<br>
@@ -26,7 +26,7 @@ If you managed to install a working web interface like `tar1090` with these setu
 
 </details>
 
-<details><summary>Connecting to a separate dump978 feeder (over the network)</summary>
+<details name="tech-tips"><summary><b>Connecting to a separate dump978 feeder (over the network)</b></summary>
 <br>
 
 Set `CUSTOM_DUMP978_LOCATION` to the IP address of the dump978 system.<br>
@@ -38,7 +38,16 @@ Also important to note, if your dump978 instance uses a different set location t
 
 </details>
 
-<details><summary>Turning off the screen at night</summary>
+<details name="tech-tips"><summary><b>Using FlightGazer just as a basic dump1090 parser (no display)</b></summary>
+<br>
+
+Enable both `NO_DISPLAY_MODE` (the `-d` flag) and `NO_FILTER` mode (`-f`) at script startup to enable just the dump1090 json parsing functionality.<br><br>
+This combination is useful for determining how many *flights* (not exactly each unique aircraft) were detected by your site over the span of a day. `FLYBY_STALENESS` still is used (which influences this value) but its minimum time is raised to 60 minutes in `NO_FILTER` mode.<br>
+If you don't plan on using the display and intend to run FlightGazer with this combination of modes, adjust the value of `FLYBY_STALENESS` to values appropriate to your local area traffic. (see: the Changelog and go to v.3.0.1)<br><br>
+As a side-effect, if you're interested in finding lapses in the aircraft database (e.g., detecting aircraft that have no known type or owner), this combination of startup features can help the database maintainers know what to add in future updates (if you're in contact with them).
+</details>
+
+<details name="tech-tips"><summary><b>Turning off the screen at night</b></summary>
 <br>
 
 `ENABLE_TWO_BRIGHTNESS: true`<br>
@@ -53,7 +62,7 @@ then set `BRIGHTNESS_SWITCH_TIME` to whatever time you want.
 Note that FlightGazer will still be running *and* driving the screen even with a brightness of `0` so CPU usage will remain the same.
 
 </details>
-<details><summary>Only turn on the screen when there's an aircraft nearby (no clock)</summary>
+<details name="tech-tips"><summary><b>Only turn on the screen when there's an aircraft nearby (no clock)</b></summary>
 <br>
 
 `BRIGHTNESS: 0`<br>
@@ -64,7 +73,7 @@ Note that FlightGazer will still be running *and* driving the screen even with a
 
 </details>
 
-<details><summary>Hiding elements on the display</summary>
+<details name="tech-tips"><summary><b>Hiding elements on the display</b></summary>
 <br>
 
 Go to the color config file and set whatever element you don't want to show to `BLACK`.<br>
@@ -72,7 +81,7 @@ Example: `seconds_color = BLACK`
 
 </details>
 
-<details><summary>Reduce flickering on a physical RGB matrix display</summary>
+<details name="tech-tips"><summary><b>Reduce flickering on a physical RGB matrix display</b></summary>
 <br>
 
 - [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)

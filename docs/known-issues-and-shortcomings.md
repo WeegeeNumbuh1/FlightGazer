@@ -18,7 +18,7 @@ These used to be listed as part of the main readme file, but has been separated 
 - Flyby stats are not 100% accurate, but can reasonably treated as so as long as the aforementioned settings are reasonable for the local traffic
   - Example where inaccuracy is possible: a helicopter hovering within the designated tracking area along with the shortest possible `FLYBY_STALENESS` value. If the helicopter stays within the area for longer than the `FLYBY_STALENESS` value, it will raise the counter
   - When using `No Filter` mode, `FLYBY_STALENESS` influences the amount of flights seen as it uses the same flyby tracking logic
-    - Therefore, FlightGazer's metrics for counting "unique aircraft seen" (aka "flights") in this mode might vary significantly if compared to other tacking services
+    - Therefore, FlightGazer's metrics for counting "unique aircraft seen" (aka "flights") in this mode might vary significantly if compared to other tracking services
 - `FLYBY_STALENESS` was introduced in v.1.3.0 to solve the initial problem of how the internal flight counter worked at the time:
   - Earlier versions of FlightGazer used a `set` as a naive way to count flybys
   - If the same aircraft appeared again later in the day, it wouldn't count as another flyby

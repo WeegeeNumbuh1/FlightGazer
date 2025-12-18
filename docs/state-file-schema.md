@@ -1,5 +1,6 @@
 # Interpreting the FlightGazer State File `current_state.json`
 > Intended audience: developers
+<a id="readme-top"></a>
 
 ## Preface
 The `current_state.json` is written to `/run/FlightGazer` when the main FlightGazer python script is running, by default.<br>
@@ -17,6 +18,17 @@ Each section that follows represents each root key present in the JSON and all o
 This JSON represents the values of *global* variables tracked within the program. Yes, you read that right, these are all values which are accessible in a global scope. This JSON is serialized after all the processing threads within FlightGazer complete their work, which serves as both an internal processing optimization and to ensure data consistency at the end of each `LOOP_INTERVAL`.<br>
 
 As a beneficial side-effect, this document also serves as a reference for the meanings behind all the globals as well.<br>
+
+#### Jump to:
+- [`FlightGazer`](#flightgazer)
+- [`receivers`](#receivers)
+- [`plane_stats`](#plane_stats)
+- [`api_stats`](#api_stats)
+- [`database_stats`](#database_stats)
+- [`display_status`](#display_status)
+- [`weather_data`](#weather_data-only-present-if-the-weather-api-is-enabled)
+- [`runtime_status`](#runtime_status)
+- [`time_now`](#time_now)
 
 > *There are a total of 200 available keys, not counting the root keys.*<br>
 > *Valid for FlightGazer v.9.7.1 and newer*
@@ -51,6 +63,7 @@ Represents overall state and the current main settings.
 | `follow_this_aircraft` | If the `FOLLOW_THIS_AIRCRAFT` setting was provided a valid ICAO hex, this aircraft will be tracked when it is detected by the receiver; null otherwise | str, null | "a00002" |
 
 > *5 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `receivers`
 Represents stats based on the ADS-B site and related hardware.
@@ -86,6 +99,7 @@ Short dictionary describing the receiver's computed statistics.
 | `Strong` | Percent of packets deemed strong (>3dBFS) as a percentage | float, null | 0.046 |
 
 > *3 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `plane_stats`
 Represents aircraft-specific stats. Any aircraft within the designated tracking area are also described here in the `relevant_planes` key.
@@ -165,6 +179,7 @@ An array of nested objects which represents current data for each aircraft consi
 | `Flyby` | Flyby number of this aircraft | int | 98 |
 
 > *3 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `api_stats`
 Represents API-related information from FlightAware.
@@ -204,6 +219,7 @@ Latest result as received by the API.
 | `APIAccessed` | Monotonic timestamp of when this API call was executed | float | 654211.4865 |
 
 > *9 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `database_stats`
 Represents database-related stats.
@@ -219,6 +235,7 @@ Represents database-related stats.
 | `last_response_time_ms` | Last query response time in milliseconds | float | 3.21 |
 
 > *7 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `display_status`
 Represents display-related information.
@@ -273,6 +290,7 @@ Represents the internal data sent to the display to render. This key is null if 
 | `is_UAT` | Data for this aircraft was sourced from dump978 | bool | false |
 
 > *15 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `weather_data` (Only present if the Weather API is enabled)
 Weather information returned by the OpenWeatherMap API for the site location.
@@ -306,6 +324,7 @@ Weather information returned by the OpenWeatherMap API for the site location.
 | `timestamp` | Unix time of last successful API result as reported from the API | int, null | 1690000000 |
 
 > *25 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `runtime_status`
 Various runtime flags and stats for this current running session of FlightGazer.
@@ -334,6 +353,8 @@ Various runtime flags and stats for this current running session of FlightGazer.
 | `pid` | System PID for the current process | int | 1234 |
 
 > *20 keys*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `time_now`
 Current time the JSON was generated, in ISO 8601 format as a string and approximated to the nearest second.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
