@@ -12,6 +12,8 @@ This file will not be present if:
 - The `WRITE_STATE` setting is set to `False`
 - FlightGazer is unable to write to `/run/FlightGazer`
 
+This file will be blank when FlightGazer has successfully initialized but has not yet begun its main loop phase.
+
 It's possible for this file to remain present if FlightGazer crashes unexpectedly (and doesn't do its shutdown routine) or is `SIGKILL`'d, at which point the data present in the file represents the last valid state of FlightGazer.<br>
 Each section that follows represents each root key present in the JSON and all of its subkeys. All keys are assumed to be present unless otherwise noted.<br>
 
@@ -161,7 +163,7 @@ An array of nested objects which represents current data for each aircraft consi
 | `OnGround` | Additional context for when altitude is reported to be 0 | bool | false |
 | `Distressed` | True if the aircraft is squawking emergency codes 7500/7600/7700 | bool | false |
 | `NavigationAccuracy` | Navigation accuracy of positions reported by the aircraft, in meters | int, null | 9 |
-| `ApproachRate` | Calculated approach speed of the aircraft in relation to the side based on speed unit; always 0 in `NOFILTER` mode, negative means moving away from the site | float | -184.6 |
+| `ApproachRate` | Calculated approach speed of the aircraft in relation to the site based on change in line-of-sight distance from previous data packet; always 0 in `NOFILTER` mode, negative means moving away from the site | float | -184.6 |
 | `FutureLatitude` | Estimated future latitude of the aircraft in the next data packet (`refresh_rate_sec` in the future); null if not estimated | float, null | 40.123500 |
 | `FutureLongitude` | Estimated future longitude of the aircraft in the next data packet (`refresh_rate_sec` in the future); null if not estimated | float, null | -73.12340 |
 | `FutureDistance` | Estimated future distance based on `FutureLatitude` and `FutureLongitude`; null if not estimated | float, null | 1.315572 |

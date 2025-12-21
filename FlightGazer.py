@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.2 --- 2025-12-14'
+VERSION: str = 'v.9.7.3 --- 2025-12-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2391,7 +2391,7 @@ class PrintToConsole:
                 else:
                     print_info.append(f"{alt_i:.1f}".rjust(7))
                     print_info.append(f"{altitude_unit}, ")
-                print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(6))
+                print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(7))
                 if altitude_multiplier != 1: # don't rely on `UNITS`
                     print_info.append("m/s, ")
                 else:
@@ -3165,6 +3165,7 @@ def main_loop_generator() -> None:
                         and loop_packet_dict['Flight'].upper().startswith(('DCM', 'FFL', 'FWR', 'XAA'))
                     ):
                         loop_packet_dict['TrackingFlag'] = "PIA"
+                        loop_packet_dict['Registration'] = None # can't tie or calculate a reg based off its ICAO
                     else:
                         loop_packet_dict['TrackingFlag'] = "Military"
                 else:
@@ -3249,7 +3250,7 @@ def main_loop_generator() -> None:
                 normal_operation = True
             is_distressed = False # flag if a plane is squawking a distress code (7500, 7600, or 7700)
             match squawk:
-                case 7500 | 7600 | 7700:
+                case '7500' | '7600' | '7700':
                     is_distressed = True
                 case _:
                     is_distressed = False
@@ -3737,6 +3738,7 @@ class AirplaneParser:
 
                 with threading.Lock(): # our initial pre-filter
                     focus_plane_ids_scratch.clear()
+                    PIA_this_poll = False
                     for entry in relevant_planes_local_copy:
                         get_plane_list.append(entry['ID']) # current planes in this loop
                         focus_plane_ids_scratch.add(entry['ID']) # add the above to the global set (rebuilds each loop)
@@ -3759,14 +3761,15 @@ class AirplaneParser:
                                                     "has been detected by your ADS-B site and declared an emergency. "
                                                     f"(Squawking {entry['Squawk']})")
                                 freeze_frame_packet(entry, show_distance=True)
-                        if entry['TrackingFlag'] == 'PIA' and not NOFILTER_MODE:
+                        if entry['TrackingFlag'] == 'PIA':
+                            PIA_this_poll = True
                             if not self._PIA_latch:
                                 self._PIA_latch = True
-                                main_logger.info(f"Rare event! Tracking PIA aircraft \'{entry['Flight']}\' ",
+                                main_logger.info(f"Very rare event! Tracking PIA aircraft \'{entry['Flight']}\' "
                                                  f"(ID: {entry['ID']}, aircraft type: {entry['CategoryDesc']})")
-                        else:
-                            if self._PIA_latch:
-                                self._PIA_latch = False
+
+                    if not PIA_this_poll and self._PIA_latch:
+                        self._PIA_latch = False
 
                 focus_plane_iter += 1
                 if focus_plane_iter > 1:
@@ -3923,6 +3926,7 @@ class AirplaneParser:
                             self._active_loop_count.append(0)
                     self.algorithm_active_time_avg = sum(self._active_loop_count) / len(self._active_loop_count)
                     plane_load[1] = self.algorithm_active_time_avg * LOOP_INTERVAL
+                    self._PIA_latch = False
                     with threading.Lock():
                         focus_plane = ""
                         focus_plane_iter = 0
@@ -4569,7 +4573,7 @@ class DisplayFeeder:
             # "FlightAware (PIA aircraft)"
             aircraft_str_ = []
             if focus_plane_stats['Distressed']:
-                aircraft_str.append("This aircraft has declared an emergency. | ")
+                aircraft_str_.append("This aircraft has declared an emergency. | ")
             if focus_plane_stats['AircraftDesc']:
                 aircraft_str_.append(focus_plane_stats['AircraftDesc'])
             else:
