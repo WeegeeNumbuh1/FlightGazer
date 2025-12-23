@@ -67,6 +67,9 @@ Additionally, with fields that aren't alphanumeric (country code) or use a limit
 **A:** Sure, just change some things in the script. Have fun. (also, you can just fork this project)<br>
 (note: any changes done to the main script will be overwritten if you update with the updater)
 
+**Q: Why are you using the `/etc` directory for the virtual enviornment? Shouldn't it be in `/opt`?**<br>
+**A:** Yes. Using `/etc` was mistakenly chosen at the very start of this project (even before the first commit). As many other features have been bolted onto FlightGazer since then, moving the virtual environment to `/opt` will break existing update routines and other services. It's going to be stuck like this for the foreseeable future.
+
 **Q: Why are your commits so *huge*?**<br>
 **A:** Yes.<br>
 

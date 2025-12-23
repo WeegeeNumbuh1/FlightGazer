@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.9.7.1
+# Last updated: v.9.7.4
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -91,7 +91,7 @@ try:
     response.raise_for_status()
     if response.status_code != 200:
         print(f"Failed to download the CSV file. Status code: {response.status_code}")
-        raise sys.exit(1)
+        sys.exit(1)
 except requests.RequestException as e:
     print(f"Failed to download the CSV file: {e}")
     sys.exit(1)

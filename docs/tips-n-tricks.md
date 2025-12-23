@@ -2,7 +2,7 @@
 > Intended audience: end-users
 
 ## Preface
-These are a collection of various settings and configurations that are supported by FlightGazer, along with other recommendations for ensuring the success of your FlightGazer deployment onto your own setup.<br>
+These are a collection of various settings and configurations that are supported by FlightGazer, along with other recommendations for ensuring the success of deploying FlightGazer onto your own setup.<br>
 The following used to be part of the main readme file, but has now been separated out and into its own individual file for easier reference.
 - signed: WeegeeNumbuh1
 
@@ -19,7 +19,7 @@ And then set `PREFER_LOCAL` to `false`.
 <br>
 
 `rbfeeder` and `Pi24` setups don't provide a web interface that FlightGazer can look at.<br>
-Therefor, FlightGazer can only run directly on those systems and must be installed on those devices.<br>
+Therefore, FlightGazer can only run directly on those systems and must be installed on those devices.<br>
 Set `PREFER_LOCAL` to `true` so that FlightGazer can read the data from these setups.<br>
 
 If you managed to install a working web interface like `tar1090` with these setups then you're an advanced user and you already know what you're doing.<br>
@@ -31,9 +31,9 @@ If you managed to install a working web interface like `tar1090` with these setu
 
 Set `CUSTOM_DUMP978_LOCATION` to the IP address of the dump978 system.<br>
 Example: `http://192.168.xxx.xxx:8978`<br><br>
-If dump1090 is running on the same system FlightGazer is running off of, leave `PREFER_LOCAL` to `true`.<br>
-FlightGazer was designed to handle reading from both a local dump1090 instance and a remote dump978 system at the same time.<br>
-However, if your network goes down or the dump978 system disconnects, this will cause FlightGazer to pause its processing as if dump1090 failed as well.<br>
+If dump1090 is running on the same system FlightGazer is running off of, leave `PREFER_LOCAL` to `true`.<br><br>
+FlightGazer was designed to handle reading from both a local dump1090 instance and a remote dump978 system at the same time.
+However, if your network goes down or the dump978 system disconnects, this will cause FlightGazer to pause its processing as if dump1090 failed as well.<br><br>
 Also important to note, if your dump978 instance uses a different set location than your dump1090 one, the distance data for UAT aircraft will be overridden by your dump1090 location.
 
 </details>

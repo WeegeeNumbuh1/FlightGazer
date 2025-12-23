@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.4 - 2025-12-23
+    - Initialization script output tweaks
+    - Initialization script now checks if the rgbmatrix library is accessible from within the virtual environment
+    - Minor fix to the database fetcher for cases when a non-200 http status is returned
+
 v.9.7.3 - 2025-12-20
     - Bug fixes:
         - Fix bug where PIA aircraft logging would fail

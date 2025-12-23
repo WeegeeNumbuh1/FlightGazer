@@ -261,7 +261,7 @@ nano config.yaml
 Edit [`colors.py`](./setup/colors.py) in the `setup` folder of FlightGazer.
 
 #### Tricks & Tips
-For useful settings with specific setups, see the [tips-n-tricks](./docs/tips-n-tricks.md) document.
+For useful settings with specific setups (e.g. remote dump1090 feeders, custom webinterfaces, etc.), see the [tips-n-tricks](./docs/tips-n-tricks.md) document.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
