@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.9.7.1
+# Last updated: v.9.7.5
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -13,6 +13,7 @@ ORANGE='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 FADE='\033[2m'
+WHITEHIGH='\033[0;30;47m'
 OWNER_OF_FGDIR='nobody'
 GROUP_OF_FGDIR='nogroup'
 
@@ -213,8 +214,8 @@ server {
 EOF
 	ln -sf $NGINX_CONF_PATH /etc/nginx/sites-enabled/flightgazer-webapp
 	nginx -t && systemctl reload nginx
-	echo -e "${NC}> nginx configured. Access via http://$NET_IP/flightgazer"
-	echo -e "  or via http://$HOSTNAME.local/flightgazer"
+	echo -e "${NC}> nginx configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 elif command -v apache2 >/dev/null 2>&1; then
 	echo -e "> Detected Apache. Configuring reverse proxy for FlightGazer webapp...${FADE}"
 	APACHE_CONF_PATH="/etc/apache2/sites-available/flightgazer-webapp.conf"
@@ -229,8 +230,8 @@ EOF
 	a2enmod proxy proxy_http
 	a2ensite flightgazer-webapp
 	systemctl reload apache2
-	echo -e "${NC}> Apache configured. Access via http://$NET_IP/flightgazer"
-	echo -e "  or via http://$HOSTNAME.local/flightgazer"
+	echo -e "${NC}> Apache configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 elif command -v lighttpd >/dev/null 2>&1; then
 	echo -e "> Detected Lighttpd. Configuring reverse proxy for FlightGazer webapp...${FADE}"
 	LIGHTTPD_CONF_PATH="/etc/lighttpd/conf-available/98-flightgazer-webapp.conf"
@@ -252,14 +253,14 @@ EOF
 	lighttpd-enable-mod proxy
 	lighttpd-enable-mod flightgazer-webapp
 	systemctl restart lighttpd
-	echo -e "${NC}> Lighttpd configured. Access via http://$NET_IP/flightgazer"
-	echo -e "  or via http://$HOSTNAME.local/flightgazer"
+	echo -e "${NC}> Lighttpd configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 else
 	echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
 	echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
 	echo "You can still access the web interface at:"
-	echo -e "http://$NET_IP:9898/flightgazer or"
-	echo -e "http://$HOSTNAME.local:9898/flightgazer"
+	echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
+	echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
 fi
 
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"

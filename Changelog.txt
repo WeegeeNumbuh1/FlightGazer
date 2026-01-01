@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.5 - 2026-01-01
+    - Distressed aircraft which report that they're on the ground are no longer tracked
+    - Bootsplash screen now waits 45 seconds from 30 to display "System Ready"
+    - Make uninstall script only work with interactive shells
+    - Highlight URLs in the webapp install script
+    - Update copyright year
+
 v.9.7.4 - 2025-12-23
     - Initialization script output tweaks
     - Initialization script now checks if the rgbmatrix library is accessible from within the virtual environment

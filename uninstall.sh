@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Uninstall script for FlightGazer.py
-# Last updated: v.9.0.0
+# Last updated: v.9.7.5
 # by: WeegeeNumbuh1
 BASEDIR=$(cd `dirname -- $0` && pwd)
 TEMPPATH='/tmp/FlightGazerUninstall.sh'
@@ -21,6 +21,10 @@ fi
 if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
 	echo -e "\n${NC}${RED}>>> ERROR: Cannot find FlightGazer.py. This uninstall script must be in the same directory as FlightGazer.py!"
 	sleep 2s
+	exit 1
+fi
+if [ ! -t 1 ]; then
+	>&2 echo -e "${RED}>>> ERROR: This script must be run interactively.${NC}"
 	exit 1
 fi
 sleep 2s

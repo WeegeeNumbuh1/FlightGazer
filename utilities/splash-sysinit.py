@@ -4,7 +4,7 @@
 # is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.8.3.0
+# Last updated: v.9.7.5
 # By: WeegeeNumbuh1
 
 import sys
@@ -114,11 +114,13 @@ except FileNotFoundError:
 TIMING_CONTROL = 0
 def timing():
     global TIMING_CONTROL
-    sleep(20)
+    sleep(30)
+    # the below used to do something, but is left here in case
+    # there needs to be another feature that looks for this exact value
     TIMING_CONTROL = 1
-    sleep(10)
+    sleep(15)
     TIMING_CONTROL = 2
-    print("FlightGazer boot splash screen: 30 seconds have passed since this has started.")
+    print("FlightGazer boot splash screen: 45 seconds have passed since this has started.")
     print("FlightGazer boot splash screen: Assuming we have not reached multi-user.target yet.")
 
 threading.Thread(target=timing, daemon=True).start()
@@ -186,23 +188,23 @@ class SplashText():
                 _skip_frames = 0
 
             if TIMING_CONTROL >= 2 and not NO_TEXT_SPLASH:
-                    _ = graphics.DrawText(
-                        self.double_buffer,
-                        loaded_font,
-                        19,
-                        27,
-                        graphics.Color(227, 110, 0),
-                        "WAITING",
-                    )
+                _ = graphics.DrawText(
+                    self.double_buffer,
+                    loaded_font,
+                    19,
+                    27,
+                    graphics.Color(227, 110, 0),
+                    "WAITING",
+                )
 
-                    _ = graphics.DrawText(
-                        self.double_buffer,
-                        loaded_font,
-                        11,
-                        31,
-                        graphics.Color(227, 110, 0),
-                        "TO CONTINUE",
-                    )
+                _ = graphics.DrawText(
+                    self.double_buffer,
+                    loaded_font,
+                    11,
+                    31,
+                    graphics.Color(227, 110, 0),
+                    "TO CONTINUE",
+                )
 
             _ = graphics.DrawText(
                 self.double_buffer,

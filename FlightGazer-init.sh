@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.7.4
+# Version = v.9.7.5
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -15,6 +15,7 @@ ORANGE='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 FADE='\033[2m'
+WHITEHIGH='\033[0;30;47m'
 CHECK_FILE="${VENVPATH}/first_run_complete"
 THIS_FILE="${BASEDIR}/FlightGazer-init.sh"
 LOGFILE="${BASEDIR}/FlightGazer-log.log"
@@ -46,13 +47,13 @@ help_str(){
 	echo "[-h]     Print this help message."
 	echo "Default (no options) is to run using rgbmatrix and minimal console output."
 	echo -e "[-d] [-f] [-t] will trigger interactive mode (console output).\n"
-	echo " ***** Main script options *****"
+	echo -e "${WHITEHIGH} ***** Main script options ***** ${NC}"
 	echo "[-d]     No Display mode - Only console output."
 	echo "[-e]     Emulate - Run display via RGBMatrixEmulator instead of real hardware."
 	echo "[-f]     No Filter mode - Disable filtering and show all aircraft positions. No API fetching."
 	echo "[-v]     Enable verbose/debug messages for the main script."
 	echo ""
-	echo " *****    Setup options    *****"
+	echo -e "${WHITEHIGH} *****    Setup options    ***** ${NC}"
 	echo "[-t]     Run in tmux, if available."
 	echo "[-c]     Install/force-check dependencies only. Do not start main script."
 	echo "[-l]     Live/Demo mode: Setup in /tmp, no permanent install."
@@ -505,6 +506,10 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
 		echo -e "${RED}    > Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
 		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
+		sleep 5s
+		echo "    > Don't want it there? Run the uninstall script,"
+		echo -e "      move this directory (${BASEDIR})"
+		echo "      to where you want it, then run this script again."
 		sleep 5s
 	else
 		echo "    > Service already exists or we are running"

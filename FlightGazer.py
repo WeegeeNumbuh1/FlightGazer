@@ -12,7 +12,7 @@ Heavily inspired by https://github.com/ColinWaddell/its-a-plane-python.
 Uses the FlightAware API for info outside what ADS-B can provide.
 """
 """
-    Copyright (C) 2025, WeegeeNumbuh1.
+    Copyright (C) 2026, WeegeeNumbuh1.
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.4 --- 2025-12-23'
+VERSION: str = 'v.9.7.5 --- 2026-01-01'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -3285,6 +3285,9 @@ def main_loop_generator() -> None:
                 gs = a.get('gs', 0)
                 # don't consider grounded planes/ground implements which are stationary
                 if not NOFILTER_MODE and gs == 0 and is_on_ground:
+                    continue
+                # don't consider distressed aircraft on the ground
+                if is_distressed and is_on_ground:
                     continue
                 # below is the last filter; if a plane passes this, we grab all the info and append to
                 # the relevant planes list
