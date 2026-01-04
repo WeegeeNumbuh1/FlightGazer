@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.5 --- 2026-01-01'
+VERSION: str = 'v.9.7.6 --- 2026-01-03'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1458,12 +1458,14 @@ def probe_API() -> tuple[int | None, float | None]:
         return None, None
 
 def configuration_check() -> None:
-    """ Configuration checker and runtime adjustments. Actually very important. """
+    """ Configuration checker and runtime adjustments. Actually very important.
+    Only should be run once. """
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS
     global UNITS_WX, OPENWEATHER_API_KEY
+    global database_lookup_cache, focus_plane_api_results
 
     main_logger.info("Checking settings configuration...")
 
@@ -1560,7 +1562,7 @@ def configuration_check() -> None:
         height_warning = f"Warning: Desired height cutoff ({HEIGHT_LIMIT}{altitude_unit}) is"
         if HEIGHT_LIMIT >= (275000 * altitude_multiplier):
             main_logger.warning(f"{height_warning} beyond the theoretical limit for flight.")
-            main_logger.info(f">>> Setting to a reasonable value:{75000 * altitude_multiplier:.2f}{altitude_unit}")
+            main_logger.info(f">>> Setting to a reasonable value: {75000 * altitude_multiplier:.2f}{altitude_unit}")
             HEIGHT_LIMIT = round(75000 * altitude_multiplier, 2)
         elif (75000 * altitude_multiplier) < HEIGHT_LIMIT < (275000 * altitude_multiplier):
             main_logger.warning(f"{height_warning} beyond typical aviation flight levels.")
@@ -1587,6 +1589,22 @@ def configuration_check() -> None:
     if NOFILTER_MODE and FLYBY_STALENESS < 60:
         main_logger.info("No Filter mode enabled, flyby staleness now set to 60 minutes.")
         FLYBY_STALENESS = 60
+
+    # adjust our caches
+    if NOFILTER_MODE:
+        database_lookup_cache = deque([{}] * 10000, maxlen=10000)
+        main_logger.debug("Database lookup cache expanded to 10000 entries")
+    if FLYBY_STALENESS > 180:
+        deque_size = 200 # baseline limit
+        flyby_hour = round(FLYBY_STALENESS / 60, 0)
+        if 3 <= flyby_hour < 6:
+            deque_size = 300
+        elif 6 <= flyby_hour < 9:
+            deque_size = 400
+        elif 9 <= flyby_hour <= 12:
+            deque_size = 500
+        focus_plane_api_results = deque([None] * deque_size, maxlen=deque_size)
+        main_logger.debug(f"API results cache sized to {deque_size} entries")
 
     if FOLLOW_THIS_AIRCRAFT:
         try:
@@ -3200,6 +3218,7 @@ def main_loop_generator() -> None:
             dump1090data_ = dump1090_data
 
         for a in dump1090data_:
+            # ===== get bare minimum info =====
             seen_pos = a.get('seen_pos')
             broadcast_type = a.get('type', 'None')
             hex = a.get('hex', "?")
@@ -3208,7 +3227,8 @@ def main_loop_generator() -> None:
                 'priority',
                 priority_lookup.get(broadcast_type)
             )
-            # filter planes that have valid tracking data and were seen recently
+
+            # ===== filter planes that have valid tracking data and were seen recently =====
             if (
                 seen_pos is None
                 or seen_pos > LOCATION_TIMEOUT
@@ -3217,6 +3237,8 @@ def main_loop_generator() -> None:
             ):
                 continue
             total += 1
+
+            # ===== get our distance =====
             lat = a.get('lat')
             lon = a.get('lon')
             nac_p = a.get('nac_p')
@@ -3238,6 +3260,8 @@ def main_loop_generator() -> None:
             else:
                 distance = 0
             ranges.append(distance)
+
+            # ===== special filtering flags =====
             really_far = False # flag for indicating if a plane is worthy of being tracked by the dxing logic
             if distance >= BEYOND_LOS_LIMIT / distance_multiplier:
                 really_far = True
@@ -3245,7 +3269,6 @@ def main_loop_generator() -> None:
             if (
                 not NOFILTER_MODE
                 and (0 < distance < RANGE)
-                or really_far
             ):
                 normal_operation = True
             is_distressed = False # flag if a plane is squawking a distress code (7500, 7600, or 7700)
@@ -3254,12 +3277,24 @@ def main_loop_generator() -> None:
                     is_distressed = True
                 case _:
                     is_distressed = False
+            bypass_all = False
             if (
                 NOFILTER_MODE
                 or hex == FOLLOW_THIS_AIRCRAFT
                 or is_distressed
-                or normal_operation
+                or really_far
             ):
+                bypass_all = True
+            # note on the `really_far` flag used above:
+            # during normal operation, if a distant plane is detected, its data
+            # is excluded from the main relevant planes list and handled by `DistantDeterminator`.
+            # Thus, this plane will:
+            # - never trigger the display or console output
+            # - won't start the normal tracking routines
+            # - still count towards the total tracking count
+
+            # ===== range and ground-detection filtering =====
+            if bypass_all or normal_operation:
                 alt_g = a.get('alt_geom') # more accurate
                 alt_b = a.get('alt_baro') # baseline altitude
                 is_on_ground = False
@@ -3277,26 +3312,27 @@ def main_loop_generator() -> None:
                     if alt == "ground":
                         is_on_ground = True
                     alt = 0
-                if not NOFILTER_MODE and NO_GROUND_TRACKING and is_on_ground:
-                    if total > 0: # don't count this aircraft
-                        total -= 1
-                    continue
                 alt = alt * altitude_multiplier
                 gs = a.get('gs', 0)
-                # don't consider grounded planes/ground implements which are stationary
-                if not NOFILTER_MODE and gs == 0 and is_on_ground:
-                    continue
-                # don't consider distressed aircraft on the ground
-                if is_distressed and is_on_ground:
-                    continue
-                # below is the last filter; if a plane passes this, we grab all the info and append to
+                if is_on_ground and not NOFILTER_MODE:
+                    if NO_GROUND_TRACKING:
+                        if total > 0: # don't count this aircraft
+                            total -= 1
+                        continue
+                    # don't consider grounded planes/ground implements which are stationary
+                    if gs == 0:
+                        continue
+                    # don't consider distressed aircraft on the ground and outside main tracking area
+                    if is_distressed and (distance >= RANGE or distance == 0):
+                        continue
+
+                # =====
+                # finally, altitude filtering.
+                # if a plane passes this, we grab all the info and append to
                 # the relevant planes list
-                if (
-                    alt < HEIGHT_LIMIT
-                    or hex == FOLLOW_THIS_AIRCRAFT
-                    or really_far
-                    or is_distressed
-                ):
+                # Recall: when using NO_FILTER mode, HEIGHT_LIMIT is set to a ridiculous value
+                # =====
+                if alt < HEIGHT_LIMIT or bypass_all:
                     flight = a.get('flight')
                     rssi = a.get('rssi', 0)
                     vs = a.get('geom_rate', a.get('baro_rate', 0))
@@ -3324,7 +3360,8 @@ def main_loop_generator() -> None:
                     elevation, slant_range_dist = elevation_and_slant(distance, alt)
                     if abs(determined_time_offset) > 5 or USING_FILESYSTEM:
                         dt = 0
-                    else: dt = determined_time_offset
+                    else:
+                        dt = determined_time_offset
                     if source == 'ADS-B':
                         true_data_age = (
                             (seen_pos

@@ -5,6 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.7.6 - 2026-01-03
+    - When running in NO_FILTER mode, the aircraft database lookup cache is now larger
+    - Cache for API results scales with FLYBY_STALENESS value if the value is longer than a few hours
+        - This reduces the occurrence of unnecessary API calls when an aircraft is seen again before the
+          FLYBY_STALENESS value due to the cache filling up
+    - Reworked logic evaluations in the main data processing loop for clarity
+    - Refined change from v.9.7.5: distressed aircraft are no longer tracked if they are both on the ground
+      and outside of the designated tracking area
+
 v.9.7.5 - 2026-01-01
     - Distressed aircraft which report that they're on the ground are no longer tracked
     - Bootsplash screen now waits 45 seconds from 30 to display "System Ready"
