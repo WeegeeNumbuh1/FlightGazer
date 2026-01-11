@@ -5,6 +5,28 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.8.0 - 2026-01-10
+    - Add experimental RGB Display support for Raspberry Pi 5 via RGBMatrixEmulator v0.15.0
+        - This requires editing the emulator configuration file in the FlightGazer directory
+          and changing the adapter to "pi5", then running FlightGazer in Emulate Mode (-e)
+        - All other systems that aren't running on a Raspberry Pi 5 will now only install v0.14.2
+            - This is done to prevent installation errors caused by the lack of build tools
+              on some systems; the installation of such packages is outside the scope of this project
+        - This feature, when used with FlightGazer, is untested, but should work
+    - Main script improvements:
+        - Fix issue where setting ENHANCED_READOUT at startup did not entirely disable the API when a key is given
+        - Tweak API results cache size to be more granular
+        - Unhandled errors no longer spam the log as much
+        - If FlightGazer detects it's connected to a combined feed it disables the dxing log
+        - Minor optimization for the print routine, especially when running in NO_FILTER mode
+        - Fix some logic checks with the Weather API results
+    - Initialization script improvements:
+        - With verbose mode, additional debugging information is now printed
+        - The main log file is now truncated at 4000 lines from 2000
+        - rgbmatrix install script is now able to revert changes if it fails to download from GitHub
+    - Lore: Ever wonder why you see "98" scattered throughout this project? It's a Love Live reference.
+        - There's also Umamusume references to look out for as well.
+
 v.9.7.6 - 2026-01-03
     - When running in NO_FILTER mode, the aircraft database lookup cache is now larger
     - Cache for API results scales with FLYBY_STALENESS value if the value is longer than a few hours

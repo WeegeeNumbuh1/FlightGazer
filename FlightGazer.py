@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.7.6 --- 2026-01-03'
+VERSION: str = 'v.9.8.0 --- 2026-01-10'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -74,7 +74,7 @@ argflags = argparse.ArgumentParser(
     description = (
         f"FlightGazer ({VERSION}), a comprehensive flight-tracking and logging program that "
         "renders live ADS-B info of nearby aircraft to an RGB-Matrix display.\n"
-        "Copyright (C) 2025, WeegeeNumbuh1.\n"
+        "Copyright (C) 2026, WeegeeNumbuh1.\n"
         "This program comes with ABSOLUTELY NO WARRANTY; for details see the GNU GPL v3."),
     epilog = ("Protip: Ensure your location is set in your dump1090 configuration!\n"
             "Report bugs to WeegeeNumbuh1: <https://github.com/WeegeeNumbuh1/FlightGazer>")
@@ -655,7 +655,7 @@ plane_latch_times: list = [
     int(15 // LOOP_INTERVAL),
 ]
 """ Precomputed table of latch times (loops) for plane selection algorithm. [2 planes, 3 planes, 4+ planes] """
-focus_plane_api_results = deque([None] * 200, maxlen=200)
+focus_plane_api_results = deque([None] * 500, maxlen=500)
 """ Additional API-derived information for `focus_plane` and previously tracked planes from FlightAware API.
 With a successful API call, the result is appended at the end of this deque.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `Status`, `APIAccessed`}.
@@ -858,6 +858,8 @@ watchdog_setpoint: int = 3
 """ How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 display_failures: int = 0
 """ Track how many times the display broke """
+unhandled_errors: int = 0
+""" How many uncaught errors have occurred (tracked to prevent log spamming) """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -921,7 +923,7 @@ def sigterm_handler(signum, frame):
     if state_json:
         state_json.unlink(missing_ok=True)
         write_bad_state_semaphore(False)
-    if super_far_plane:
+    if super_far_plane and not combined_feed:
         main_logger.info("Before exiting, there's this:")
         dxing_log()
     main_logger.info(f"- Exit signal commanded at {exit_time}")
@@ -1089,11 +1091,19 @@ def strip_accents(s: str, skip_fallback: bool = False) -> str:
 def catcher(exctype, value, tb):
     """ Catch unhandled exceptions and dump to log.
     https://stackoverflow.com/a/73119119 """
-    main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
+    global unhandled_errors
+    unhandled_errors += 1
+    cutoff = 50
+    if unhandled_errors < cutoff:
+        main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
+    elif unhandled_errors == cutoff:
+        main_logger.error(f"Unhandled error count has reached {cutoff}, suppressing further errors to prevent log spam.")
+        # there really shouldn't be this many unhandled errors
+        write_bad_state_semaphore(True)
 
 def dxing_log() -> None:
     """ If `super_far_plane` has data, print the contents to the log. """
-    if not super_far_plane: return
+    if not super_far_plane or combined_feed: return
     data0 = []
     dis = super_far_plane['Distance'] / distance_multiplier
     if not combined_feed:
@@ -1107,11 +1117,11 @@ def dxing_log() -> None:
     data0.append(f"was detected {round(super_far_plane['Distance'], 3)} {distance_unit} away ")
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
-    main_logger.info(f"{''.join(data0)}")
-    if not combined_feed:
-        main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
+    if dis >= 400:
+        main_logger.warning(f"{''.join(data0)}")
     else:
-        main_logger.info("This ADS-B site might be using a combined feed. This data is not an accurate representation of the site's ADS-B capabilities.")
+        main_logger.info(f"{''.join(data0)}")
+    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     accuracy = super_far_plane['NavigationAccuracy']
     if accuracy and accuracy >= 1000:
         main_logger.info(">>> Note: The aircraft reported an inaccurate position at the time of the following data packet.")
@@ -1594,15 +1604,9 @@ def configuration_check() -> None:
     if NOFILTER_MODE:
         database_lookup_cache = deque([{}] * 10000, maxlen=10000)
         main_logger.debug("Database lookup cache expanded to 10000 entries")
-    if FLYBY_STALENESS > 180:
-        deque_size = 200 # baseline limit
-        flyby_hour = round(FLYBY_STALENESS / 60, 0)
-        if 3 <= flyby_hour < 6:
-            deque_size = 300
-        elif 6 <= flyby_hour < 9:
-            deque_size = 400
-        elif 9 <= flyby_hour <= 12:
-            deque_size = 500
+    if FLYBY_STALENESS > 60:
+        deque_size_hr = 500 # baseline limit, ~500 queries/hr
+        deque_size = int(round(FLYBY_STALENESS / 60, 1) * deque_size_hr)
         focus_plane_api_results = deque([None] * deque_size, maxlen=deque_size)
         main_logger.debug(f"API results cache sized to {deque_size} entries")
 
@@ -1673,6 +1677,8 @@ def configuration_check() -> None:
 
 def configuration_check_api() -> None:
     """ Check the API configuration. Handles `EHNANCED_READOUT` and `ENHANCED_READOUT_INIT` as well. """
+    """ Programmer's notes: Don't forget to set `API_KEY` to an empty string to disable the API as other
+    parts of this program will use that to determine if the API is even available. """
     global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT, API_cost_limit_reached
     global ENHANCED_READOUT, ENHANCED_READOUT_INIT
 
@@ -1709,6 +1715,10 @@ def configuration_check_api() -> None:
             API_COST_LIMIT = None
             API_KEY = ""
 
+        if ENHANCED_READOUT:
+            main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
+            API_KEY = ""
+
         # test if the API key works
         if API_KEY:
             api_use = None
@@ -1724,40 +1734,37 @@ def configuration_check_api() -> None:
                 api_usage_cost_baseline = api_cost
 
         if API_KEY: # test again
-            if ENHANCED_READOUT:
-                main_logger.info("ENHANCED_READOUT setting is enabled. API will not be used.")
+            if ENHANCED_READOUT_AS_FALLBACK and DISPLAY_IS_VALID:
+                main_logger.info("ENHANCED_READOUT_AS_FALLBACK is enabled. When an API limit is reached, ENHANCED_READOUT will be used.")
+
+            if API_DAILY_LIMIT is None:
+                main_logger.info("No daily limit set for API calls.")
             else:
-                if ENHANCED_READOUT_AS_FALLBACK and DISPLAY_IS_VALID:
-                    main_logger.info("ENHANCED_READOUT_AS_FALLBACK is enabled. When an API limit is reached, ENHANCED_READOUT will be used.")
+                main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
 
-                if API_DAILY_LIMIT is None:
-                    main_logger.info("No daily limit set for API calls.")
+            if API_COST_LIMIT is None:
+                main_logger.info("No cost limit set for API calls.")
+            else:
+                API_COST_LIMIT = round(API_COST_LIMIT, 2)
+                if api_cost < API_COST_LIMIT:
+                    main_logger.info(f"Limiting API calls to when usage is near ${API_COST_LIMIT:.2f}. (${(API_COST_LIMIT - api_cost):.2f} available to use)")
                 else:
-                    main_logger.info(f"Limiting API calls to {API_DAILY_LIMIT} per day.")
+                    main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
+                    main_logger.info(">>> Disabling API until credits are available again. (checks will occur every midnight)")
+                    API_cost_limit_reached = True
 
-                if API_COST_LIMIT is None:
-                    main_logger.info("No cost limit set for API calls.")
-                else:
-                    API_COST_LIMIT = round(API_COST_LIMIT, 2)
-                    if api_cost < API_COST_LIMIT:
-                        main_logger.info(f"Limiting API calls to when usage is near ${API_COST_LIMIT:.2f}. (${(API_COST_LIMIT - api_cost):.2f} available to use)")
-                    else:
-                        main_logger.warning(f"Current API usage (${api_cost}) exceeds set limit (${API_COST_LIMIT:.2f}).")
-                        main_logger.info(">>> Disabling API until credits are available again. (checks will occur every midnight)")
-                        API_cost_limit_reached = True
-
-        if not API_KEY:
-            main_logger.info("API is unavailable. Additional API-derived info will not be available.")
-            if DISPLAY_IS_VALID:
-                if ENHANCED_READOUT:
-                    main_logger.info("Additional info provided by dump1090 will be substituted on display instead.")
-                elif not ENHANCED_READOUT and not ENHANCED_READOUT_AS_FALLBACK:
-                    main_logger.info("Setting ENHANCED_READOUT or ENHANCED_READOUT_AS_FALLBACK to \'true\' is highly recommended.")
-                elif not ENHANCED_READOUT and ENHANCED_READOUT_AS_FALLBACK:
-                    ENHANCED_READOUT = True
-                    main_logger.info("ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
+        if not API_KEY and DISPLAY_IS_VALID:
+            if ENHANCED_READOUT:
+                main_logger.info("Additional info provided by dump1090 will be substituted on display instead.")
+            elif not ENHANCED_READOUT and not ENHANCED_READOUT_AS_FALLBACK:
+                main_logger.info("Setting ENHANCED_READOUT or ENHANCED_READOUT_AS_FALLBACK to \'true\' is highly recommended.")
+            elif not ENHANCED_READOUT and ENHANCED_READOUT_AS_FALLBACK:
+                ENHANCED_READOUT = True
+                main_logger.info("ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
     else:
         main_logger.info("No Filter mode is enabled. API will not be used.")
+        API_KEY = ""
+
     ENHANCED_READOUT_INIT = ENHANCED_READOUT
 
     main_logger.info("API check complete.")
@@ -2357,6 +2364,11 @@ class PrintToConsole:
             elif len(focus_plane_ids_scratch) == 0:
                 print(f"{fade}Aircraft scratchpad: {{}}{rst}")
 
+        if altitude_multiplier != 1: # don't rely on `UNITS`
+            vert_speed_unit = "m/s"
+        else:
+            vert_speed_unit = "ft/min"
+
         # aircraft readout section
         for aircraft in relevant_planes:
             try:
@@ -2385,6 +2397,7 @@ class PrintToConsole:
                 print_info.append(f" ({aircraft['Country']}, ")
                 print_info.append(f"{aircraft['ID']}".ljust(6))
                 print_info.append(")")
+                # this works even in NO_FILTER mode
                 if aircraft['Distressed']:
                     print_info.append(" ***EMERGENCY*** ")
                 print_info.append(" | ")
@@ -2410,10 +2423,7 @@ class PrintToConsole:
                     print_info.append(f"{alt_i:.1f}".rjust(7))
                     print_info.append(f"{altitude_unit}, ")
                 print_info.append(f"{aircraft['VertSpeed']:.1f}".rjust(7))
-                if altitude_multiplier != 1: # don't rely on `UNITS`
-                    print_info.append("m/s, ")
-                else:
-                    print_info.append("ft/min, ")
+                print_info.append(f"{vert_speed_unit}, ")
                 print_info.append(f"{aircraft['Elevation']:.2f}°".rjust(6))
                 print_info.append(" | ")
                 # distance section
@@ -2425,8 +2435,14 @@ class PrintToConsole:
                 print_info.append("LOS")
                 print_info.append(f"{aircraft['SlantRange']:.2f}".rjust(6))
                 print_info.append(f"{distance_unit} ")
-                print_info.append((f"({aircraft['Latitude']:.3f}, "
-                                   f"{aircraft['Longitude']:.3f})").ljust(16))
+                # handle very rare edge case when there's no position data (occurs in NO_FILTER mode)
+                if aircraft['Latitude'] and aircraft['Longitude']:
+                    print_info.append(
+                        (f"({aircraft['Latitude']:.3f}, "
+                        f"{aircraft['Longitude']:.3f})").ljust(16)
+                    )
+                else:
+                    print_info.append("None".ljust(16))
                 print_info.append(" | ")
                 # last section
                 print_info.append("RSSI: ")
@@ -2529,7 +2545,7 @@ class PrintToConsole:
             api_str.append("\n") # add space between the last plane info and this section
             if focus_plane_stats['OnGround']:
                 api_str.append(f"{rst}{italic}Note: The below aircraft "
-                                f"may have landed since the API was checked.{rst}\n")
+                                f"may have landed since the API was last checked.{rst}\n")
             api_str.append(f"{blue_highlight}API results for "
                             f"{white_highlight}{api_flight}{blue_highlight}: ")
             api_str.append(f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
@@ -5135,6 +5151,7 @@ class WriteState:
                 'range_too_large': range_too_large,
                 'combined_feed': combined_feed,
                 'display_failures': None if NODISPLAY_MODE else display_failures,
+                'unhandled_errors': unhandled_errors,
                 'cpu_percent': resource_usage[0],
                 'cpu_temp_C': resource_usage[2],
                 'memory_MiB': resource_usage[1],
@@ -5692,6 +5709,7 @@ class DistantDeterminator():
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
         for packet in message:
             # filter out general aviation with glitchy locations
+            # note: don't rely on NavigationAccuracy as it's sometimes unavailable
             if packet['Altitude'] / altitude_multiplier < 10000:
                 continue
             farthest = packet
@@ -5700,10 +5718,12 @@ class DistantDeterminator():
             return
         self._far_time_increment =+ 1
         if (
-            self._far_time_increment * LOOP_INTERVAL >= 21600 # if we've detected really distant aircraft for longer than 6 hours
+            # if we've detected really distant aircraft for longer than 15 hours
+            self._far_time_increment * LOOP_INTERVAL >= 54000 # this is really lenient to account for times of widespread ducting
             and not combined_feed
         ):
             main_logger.warning(f"{dump1090} might be configured as a combined feed. FlightGazer is only meant for single site feeds.")
+            main_logger.info(">>> DXing logging has been disabled.")
             if DISPLAY_IS_VALID:
                 main_logger.warning("Maximum range shown on the display will be capped to 300nmi or the equivalent.")
             combined_feed = True
@@ -5859,7 +5879,9 @@ class wx_API():
             Returns dew point in Celcius. Returns `None` if input temp or humidity is unavailable.
             Uses the Bögel modification for accuracy.
             See: https://en.wikipedia.org/wiki/Dew_point#Calculating_the_dew_point """
-            if not temp_c or not humidity:
+            if temp_c is None or humidity is None:
+                return None
+            if humidity <= 0:
                 return None
             # no 'a' term as it drops out when simplifying the calculation
             b = 18.678 # unitless
@@ -5883,7 +5905,11 @@ class wx_API():
             gives us height above ground level.
             Uses the Tom Bradbury method as used by the FAA.
             Additional info: https://github.com/weewx/weewx/blob/master/src/weewx/wxformulas.py """
-            if not surface_temp_c or not dew_point_c or surface_temp_c < dew_point_c:
+            if (
+                surface_temp_c is None
+                or dew_point_c is None
+                or surface_temp_c < dew_point_c
+            ):
                 return None
             try:
                 spread = surface_temp_c - dew_point_c
@@ -5899,7 +5925,7 @@ class wx_API():
             - `c`: Celcius
             - `f`: Fahrenheit
             - `c-f`: Converts input Celcius to Fahrenheit """
-            if not input_temp: return None
+            if input_temp is None: return None
             try:
                 match scale:
                     case 'c' | 'C':
@@ -5921,7 +5947,7 @@ class wx_API():
             - `mph`: miles per hour
             - `kt`: knots
             - `kmh`: kilometers per hour """
-            if not ms: return None
+            if ms is None: return None
             try:
                 match scale:
                     case 'mph' | 'MPH' | 'imperial':
@@ -5938,7 +5964,7 @@ class wx_API():
         def hPa_to_inHg(input: float) -> float | None:
             """ Convert an input pressure in hectopascals to inches of mercury.
             Returns `None` for invalid values. """
-            if not input: return None
+            if input is None: return None
             try:
                 return round(input / 33.864, 3)
             except ValueError:
@@ -5955,9 +5981,9 @@ class wx_API():
             Returns elevation in meters.
             https://en.wikipedia.org/wiki/Barometric_formula """
             if (
-                not sea_level_pressure_hPa
-                or not ground_level_pressure_hPa
-                or not reference_temp_k
+                sea_level_pressure_hPa is None
+                or ground_level_pressure_hPa is None
+                or reference_temp_k is None
             ):
                 return None
 
@@ -5979,7 +6005,7 @@ class wx_API():
             - `nmi`: nautical miles
             - `km`: kilometers
             """
-            if not meter: return None
+            if meter is None: return None
             try:
                 match scale:
                     case 'ft' | 'FT' | 'feet':
@@ -8246,7 +8272,7 @@ if not CURRENT_IP:
                      "it is recommended to restart FlightGazer to restore functionality.")
     write_bad_state_semaphore(True)
 
-configuration_check_api()
+configuration_check_api() # must be run after display init
 if API_KEY:
     API_session = requests.Session()
 api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)

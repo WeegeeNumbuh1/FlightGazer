@@ -32,8 +32,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 200 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.9.7.1 and newer*
+> *There are a total of 201 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.9.8.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -349,12 +349,13 @@ Various runtime flags and stats for this current running session of FlightGazer.
 | `range_too_large` | True if configured `RANGE`/`HEIGHT_LIMIT` combination is too large for local traffic, keeping the selection algorithm needlessly active | bool | false |
 | `combined_feed` | True if multiple dump1090 feeds are being combined on this currently connected instance | bool | false |
 | `display_failures` | Count of display failures for this session (null if display disabled) | int, null | 0 |
+| `unhandled_errors` | Number of times an unexpected error was caught | int | 0 |
 | `cpu_percent` | CPU usage percent for this process (normalized) | float | 18.41 |
 | `cpu_temp_C` | CPU temperature in Celsius, if available; otherwise null | float, null | 50.3 |
 | `memory_MiB` | Process memory usage in MiB | float | 15.34 |
 | `pid` | System PID for the current process | int | 1234 |
 
-> *20 keys*
+> *21 keys*
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `time_now`

@@ -178,11 +178,6 @@ Using this project assumes you have the following:
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - You can use the initialization script to install this, see [this section](#-optional-behaviors) after reading through the setup
-  - If you did not use the built-in install method above, the below points need to be followed:
-    - Refer to [adafruit's guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/) on how to get this working if it's not installed already
-    - It needs to be accessible as a Python module globally or in the same home directory of the user that installed FlightGazer
-    - Must be built using the adafruit script
-    - Note: if using a Raspberry Pi, the core `rgbmatrix` library [doesn't run on a Pi 5 or newer](https://github.com/hzeller/rpi-rgb-led-matrix/issues/1603). Use a Pi 4 or older.
   - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#️-usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Recommended: Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
@@ -347,6 +342,9 @@ A viable setup if not using an RGB Matrix display is to:
 > [!IMPORTANT]
 > <b>Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
 > <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
+
+#### Raspberry Pi 5 support
+Refer to the [Running on a Raspberry Pi 5 document](./docs/using-this-on-a-Raspberry-Pi-5.md).
 
 ### 📈 Using FlightGazer's Data
 

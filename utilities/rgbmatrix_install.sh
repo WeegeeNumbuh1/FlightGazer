@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.9.3.0 (November 2025)
+# Last updated: v.9.8.0 (January 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -38,6 +38,14 @@ if [ -f '/sys/firmware/devicetree/base/model' ] && grep -q 'Raspberry Pi' /proc/
 	DEV_TYPE=$(tr -d '\0' < /sys/firmware/devicetree/base/model) >/dev/null 2>&1
 	# https://stackoverflow.com/a/46163928
 	# https://raspberrypi.stackexchange.com/a/61071
+	case "$DEV_TYPE" in
+		*"Pi 5"*)
+			PI5=true
+			;;
+		*)
+			PI5=false
+			;;
+	esac
 else
 	echo -e "${RED}>>> ERROR: The rgbmatrix library is only meant for the Raspberry Pi!\n${NC}"
 	echo "No changes have been made to this system."
@@ -83,6 +91,9 @@ else
 	echo "the rgbmatrix display, if it's not configured already."
 fi
 echo "**********************************************************"
+if [ "$PI5" = true ]; then
+	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5. The install will continue, however.${NC}"
+fi
 sleep 5s
 echo "Starting soon... (press Ctrl+C to cancel this install now)"
 sleep 10s
@@ -124,15 +135,23 @@ fi
 echo -e "> Downloading RGB matrix software...\n${FADE}"
 rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null # remove anything existing
 git clone --depth=1 $GITUSER/$REPO "$RGB_MATRIX_DIR"
+# uncomment the lines below AND comment out the line above
+# to use the specific commit at the top of this script
+
+# curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
+# && unzip -q /tmp/$REPO-$COMMIT.zip\
+# && rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR"
+
 if [ $? -ne 0 ]; then
 	echo -e "${RED}>>> ERROR: Failed to download from GitHub. Cannot continue.${NC}"
+	echo "Undoing changes..."
+	rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null
+	if [ -d "${USER_HOME}/rpi-rgb-led-matrix_old" ]; then
+		mv "${USER_HOME}/rpi-rgb-led-matrix_old" "$RGB_MATRIX_DIR"
+	fi
+	echo "Done. Try running this script at a later time."
 	exit 1
 fi
-# uncomment the below to use the specific commit at the top of this script
-# curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip
-# unzip -q /tmp/$REPO-$COMMIT.zip
-# rm /tmp/$REPO-$COMMIT.zip
-# mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR"
 echo -e "\n${GREEN}>>> Building RGB matrix software..."
 echo -e "${ORANGE}(This will take a few minutes)\n${NC}${FADE}"
 cd "$RGB_MATRIX_DIR"
