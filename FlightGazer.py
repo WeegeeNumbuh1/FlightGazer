@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.8.0 --- 2026-01-10'
+VERSION: str = 'v.9.8.1 --- 2026-01-14'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1936,13 +1936,14 @@ def perf_monitoring() -> None:
             ▼                ▼              ▼            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
     [AirplaneParser]   [synchronizer]   [DistantDeterminator]      [dump1090Watchdog]
             |
-            ├────────────────┬──────────────────┐               extract_API_results()
-            ▼                ▼                  ▼                         |
-      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3                |
-         5▲ ▲                |4                 ▼                         |
-          | └- - - - - - - - ┘             [WriteState]                   |
-          |                                                               |
-          └ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ┘
+            ├────────────────┬──────────────────┐
+            ▼                ▼                  ▼
+      [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
+      6▲ 5▲ ▲                |4                 ▼
+       |  | └- - - - - - - - ┘             [WriteState]
+       |  |
+       |  └ - - - - - -  extract_API_results()
+       └ - - - - - - - API_Scheduler()
 
 1 = Only executes completely when the following are true:
     - API_KEY exists                 | set only on startup
@@ -1975,6 +1976,9 @@ def perf_monitoring() -> None:
     when the normal signal chain is traversed with a stale entry in the results deque,
     the API fetcher will handle the signal from AirplaneParser first, then
     the calls from extract_API_results() will follow.
+
+6 = API_Scheduler() will trigger an API call if `focus_plane` is present and the thread
+    switches API access "on" when it was previously "off"
 
 """
 
@@ -3663,11 +3667,11 @@ class AirplaneParser:
         self._date_of_last_rare_message: str = ""
         self.plane_count_avg: float = 0. # average amount of planes tracked when `focus_plane_iter` > 0
         self.algorithm_active_time_avg: float = 0. # average duration the algorithm is in an active state before it resets
-        self._plane_counts = deque(maxlen=500)
-        self._active_loop_count = deque(maxlen=50)
+        self._plane_counts = deque(maxlen=int(1800 / LOOP_INTERVAL)) # track current plane count, per loop, up to 30 minutes
+        self._active_loop_count = deque(maxlen=50) # duration of this algorithm's activity, per instance
         self._range_too_large = False
         self._PIA_latch = False
-        self._distressed_latch = False
+        self._distressed_latch = False # latches until there are no more planes to track
         self.run_loop()
 
     def plane_selector(self, message):
@@ -3959,8 +3963,9 @@ class AirplaneParser:
                     iter_time > 1800
                     and not follow_flag
                     and not self._distressed_latch
+                    and self.plane_count_avg > 1.6
                 ):
-                    warn_reason = 'Tracking for longer than 30 minutes'
+                    warn_reason = f'Tracking for longer than 30 minutes (Average: {self.plane_count_avg:.2f} aircraft)'
                 if not self._range_too_large and warn_reason:
                     main_logger.warning("************************************************************")
                     main_logger.warning(f"*** The desired focus region (<{RANGE:.2f}{distance_unit}, "
@@ -3974,7 +3979,9 @@ class AirplaneParser:
 
             else: # when there are no planes
                 if focus_plane_iter > 0:# clean-up variables
-                    if focus_plane_iter * LOOP_INTERVAL < 1800: # don't count algorithm times >30 minutes (for cases when `follow_flag` is True)
+                    # don't count algorithm times >30 minutes
+                    # (for cases when `follow_flag` or `is_distressed` is True)
+                    if focus_plane_iter * LOOP_INTERVAL < 1800:
                         self._active_loop_count.append(focus_plane_iter)
                     else:
                         # super edge-case: tracking the FOLLOW_THIS_AIRCRAFT right at startup and tracking >30min
@@ -4023,6 +4030,7 @@ class APIFetcher:
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=extract_API_results)
+        register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=API_Scheduler)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self.run_loop()
 
@@ -5365,6 +5373,9 @@ def API_Scheduler() -> None:
             API_schedule_triggered = True # if the day is not found, we assume no API calls are allowed
         if API_schedule_triggered != last_API_schedule_triggered:
             main_logger.debug(f"API_SCHEDULE toggled - API calls disabled: {API_schedule_triggered}")
+            if not API_schedule_triggered and focus_plane:
+                main_logger.debug(f"Focus plane \'{focus_plane}\' currently being tracked when enabling API; triggering an API call.")
+                dispatcher.send(message='', signal=PLANE_SELECTED, sender=API_Scheduler)
         time.sleep(10)
 
 class synchronizer():

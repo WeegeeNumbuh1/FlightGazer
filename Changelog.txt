@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.8.1 - 2026-01-14
+    - Handle edge case when the API scheduler enables API usage and an aircraft is currently being tracked
+    - Improvements to the "tracking area is too large" algorithm to handle more edge cases
+
 v.9.8.0 - 2026-01-10
     - Add experimental RGB Display support for Raspberry Pi 5 via RGBMatrixEmulator v0.15.0
         - This requires editing the emulator configuration file in the FlightGazer directory

@@ -22,13 +22,14 @@ If you'd like to see descriptions for all the globals used in the script, those 
                 ▼                ▼              ▼            ░░░░░░░░░░░ ▼ ░░░░░░░░░░░░░░░░░░░░░░
         [AirplaneParser]   [synchronizer]   [DistantDeterminator]      [dump1090Watchdog]
                 |
-                ├────────────────┬──────────────────┐               extract_API_results()
-                ▼                ▼                  ▼                         |
-          [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3                |
-             5▲ ▲                |4                 ▼                         |
-              | └- - - - - - - - ┘             [WriteState]                   |
-              |                                                               |
-              └ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ┘
+                ├────────────────┬──────────────────┐
+                ▼                ▼                  ▼
+          [APIFetcher]1   [DisplayFeeder]2   [PrintToConsole]3
+          6▲ 5▲ ▲                |4                 ▼
+           |  | └- - - - - - - - ┘             [WriteState]
+           |  |
+           |  └ - - - - - -  extract_API_results()
+           └ - - - - - - - API_Scheduler()
 
     1 = Only executes completely when the following are true:
         - API_KEY exists                 | set only on startup
@@ -61,6 +62,9 @@ If you'd like to see descriptions for all the globals used in the script, those 
         when the normal signal chain is traversed with a stale entry in the results deque,
         the API fetcher will handle the signal from AirplaneParser first, then
         the calls from extract_API_results() will follow.
+
+    6 = API_Scheduler() will trigger an API call if `focus_plane` is present and the thread
+        switches API access "on" when it was previously "off"
 
 ## Selection Algorithm Notes
 > *tl;dr this code is cooked, bro. Must've been an Italian in a past life with how much spaghetti is in here.*<br>
