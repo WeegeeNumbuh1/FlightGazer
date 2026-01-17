@@ -273,9 +273,10 @@ write_path.rename(f"{write_path}.old")
 print(f"Writing to {write_path}...")
 
 write_start = perf_counter()
+date_gen_str = datenow.strftime("%Y-%m-%dT%H:%M:%SZ")
 with open(write_path, 'w', encoding='utf-8') as file:
     file.write(header_str)
-    file.write(f"GENERATED = '{datenow.strftime("%Y-%m-%dT%H:%M:%SZ")}'\n")
+    file.write(f"GENERATED = '{date_gen_str}'\n")
     file.write(f"# Used tar1090-db version: {tar1090db_verstr}\n")
     if not friendly_available:
         file.write("# NOTICE: There are no \'friendly\' names in this dataset.\n")
