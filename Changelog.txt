@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.0 - 2026-01-17
+    - Overhauled operators database generator
+        - The database now prioritizes using the tar1090 database for the friendly names and
+          uses Wikipedia as a fallback
+        - The generator now checks the age of the database and will automatically update it if the data
+          is over 6 months old
+        - The generated database is also tested to ensure FlightGazer can use it
+    - The initialization script now will run the operators database generator along with the main aircraft
+      database generator to keep it up to date
+      - Running the operators database generator requires additional python modules to be added in the virtual environment
+    - Operators database update
+
 v.9.8.1 - 2026-01-14
     - Handle edge case when the API scheduler enables API usage and an aircraft is currently being tracked
     - Improvements to the "tracking area is too large" algorithm to handle more edge cases

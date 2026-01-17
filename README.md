@@ -9,7 +9,7 @@
 </div>
 <!-- end title section -->
 
-## 🚩 About
+## About
 This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
 nearby aircraft with **real-time ADS-B** ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
@@ -18,40 +18,43 @@ Uses the FlightAware API to get an aircraft's departure and destination airports
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
 
 >[!NOTE]
-> Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.
+> Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.<br>
+
+> Every text-based line in this project was typed by hand (beside the fonts and databases), including [documentation](./docs/).<br>
+> <b>*No LLM-generated code whatsoever.*</b> (my code lasagna is superior than its slop 😤)
 
 <details open>
 <summary><b>Table of Contents</b></summary>
 
-- [About](#-about)
-- [What it looks like](#-what-it-looks-like)
-- [Features](#-features)
-- [Setup](#️-setup)
+- [About](#about)
+- [What it looks like](#what-it-looks-like)
+- [Features](#features)
+- [Setup](#️setup)
   - [Prerequisites (Important)](#️-prerequisites-important)
-  - [Installation \& Getting Started](#-installation--getting-started)
-  - [Configuration](#️-configuration)
-- [Usage](#️-usage)
-  - [Interactive Mode](#️-interactive-mode)
-  - [Optional Behaviors](#-optional-behaviors)
-  - [The Emulator](#-the-emulator)
-  - [Using FlightGazer's Data](#-using-flightgazers-data)
-  - [Shutting Down \& Restarting](#-shutting-down--restarting)
-  - [Output Reference \& Meanings](#️-output-reference--meanings)
-  - [Misc](#-misc)
-- [How to Update](#️-how-to-update)
-- [Uninstall](#-uninstall)
-- [FAQ's](#-frequently-asked-questions-not-really-but-they-could-pop-up)
-- [Known Issues](#-known-issues-shortcomings-and-reporting-issues)
-- [Support \& Discussion](#-support--discussion)
-- [Changelog \& Contributing](#️-changelog-planned-features-and-contributing)
-- [Additional Related/Similar Projects](#-additional-relatedsimilar-projects)
-- [Highlights Across Media](#️-highlights-across-media)
+  - [Installation \& Getting Started](#installation--getting-started)
+  - [Configuration](#️configuration)
+- [Usage](#️usage)
+  - [Interactive Mode](#️interactive-mode)
+  - [Optional Behaviors](#optional-behaviors)
+  - [The Emulator](#the-emulator)
+  - [Using FlightGazer's Data](#using-flightgazers-data)
+  - [Shutting Down \& Restarting](#shutting-down--restarting)
+  - [Output Reference \& Meanings](#️output-reference--meanings)
+  - [Misc](#misc)
+- [How to Update](#️how-to-update)
+- [Uninstall](#uninstall)
+- [FAQ's](#frequently-asked-questions-not-really-but-they-could-pop-up)
+- [Known Issues](#known-issues-shortcomings-and-reporting-issues)
+- [Support \& Discussion](#support--discussion)
+- [Changelog \& Contributing](#️changelog-planned-features-and-contributing)
+- [Additional Related/Similar Projects](#additional-relatedsimilar-projects)
+- [Highlights Across Media](#️highlights-across-media)
 - [License \& Warranty](#️-license--warranty)
-- [Acknowledgements](#-acknowledgements)
+- [Acknowledgements](#acknowledgements)
 
 </details>
 
-## 👀 What it looks like
+## What it looks like
 
 <div align="center">
 <details open>
@@ -70,13 +73,16 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 <details><summary>I like this, how do I build my own?</summary>
 
 [Coming Soon™](./docs/build-your-own-FlightGazer-tracking-box.md).<br>
-If you want one, I can also build one for you. (also Coming Soon™)
+
 </details>
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 </div>
 
-## 💪 Features
+## Support The Author
+Like what you see above? I can make you one. *(link coming soon™)*
+
+## Features
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
 
 ### Summary
@@ -153,7 +159,7 @@ If you want one, I can also build one for you. (also Coming Soon™)
 </details>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 🛠️ Setup
+## Setup
 ### ⚠️ Prerequisites (Important)
 
 <details><summary><b>Show/Hide All</b></summary>
@@ -211,7 +217,7 @@ Other ADS-B decoders will not work. Your site location needs to be set for most 
 
 </details>
 
-### 📶 Installation & Getting Started
+### Installation & Getting Started
 Make sure you meet the above prerequisites.<br>
 There are two approaches:
 - Using the web-app (recommended)
@@ -241,7 +247,7 @@ If you want finer control over the installation process and didn't use the web-a
 - To make management easier later on, install the web-app
   - Run `sudo bash install-FlightGazer-webapp.sh`
 
-### 🎚️ Configuration
+### Configuration
 
 Edit [`config.yaml`](./config.yaml) which is found in the same directory as the main script itself.<br>
 If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.<br>
@@ -260,7 +266,7 @@ For useful settings with specific setups (e.g. remote dump1090 feeders, custom w
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 🏃‍♂️ Usage
+## Usage
 The main python script ([`FlightGazer.py`](./FlightGazer.py)) is designed to be started by the [`FlightGazer-init.sh`](./FlightGazer-init.sh) file.<br>
 When FlightGazer is installed, you can use the command `sudo systemctl start flightgazer` to start it if it's not already running.
 
@@ -280,7 +286,7 @@ When FlightGazer is installed, you can use the command `sudo systemctl start fli
 > # or
 > journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
-### ⚙️ Interactive Mode
+### Interactive Mode
 The script and python file are designed to run interactively in a console. If you run the following command manually:
 ```
 sudo bash /path/to/FlightGazer/FlightGazer-init.sh
@@ -294,7 +300,7 @@ The script automatically detects that you're running interactively and will disp
 
 </details>
 
-### 🔡 Optional Behaviors
+### Optional Behaviors
 
 `FlightGazer-init.sh` supports optional arguments that adjust the behaviors of the FlightGazer installation and main python script. Expand the table below to see all possible operating modes. Multiple flags can be passed as well.
 
@@ -326,7 +332,7 @@ sudo /etc/FlightGazer-pyvenv/bin/python3 /path/to/FlightGazer/FlightGazer.py
 The main python file accepts almost all the same arguments as the initialization script, but you can always pass `-h` to see all possible operating modes.
 </details>
 
-### 🎮 The Emulator
+### The Emulator
 
 When FlightGazer does not detect the physical RGB Matrix hardware/software, it falls back to using the display emulator.<br>
 To see the display, you can:
@@ -346,7 +352,7 @@ A viable setup if not using an RGB Matrix display is to:
 #### Raspberry Pi 5 support
 Refer to the [Running on a Raspberry Pi 5 document](./docs/using-this-on-a-Raspberry-Pi-5.md).
 
-### 📈 Using FlightGazer's Data
+### Using FlightGazer's Data
 
 When FlightGazer is running, it writes a JSON to `/run/FlightGazer/current_state.json` and updates every `LOOP_INTERVAL` (2 seconds by default).<br>
 Additionally, if you're using the web-app, this same JSON is also available at the `/data/current_state.json` endpoint.<br>
@@ -357,7 +363,7 @@ See the [JSON details](./docs/state-file-schema.md) for a full explanation of th
 There's also an additional file `flybys.csv` in the same directory that FlightGazer resides in, which tracks hourly cumulative counts of aircraft flybys and API stats. This file is also used by FlightGazer to maintain its daily counts whenever it's restarted.
 
 
-### 🔕 Shutting Down & Restarting
+### Shutting Down & Restarting
 It's easier with the web-app.<br>
 If that's not in use, to shutdown FlightGazer, do any one of the following:
 <details><summary>Show/Hide</summary>
@@ -387,11 +393,11 @@ sudo systemctl start flightgazer &
 or, you may [start it manually](#️-interactive-mode).
 </details>
 
-### 🖼️ Output Reference & Meanings
+### Output Reference & Meanings
 
 See the [Output Reference](./docs/output-reference.md) document.
 
-### 👓 Misc
+### Misc
 
 <details><summary>What the initialization script does</summary>
 
@@ -421,6 +427,8 @@ See the [Output Reference](./docs/output-reference.md) document.
   - suntime
   - ruamel.yaml
   - orjson
+  - beautifulsoup4
+  - fake-useragent
   - RGBMatrixEmulator<br>
 *if the web app is installed as well:*
   - Flask
@@ -484,7 +492,7 @@ Check the [`utilities`](./utilities/) directory.
 </details>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## ⬆️ How to Update
+## How to Update
 Use the web-app ![:gladsuna:](https://cdn.discordapp.com/emojis/824790344431435817.webp?size=20).<br>
 or:
 
@@ -519,7 +527,7 @@ The migrator cannot migrate v.1.x configuration files to the newer format so you
 </details>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 🚮 Uninstall
+## Uninstall
 ```
 sudo bash /path/to/FlightGazer/uninstall.sh
 ```
@@ -528,13 +536,13 @@ sudo bash /path/to/FlightGazer/uninstall.sh
 Simply delete the folder (and the virtual python environment if you set that up as well).
 </details>
 
-## ❔ Frequently Asked Questions (not really but they could pop up)
+## Frequently Asked Questions (not really but they could pop up)
 
 👉 [**Read This First**](./docs/FAQs.md)
 
 If your question isn't listed in the FAQ's, open an issue here on GitHub.
 
-## 🐛 Known Issues, Shortcomings, and Reporting Issues
+## Known Issues, Shortcomings, and Reporting Issues
 >[!WARNING]
 > FlightGazer must constantly run as root.
 - This is unavoidable due to the need to interact with low-level hardware to drive the RGB display.
@@ -555,10 +563,10 @@ If you do encounter an issue, provide a copy of `FlightGazer-log.log` which can 
 If using the web-app, also provide the `FlightGazer-initialization.log` which can be downloaded from "Details and Logs".
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 💬 Support & Discussion
+## Support & Discussion
 \* (dust) \*
 
-## ✏️ Changelog, Planned Features, and Contributing
+## Changelog, Planned Features, and Contributing
 Catch up on lore: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
@@ -575,7 +583,7 @@ If you'd like to make your own edits that changes the way the project operates, 
 If there's something not addressed here, please reach out to me directly.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 📖 Additional Related/Similar Projects
+## Additional Related/Similar Projects
 
 - [Another `dump1090` x `rgbmatrix` project](https://github.com/Weslex/rpi-led-flight-tracker), but renders out a minimap instead and uses larger RGB matrix panels
   - Fun fact: I used the same font from the above project for FlightGazer
@@ -586,9 +594,12 @@ If there's something not addressed here, please reach out to me directly.
 - [Skystats](https://github.com/tomcarman/skystats), a fancier way to show aircraft stats
    - FlightGazer does aircraft stats via the log, but the above is a prettier way to see similar data (FlightGazer still tracks different aspects not covered by Skystats)
 - [MLB-LED-Scoreboard](https://github.com/MLB-LED-Scoreboard/mlb-led-scoreboard), instead of planes, track baseballs (another project that uses these RGB matrix panels)
+- Other "FlightGazer"-like projects:
+  - [This one off of Reddit](https://old.reddit.com/r/ADSB/comments/1py0a9z/my_custom_adsb_approach_display_video/)
+  - [A modified 'its-a-plane' version](https://www.etsy.com/listing/4346934119/aviation-whats-flying-overhead-display) (Etsy)
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 🎖️ Highlights Across Media
+## Highlights Across Media
 \* (dust) \*
 
 ## ⚖️ License & Warranty
@@ -602,7 +613,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ```
 If you intend to use this project, the code must remain open source.
 
-## ✅ Acknowledgements
+## Acknowledgements
 Huge shout out to [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator). This tool was invaluable for getting the layout dialed in and figuring out the logic needed to update the display correctly, all while avoiding having to program directly on the Raspberry Pi itself (VSCode Remote on a Zero 2W is literally impossible, I've tried).
 
 <a href="https://discord.gg/haha98"><img src="https://cdn.discordapp.com/emojis/412016075384029184.webp?size=96&quality=lossless" alt="yahane" width="64" height="64"></a>

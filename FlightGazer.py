@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.8.1 --- 2026-01-14'
+VERSION: str = 'v.9.9.0 --- 2026-01-17'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -4805,14 +4805,17 @@ class dump1090Watchdog:
 
     def watchdog(self, message):
         global DUMP1090_IS_AVAILABLE, relevant_planes, watchdog_triggers
+        global lockstep_corrector, dump1090_json_age
         DUMP1090_IS_AVAILABLE = False
         with threading.Lock(): # indirectly let the other threads know that dump1090 is not available
             relevant_planes.clear()
+            lockstep_corrector = 0
+            dump1090_json_age = [0., 0.]
         watchdog_triggers += 1
         write_bad_state_semaphore(True)
         if watchdog_triggers > (watchdog_setpoint - 1):
             main_logger.error(f"{dump1090} watchdog has been triggered too many times ({watchdog_setpoint}).")
-            main_logger.error(">>> Permanently disabling dump1090 readout for this session.")
+            main_logger.error(f">>> Permanently disabling {dump1090} readout for this session.")
             main_logger.error(f"If this is a remote {dump1090} connection, please check your internet connectivity.")
             main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
             main_logger.error("Please correct the underlying issue and restart FlightGazer.")
@@ -5220,7 +5223,7 @@ def operator_lookup(callsign: str) -> dict | None:
     from `callsign_lookup_cache` and then the lookup tables in `operators.py`. If there is a match, this function will
     store the result in the cache for faster lookup, as it is expected this function will be called for each active plane inside
     the given RANGE and at every `LOOP_INTERVAL`. Worst case scenario is when `NO_FILTER` is enabled + very active ADS-B site (~300 planes).
-    Dictionary keys are `3Ltr`, `Company`, `Country`, `Telephony`, `FriendlyName` and `Comments`. """
+    Dictionary keys are `3Ltr`, `Company`, `Country`, `Telephony`, and `FriendlyName`. """
     global callsign_lookup_cache
 
     def lookup(input: str) -> dict | None:

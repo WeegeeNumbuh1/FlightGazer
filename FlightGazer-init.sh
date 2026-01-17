@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.8.1
+# Version = v.9.9.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -20,6 +20,7 @@ CHECK_FILE="${VENVPATH}/first_run_complete"
 THIS_FILE="${BASEDIR}/FlightGazer-init.sh"
 LOGFILE="${BASEDIR}/FlightGazer-log.log"
 DB_DOWNLOADER="${BASEDIR}/utilities/aircraft_db_fetcher.py"
+OP_DOWNLOADER="${BASEDIR}/utilities/operators_generator.py"
 INTERNET_STAT=0 # think return codes
 SKIP_CHECK=0 # 0 = do not skip dependency checks, 1 = skip
 WEB_INT=0 # 1 = web interface is present
@@ -702,6 +703,14 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		"${VENVCMD}" install --upgrade orjson >/dev/null
 		echo -e "${CHECKMARK}"
 
+		echo -e "${FADE}${VERB_TEXT}BeautifulSoup"
+		"${VENVCMD}" install --upgrade beautifulsoup4 >/dev/null
+		echo -e "${CHECKMARK}"
+
+		echo -e "${FADE}${VERB_TEXT}fake-useragent"
+		"${VENVCMD}" install --upgrade fake-useragent >/dev/null
+		echo -e "${CHECKMARK}"
+
 		if [ "$VERB_TEXT" == "Installing: " ]; then
 			echo -e "${FADE}(The next install may take some time, please be patient.)"
 			echo -e "${VERB_TEXT}RGBMatrixEmulator"
@@ -748,7 +757,9 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		-ie "yaml"\
 		-ie "orjson"\
 		-ie "gunicorn"\
-		-ie "Flask")
+		-ie "Flask"\
+		-ie "beautifulsoup4"\
+		-ie "fake-useragent")
 		echo -e "Detected package versions:\n${PIPPKGS}"
 	fi
 	touch "$LOGFILE"
@@ -775,6 +786,23 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo -e "${NC}${ORANGE}> Unable to check or generate aircraft database"
 		echo "  due to downloader script missing.${NC}${FADE}"
 	fi
+	echo -e "${NC}> Checking operators database...${FADE}"
+	if [ -f "$OP_DOWNLOADER" ]; then
+		"${VENVPATH}/bin/python3" "$OP_DOWNLOADER"
+		if [ $? -ne 0 ]; then
+			echo -e "${NC}${ORANGE}> Failed to generate database.${NC}"
+			echo "You can try again at a later time by running"
+			echo -e "${VENVPATH}/bin/python3 ${OP_DOWNLOADER}"
+			echo "in your console."
+		else
+			echo -e "${NC}> Database management successfully completed."
+			chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${OP_DOWNLOADER}" >/dev/null 2>&1
+		fi
+	else
+		echo -e "${NC}${ORANGE}> Unable to check or generate operators database"
+		echo "  due to the generator script missing.${NC}${FADE}"
+	fi
+
 	if [ $INTERNET_STAT -eq 0 ]; then
 		touch $CHECK_FILE
 	fi
