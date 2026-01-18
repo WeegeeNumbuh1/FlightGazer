@@ -564,7 +564,7 @@ If using the web-app, also provide the `FlightGazer-initialization.log` which ca
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Support & Discussion
-\* (dust) \*
+Refer to the [Support Links](/docs/support-links.md) document.
 
 ## Changelog, Planned Features, and Contributing
 Catch up on lore: [`Changelog.txt`](./Changelog.txt).
