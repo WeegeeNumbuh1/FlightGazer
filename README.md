@@ -28,6 +28,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 
 - [About](#about)
 - [What it looks like](#what-it-looks-like)
+- [Support the Author](#support-the-author)
 - [Features](#features)
 - [Setup](#️setup)
   - [Prerequisites (Important)](#️-prerequisites-important)
@@ -131,6 +132,7 @@ Like what you see above? I can make you one. *(link coming soon™)*
 - All installed components confirmed to run on `ARMv7`, `ARMv8`, `x86_64`, `i686`
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
+  - Keeps databases updated over time without having to update to the latest version of FlightGazer
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Program state is available in a json file for use elsewhere

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.0 --- 2026-01-17'
+VERSION: str = 'v.9.9.1 --- 2026-01-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -4334,6 +4334,13 @@ class DisplayFeeder:
             ix = round(trk / (360. / len(dirs)))
             return dirs[ix % len(dirs)]
 
+        def normalize(s: str) -> str:
+            """ Removes excess whitespace and ensures everything is a single line """
+            try:
+                return " ".join(s.split()).strip()
+            except Exception:
+                return s
+
         # idle_stats
         total_flybys = "0"
         total_planes = "0"
@@ -4742,7 +4749,7 @@ class DisplayFeeder:
                 'Track': track,
                 'VertSpeed': vs,
                 'RSSI': rssi,
-                'AircraftInfo': strip_accents(aircraft_str),
+                'AircraftInfo': normalize(strip_accents(aircraft_str)),
                 'is_UAT': True if focus_plane_stats['Source'] == 'UAT' else False,
             }
         with threading.Lock():

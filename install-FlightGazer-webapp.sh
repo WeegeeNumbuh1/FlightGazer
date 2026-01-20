@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.9.7.5
+# Last updated: v.9.9.1
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -282,7 +282,7 @@ if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
 	TimeoutStartSec=10
 	TimeoutStopSec=2
 	Restart=on-failure
-	StartLimitBurst=2
+	StartLimitBurst=4
 	RestartSec=10s
 
 	[Install]

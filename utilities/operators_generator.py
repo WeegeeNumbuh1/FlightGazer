@@ -4,17 +4,75 @@ Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
 # Last updated: January 2026
-# Released in conjunction with Flightgazer version: v.9.9.0
-import sys
-from time import perf_counter
-script_start = perf_counter()
+# Released in conjunction with Flightgazer version: v.9.9.1
 
-print("********** FlightGazer Operator Database Importer **********\n")
+import sys
+
 if __name__ != '__main__':
     print("This script cannot be imported as a module.")
     print("Run this directly from the command line.")
     sys.exit(1)
 
+print("********** FlightGazer Operator Database Importer **********\n")
+
+from time import perf_counter
+script_start = perf_counter()
+from pathlib import Path
+import datetime
+
+current_path = Path(__file__).resolve().parent
+write_path = Path(current_path, 'operators.py')
+alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+datenow = datetime.datetime.now(tz=datetime.timezone.utc)
+old_version = None
+old_version_time = None
+if write_path.exists():
+    print("Operators database exists, checking...")
+    sys.path.append(current_path)
+    try:
+        import operators as op
+        old_version = op.GENERATED
+    except (ImportError, AttributeError) as e:
+        # older version of the file
+        search_line = '# Generated on:'
+        old_version_raw = ''
+        with open(write_path, 'r') as oldfile:
+            for line in oldfile:
+                if search_line in line:
+                    old_version_raw = line.strip()
+                    break
+        if old_version_raw:
+            # example string: '# Generated on: 2026-01-01 00:00:00'
+            old_version = 'T'.join(old_version_raw.split()[3:]) + 'Z'
+        else:
+            print("Could not determine when this file was generated.")
+
+    if old_version:
+        try:
+            old_version_time = datetime.datetime.strptime(
+                old_version, "%Y-%m-%dT%H:%M:%S%z"
+            )
+            delta = datenow - old_version_time
+            print(f"Current database was dated: {old_version_time}")
+            print(f"({delta.days} day(s) ago)")
+            if delta.days < 180:
+                print("Database is still valid, no need to update.")
+                print("\n***** Done. *****")
+                sys.exit(0)
+            else:
+                print("Database is outdated.\n")
+        except Exception as e:
+            print(f"Could not determine when this file was generated.\n{e}")
+    else:
+        print("Could not determine when this file was generated.")
+
+print("Continuing update...")
+# load in all the other modules
+import unicodedata
+import gzip
+import ast
+import importlib
 try:
     import requests
 except ImportError:
@@ -34,16 +92,6 @@ except ImportError:
     print("You can install it using 'pip install fake-useragent'.")
     sys.exit(1)
 
-from pathlib import Path
-import datetime
-import unicodedata
-import gzip
-import ast
-import importlib
-
-current_path = Path(__file__).resolve().parent
-write_path = Path(current_path, 'operators.py')
-alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 FAA_source = 'https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3_section_3.html'
 tar1090db = 'https://github.com/wiedehopf/tar1090-db/raw/refs/heads/master/db/operators.js'
 tar1090db_ver = 'https://raw.githubusercontent.com/wiedehopf/tar1090-db/refs/heads/master/version'
@@ -91,6 +139,13 @@ def strip_accents(s: str, skip_fallback: bool = False) -> str:
         return s
     else:
         return ''.join([s_ if s_.isascii() else "_" for s_ in s])
+
+def normalize(s: str) -> str:
+    """ Removes excess whitespace and ensures everything is a single line """
+    try:
+        return " ".join(s.split()).strip()
+    except Exception:
+        return s
 
 def extractor() -> dict | None:
     """ Download the compressed operators database from tar1090-db and return
@@ -192,49 +247,6 @@ def restore_old():
         write_path.unlink(missing_ok=True)
         backup.rename(write_path)
 
-datenow = datetime.datetime.now(tz=datetime.timezone.utc)
-old_version = None
-old_version_time = None
-if write_path.exists():
-    print("Operators database exists, checking...")
-    sys.path.append(current_path)
-    try:
-        import operators as op
-        old_version = op.GENERATED
-    except (ImportError, AttributeError) as e:
-        # older version of the file
-        search_line = '# Generated on:'
-        old_version_raw = ''
-        with open(write_path, 'r') as oldfile:
-            for line in oldfile:
-                if search_line in line:
-                    old_version_raw = line.strip()
-                    break
-        if old_version_raw:
-            # example string: '# Generated on: 2026-01-01 00:00:00'
-            old_version = 'T'.join(old_version_raw.split()[3:]) + 'Z'
-        else:
-            print("Could not determine when this file was generated.")
-
-    if old_version:
-        try:
-            old_version_time = datetime.datetime.strptime(
-                old_version, "%Y-%m-%dT%H:%M:%S%z"
-            )
-            delta = datenow - old_version_time
-            print(f"Current database was dated: {old_version_time}")
-            print(f"({delta.days} days ago)")
-            if delta.days < 180:
-                print("Database is still valid, no need to update.")
-                print("\n***** Done. *****")
-                sys.exit(0)
-            else:
-                print("Database is outdated, continuing update.\n")
-        except Exception as e:
-            print(f"Could not determine when this file was generated.\n{e}")
-    else:
-        print("Could not determine when this file was generated.")
-
 print("Downloading data from the FAA...")
 try:
     download1 = perf_counter()
@@ -263,7 +275,7 @@ else:
     print("Could not download operator database, falling back to using Wikipedia...")
     data2 = wikipedia_fetcher()
     if not data2:
-        print("Warning: friendly operator names will be unavailable in this dataset.")
+        print("WARNING: friendly operator names will be unavailable in this dataset.")
         friendly_available = False
 
 # make a backup
@@ -277,9 +289,9 @@ date_gen_str = datenow.strftime("%Y-%m-%dT%H:%M:%SZ")
 with open(write_path, 'w', encoding='utf-8') as file:
     file.write(header_str)
     file.write(f"GENERATED = '{date_gen_str}'\n")
-    file.write(f"# Used tar1090-db version: {tar1090db_verstr}\n")
+    file.write(f"# Used tar1090-db version: {tar1090db_verstr}\n\n")
     if not friendly_available:
-        file.write("# NOTICE: There are no \'friendly\' names in this dataset.\n")
+        file.write("# NOTICE: There are no \'friendly\' names in this dataset.\n\n")
     for i, table in enumerate(soup.find_all('table')):
         rows = table.find_all('tr')
         file.write(f"{alphabet[i]}_TABLE = [\n")
@@ -305,11 +317,11 @@ with open(write_path, 'w', encoding='utf-8') as file:
                             friendly = ''
 
                 letter_section.append({
-                    '3Ltr': cols[0].text.strip(),
-                    'Company': cols[1].text.strip(),
-                    'Country': cols[2].text.strip(),
-                    'Telephony': cols[3].text.strip(),
-                    'FriendlyName': friendly,
+                    '3Ltr': normalize(cols[0].text),
+                    'Company': normalize(cols[1].text),
+                    'Country': normalize(cols[2].text),
+                    'Telephony': normalize(cols[3].text),
+                    'FriendlyName': normalize(friendly),
                 })
                 file.write(f"    {letter_section[-1]},\n")
         file.write(f"] # {j} entries.\n\n")
@@ -326,18 +338,30 @@ try:
     importlib.reload(op)
     new_version = op.GENERATED
     print(f"New file generated on: {new_version}")
+    from random import choices
     if new_version != old_version:
         # test that we can extract a result
         result_test = []
-        result_test.append(dict_lookup(getattr(op, 'A_TABLE'), '3Ltr', 'AAL'))
-        result_test.append(dict_lookup(getattr(op, 'D_TABLE'), '3Ltr', 'DAL'))
-        result_test.append(dict_lookup(getattr(op, 'U_TABLE'), '3Ltr', 'UAL'))
+        random_icaos = set()
+        # generate a minimum of 100 random, but valid callsigns
+        for _ in range(500): # bail out if we can't hit the minimum
+            test_icao = ''.join(choices(alphabet, k=3))
+            if test_icao in random_icaos:
+                continue
+            random_icaos.add(test_icao)
+            if (lookup := dict_lookup(getattr(op, f'{test_icao[0]}_TABLE'), '3Ltr', test_icao)) is not None:
+                result_test.append(lookup)
+            if len(result_test) >= 100:
+                break
+
         for entry in result_test:
-            _ = entry['Company']
+            if not (_ := entry['Company']): # every entry needs a name at minimum
+                raise AttributeError('Unable to fetch required name from database.')
             _ = entry['FriendlyName']
+
         print("Updated database successfully passed validity checks.")
 except Exception as e:
-    print(f"New database failed check: {e}")
+    print(f"ERROR: New database failed check:\n{e}")
     print("Restoring older version...")
     restore_old()
     valid_check = False

@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.9.0
+# Version = v.9.9.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -584,8 +584,8 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		if [ $RGBMATRIX_PRESENT -eq 0 ] || [ $RGBMATRIX_PRESENT -eq 3 ]; then
 			echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
 			systemctl enable flightgazer-bootsplash.service 2>&1
-			echo -e "${NC}${FADE}    > Note: If you do not want the boot splash, use the command"
-			echo "      systemctl disable flightgazer-bootsplash.service"
+			echo -e "${NC}    > Note: If you do not want the boot splash, use the command"
+			echo -e "      systemctl disable flightgazer-bootsplash.service${FADE}"
 		else
 			echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
 			systemctl disable flightgazer-bootsplash.service 2>&1
@@ -595,9 +595,9 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		echo -e "${RED}    > Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
 		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
 		sleep 5s
-		echo "    > Don't want it there? Run the uninstall script,"
+		echo -e "    ${NC}> Don't want it there? Run the uninstall script,"
 		echo -e "      move this directory (${BASEDIR})"
-		echo "      to where you want it, then run this script again."
+		echo -e "      to where you want it, then run this script again.${FADE}"
 		sleep 5s
 	else
 		echo "    > Service already exists or we are running"

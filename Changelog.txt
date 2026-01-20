@@ -5,6 +5,18 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.1 - 2026-01-20
+    - Operators database generator tweaks:
+        - Fix syntax issue for older Python versions
+        - The generator loads much faster when it only needs to check the current age of the database
+        - The testing routine when checking the database's validity is more varied and does not check fixed entries
+        - All strings are now normalized
+    - Operators database update with the above changes
+    - FlightGazer removes excess spaces for the strings generated for SHOW_EVEN_MORE_INFO
+    - Slight tweak to the webapp service file to handle systems which may restart
+      the service faster than anticipated following an update through the webapp itself
+        - Only affects new installs
+
 v.9.9.0 - 2026-01-17
     - Overhauled operators database generator
         - The database now prioritizes using the tar1090 database for the friendly names and
