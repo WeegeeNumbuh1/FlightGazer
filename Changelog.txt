@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.2 - 2026-01-22
+    - During a watchdog timeout, the synchronizer thread no longer attempts to control drift
+    - Slight tweak to the rgbmatrix install script
+
 v.9.9.1 - 2026-01-20
     - Operators database generator tweaks:
         - Fix syntax issue for older Python versions
