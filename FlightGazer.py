@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.1 --- 2026-01-20'
+VERSION: str = 'v.9.9.2 --- 2026-01-22'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2198,8 +2198,9 @@ def flyby_stats() -> None:
 
         # load in last line of stats file, check if today's the current date, and re-populate our running stats
         if flyby_stats_present:
+            # https://stackoverflow.com/a/54278929
             with open(FLYBY_STATS_FILE, 'rb') as f:
-                try: # catch OSError in case of a one line file
+                try: # handle the case of a one line file
                     f.seek(-2, os.SEEK_END)
                     while f.read(1) != b'\n':
                         f.seek(-2, os.SEEK_CUR)
@@ -3562,6 +3563,7 @@ def main_loop_generator() -> None:
                     with threading.Lock():
                         general_stats = {'Tracking': 0, 'Range': 0.}
                         relevant_planes.clear()
+                        relevant_planes_last.clear()
                         runtime_sizes[0] = 0
                     if DUMP1090_IS_AVAILABLE: raise TimeoutError
                 start_time = time.perf_counter()
@@ -5505,6 +5507,11 @@ class synchronizer():
     def sync(self, message) -> None:
         """ Does what it says on the can. """
         global lockstep_corrector, determined_time_offset
+        # handle case when watchdog is triggered
+        if not DUMP1090_IS_AVAILABLE:
+            lockstep_corrector = 0.
+            return
+
         def pid_controller(setpoint, pv, kp, ki, kd, previous_error, integral, dt):
             """ Thanks Digikey """
             error = setpoint - pv

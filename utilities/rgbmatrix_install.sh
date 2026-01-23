@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.9.8.0 (January 2026)
+# Last updated: v.9.9.2 (January 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -15,8 +15,10 @@ BASEDIR=$(cd `dirname -- $0` && pwd)
 export PIP_ROOT_USER_ACTION=ignore
 GITUSER='https://github.com/hzeller'
 REPO='rpi-rgb-led-matrix'
-# this fixes an issue when using PIL >= 12 and allows building with Python >= 3.12
-COMMIT=3a5d753e91f40e24e6ae2041fac95946e7a81767
+
+COMMIT=02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
+# Previously: 3a5d753e91f40e24e6ae2041fac95946e7a81767
+# fixes an issue when using PIL >= 12 and allows building with Python >= 3.12
 
 echo -ne "\033]0;rgbmatrix installer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to the rgbmatrix installer! (for FlightGazer)${NC}"
@@ -110,13 +112,14 @@ echo -e "> Installing to ${RGB_MATRIX_DIR}"
 echo -e "\n${GREEN}>>> Installing needed dependencies...${NC}"
 echo -e "> Updating packages...${FADE}"
 apt-get update
-echo -e "${NC}> Doing the install... (this might take some time)${FADE}"
+echo -e "${NC}> Checking/installing prerequisites... (this might take some time)${FADE}"
 apt-cache --generate pkgnames | \
 grep --line-regexp --fixed-strings \
 	-e make \
 	-e gcc \
 	-e g++ \
 	-e python3-dev \
+	-e python3-setuptools \
 	-e python3-pip \
 	-e python3-venv \
 	-e python3-pillow \

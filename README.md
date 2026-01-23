@@ -94,10 +94,10 @@ Like what you see above? I can make you one. *(link coming soon™)*
   - With v.6.0.0 and newer, you can see additional info like aircraft type, airline, and owner, all without needing API access
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
 - It's a neat looking clock when there aren't any aircraft flying overhead
-  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the furthest aircraft you can detect
+  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
 - Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
-- Easily configured, controlled, monitored, and updated within a web browser
+- Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 - Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
 - Designed to run 24/7
@@ -562,7 +562,7 @@ See also: [Other Quirks & Features™](./docs/known-issues-and-shortcomings.md)
 Found a bug? Want to suggest a new feature? Open an issue here on GitHub.
 
 If you do encounter an issue, provide a copy of `FlightGazer-log.log` which can be found in the FlightGazer directory.<br>
-If using the web-app, also provide the `FlightGazer-initialization.log` which can be downloaded from "Details and Logs".
+If using the web-app, you can download all the logs as a zip file from the "Details and Logs" page.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Support & Discussion
@@ -573,7 +573,6 @@ Catch up on lore: [`Changelog.txt`](./Changelog.txt).
 
 Faraway ideas:
 - [ ] ~~Docker image?~~ (unlikely)
-- [x] Settings management from webpage → [Available here](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 - [ ] Support display output to a [FlightFeeder Pro](https://flightaware.store/products/flightfeeder-pro-ads-b-flight-tracker-1090-mhz-piaware)?
 
 >[!IMPORTANT]
