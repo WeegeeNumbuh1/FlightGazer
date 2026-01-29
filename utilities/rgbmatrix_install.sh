@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.9.9.2 (January 2026)
+# Last updated: v.9.9.3 (January 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -94,7 +94,11 @@ else
 fi
 echo "**********************************************************"
 if [ "$PI5" = true ]; then
-	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5. The install will continue, however.${NC}"
+	sleep 2s
+	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5.${NC} The install will continue, however."
+	echo "It is recommended to use RGBMatrixEmulator (running FlightGazer with the -e flag)"
+	echo "if you wish to use an RGB display with the RPi5, for now."
+	echo "Refer to the FlightGazer README file for more guidance."
 fi
 sleep 5s
 echo "Starting soon... (press Ctrl+C to cancel this install now)"

@@ -129,8 +129,8 @@ Like what you see above? I can make you one. *(link coming soon™)*
   - Hot sections are fully profiled and other processing threads are continually monitored during runtime
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
-- Adaptive and variable frame rate
   - The python script has been verified to run in both Linux (Debian) and Windows. (MacOS untested)
+- Adaptive and variable frame rate
 - All installed components confirmed to run on `ARMv7`, `ARMv8`, `x86_64`, `i686`
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`

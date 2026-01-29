@@ -2,7 +2,6 @@
 > Intended audience: end-users
 
 ## Preface
-> *no one is really asking these questions, but they could pop up*
 
 This document serves to both provide solutions to potentially common inquries and as a supplemental troubleshooting guide when using FlightGazer.<br>
 It's impossible to cover all situations and scenarios when it comes to using FlightGazer, but this should be the first thing to refer to before going through the hassle of filing a bug report. This section used to exist in the main readme file, but has been separated out for easier reference.<br>
