@@ -126,8 +126,10 @@ Like what you see above? I can make you one. *(link coming soon™)*
 - Highly optimized and fast
   - Worst case takes ~25ms on average from raw data to fully parsed, filtered, run through the selection algorithm, and formatted
     - The above statistic taken from a Rasberry Pi Zero 2W w/ 32-bit OS operating as a 99.9th percentile (worldwide) ADS-B+UAT receiver at peak traffic while sending data to multiple ADS-B aggregators with MLAT
+  - Hot sections are fully profiled and other processing threads are continually monitored during runtime
 - Small memory footprint once settled (10-40 MiB)
 - Fully Python based
+- Adaptive and variable frame rate
   - The python script has been verified to run in both Linux (Debian) and Windows. (MacOS untested)
 - All installed components confirmed to run on `ARMv7`, `ARMv8`, `x86_64`, `i686`
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)

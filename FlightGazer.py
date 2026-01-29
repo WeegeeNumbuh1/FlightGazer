@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.2 --- 2026-01-22'
+VERSION: str = 'v.9.9.3 --- 2026-01-29'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -618,6 +618,13 @@ if not CONFIG_MISSING:
     del advanced_key
 if config: del config
 
+# Log the current operators database version
+try:
+    main_logger.info(f"Using operators database: {op.GENERATED}")
+except AttributeError:
+    # could be using the older version
+    pass
+
 if FASTER_REFRESH:
     LOOP_INTERVAL = 1
 
@@ -632,9 +639,9 @@ receiver_stats: dict = {'Gain': None, 'Noise': None, 'Strong': None}
 `receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage} """
 
 # active plane stuff
-relevant_planes: list = []
+relevant_planes: list[dict] = []
 """ List of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()` for keys) """
-relevant_planes_last: list = []
+relevant_planes_last: list[dict] = []
 """ `relevant_planes` data from the last loop. Only used when `NOFILTER_MODE` is False. Used for the plane selector algorithm.
 Becomes empty if `relevant_planes` is empty (eg: showing the clock) """
 focus_plane: str = ""
@@ -643,13 +650,13 @@ focus_plane_stats: dict = {}
 """ Extracted stats for `focus_plane` from `relevant_planes`, done by `AirplaneParser.plane_selector()` """
 focus_plane_iter: int = 0
 """ Variable that increments per loop when `AirplaneParser` is active. Resets to 0 when not. """
-focus_plane_ids_scratch = set()
+focus_plane_ids_scratch: set[str] = set()
 """ Scratchpad of currently tracked planes (all IDs in `relevant_planes` at current loop).
 Elements can be removed if plane count > 1 due to selector algorithm """
-focus_plane_ids_discard = set()
+focus_plane_ids_discard: set[str] = set()
 """ Scratchpad of previously tracked plane IDs during the duration of `AirplaneParser`'s execution.
 Gets cleared when all possible planes have been cycled through. """
-plane_latch_times: list = [
+plane_latch_times: list[int] = [
     int(30 // LOOP_INTERVAL),
     int(20 // LOOP_INTERVAL),
     int(15 // LOOP_INTERVAL),
@@ -660,7 +667,7 @@ focus_plane_api_results = deque([None] * 500, maxlen=500)
 With a successful API call, the result is appended at the end of this deque.
 Valid keys are {`ID`, `Flight`, `Origin`, `Destination`, `OriginInfo`, `DestinationInfo`, `Departure`, `Status`, `APIAccessed`}.
 `OriginInfo` and `DestinationInfo` are lists in the order of [name, city] either as strings or None. """
-unique_planes_seen: list = []
+unique_planes_seen: list[dict] = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`, `Flyby`} """
 callsign_lookup_cache = deque([{}] * 100, maxlen=100)
@@ -678,7 +685,7 @@ super_far_plane: dict = {}
 This is a dictionary with the same keys in `relevant_planes` with an added datetime
 accessible with the `Datetime` key. This dictionary remains empty if nothing meets the required criteria.
 This dictionary is reset at the end of the day with the `runtime_accumulators_reset()` function. """
-plane_load: list = [0., 0.]
+plane_load: list[float] = [0., 0.]
 """ Average amount of relevant planes as tracked by the selection algorithm [0],
 and average duration the algorithm is in an active state in seconds [1] """
 tracking_distress_call: str = ''
@@ -784,7 +791,7 @@ combined_feed: bool = False
 """ True if it's determined this dump1090 instance is being used with multiple sites.
 Controlled by `DistantDeterminator()` """
 #--- API stuff
-api_hits: list = [0, 0 ,0 ,0]
+api_hits: list[int] = [0, 0, 0 ,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 API_daily_limit_reached: bool = False
 """ This flag will be set to True if we reach `API_DAILY_LIMIT`. """
@@ -808,7 +815,7 @@ Keys (prepare to handle `None` for all of these):
     `API_key`, `successful_calls`, `failed_calls`, `timestamp`
 """
 #--- running stats
-process_time: list = [0., 0. ,0. ,0.]
+process_time: list[float] = [0., 0. ,0. ,0.]
 """ [dump1090 response, filter data, API response, frame render] ms """
 selection_events: int = 0
 """ Track amount of times the plane selector is triggered. """
@@ -820,11 +827,11 @@ high_priority_events: int = 0
 algorithm_daily_runtime: int = 0
 """ Time in seconds the algorithm has been in use today, based on cumulative loop counts.
 As reference, a `really_really_active_adsb_site` can have a value up to 16 hours. """
-process_time2: list = [0., 0., 0., 0.]
+process_time2: list[float] = [0., 0., 0., 0.]
 """ [time to print last console output, format data, json deserializing, json serializing] ms """
-runtime_sizes: list = [0, 0, 0]
+runtime_sizes: list[int] = [0, 0, 0]
 """ Actual debug info: [dump1090 json size, total data processed, reserved] bytes """
-dump1090_json_age: list = [0., 0.]
+dump1090_json_age: list[float] = [0., 0.]
 """ Age (seconds) of the [dump1090_json, dump978_json] between when it was written and after we polled and processed (not filtered) it.
 This is used for accurate location projections for planes and for controlling drift.
 If not using the filesystem, there is added uncertainty due to differences between the local system's and remote system's time.
@@ -3095,7 +3102,7 @@ def main_loop_generator() -> None:
             main_logger.debug(f"Error fetching or decoding json ({e})", exc_info=False)
             return None
 
-    def dump1090_loop(dump1090_data: list) -> tuple[dict, list]:
+    def dump1090_loop(dump1090_data: list[dict]) -> tuple[dict, list]:
         """ Our dump1090 json filter and internal formatter. Must be fed by a valid `dump1090_heartbeat()` response.
         Returns a dictionary and a list.
         - dictionary: general stats to be updated per loop.

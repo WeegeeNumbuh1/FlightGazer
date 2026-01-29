@@ -25,4 +25,4 @@ Thus, this library is unsuitable for FlightGazer *when used directly*.
 FlightGazer installs [RGBMatrixEmulator](https://github.com/ty-porter/RGBMatrixEmulator) as a fallback when the rgbmatrix library is unavailable or fails to load.<br>
 [v0.15.0](https://github.com/ty-porter/RGBMatrixEmulator/releases/tag/v0.15.0) adds support for the Pi5 with a "Pi5 adapter" which bridges/shims rgbmatrix calls to the Piomatter library mentioned above.
 
-If you are using a Raspberry Pi 5, the FlightGazer initialization script automatically installs the latest version of RGBMatrixEmulator which supports this experimental feature. Other systems and Raspberry Pi hardware that isn't the Pi 5 will use v0.14.2.
+If you are using a Raspberry Pi 5, the FlightGazer initialization script automatically installs the specific version of RGBMatrixEmulator (`RGBMatrixEmulator[pi5]`) which supports this experimental feature. Other systems and Raspberry Pi hardware that isn't the Pi 5 will use the normal version without this add-in.

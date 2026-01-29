@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.3 - 2026-01-29
+    - Operators generator now pulls data from the new FlightGazer-aircraft-db repo
+        - Depreciate and remove pulling from Wikipedia and tar1090-db for the airline names
+        - Database generation is much faster and more resilient
+    - Another operators database update
+    - Update install scripts and checks for RGBMatrixEmulator v0.15.1
+
 v.9.9.2 - 2026-01-22
     - During a watchdog timeout, the synchronizer thread no longer attempts to control drift
     - Slight tweak to the rgbmatrix install script
@@ -363,7 +370,7 @@ v.8.1.0 - 2025-08-29
 
 v.8.0.4 - 2025-08-27
     - Fix case where the display would potentially crash if the locale is not in English
-        - This is caused by the way the locale outputs the weekday and month names; if the output isn't ASC-II, the font in use
+        - This is caused by the way the locale outputs the weekday and month names; if the output isn't ASCII, the font in use
           doesn't have the corresponding glyph to render the required character, thus causing the rendering to fail
     - Optimized time polling for the clock to reduce the amount of function calls, making rendering faster when the clock is shown
     - For clarity, the alternative font is used when JOURNEY_PLUS is enabled and the API returns a result with 4 or more characters

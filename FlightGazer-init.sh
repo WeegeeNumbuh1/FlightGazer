@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.9.1
+# Version = v.9.9.3
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -718,11 +718,10 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			echo -e "${FADE}${VERB_TEXT}RGBMatrixEmulator"
 		fi
 		if [ "$PI5" = true ]; then
-			# RPi 5, install the latest
-			"${VENVCMD}" install --upgrade RGBMatrixEmulator >/dev/null
+			# RPi 5, install the pi5 specific version
+			"${VENVCMD}" install --upgrade RGBMatrixEmulator[pi5] >/dev/null
 		else
-			# >= v0.15.0 will try to install Pi 5 support, we don't need that on other systems
-			"${VENVCMD}" install RGBMatrixEmulator==0.14.2 --upgrade >/dev/null
+			"${VENVCMD}" install RGBMatrixEmulator --upgrade >/dev/null
 		fi
 		echo -e "${CHECKMARK}"
 

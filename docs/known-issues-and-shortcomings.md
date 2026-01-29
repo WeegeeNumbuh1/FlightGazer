@@ -42,5 +42,5 @@ These used to be listed as part of the main readme file, but has been separated 
 ### FlightGazer isn't able to propagate a failure status when running as a service
 - With the way FlightGazer is run (inside `tmux` to ensure persistence), any unhandled error that leads to it crashing is not propagated
 - **Versions v.9.1.0 and newer now write a file in** `/run/FlightGazer` **if FlightGazer ends up in a degraded state or quits due to an uncorrectable error.**
-- This issue is not fully fixed but has been mitiaged somewhat, as long as the main python script is able to run
+- This issue is not fully fixed but has been mitigated somewhat, as long as the main python script is able to run
   - Syntax errors tend to be the Achilles Heel in this case; the service will start successfully, but because `tmux` exits once there is nothing running, it will return an exit code of `0`.
