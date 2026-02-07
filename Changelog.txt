@@ -5,8 +5,15 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.4 - 2026-02-06
+    - Tweak dxing log to handle aircraft with high location uncertainty
+    - When an aircraft declares an emergency, a description of the type of emergency is now included,
+      both in the logs and on the Show Even More Info marquee
+    - Minor fixes to the operators generator
+    - Yet another operators database update
+
 v.9.9.3 - 2026-01-29
-    - Operators generator now pulls data from the new FlightGazer-aircraft-db repo
+    - Operators generator now pulls data from the new FlightGazer-airlines-db repo
         - Depreciate and remove pulling from Wikipedia and tar1090-db for the airline names
         - Database generation is much faster and more resilient
     - Another operators database update

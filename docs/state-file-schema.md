@@ -28,7 +28,7 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`api_stats`](#api_stats)
 - [`database_stats`](#database_stats)
 - [`display_status`](#display_status)
-- [`weather_data`](#weather_data-only-present-if-the-weather-api-is-enabled)
+- [`weather_data`](#weather_data)
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
@@ -162,7 +162,7 @@ An array of nested objects which represents current data for each aircraft consi
 | `Source` | Source of the data, either "ADS-B" or "UAT" | str | "ADS-B" |
 | `OnGround` | Additional context for when altitude is reported to be 0 | bool | false |
 | `Distressed` | True if the aircraft is squawking emergency codes 7500/7600/7700 | bool | false |
-| `NavigationAccuracy` | Navigation accuracy of positions reported by the aircraft, in meters | int, null | 9 |
+| `NavigationAccuracy` | Navigation accuracy of positions reported by the aircraft. Higher values represent a lower estimated position uncertainty (better) | int, null | 9 |
 | `ApproachRate` | Calculated approach speed of the aircraft in relation to the site based on change in line-of-sight distance from previous data packet; always 0 in `NOFILTER` mode, negative means moving away from the site | float | -184.6 |
 | `FutureLatitude` | Estimated future latitude of the aircraft in the next data packet (`refresh_rate_sec` in the future); null if not estimated | float, null | 40.123500 |
 | `FutureLongitude` | Estimated future longitude of the aircraft in the next data packet (`refresh_rate_sec` in the future); null if not estimated | float, null | -73.12340 |
@@ -294,8 +294,9 @@ Represents the internal data sent to the display to render. This key is null if 
 > *15 keys*
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## `weather_data` (Only present if the Weather API is enabled)
-Weather information returned by the OpenWeatherMap API for the site location.
+## `weather_data`
+Weather information returned by the OpenWeatherMap API for the site location.<br>
+<b>Note: This key is only present if the Weather API is enabled.</b>
 
 | key | description | schema | example |
 | --- | --- | --- | --- |

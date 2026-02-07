@@ -67,7 +67,7 @@ if write_path.exists():
     else:
         print("Could not determine when this file was generated.")
 
-print("Continuing update...")
+print("Continuing update.")
 # load in all the other modules
 import unicodedata
 import importlib
@@ -207,7 +207,7 @@ soup = bs(html, 'html.parser')
 print(f"Data parsed in {(perf_counter() - parse_start):.2f} seconds.")
 data_fg_db = fg_db_fetcher()
 if not data_fg_db:
-    print("Failed to fetch data from the FlightGazer-aircraft-db database.")
+    print("Failed to fetch data from the FlightGazer-airlines-db database.")
     print("Cannot continue, please try again at a later time.")
     sys.exit(1)
 
@@ -226,7 +226,7 @@ def write_new():
         entrycount = 0
         file.write(header_str)
         file.write(f"GENERATED = '{date_gen_str}'\n")
-        file.write(f"# Used FlightGazer-aircraft-db: {fg_db_verstr}\n\n")
+        file.write(f"# Used FlightGazer-airlines-db: {fg_db_verstr}\n\n")
         for i, table in enumerate(soup.find_all('table')):
             rows = table.find_all('tr')
             file.write(f"{alphabet[i]}_TABLE = [\n")
@@ -273,7 +273,7 @@ except Exception as e:
 print(f"\nChecking the new file's validity...")
 valid_check = True
 try:
-    if 'op' in sys.modules:
+    if 'operators' in sys.modules:
         importlib.reload(op)
     else:
         sys.path.append(current_path)

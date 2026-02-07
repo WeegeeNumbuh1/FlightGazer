@@ -5,7 +5,7 @@
     <img src="media/FlightGazer-logo.png" alt="Logo">
     </a>
     <h1 align="center">FlightGazer</h1>
-    A comprehensive flight-tracking and logging program that renders ADS-B aircraft info to an RGB-Matrix display.
+    A comprehensive flight-tracking and logging program that renders live ADS-B info of nearby aircraft to an RGB-Matrix display.
 </div>
 <!-- end title section -->
 

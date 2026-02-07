@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.3 --- 2026-01-29'
+VERSION: str = 'v.9.9.4 --- 2026-02-06'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -1130,7 +1130,7 @@ def dxing_log() -> None:
         main_logger.info(f"{''.join(data0)}")
     main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     accuracy = super_far_plane['NavigationAccuracy']
-    if accuracy and accuracy >= 1000:
+    if accuracy and accuracy <= 1:
         main_logger.info(">>> Note: The aircraft reported an inaccurate position at the time of the following data packet.")
     freeze_frame_packet(super_far_plane, show_distance=False)
 
@@ -3140,7 +3140,7 @@ def main_loop_generator() -> None:
             - Source: Source of the data, either 'ADS-B' or 'UAT'
             - OnGround: Additional context for when Altitude is 0; True if actually on the ground, False if the altitude could not be determined.
             - Distressed: True if an aircraft is emitting a distress code (squawking 7500, 7600, 7700), False otherwise.
-            - NavigationAccuracy: Navigation accuracy of the position, in meters. Defaults None
+            - NavigationAccuracy: Categorical representaion of position accuracy, higher better. Defaults None.
             - ApproachRate: Plane's approach rate to your location based on speed unit (always 0 when NOFILTER_MODE is enabled)
             - FutureLatitude: Estimated next latitude of the plane based on heading, speed, and LOOP_INTERVAL. Defaults None, always None when NOFILTER_MODE is enabled
             - FutureLongitude: Same as above, but for longitude
@@ -3826,9 +3826,18 @@ class AirplaneParser:
                             if not self._distressed_latch:
                                 self._distressed_latch = True # note, this latch will only reset once there are no more planes
                                 tracking_distress_call = entry['ID']
+                                match entry['Squawk']:
+                                    case "7500":
+                                        squawkdesc = "Aircraft Hijacking"
+                                    case "7600":
+                                        squawkdesc = "Radio Failure"
+                                    case "7700":
+                                        squawkdesc = "General Emergency"
+                                    case _:
+                                        squawkdesc = ""
                                 main_logger.warning(f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
                                                     "has been detected by your ADS-B site and declared an emergency. "
-                                                    f"(Squawking {entry['Squawk']})")
+                                                    f"(Squawking {entry['Squawk']}, {squawkdesc})")
                                 freeze_frame_packet(entry, show_distance=True)
                         if entry['TrackingFlag'] == 'PIA':
                             PIA_this_poll = True
@@ -4646,14 +4655,23 @@ class DisplayFeeder:
             # "2025 BOEING 787-8 Dreamliner | United Airlines"
             # "1998 CESSNA T182 Turbo Skylane | DOE JOHN"
             # "2024 BELL 429 GlobalRanger (LADD aircraft) | CITY OF CHICAGO DEPARTMENT OF POLICE"
-            # "BOEING-VERTOL CH-47 Chinook (Military aircraft) | AIR MOBILITY COMMAND (AMC)"
+            # "BOEING-VERTOL CH-47 Chinook (Military aircraft) | Air Mobility Command"
             # "BOEING KC-135R/T Stratotanker (Military aircraft)"
             # "NORTHROP GRUMMAN RQ-4 Global Hawk (Military aircraft) REG:11-2046 SQWK:7400" (only with EXTENDED_DETAILS enabled)
             # "Aircraft type: High Vortex Large (75000-300000 lbs) (PIA aircraft) | ForeFlight"
             # "FlightAware (PIA aircraft)"
             aircraft_str_ = []
             if focus_plane_stats['Distressed']:
-                aircraft_str_.append("This aircraft has declared an emergency. | ")
+                match focus_plane_stats['Squawk']:
+                    case "7500":
+                        squawkdesc = "Aircraft Hijacking"
+                    case "7600":
+                        squawkdesc = "Radio Failure"
+                    case "7700":
+                        squawkdesc = "General Emergency"
+                    case _:
+                        squawkdesc = ""
+                aircraft_str_.append(f"This aircraft has declared an emergency: {squawkdesc} | ")
             if focus_plane_stats['AircraftDesc']:
                 aircraft_str_.append(focus_plane_stats['AircraftDesc'])
             else:
