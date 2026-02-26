@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.4 --- 2026-02-06'
+VERSION: str = 'v.9.9.5 --- 2026-02-25'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2130,6 +2130,7 @@ def runtime_accumulators_reset() -> None:
             FOLLOW_THIS_AIRCRAFT_SPOTTED = False
         if dump1090_failures > 0 and watchdog_triggers == 0:
             dump1090_failures -= 1
+            main_logger.info("Notice: sporadic timeout(s) detected today, decreasing occurrence count by 1.")
 
     # update current API usage to what's reported on FlightAware's side
     if API_KEY:
@@ -3588,6 +3589,16 @@ def main_loop_generator() -> None:
                 dump1090_failures += 1
                 sequential_failures += 1
                 failures_delta += 1
+
+                # handling when `runtime_accumulators_reset()` decrements the failure count
+                # and we need to keep `failures_delta` in sync with it
+                if (
+                    dump1090_failures < failures_delta
+                    and watchdog_triggers == 0
+                    and failures_delta > 0
+                ):
+                    failures_delta = dump1090_failures
+
                 if INTERACTIVE:
                     cls()
                     print(f"FlightGazer: {dump1090} service timed out. This is occurrence {dump1090_failures}.")

@@ -96,7 +96,7 @@ Like what you see above? I can make you one. *(link coming soon™)*
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
-- Extensive logging and [console output](#️-interactive-mode) capabilities as a core function
+- Extensive logging and [console output](#interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
 - Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
@@ -142,7 +142,6 @@ Like what you see above? I can make you one. *(link coming soon™)*
 - Automatically tracks aircraft which report distress signals
 - Robust and hard-to-break
 - Unique tools and custom-developed fonts that can be used in other projects (don't forget to credit me)
-- Constant development
 - Adequate documentation
 
 </details>
@@ -173,7 +172,7 @@ Using this project assumes you have the following:
 - A working `dump1090` instance or similar interface where `aircraft.json` can be read/accessed
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
-  - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️-configuration) section)
+  - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️configuration) section)
   - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
 - The latest Python (>=3.10)
 - At least 100 MB of available disk space
@@ -187,8 +186,8 @@ Using this project assumes you have the following:
   - `systemd` based system
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
-  - You can use the initialization script to install this, see [this section](#-optional-behaviors) after reading through the setup
-  - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#️-usage) section)
+  - You can use the initialization script to install this, see [this section](#optional-behaviors) after reading through the setup
+  - `rgbmatrix` does not need to be installed to run FlightGazer, however. (see [Usage](#usage) section)
 - The physical RGB matrix hardware (again, not strictly necessary)
   - Recommended: Using the [adafruit matrix bonnet](https://www.adafruit.com/product/3211)
   - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)
@@ -247,14 +246,14 @@ If you want finer control over the installation process and didn't use the web-a
 - Edit the configuration first (see the section below)
 - Run `sudo bash FlightGazer-init.sh`
   - Optional: if you just want to try out FlightGazer without a permanent install, pass the `-l` flag at the end of the above command
-  - Additional operating modes are explained [here](#-optional-behaviors)
+  - Additional operating modes are explained [here](#optional-behaviors)
 - To make management easier later on, install the web-app
   - Run `sudo bash install-FlightGazer-webapp.sh`
 
 ### Configuration
 
 Edit [`config.yaml`](./config.yaml) which is found in the same directory as the main script itself.<br>
-If you changed any setting, FlightGazer must be [restarted](#-shutting-down--restarting) for the change to take effect.<br>
+If you changed any setting, FlightGazer must be [restarted](#shutting-down--restarting) for the change to take effect.<br>
 Example:
 ```bash
 cd /path/to/Flightgazer

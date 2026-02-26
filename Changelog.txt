@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.9.9.5 - 2026-02-25
+    - Watchdog tweaks to handle long running sessions with sporadic dump1090 timeouts
+
 v.9.9.4 - 2026-02-06
     - Tweak dxing log to handle aircraft with high location uncertainty
     - When an aircraft declares an emergency, a description of the type of emergency is now included,
