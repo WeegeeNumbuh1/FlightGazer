@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.9.9.5 --- 2026-02-25'
+VERSION: str = 'v.10.0.0 --- 2026-03-07'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -143,7 +143,9 @@ else:
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
 CURRENT_DIR = Path(__file__).resolve().parent
-if os.name != 'nt':
+is_posix: bool = False
+if os.name == 'posix':
+    is_posix = True
     try:
         PATH_OWNER = CURRENT_DIR.owner()
         OWNER_HOME = os.path.expanduser(f"~{PATH_OWNER}")
@@ -151,6 +153,7 @@ if os.name != 'nt':
         PATH_OWNER = None
         OWNER_HOME = Path.home()
 else:
+    is_posix = False
     PATH_OWNER = None
     OWNER_HOME = Path.home()
 
@@ -167,18 +170,11 @@ try: # should basically work all the time since we're running as root, but this 
 except PermissionError:
     import tempfile
     workingtempdir = tempfile.gettempdir()
-    if os.name == 'posix':
-        LOGFILE = Path(workingtempdir, "FlightGazer-log.log")
-        LOGFILE.touch(mode=0o777, exist_ok=True)
-        with open(LOGFILE, 'a') as f:
-            f.write("\n")
-        del f
-    if os.name == 'nt':
-        LOGFILE = Path(workingtempdir, "FlightGazer-log.log")
-        LOGFILE.touch(mode=0o777, exist_ok=True)
-        with open(LOGFILE, 'a') as f:
-            f.write("\n")
-        del f
+    LOGFILE = Path(workingtempdir, "FlightGazer-log.log")
+    LOGFILE.touch(mode=0o777, exist_ok=True)
+    with open(LOGFILE, 'a') as f:
+        f.write("\n")
+    del f
 
 logging_format = logging.Formatter(
     fmt='%(asctime)s.%(msecs)03d - %(threadName)s | %(levelname)s: %(message)s',
@@ -225,7 +221,7 @@ main_logger.info("==============================================================
 main_logger.info("===                 Welcome to FlightGazer!                ===")
 main_logger.info("==============================================================")
 main_logger.info(f"FlightGazer Version: {VERSION}")
-main_logger.info(f"Script started: {STARTED_DATE.replace(microsecond=0)}")
+main_logger.info(f"Script started: {STARTED_DATE}")
 if PATH_OWNER:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\' (owned by \'{PATH_OWNER}\')")
 else:
@@ -260,6 +256,7 @@ try:
         ORJSON_IMPORTED = True
     except ImportError:
         ORJSON_IMPORTED = False # we can always fall back on the standard json library
+    main_logger.debug("External modules load-in successful.")
 except Exception as e:
     main_logger.exception(f"{e}")
     main_logger.critical("Could not load required 3rd-party modules.")
@@ -274,6 +271,7 @@ try:
     from utilities.registrations import registration_from_hexid as reg_lookup
     from utilities.animator import Animator
     from utilities import operators as op
+    main_logger.debug("Internal modules load-in successful.")
 except Exception as e:
     main_logger.exception(f"{e}")
     main_logger.critical("Could not load or find required internal modules.")
@@ -287,6 +285,7 @@ CONFIG_FILE = Path(CURRENT_DIR, "config.yaml")
 FLYBY_STATS_FILE = Path(CURRENT_DIR, "flybys.csv")
 DATABASE_FILE = Path(CURRENT_DIR, "utilities", "database.db")
 API_URL: str = "https://aeroapi.flightaware.com/aeroapi/"
+API_CACHE_DATABASE = Path(CURRENT_DIR, "API_cache.db")
 USER_AGENT: dict = {'User-Agent': "Wget/1.25.0"}
 """ Use Wget user-agent for our requests """
 LOOP_INTERVAL: float = 2
@@ -303,6 +302,7 @@ BEYOND_LOS_LIMIT = 290
 # load in all the display-related modules
 DISPLAY_IS_VALID: bool = True
 if not NODISPLAY_MODE:
+    main_logger.debug("Loading display drivers...")
     try:
         if not EMULATE_DISPLAY:
             try:
@@ -343,6 +343,7 @@ if not NODISPLAY_MODE:
                 from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
                 logging.getLogger("tornado.access").setLevel(logging.WARNING) # suppress some of the access logging details
                 logging.getLogger("PIL.Image").setLevel(logging.INFO)
+                main_logger.debug("RGBMatrixEmulator successfully imported.")
             except ImportError:
                 DISPLAY_IS_VALID = False
                 main_logger.error("Display module \'RGBMatrixEmulator\' not found "
@@ -480,6 +481,8 @@ UNITS_WX: int|None = 0
 PREFER_ICAO_CODES: bool = False
 EXTENDED_DETAILS: bool = False
 DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
+SCROLLING_SPEED: int = 25 # new setting!
+API_PERSISTENT_CACHE: bool = False # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -550,6 +553,8 @@ default_settings: dict = {
     "PREFER_ICAO_CODES": PREFER_ICAO_CODES,
     "EXTENDED_DETAILS": EXTENDED_DETAILS,
     "DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT": DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT,
+    "SCROLLING_SPEED": SCROLLING_SPEED,
+    "API_PERSISTENT_CACHE": API_PERSISTENT_CACHE,
 }
 """ Dict of default settings """
 
@@ -791,6 +796,7 @@ combined_feed: bool = False
 """ True if it's determined this dump1090 instance is being used with multiple sites.
 Controlled by `DistantDeterminator()` """
 #--- API stuff
+# Note: capital "API" indicate bools, lowercase "api" are other types
 api_hits: list[int] = [0, 0, 0 ,0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 API_daily_limit_reached: bool = False
@@ -814,6 +820,13 @@ Keys (prepare to handle `None` for all of these):
     `pressure_unit`, `ceiling_elevation_unit`,
     `API_key`, `successful_calls`, `failed_calls`, `timestamp`
 """
+API_cache_present: bool = False
+""" True if the API persistent cache is available and present. """
+api_db_performance: list = [0, 0, 0, 0., 0., 0, 0]
+""" Info about how the API cache is performing.
+[Total queries, queries with no result, general failures,
+average response time (ms), last response time (ms), total commits,
+queries with returned data] """
 #--- running stats
 process_time: list[float] = [0., 0. ,0. ,0.]
 """ [dump1090 response, filter data, API response, frame render] ms """
@@ -927,6 +940,7 @@ def sigterm_handler(signum, frame):
     # final cleanup
     flyby_stats()
     if DATABASE_CONNECTED: db.close()
+    if API_cache_present: api_cache.close()
     if state_json:
         state_json.unlink(missing_ok=True)
         write_bad_state_semaphore(False)
@@ -961,7 +975,6 @@ def cls() -> None:
     # [2J - clear screen
     _ = sys.stdout.write("\x1bc\x1b[3J\x1b[H\x1b[2J")
     sys.stdout.flush()
-    # os.system('cls' if os.name=='nt' else 'clear')
 
 def timedelta_clean(timeinput: datetime.datetime) -> str:
     """ Cleans up time deltas without the microseconds. """
@@ -1269,7 +1282,7 @@ def probe1090() -> tuple[str | None, str | None]:
     If `PREFER_LOCAL` is enabled, this function will try to see if it can access dump1090 from the local
     file system and use that if it works first. When this happens, `USING_FILESYSTEM` flag will be set. """
     global USING_FILESYSTEM
-    if PREFER_LOCAL and os.name=='posix':
+    if PREFER_LOCAL and is_posix:
         # file locations sourced from https://raw.githubusercontent.com/wiedehopf/tar1090/master/install.sh
         file_locations = [
             "/run/readsb",
@@ -1280,7 +1293,7 @@ def probe1090() -> tuple[str | None, str | None]:
             "/run/adsbexchange-feed",
             "/run/shm", # AirNav's rbfeeder
         ]
-        for i, json_1090 in enumerate(file_locations):
+        for _, json_1090 in enumerate(file_locations):
             if Path(json_1090, "aircraft.json").is_file():
                 USING_FILESYSTEM = True
                 main_logger.info("A local working dump1090 instance was found running on this system.")
@@ -1309,13 +1322,13 @@ def probe1090() -> tuple[str | None, str | None]:
 def probe978() -> str | None:
     """ Check if dump978 exists and returns its `URL` or None if not found. """
     global USING_FILESYSTEM_978
-    if PREFER_LOCAL and os.name=='posix':
+    if PREFER_LOCAL and is_posix:
         file_locations = [
             "/run/skyaware978",
             "/run/adsb-feeder-ultrafeeder/skyaware978",
             "/run/adsbexchange-978",
         ]
-        for i, json_978 in enumerate(file_locations):
+        for _, json_978 in enumerate(file_locations):
             if Path(json_978, "aircraft.json").is_file():
                 USING_FILESYSTEM_978 = True
                 main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
@@ -1352,7 +1365,7 @@ def dump1090_check() -> None:
     if CUSTOM_DUMP1090_LOCATION:
         main_logger.info(f"Custom dump1090 location is set: \'{CUSTOM_DUMP1090_LOCATION}\'")
     main_logger.info("Searching for dump1090...")
-    if PREFER_LOCAL and os.name != 'posix':
+    if PREFER_LOCAL and not is_posix:
         main_logger.info("PREFER_LOCAL is enabled but this is not a posix system. Falling back to using the network.")
     for wait in range(3):
         tries = 3 - wait
@@ -1480,9 +1493,39 @@ def configuration_check() -> None:
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
-    global LED_PWM_BITS
+    global LED_PWM_BITS, SCROLLING_SPEED
     global UNITS_WX, OPENWEATHER_API_KEY
-    global database_lookup_cache, focus_plane_api_results
+    global database_lookup_cache, focus_plane_api_results, plane_latch_times
+
+    def switchtime_calc(num: float) -> tuple[int]:
+        """ Given an input site radius, outputs a tuple
+        of switch times for 2, 3, 4+ planes, in seconds. """
+        minimum = 15
+        maximum = 30
+        mid_low_limit = 20
+        low_cutoff = 2
+        high_cutoff = 20
+        # basic linear stuff
+        short_time_slope = (maximum - minimum) / (high_cutoff - low_cutoff)
+        short_time_b = maximum - (short_time_slope * high_cutoff)
+        mid_time_slope = (maximum - mid_low_limit) / (high_cutoff - low_cutoff)
+        mid_time_b = maximum - (mid_time_slope * high_cutoff)
+        if num <= low_cutoff:
+            return maximum, mid_low_limit, minimum
+        elif num >= high_cutoff:
+            return maximum, maximum, maximum
+        else:
+            short_time = int(short_time_slope * num + short_time_b)
+            mid_time = int(mid_time_slope * num + mid_time_b)
+            if short_time < minimum:
+                short_time = minimum
+            elif short_time > maximum:
+                short_time = maximum
+            if mid_time < minimum:
+                mid_time = minimum
+            elif mid_time > maximum:
+                mid_time = maximum
+            return maximum, mid_time, short_time
 
     main_logger.info("Checking settings configuration...")
 
@@ -1539,11 +1582,28 @@ def configuration_check() -> None:
         if (
             LED_PWM_BITS is None
             or not isinstance(LED_PWM_BITS, int)
-            or (1 < LED_PWM_BITS > 11)
+            or not (2 <= LED_PWM_BITS <= 11)
         ):
             main_logger.warning("LED_PWM_BITS is out of bounds or not an integer.")
             main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
             LED_PWM_BITS = default_settings['LED_PWM_BITS']
+
+        if (
+            SCROLLING_SPEED is None
+            or not isinstance(SCROLLING_SPEED, int)
+            or not (10 <= SCROLLING_SPEED <= 50)
+        ):
+            main_logger.warning("SCROLLING_SPEED is out of bounds or not an integer.")
+            main_logger.info(f">>> Setting to default ({default_settings['SCROLLING_SPEED']})")
+            SCROLLING_SPEED = default_settings['SCROLLING_SPEED']
+        else:
+            if (
+                JOURNEY_PLUS
+                or ENHANCED_READOUT
+                or ENHANCED_READOUT_AS_FALLBACK
+            ) and SHOW_EVEN_MORE_INFO:
+                if VERBOSE_MODE or SCROLLING_SPEED != default_settings['SCROLLING_SPEED']:
+                    main_logger.info(f"Scrolling speed is set to {SCROLLING_SPEED}")
 
     if not NOFILTER_MODE:
         if not isinstance(RANGE, (int, float)):
@@ -1594,6 +1654,15 @@ def configuration_check() -> None:
             main_logger.info(f">>> Setting to a reasonable minimum: {2500 * altitude_multiplier:.2f}{altitude_unit}.")
             HEIGHT_LIMIT = round(2500 * altitude_multiplier, 2)
         main_logger.info(f"Filtering summary: <{RANGE:.2f}{distance_unit}, <{HEIGHT_LIMIT:.2f}{altitude_unit}.")
+
+        normal, mid, fast = switchtime_calc(RANGE * distance_multiplier)
+        plane_latch_times = [
+            int(normal // LOOP_INTERVAL),
+            int(mid // LOOP_INTERVAL),
+            int(fast // LOOP_INTERVAL)
+        ]
+        main_logger.debug(f"Plane latch times (loops): {plane_latch_times}")
+
     else:
         RANGE = 10000
         HEIGHT_LIMIT = 275000
@@ -1624,7 +1693,8 @@ def configuration_check() -> None:
                 raise ValueError
             del test1
             FOLLOW_THIS_AIRCRAFT = FOLLOW_THIS_AIRCRAFT.lower() # json file has the hex IDs in lowercase
-            main_logger.info(f"FOLLOW_MODE enabled: Aircraft with hex ID \'{FOLLOW_THIS_AIRCRAFT}\' will be shown when detected by the ADS-B receiver.")
+            main_logger.info(f"FOLLOW_MODE enabled: Aircraft with hex ID \'{FOLLOW_THIS_AIRCRAFT}\' "
+                             "will be shown when detected by the ADS-B receiver.")
         except (ValueError, TypeError):
             main_logger.warning("FOLLOW_THIS_AIRCRAFT is not a valid hex ID.")
             main_logger.info(">>> Disabling FOLLOW_MODE.")
@@ -2132,6 +2202,10 @@ def runtime_accumulators_reset() -> None:
             dump1090_failures -= 1
             main_logger.info("Notice: sporadic timeout(s) detected today, decreasing occurrence count by 1.")
 
+    if API_cache_present:
+        api_cache.prune()
+        api_db_performance[5] = api_cache.commits
+
     # update current API usage to what's reported on FlightAware's side
     if API_KEY:
         api_calls, api_cost = probe_API()
@@ -2442,8 +2516,8 @@ class PrintToConsole:
                 # distance section
                 print_info.append(f"DIST: {aircraft['Direction']}")
                 print_info.append(f"{aircraft['Distance']:.2f}".rjust(6))
-                if aircraft['NavigationAccuracy'] and aircraft['NavigationAccuracy'] >= 1000:
-                    print_info.append("*")
+                if aircraft['NavigationAccuracy'] and aircraft['NavigationAccuracy'] <= 3:
+                    print_info.append("?")
                 print_info.append(f"{distance_unit} ")
                 print_info.append("LOS")
                 print_info.append(f"{aircraft['SlantRange']:.2f}".rjust(6))
@@ -2539,9 +2613,16 @@ class PrintToConsole:
 
         if result:
             api_flight = result['Flight']
-            api_orig = result['Origin']
+            api_aka = result['Identity']
+            if PREFER_ICAO_CODES:
+                api_orig = result['OriginICAO']
+            else:
+                api_orig = result['Origin']
             if api_orig is None: api_orig = "?"
-            api_dest = result['Destination']
+            if PREFER_ICAO_CODES:
+                api_dest = result['DestinationICAO']
+            else:
+                api_dest = result['Destination']
             if api_dest is None: api_dest = "?"
             api_dpart_time = result['Departure']
             if api_dpart_time is not None:
@@ -2560,7 +2641,10 @@ class PrintToConsole:
                 api_str.append(f"{rst}{italic}Note: The below aircraft "
                                 f"may have landed since the API was last checked.{rst}\n")
             api_str.append(f"{blue_highlight}API results for "
-                            f"{white_highlight}{api_flight}{blue_highlight}: ")
+                            f"{white_highlight}{api_flight}{blue_highlight}")
+            if api_aka and api_flight != api_aka:
+                api_str.append(f" ({api_aka})")
+            api_str.append(": ")
             api_str.append(f"[ {api_orig} ] --> [ {api_dest} ], {api_dpart_delta} flight time{rst}")
             api_str.append(f" | {italic}")
             if api_orig_name is not None: # known airport reported
@@ -2571,12 +2655,15 @@ class PrintToConsole:
             else: # coordinate-based origin, almost always has a nearby city as a result
                 if api_orig_city:
                     api_str.append(f"First seen near {api_orig_city}")
-            if result['Status'] == 1:
-                api_str.append("(No API result)")
-            elif result['Status'] == 2:
-                api_str.append("Error: This API call returned a non HTTP-200 code, check the logs.")
-            elif result['Status'] == 3:
-                api_str.append("Error: This API call encountered a connection error or timeout, check the logs.")
+            match result['Status']:
+                case 1:
+                    api_str.append("(No API result)")
+                case 2:
+                    api_str.append("Error: This API call returned a non HTTP-200 code, check the logs.")
+                case 3:
+                    api_str.append("Error: This API call encountered a connection error or timeout, check the logs.")
+                case 4:
+                    api_str.append(" [Cached result]")
             api_str.append(f"{rst}")
             print("".join(api_str))
 
@@ -2687,13 +2774,13 @@ class PrintToConsole:
                 wx_str.append("N/A° | ")
             wx_str.append("winds ")
             if (winds_ := WX_API_data['wind_speed']) > 0:
-                wx_str.append(f"{winds_:.2f}{WX_API_data['wind_speed_unit']} "
+                wx_str.append(f"{winds_:.1f}{WX_API_data['wind_speed_unit']} "
                               f"@ {WX_API_data['wind_dir']}° | ")
             else:
                 wx_str.append("Calm | ")
             wx_str.append("vis ")
             if (vis_ := WX_API_data['visibility']):
-                wx_str.append(f"{vis_:.3f}{WX_API_data['distance_unit']}")
+                wx_str.append(f"{vis_:.2f}{WX_API_data['distance_unit']}")
             else:
                 wx_str.append("N/A")
             wx_str.append(", ceil ")
@@ -2736,15 +2823,19 @@ class PrintToConsole:
         if VERBOSE_MODE:
             json_details.append(f"> json details: {runtime_sizes[0] / 1024:.3f} KiB")
             if process_time[0] != 0:
-                json_details.append(" | Transfer speed: "
-                                    f"{(runtime_sizes[0] * 1000)/(process_time[0] * 1048576):.3f} "
-                                    "MiB/s | ")
+                json_details.append(
+                    " | Transfer speed: "
+                    f"{(runtime_sizes[0] * 1000)/(process_time[0] * 1048576):.3f} "
+                    "MiB/s | "
+                )
             else:
                 json_details.append(" | Transfer speed: 0 MiB/s | ")
             if process_time2[2] != 0:
-                json_details.append("Processing speed: "
-                                    f"{(runtime_sizes[0] * 1000)/(process_time2[2] * 1048576):.3f} "
-                                    "MiB/s")
+                json_details.append(
+                    "Processing speed: "
+                    f"{(runtime_sizes[0] * 1000)/(process_time2[2] * 1048576):.3f} "
+                    "MiB/s"
+                )
             else:
                 json_details.append("Processing speed: 0 MiB/s")
             if WRITE_STATE:
@@ -2762,13 +2853,23 @@ class PrintToConsole:
             print("".join(json_details_2))
 
         # verbose stats line 4 (database stuff)
-        db_stuff = []
         if (VERBOSE_MODE or NOFILTER_MODE) and DATABASE_CONNECTED:
-            db_stuff.append("> Database stats since start: ")
-            db_stuff.append(f"Total queries: {database_stats[0]}, empty results: {database_stats[1]},")
-            db_stuff.append(f" errors: {database_stats[2]} | Retrieval times:")
-            db_stuff.append(f" {database_stats[3]:.3f} ms avg, {database_stats[4]:.3f} ms last")
-            print("".join(db_stuff))
+            print(
+                "> Database stats since start: "
+                f"Total queries: {database_stats[0]}, empty results: {database_stats[1]},"
+                f" errors: {database_stats[2]} | Retrieval times:"
+                f" {database_stats[3]:.3f} ms avg, {database_stats[4]:.3f} ms last"
+            )
+
+        # verbose stats line 5 (API results cache)
+        if VERBOSE_MODE and API_cache_present:
+            print(
+                "> API cache stats: "
+                f"Total queries: {api_db_performance[0]}, "
+                f"{api_db_performance[6]}/{api_db_performance[1]} hits/misses,"
+                f" errors: {api_db_performance[2]}, commits: {api_db_performance[5]} | Retrieval times:"
+                f" {api_db_performance[3]:.3f} ms avg, {api_db_performance[4]:.3f} ms last "
+            )
 
         if VERBOSE_MODE:
             print(gen_info_str)
@@ -3978,7 +4079,7 @@ class AirplaneParser:
                 plane_load[0] = self.plane_count_avg
                 iter_time = focus_plane_iter * LOOP_INTERVAL
                 warn_reason = ''
-                if self.plane_count_avg >= 8:
+                if self.plane_count_avg >= 8 and iter_time > 30:
                     warn_reason = f'Too many aircraft in area (Average: {self.plane_count_avg:.2f})'
                 elif self.plane_count_avg > 5 and iter_time > 240:
                     warn_reason = f'Very high short-term traffic (Average: {self.plane_count_avg:.2f} aircraft) over 4 minutes'
@@ -4065,32 +4166,38 @@ class APIFetcher:
 
     def get_API_results(self, message):
         """ The real meat and potatoes for this class. Will append a dict to `focus_plane_api_results`
-        with any attempt to query the API, failures included. """
+        with any attempt to query the API, failures included. If the persistent API cache is available, queries will look
+        at the cache first, and if not, will use the actual API for a result, then append the result to the cache. """
         """ API results to output table:
 
-           --- API Result ---   |  O  |  D  |  on  |  oc  |  dn  |  dc  |  t  |  S  | --- Notes ---
-        ______________________________________________________________________________________________________
-        Full                    |  X  |  X  |  X   |  X   |  X   |  X   |  X  |  0  |
-        Chartered/location only |  X  |     |  X   |  X   |      |      |  X  |  0  |
-        Coordinate origin only  |  X  |  m  |      |  X   |      |      |  X  |  0  | O = latitude coordinate, D = longitude coordinate
-        No result/blocked plane |  m  |     |      |      |      |      |     |  1  | O = "N/A"
-        Non HTTP-200 result     |     |     |      |      |      |      |     |  2  |
-        Any other failure       |     |     |      |      |      |      |     |  3  |
+           --- API Result ---   |  O  |  D  |  oi  |  di  |  on  |  oc  |  dn  |  dc  |  t  |  ty  |  S  | --- Notes ---
+        ___________________________________________|______|________________________________________|_______________________________
+        Full                    |  X  |  X  |  X   |  X   |  X   |  X   |  X   |  X   |  X  |  X   |  0  |
+        Chartered/location only |  X  |     |  X   |      |  X   |  X   |      |      |  X  |  X   |  0  |
+        Coordinate origin only  |  X  |  m  |      |      |      |  X   |      |      |  X  |  X   |  0  | O = latitude coordinate, D = longitude coordinate
+        No result/blocked plane |  m  |     |      |      |      |      |      |      |     |      |  1  | O = "N/A"
+        Non HTTP-200 result     |     |     |      |      |      |      |      |      |     |      |  2  |
+        Any other failure       |     |     |      |      |      |      |      |      |     |      |  3  |
+        From persistent cache   |  X  |  X  |  X   |  X   |  X   |  X   |  X   |  X   |     |  X   |  4  |
 
         Key:
         O  = origin airport code
         D  = destination airport code
+        oi = origin airport code (ICAO)
+        di = destination airport code (ICAO)
         on = origin airport name
         oc = origin airport city/location
         dn = destination airport name
         dc = destination airport city/location
         t  = time flight took off or was first tracked
+        ty = flight type
         S  = API_status value
         X  = Uses API result
         m  = Modifies/overloads the normal output
         """
         global process_time, focus_plane_api_results, api_hits
         global API_daily_limit_reached, estimated_api_cost, API_KEY, API_cost_limit_reached
+        global api_db_performance
         if (
             API_KEY is None
             or not API_KEY
@@ -4106,16 +4213,21 @@ class APIFetcher:
         date_tomorrow = date_now + datetime.timedelta(days=1)
         date_tomorrow_iso = date_tomorrow.astimezone().replace(microsecond=0).isoformat()
         origin: str | None = None
+        origin_icao: str | None = None
         destination: str | None = None
+        destination_icao: str | None = None
         departure_time: datetime.datetime | None = None
         origin_city: str | None = None
         origin_name: str | None = None
         destination_city: str | None = None
         destination_name: str | None = None
+        flight_type: str | None = None
         API_status = 0
+        cache_result: dict | None = None
+        identity: str | None = None
         stale_age = FLYBY_STALENESS * 60 # seconds
 
-        flight_name = focus_plane_stats_now.get('Flight', "")
+        flight_name: str = focus_plane_stats_now.get('Flight', "")
 
         # if for some reason there is no flight ID, don't bother trying to query the API
         if not flight_name or flight_name.startswith('~') or flight_name == '?': return
@@ -4176,6 +4288,28 @@ class APIFetcher:
             # main_logger.debug(f"Wait complete, ENHANCED_READOUT: {ENHANCED_READOUT}")
         if ENHANCED_READOUT: return
 
+        # check if this flight exists in the long-term cache before actually hitting the API
+        if API_cache_present:
+            cache_result = api_cache.fetch(flight_name)
+            if cache_result:
+                origin = cache_result.get('Origin')
+                identity = cache_result.get('Identity')
+                origin_icao = cache_result.get('OriginICAO')
+                destination = cache_result.get('Destination')
+                destination_icao = cache_result.get('DestinationICAO')
+                origin_city = cache_result.get('OriginCity')
+                origin_name = cache_result.get('OriginName')
+                destination_city = cache_result.get('DestinationCity')
+                destination_name = cache_result.get('DestinationName')
+                API_status = 4
+                flight_type = "Airline"
+            api_db_performance[0] = api_cache.queries
+            api_db_performance[1] = api_cache.query_misses
+            api_db_performance[2] = api_cache.errors
+            api_db_performance[3] = api_cache.average_speed
+            api_db_performance[4] = api_cache.last_access_speed
+            api_db_performance[6] = api_cache.hits
+
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
         base_url = API_URL + f"flights/{flight_name}"
         params = {
@@ -4184,20 +4318,22 @@ class APIFetcher:
             'max_pages': 1
         }
 
-        try:
-            start_time = time.perf_counter()
-            response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
-            process_time[2] = round((time.perf_counter() - start_time) * 1000, 3)
-            if response.status_code == 200: # check if service to the API call was valid
-                response_json = response.json()
-                # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
-                if response_json['flights']: # if no results (ex: invalid flight_id or plane is blocked from tracking) this key will be empty
-                    api_hits[0] += 1
-                    main_logger.debug(f"API call for \'{flight_name}\' successful. Took {process_time[2]}ms")
-                    for flight in response_json['flights']:
-                        if "En Route" in flight.get('status', ''): # check we're reading current flight information
-                            if flight['origin']:
-                                if not PREFER_ICAO_CODES:
+        if not cache_result:
+            try:
+                start_time = time.perf_counter()
+                response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
+                process_time[2] = round((time.perf_counter() - start_time) * 1000, 3)
+                if response.status_code == 200: # check if service to the API call was valid
+                    response_json = response.json()
+                    # API reference -> https://www.flightaware.com/aeroapi/portal/documentation#get-/flights/-ident-
+                    if response_json['flights']: # if no results (ex: invalid flight_id or plane is blocked from tracking) this key will be empty
+                        api_hits[0] += 1
+                        main_logger.debug(f"API call for \'{flight_name}\' successful. Took {process_time[2]}ms")
+                        for flight in response_json['flights']:
+                            if "En Route" in flight.get('status', ''): # check we're reading current flight information
+                                identity = flight.get('ident') # actual flight number or registration; may not match callsign
+                                if flight['origin']:
+                                    origin_icao = flight['origin'].get('code')
                                     # we optimally want the 3 letter airport codes
                                     # cascade through these keys until we have something
                                     origin = flight['origin'].get('code_lid')
@@ -4205,99 +4341,107 @@ class APIFetcher:
                                         origin = flight['origin'].get('code_iata')
                                     if origin is None:
                                         # note: the `code` key will either use the ICAO or FAA LID code
-                                        origin = flight['origin'].get('code')
-                                else:
-                                    origin = flight['origin'].get('code')
-                                # airport name, not always present if coordinate-based origin
-                                origin_name = flight['origin'].get('name')
-                                # origin city, almost always present even with coordinate-based origin
-                                origin_city = flight['origin'].get('city')
+                                        origin = origin_icao
 
-                            # with position-only flights, the `destination` key will be None
-                            if flight['destination']:
-                                if not PREFER_ICAO_CODES:
+                                    # airport name, not always present if coordinate-based origin
+                                    origin_name = flight['origin'].get('name')
+                                    # origin city, almost always present even with coordinate-based origin
+                                    origin_city = flight['origin'].get('city')
+
+                                # with position-only flights, the `destination` key will be None
+                                if flight['destination']:
+                                    destination_icao = flight['destination'].get('code')
                                     destination = flight['destination'].get('code_lid')
                                     if destination is None:
                                         destination = flight['destination'].get('code_iata')
                                     if destination is None:
-                                        destination = flight['destination'].get('code')
-                                else:
-                                    destination = flight['destination'].get('code')
+                                        destination = destination_icao
 
-                                destination_name = flight['destination'].get('name')
-                                destination_city = flight['destination'].get('city')
+                                    destination_name = flight['destination'].get('name')
+                                    destination_city = flight['destination'].get('city')
 
-                            if (depart_iso := flight.get('actual_off')):
-                                # API returns UTC time in the form of yyyy-mm-ddThh:mm:ssZ; need to format for .fromisoformat()
-                                departure_time = datetime.datetime.fromisoformat(depart_iso[:-1] + "+00:00")
+                                if (depart_iso := flight.get('actual_off')):
+                                    # API returns UTC time in the form of yyyy-mm-ddThh:mm:ssZ; need to format for .fromisoformat()
+                                    departure_time = datetime.datetime.fromisoformat(depart_iso[:-1] + "+00:00")
 
-                            API_status = 0
-                            break
-                    else: # can happen for general aviation and we detected a new flight before the API does
+                                flight_type = flight.get('type')
+
+                                API_status = 0
+                                break
+                        else: # can happen for general aviation and we detected a new flight before the API does
+                            api_hits[2] += 1
+                            main_logger.debug(f"Could not find currently operating flight for \'{flight_name}\'. Took {process_time[2]}ms")
+                            origin = "N/A"
+                            API_status = 1
+                    else:
                         api_hits[2] += 1
-                        main_logger.debug(f"Could not find currently operating flight for \'{flight_name}\'. Took {process_time[2]}ms")
+                        main_logger.debug(f"API call for \'{flight_name}\' returned no useful data. Took {process_time[2]}ms")
                         origin = "N/A"
                         API_status = 1
                 else:
-                    api_hits[2] += 1
-                    main_logger.debug(f"API call for \'{flight_name}\' returned no useful data. Took {process_time[2]}ms")
-                    origin = "N/A"
-                    API_status = 1
-            else:
-                raise requests.exceptions.HTTPError(f"Received non-200 HTTP status, {response.status_code}") from None
-        except requests.exceptions.HTTPError as e:
-            api_hits[1] += 1
-            API_status = 2
-            main_logger.warning(f"API call for \'{flight_name}\' failed. {e}")
-        except requests.exceptions.ConnectionError as e:
-            api_hits[1] += 1
-            API_status = 3
-            if not VERBOSE_MODE:
-                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error.")
-            else:
-                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error. [ {e} ]")
-        except requests.exceptions.Timeout as e:
-            api_hits[1] += 1
-            API_status = 3
-            if not VERBOSE_MODE:
-                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout.")
-            else:
-                main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout. [ {e} ]")
-        except Exception as e:
-            api_hits[1] += 1
-            API_status = 3
-            main_logger.exception(f"API call for \'{flight_name}\' failed or invalid.")
-        finally:
-            # special case when the API returns a coordinate instead of an airport
-            # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
-            if origin is not None and origin.startswith("L "):
-                main_logger.info(f"Rare event! API returned a coordinate origin ({origin}, near {origin_city}) for \'{flight_name}\'.")
-                orig_coord = origin[2:].split(" ")
-                lat = float(orig_coord[0])
-                lon = float(orig_coord[1])
-                if lat >= 0: lat_str = "N"
-                elif lat <0: lat_str = "S"
-                if lon >= 0: lon_str = "E"
-                elif lon <0: lon_str = "W"
-                origin = f"{abs(lat):.1f}{lat_str}"
-                # Exploit the fact that since we are looking at a position-only flight there will be no known destination beforehand.
-                # We replace the destination with the longitude instead for space reasons (worst case string length: 5 lat, 6 lon)
-                destination = f"{abs(lon):.1f}{lon_str}"
+                    raise requests.exceptions.HTTPError(f"Received non-200 HTTP status, {response.status_code}") from None
+            except requests.exceptions.HTTPError as e:
+                api_hits[1] += 1
+                API_status = 2
+                main_logger.warning(f"API call for \'{flight_name}\' failed. {e}")
+            except requests.exceptions.ConnectionError as e:
+                api_hits[1] += 1
+                API_status = 3
+                if not VERBOSE_MODE:
+                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error.")
+                else:
+                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error. [ {e} ]")
+            except requests.exceptions.Timeout as e:
+                api_hits[1] += 1
+                API_status = 3
+                if not VERBOSE_MODE:
+                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout.")
+                else:
+                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout. [ {e} ]")
+            except Exception as e:
+                api_hits[1] += 1
+                API_status = 3
+                main_logger.exception(f"API call for \'{flight_name}\' failed or invalid.")
+            finally:
+                # special case when the API returns a coordinate instead of an airport
+                # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
+                if origin is not None and origin.startswith("L "):
+                    main_logger.info(f"Rare event! API returned a coordinate origin ({origin}, near {origin_city}) for \'{flight_name}\'.")
+                    orig_coord = origin[2:].split(" ")
+                    lat = float(orig_coord[0])
+                    lon = float(orig_coord[1])
+                    if lat >= 0: lat_str = "N"
+                    elif lat <0: lat_str = "S"
+                    if lon >= 0: lon_str = "E"
+                    elif lon <0: lon_str = "W"
+                    origin = f"{abs(lat):.1f}{lat_str}"
+                    # Exploit the fact that since we are looking at a position-only flight there will be no known destination beforehand.
+                    # We replace the destination with the longitude instead for space reasons (worst case string length: 5 lat, 6 lon)
+                    destination = f"{abs(lon):.1f}{lon_str}"
 
-            api_results = {
-                'ID': focus_plane_stats_now.get('ID'),
-                'Flight': flight_name,
-                'Origin': origin,
-                'Destination': destination,
-                'OriginInfo': [origin_name, origin_city],
-                'DestinationInfo': [destination_name, destination_city],
-                'Departure': departure_time,
-                'Status': API_status,
-                'APIAccessed': time.monotonic()
-            }
-            with threading.Lock():
-                estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
-                focus_plane_api_results.append(api_results)
+        api_results = {
+            'ID': focus_plane_stats_now.get('ID'),
+            'Flight': flight_name,
+            'Identity': identity,
+            'Origin': origin,
+            'OriginICAO': origin_icao,
+            'Destination': destination,
+            'DestinationICAO': destination_icao,
+            'OriginInfo': [origin_name, origin_city],
+            'DestinationInfo': [destination_name, destination_city],
+            'Departure': departure_time,
+            'Type': flight_type,
+            'Status': API_status,
+            'APIAccessed': time.monotonic()
+        }
+        with threading.Lock():
+            estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
+            focus_plane_api_results.append(api_results)
+
+        if API_cache_present and API_status == 0:
+            api_cache.append(api_results)
+            api_db_performance[2] = api_cache.errors
+            api_db_performance[5] = api_cache.commits
 
     """
     def get_API_results_adsbdb():
@@ -4628,9 +4772,15 @@ class DisplayFeeder:
             if not focus_plane_stats['OnGround'] or not api_limiter_reached():
                 result = extract_API_results(focus_plane_api_results, focus_plane)
                 if result:
-                    api_orig = result['Origin']
+                    if PREFER_ICAO_CODES:
+                        api_orig = result['OriginICAO']
+                    else:
+                        api_orig = result['Origin']
                     if api_orig is None: api_orig = filler_text
-                    api_dest = result['Destination']
+                    if PREFER_ICAO_CODES:
+                        api_dest = result['DestinationICAO']
+                    else:
+                        api_dest = result['Destination']
                     if api_dest is None: api_dest = filler_text
                     api_dpart_time = result['Departure']
                     if api_dpart_time is not None:
@@ -4990,7 +5140,7 @@ class WriteState:
         self.json_file = Path(self.run_dir, "current_state.json")
         if (
             not WRITE_STATE
-            or os.name != 'posix'
+            or not is_posix
             or not Path('/run').exists()
         ):
             main_logger.info("FlightGazer state will not be written. (Not running on Linux or /run does not exist.)")
@@ -5109,6 +5259,17 @@ class WriteState:
                 'relevant_planes': relevant_planes if not NOFILTER_MODE else None,
             }
 
+            api_db_stats: dict | None = None
+            if API_cache_present:
+                api_db_stats = {
+                    'total_queries': api_db_performance[0],
+                    'hits': api_db_performance[6],
+                    'empty_results': api_db_performance[1],
+                    'errors': api_db_performance[2],
+                    'commits': api_db_performance[5],
+                    'average_response_times_ms': round(api_db_performance[3]),
+                    'last_response_time_ms': round(api_db_performance[4])
+                }
             api_stats = {
                 'api_enabled': True if API_KEY else False,
                 'api_key': f"*****{API_KEY[-5:]}" if API_KEY else None,
@@ -5124,6 +5285,7 @@ class WriteState:
                 'api_schedule_triggered': API_schedule_triggered,
                 'last_api_response_time_ms': process_time[2],
                 'last_api_result': focus_plane_api_results[-1],
+                'api_cache_stats': api_db_stats
             }
 
             database_info = {
@@ -6602,7 +6764,7 @@ class Display(
             and SHOW_EVEN_MORE_INFO
         ):
             self._last_framerate = self.framerate
-            self.framerate = 25
+            self.framerate = SCROLLING_SPEED
             self.delay = adaptive_speed(self.framerate, process_time[3] / 1000)
         else:
             self._last_framerate = self.framerate
@@ -8296,7 +8458,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         the display output type. Only exists when `ENHANCED_READOUT_AS_FALLBACK` and `API_KEY` are enabled.
         Note that this is still safe to use even if the API_KEY is disabled later on as the API caller will
         simply return before waiting for this Condition. """
-    if not EMULATE_DISPLAY and os.name == 'posix' and os.geteuid() != 0:
+    if not EMULATE_DISPLAY and is_posix and os.geteuid() != 0:
         main_logger.critical("*************************************************")
         main_logger.critical("*   Display driver 'rgbmatrix' requires root!   *")
         main_logger.critical("*      Please run FlightGazer using sudo.       *")
@@ -8336,13 +8498,13 @@ if not CURRENT_IP:
                      "it is recommended to restart FlightGazer to restore functionality.")
     write_bad_state_semaphore(True)
 
+flyby_stats() # initialize the stats writer
+
 configuration_check_api() # must be run after display init
 if API_KEY:
     API_session = requests.Session()
 api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)
 api_scheduling_thread.start()
-
-flyby_stats() # initialize first
 
 # define our scheduled tasks (our "one-shot" functions)
 # NB: order matters in how these are registered as these run sequentially when asked to run at the same time
@@ -8378,7 +8540,40 @@ if LOCATION_IS_SET:
 session = requests.Session()
 """ Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
 suntimes()
-# this must be done after reading the location
+
+if DATABASE_FILE.exists():
+    main_logger.info("Aircraft database is present.")
+    try:
+        from utilities.database_lookup import DatabaseHandler
+        db = DatabaseHandler(database_location=DATABASE_FILE, timeout=LOOP_INTERVAL)
+        DATABASE_CONNECTED = db.connect()
+        if db.is_connected():
+            main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
+            database_ver = db.database_version
+        else:
+            main_logger.error("Could not connect to the database.")
+    except ImportError:
+        main_logger.warning("Failed to load required database handler. "
+                            "Some additional aircraft info may not be available.")
+else:
+    main_logger.info("Aircraft database is unavailable.")
+
+if API_KEY and API_PERSISTENT_CACHE:
+    main_logger.info("API persistent cache feature is enabled, loading features...")
+    try:
+        from utilities.API_db_cache import APICacheHandler
+        api_cache = APICacheHandler(database_location=API_CACHE_DATABASE, timeout=LOOP_INTERVAL, stale=30)
+        API_cache_present = api_cache.connect()
+        if api_cache.is_connected():
+            api_cache.prune()
+            main_logger.info(f"Successfully connected to \'{API_CACHE_DATABASE}\'")
+        else:
+            main_logger.error("Could not connect to the database.")
+    except ImportError:
+        main_logger.warning("Failed to load required database handler. "
+                            "API functionality remains unaffected, but the persistent cache is unavailable.")
+
+# the below must be done after reading the location
 if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
     if LOCATION_IS_SET:
         if CLOCK_CENTER_ENABLED and (
@@ -8413,23 +8608,6 @@ if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
         main_logger.info("OpenWeather API key is present but location is not set. "
                          "Weather information will be unavailable.")
 
-if DATABASE_FILE.exists():
-    main_logger.info("Aircraft database is present.")
-    try:
-        from utilities.database_lookup import DatabaseHandler
-        db = DatabaseHandler(database_location=DATABASE_FILE, timeout=LOOP_INTERVAL)
-        DATABASE_CONNECTED = db.connect()
-        if db.is_connected():
-            main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
-            database_ver = db.database_version
-        else:
-            main_logger.error("Could not connect to the database.")
-    except ImportError:
-        main_logger.warning("Failed to load required database handler. "
-                            "Some additional aircraft info may not be available.")
-else:
-    main_logger.info("Aircraft database is unavailable.")
-
 def main() -> None:
     """ Enters the main loop. """
     # define our main threads
@@ -8446,7 +8624,7 @@ def main() -> None:
     # DXing -> https://en.wikipedia.org/wiki/DXing
     main_logger.info("Cleared for takeoff.")
 
-    if INTERACTIVE:
+    if INTERACTIVE and not INSIDE_TMUX:
         try:
             print("\nInteractive mode enabled. Pausing here for 15 seconds\n"
                 "so you can read the above output before we enter the main loop.")
@@ -8509,6 +8687,10 @@ def main() -> None:
     if INTERACTIVE:
         main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
     sys.excepthook = catcher
+    if DUMP1090_JSON is None:
+        main_logger.error("There is no connection to dump1090! FlightGazer may not be useful in its current state.")
+        main_logger.info(">>> Please check your settings, network connection, "
+                         "and/or the status of dump1090. Then, restart FlightGazer.")
 
     try:
         while True: #keep-alive

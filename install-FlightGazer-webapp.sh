@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.9.9.1
+# Last updated: v.10.0.0
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -70,6 +70,32 @@ venv_install() {
 	echo -e "${FADE}> gunicorn..."
 	"${VENVCMD}" install --upgrade gunicorn >/dev/null
 	echo -e "Done.${NC}"
+}
+
+service_file() {
+	cat <<- EOF > /etc/systemd/system/flightgazer-webapp.service
+	[Unit]
+	Description=FlightGazer Web Interface
+	Documentation="https://github.com/WeegeeNumbuh1/FlightGazer-webapp"
+	StartLimitIntervalSec=30
+
+	[Service]
+	# yeah we use root for this, but this web app isn't something you expose to the rest of the internet anyway (if you do, then gg)
+	User=root
+	ExecStart="${VENVPATH}/bin/gunicorn" -w 1 -b 0.0.0.0:9898 --no-control-socket --chdir "${BASEDIR}/web-app/" "FG-webapp:app"
+	Type=simple
+	KillMode=control-group
+	TimeoutStartSec=10
+	TimeoutStopSec=2
+	Restart=on-failure
+	StartLimitBurst=4
+	RestartSec=10s
+
+	[Install]
+	WantedBy=multi-user.target
+	EOF
+
+	systemctl daemon-reload 2>&1
 }
 
 systemctl list-unit-files flightgazer-webapp.service >/dev/null
@@ -141,6 +167,8 @@ else
 		echo "Checking venv dependencies first (please wait)..."
 		systemctl stop flightgazer-webapp >/dev/null 2>&1
 		echo -e "${FADE}The web interface has been shut down."
+		echo "Checking service file..."
+		service_file
 		venv_install
 		bash "${BASEDIR}/web-app/update-webapp.sh"
 		if [ $? -ne 0 ]; then
@@ -262,47 +290,18 @@ else
 	echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
 	echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
 fi
-
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
-if [ ! -f "/etc/systemd/system/flightgazer-webapp.service" ]; then
-	cat <<- EOF > /etc/systemd/system/flightgazer-webapp.service
-	[Unit]
-	Description=FlightGazer Web Interface
-	Documentation="https://github.com/WeegeeNumbuh1/FlightGazer-webapp"
-	StartLimitIntervalSec=30
-
-	[Service]
-	# yeah we use root for this, but this web app isn't something you expose to the rest of the internet anyway (if you do, then gg)
-	User=root
-	ExecStart="${VENVPATH}/bin/gunicorn" -w 1 -b 0.0.0.0:9898 --chdir "${BASEDIR}/web-app/" "FG-webapp:app"
-	Type=simple
-	# Note: the below is required to handle the case when the web interface updates itself and needs to restart the service.
-	# Without this, this service will fail to restart as the process that sent the restart command is killed once the command is initiated.
-	KillMode=process
-	TimeoutStartSec=10
-	TimeoutStopSec=2
-	Restart=on-failure
-	StartLimitBurst=4
-	RestartSec=10s
-
-	[Install]
-	WantedBy=multi-user.target
-	EOF
-
-	systemctl daemon-reload 2>&1
-	systemctl enable flightgazer-webapp.service 2>&1
-	echo "Starting service..."
-	systemctl start flightgazer-webapp.service
-	echo "Service status:"
-	systemctl status flightgazer-webapp.service --no-pager
-	echo ""
-	echo -e "${NC}> Service installed. The FlightGazer web interface will run at boot via systemd.\n"
-	echo -e "${RED}> Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
-	echo -e "  Doing so will cause the service to fail!${NC}"
-	sleep 5s
-else
-echo "> Service already exists."
-fi
+service_file
+systemctl enable flightgazer-webapp.service 2>&1
+echo "Starting service..."
+systemctl start flightgazer-webapp.service
+echo "Service status:"
+systemctl status flightgazer-webapp.service --no-pager
+echo ""
+echo -e "${NC}> Service installed. The FlightGazer web interface will run at boot via systemd.\n"
+echo -e "${RED}> Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
+echo -e "  Doing so will cause the service to fail!${NC}"
+sleep 5s
 
 echo -e "${GREEN}>>> Install complete.${NC}"
 exit 0

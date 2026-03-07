@@ -81,7 +81,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 </div>
 
 ## Support The Author
-Like what you see above? I can make you one. *(link coming soon™)*
+Like what you see above? I can make you a tracking box just like it. *(link coming soon™)*
 
 ## Features
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
@@ -96,11 +96,11 @@ Like what you see above? I can make you one. *(link coming soon™)*
 - It's a neat looking clock when there aren't any aircraft flying overhead
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
-- Extensive logging and [console output](#interactive-mode) capabilities as a core function
+- Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
-- Can emulate an RGB Matrix display in a web browser if you don't have the actual hardware
+- Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
-- Designed to run 24/7
+- Robust and stable enough for 24/7/365 operation
 
 <details><summary><b>More Features</b></summary>
 
@@ -137,11 +137,10 @@ Like what you see above? I can make you one. *(link coming soon™)*
   - Keeps databases updated over time without having to update to the latest version of FlightGazer
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
-- Program state is available in a json file for use elsewhere
+- Program state is [available as a json file](#using-flightgazers-data) for use elsewhere
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Automatically tracks aircraft which report distress signals
-- Robust and hard-to-break
-- Unique tools and custom-developed fonts that can be used in other projects (don't forget to credit me)
+- [Unique tools](./utilities/) and [custom-developed fonts](./fonts/) that can be used in other projects (don't forget to credit me)
 - Adequate documentation
 
 </details>
@@ -193,9 +192,11 @@ Using this project assumes you have the following:
   - Using `64x32` sized, HUB75 type matrix display (this is the only layout this script was designed for)
   - Other matrix displays and setups can be used as well using advanced settings
 - Your location set in `dump1090`
-- A console that can interpret ANSI escape sequences (should be most modern ones)
+- A terminal that can interpret ANSI escape sequences (should be most modern ones)
+- Accurate timekeeping via NTP (e.g. `chrony`) or GPS
 - If using a Raspberry Pi, use a model that has multiple CPU cores (Raspberry Pi 3/Raspberry Pi 2W or newer)
 - Not using a combined feed for the data source (you would know if you set this up)
+- Using FlightGazer on its own dedicated computer system
 #### For Enhanced Functionality
 - A [FlightAware API key](https://www.flightaware.com/commercial/aeroapi/) (optional) for getting additional aircraft information such as origin/destination airports
   - It is highly recommended to generate a key that will only be used for FlightGazer for accurate cost tracking
@@ -290,7 +291,7 @@ When FlightGazer is installed, you can use the command `sudo systemctl start fli
 > journalctl -u flightgazer # use arrow keys to navigate, press 'q' to exit
 > ```
 ### Interactive Mode
-The script and python file are designed to run interactively in a console. If you run the following command manually:
+The script and python file are designed to run interactively in a terminal. If you run the following command manually:
 ```
 sudo bash /path/to/FlightGazer/FlightGazer-init.sh
 ```
@@ -313,7 +314,7 @@ The script automatically detects that you're running interactively and will disp
 | Flag | Enables<br>interactive<br>mode in<br>FlightGazer? | What it does |
 |---|:---:|:---:|
 | (no flag) | ❌ | Default operating mode when not run as a service.<br>Only prints log entries to `stdout`.<br>Will use `rgbmatrix`. Uses `RGBMatrixEmulator` as a fallback.|
-|`-d`| ✅ | Do not load any display driver. Only print console output.<br>Overrides `-e`.|
+|`-d`| ✅ | Do not load any display driver. Only print terminal output.<br>Overrides `-e`.|
 |`-e`| ❌ | Use `RGBMatrixEmulator` as the display driver instead of actual hardware.<br>Display by default can be seen in an internet browser.<br>(see the next section)|
 |`-f`| ✅ | No Filter mode.<br>Ignores set `RANGE` and `HEIGHT_LIMIT` settings and shows all aircraft detected.<br>Display will never show aircraft details and remain as a clock.<br>Useful for low traffic areas.|
 |`-t`| ✅ | Run in `tmux`. Useful for long-running interactive sessions. <br>Default operating mode when started as a service.|
@@ -549,12 +550,16 @@ If your question isn't listed in the FAQ's, open an issue here on GitHub.
 >[!WARNING]
 > FlightGazer must constantly run as root.
 - This is unavoidable due to the need to interact with low-level hardware to drive the RGB display.
-  - The rgbmatrix library is capable of dropping root privleges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
-    - Additionally, not running as root will reduce performance, which we need the most of since this is all based on Python.
-  - The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority.
-  - Related processes like the web-app must also run as root since it needs to be able to start or stop the FlightGazer service.
-  - Even though the emulator does not need to run as root, it will still inherit root permissions due to the way FlightGazer runs.
-    - Same goes for running in `NO_DISPLAY` mode (`-d`).
+<details><summary>More details</summary>
+
+- The rgbmatrix library is capable of dropping root privleges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
+  - Additionally, not running as root will reduce performance, which we need the most of since this is all based on Python.
+- The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority.
+- Related processes like the web-app must also run as root since it needs to be able to start or stop the FlightGazer service.
+- Even though the emulator does not need to run as root, it will still inherit root permissions due to the way FlightGazer runs.
+  - Same goes for running in `NO_DISPLAY` mode (`-d`).
+</details>
+
 - If you're not comfortable with this, do not use this project.
   - *or*, suggest code changes which may reduce the attack surface.
 
@@ -602,7 +607,7 @@ If there's something not addressed here, please reach out to me directly.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Highlights Across Media
-\* (dust) \*
+Check the [trophy case](./docs/trophy-case.md).
 
 ## ⚖️ License & Warranty
 FlightGazer is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) license.<br>

@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.9.9.5 # do not modify this
+CONFIG_VERSION: v.10.0.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -76,6 +76,17 @@ API_SCHEDULE:
 # 0-11:  '-x--xx-xxx-x' means "use the API from 1:00-2:00, 4:00-6:00, 7:00-9:00, 11:00-12:00"
 # If the string starts with a '-', you must encapsulate it in quotes.
 
+API_PERSISTENT_CACHE: false
+# [true/false]
+# Enable a persistent cache of API results over the past 30 days.
+# When an API result is from a commercial flight, save the results so the API doesn't have to be used
+# when the same flight appears again.
+# Limitations:
+# Flight duration will not be available when a result is served by this cache.
+# Encountering chartered or multi-hop flights with this setting enabled may present incorrect information.
+# This cache will not save results from general aviation flights.
+# Any calls to both the API and this cache will stop if any API limit is reached.
+
 # ============= Screen Output settings =============
 # ==================================================
 
@@ -107,6 +118,13 @@ SHOW_EVEN_MORE_INFO: true
 # If using JOURNEY_PLUS, this information will replace the default center readout
 # and relocate RSSI in the bottom right with the aircraft track (vertical speed is no longer shown).
 
+SCROLLING_SPEED: 25
+# [Integer: 10 ~ 50]
+# Adjust how fast the SHOW_EVEN_MORE_INFO scrolling marquee moves, in frames per second.
+# Higher speeds may not be achievable depending on system conditions and configurations,
+# especially if using the display emulator.
+# Recommended to keep this value between 20-30 for readability.
+
 EXTENDED_DETAILS: false
 # [true/false]
 # When SHOW_EVEN_MORE_INFO is enabled, add an aircraft's registration and its current transponder code to
@@ -130,7 +148,7 @@ CLOCK_CENTER_ROW:
 
 CLOCK_CENTER_ROW_CYCLE: false
 # [true/false]
-# Automatically cycle through all available clock ceneter row options every 10 seconds.
+# Automatically cycle through all available clock center row options every 10 seconds.
 # When this is enabled, only one (1) row will be enabled and ignores the settings for CLOCK_CENTER_ROW.
 # If the Weather API is available, this will cycle through those display options as well.
 
@@ -145,7 +163,7 @@ ALTERNATIVE_FONT: false
 
 PREFER_ICAO_CODES: false
 # [true/false]
-# When true, use ICAO codes instead of the default IATA codes for airports.
+# When true, use ICAO (4 letter) codes instead of the default IATA (3 letter) codes for airports.
 
 DISPLAY_SWITCH_PROGRESS_BAR: true
 # [true/false]
@@ -247,7 +265,7 @@ FOLLOW_THIS_AIRCRAFT: ''
 
 FASTER_REFRESH: false
 # [true/false]
-# When true, decrease dump1090 polling time to 1 second versus the default 2 seconds. Increases CPU load.
+# When true, decrease dump1090 polling time to 1 second versus the default 2 seconds. Increases CPU load slightly.
 
 OPENWEATHER_API_KEY: ''
 # [String]
@@ -292,7 +310,7 @@ HAT_PWM_ENABLED: true
 # If you set the quality modification for the RGB-Matrix hat, set to true. If not, set to false.
 
 LED_PWM_BITS: 8
-# [Integer: 1 ~ 11]
+# [Integer: 2 ~ 11]
 # Lower decreases color depth but increases refresh rate. Adjust to taste. '8' works well in most cases.
 
 # ========== Advanced RGB-Matrix settings ==========

@@ -96,23 +96,27 @@ If you'd like to see descriptions for all the globals used in the script, those 
 ## API Results Table
     API results to output table:
 
-       --- API Result ---   |  O  |  D  |  on  |  oc  |  dn  |  dc  |  t  |  S  | --- Notes ---
-    ______________________________________________________________________________________________________
-    Full                    |  X  |  X  |  X   |  X   |  X   |  X   |  X  |  0  |
-    Chartered/location only |  X  |     |  X   |  X   |      |      |  X  |  0  |
-    Coordinate origin only  |  X  |  m  |      |  X   |      |      |  X  |  0  | O = latitude coordinate, D = longitude coordinate
-    No result/blocked plane |  m  |     |      |      |      |      |     |  1  | O = "N/A"
-    Non HTTP-200 result     |     |     |      |      |      |      |     |  2  |
-    Any other failure       |     |     |      |      |      |      |     |  3  |
+       --- API Result ---   |  O  |  D  |  oi  |  di  |  on  |  oc  |  dn  |  dc  |  t  |  ty  |  S  | --- Notes ---
+    ___________________________________________|______|________________________________________|_______________________________
+    Full                    |  X  |  X  |  X   |  X   |  X   |  X   |  X   |  X   |  X  |  X   |  0  |
+    Chartered/location only |  X  |     |  X   |      |  X   |  X   |      |      |  X  |  X   |  0  |
+    Coordinate origin only  |  X  |  m  |      |      |      |  X   |      |      |  X  |  X   |  0  | O = latitude coordinate, D = longitude coordinate
+    No result/blocked plane |  m  |     |      |      |      |      |      |      |     |      |  1  | O = "N/A"
+    Non HTTP-200 result     |     |     |      |      |      |      |      |      |     |      |  2  |
+    Any other failure       |     |     |      |      |      |      |      |      |     |      |  3  |
+    From persistent cache   |  X  |  X  |  X   |  X   |  X   |  X   |  X   |  X   |     |  X   |  4  |
 
     Key:
     O  = origin airport code
     D  = destination airport code
+    oi = origin airport code (ICAO)
+    di = destination airport code (ICAO)
     on = origin airport name
     oc = origin airport city/location
     dn = destination airport name
     dc = destination airport city/location
     t  = time flight took off or was first tracked
+    ty = flight type
     S  = API_status value
     X  = Uses API result
     m  = Modifies/overloads the normal output

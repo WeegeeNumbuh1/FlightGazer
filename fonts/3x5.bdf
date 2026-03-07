@@ -1,8 +1,8 @@
 STARTFONT 2.1
-COMMENT 
 COMMENT Converted from OpenType font "3x5.ttf" by "otf2bdf 3.0".
 COMMENT 
-COMMENT Edited by WeegeeNumbuh1 to add arrows and other useful drawing elements; 'Q' also has been modified for clarity
+COMMENT Edited by WeegeeNumbuh1 to add arrows and other useful drawing elements.
+COMMENT A handful of other glyphs have been edited for better readability and consistency for FlightGazer.
 COMMENT nb: the added glyphs can be seen by the name "char[decimal]"; convert to hex to map it to Unicode
 COMMENT 
 FONT -FreeType-Teeny Tiny Pixls-Medium-R-Normal--5-50-72-72-P-32-ISO10646-1
@@ -800,10 +800,10 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 4 0 0
 BITMAP
-E0
+60
 80
 80
-E0
+60
 ENDCHAR
 STARTCHAR 0064
 ENCODING 100
@@ -834,7 +834,7 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 5 0 0
 BITMAP
-20
+60
 40
 E0
 40
@@ -846,7 +846,7 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 4 0 0
 BITMAP
-C0
+E0
 A0
 60
 C0
@@ -867,13 +867,13 @@ STARTCHAR 0069
 ENCODING 105
 SWIDTH 800 0
 DWIDTH 4 0
-BBX 3 5 0 0
+BBX 2 5 1 0
 BITMAP
-40
+80
 00
-40
-40
-E0
+80
+80
+C0
 ENDCHAR
 STARTCHAR 006A
 ENCODING 106
@@ -972,7 +972,7 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 4 0 0
 BITMAP
-E0
+60
 80
 80
 80
@@ -992,10 +992,11 @@ STARTCHAR 0074
 ENCODING 116
 SWIDTH 800 0
 DWIDTH 4 0
-BBX 3 4 0 0
+BBX 3 5 0 0
 BITMAP
 40
 E0
+40
 40
 60
 ENDCHAR
@@ -1051,7 +1052,7 @@ BBX 3 4 0 0
 BITMAP
 A0
 A0
-E0
+60
 20
 ENDCHAR
 STARTCHAR 007A
@@ -1301,7 +1302,7 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 4 0 1
 BITMAP
-E0
+C0
 20
 40
 E0
@@ -1312,7 +1313,7 @@ SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 4 0 1
 BITMAP
-E0
+C0
 20
 60
 E0
@@ -2662,8 +2663,8 @@ BITMAP
 E0
 40
 ENDCHAR
-STARTCHAR char9668
-ENCODING 9668
+STARTCHAR char9664
+ENCODING 9664
 SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 5 0 0
@@ -2674,8 +2675,8 @@ E0
 60
 20
 ENDCHAR
-STARTCHAR char9664
-ENCODING 9664
+STARTCHAR char9668
+ENCODING 9668
 SWIDTH 800 0
 DWIDTH 4 0
 BBX 3 5 0 0

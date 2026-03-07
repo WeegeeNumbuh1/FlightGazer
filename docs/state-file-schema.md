@@ -25,6 +25,7 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`FlightGazer`](#flightgazer)
 - [`receivers`](#receivers)
 - [`plane_stats`](#plane_stats)
+  - [`relevant_planes`](#relevant_planes-subkey)
 - [`api_stats`](#api_stats)
 - [`database_stats`](#database_stats)
 - [`display_status`](#display_status)
@@ -32,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 201 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.9.8.0 and newer*
+> *There are a total of 213 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.10.0.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -193,7 +194,7 @@ Represents API-related information from FlightAware.
 | `successful_calls` | Number of successful API calls for the current day | int | 80 |
 | `failed_calls` | Number of failed API calls for the current day | int | 0 |
 | `calls_with_no_data` | Number of calls that returned no data or where the aircraft was blocked from tracking | int | 2 |
-| `cache_hits` | Number of times API results were served from cache | int | 32 |
+| `cache_hits` | Number of times API results were served from in-memory cache | int | 32 |
 | `baseline_use` | API usage baseline (currency) at script start and updated at midnight | float | 8.395 |
 | `cost_today` | Estimated API cost consumed today based on calls executed | float | 1.250 |
 | `estimated_use` | Combined baseline and current estimated API usage | float | 9.645 |
@@ -201,9 +202,10 @@ Represents API-related information from FlightAware.
 | `api_daily_limit_reached` | Whether the configured daily API call limit was reached today | bool | false |
 | `api_schedule_triggered` | Whether the API schedule has currently disabled calls | bool | false |
 | `last_api_response_time_ms` | Last API call round-trip time (milliseconds) | float | 1260.5 |
-| `last_api_result` | The last API result; null if the API hasn't been used | object, null | (see below) |
+| `last_api_result` | The last API result; null if the API hasn't been used | object, null | (see `last_api_result` subkey below) |
+| `api_cache_stats` | Array of performance statistics for the API cache, null if the `API_PERSISTENT_CACHE` setting is disabled | array, null | (see `api_cache_stats` subkey below) |
 
-> *14 keys*
+> *15 keys*
 
 ### `last_api_result` subkey
 Latest result as received by the API.
@@ -211,20 +213,39 @@ Latest result as received by the API.
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `ID` | ICAO hex ID of the aircraft associated with this API call | str | "a00002" |
-| `Flight` | Callsign used for API lookup | str | "DAL123" |
+| `Flight` | Callsign used for API lookup | str | "DAL123T" |
+| `Identity` | Flight as returned by the API; can be different from callsign, or null | str, null | "DAL123" |
 | `Origin` | Origin airport code, or null | str, null | "JFK" |
+| `OriginICAO` | Origin airport ICAO code, or null | str, null | "KJFK" |
 | `Destination` | Destination airport code, or null | str, null | "LAX" |
+| `DestinationICAO` | Destination airport ICAO code, or null | str, null | "KLAX" |
 | `OriginInfo` | Array with origin airport name and city, or nulls | array | ["John F. Kennedy Intl", "New York"] |
 | `DestinationInfo` | Array with destination airport name and city, or nulls | array | ["Los Angeles Intl", "Los Angeles"] |
 | `Departure` | ISO time the aircraft first became airborne or was detected by the API, or null | str, null | "2025-01-01T12:12:12+00:00" |
-| `Status` | Internal FlightGazer API status flag (0 = success, 1 = blocked/no data, 2 = non-200 HTTP result, 3 = connection failure) | int | 0 |
+| `Type` | What type of flight this is, or null | str, null | "General_Aviation" |
+| `Status` | Internal FlightGazer API status flag (0 = success, 1 = blocked/no data, 2 = non-200 HTTP result, 3 = connection failure, 4 = sourced from cache) | int | 0 |
 | `APIAccessed` | Monotonic timestamp of when this API call was executed | float | 654211.4865 |
 
-> *9 keys*
+> *13 keys*
+
+### `api_cache_stats` subkey
+Performance stats for the persistent API cache subsystem. This key is null if the API is unavailable or the `API_PERSISTENT_CACHE` setting is disabled.
+| key| description | schema | example |
+| --- | --- | --- | --- |
+| `total_queries` | Total number of successful database queries performed | int | 1246 |
+| `hits` | Number of queries that returned data | int | 198 |
+| `empty_results` | Number of queries that returned no data | int | 1048 |
+| `errors` | Number of failed database actions | int | 0 |
+| `commits` | Number of successful changes written to the database | int | 178 |
+| `average_response_times_ms` | Average response time for database queries in milliseconds | float | 1.65 |
+| `last_response_time_ms` | Last query response time in milliseconds | float | 2.66 |
+
+> *7 keys*
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `database_stats`
-Represents database-related stats.
+Represents stats for the aircraft database.
 
 | key| description | schema | example |
 | --- | --- | --- | --- |
@@ -256,7 +277,7 @@ Represents display-related information.
 | `render_time_ms` | The average time taken to render the animation frames, in milliseconds | float | 4.667 |
 | `current_brightness` | Current brightness level for display (0-100), or null when invalid | int, null | 100 |
 | `current_mode` | Which display mode is active: "active (plane display)" or "idle (clock)", null otherwise | str, null | "idle (clock)" |
-| `data_for_screen` | The actual data dictionary sent to the screen, or null if `display_is_valid` is false | object, null | See `data_for_screen` tables below |
+| `data_for_screen` | The actual data dictionary sent to the screen, or null if `display_is_valid` is false | object, null | (see `data_for_screen` tables below) |
 
 > *13 keys*
 

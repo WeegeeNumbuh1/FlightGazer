@@ -5,6 +5,32 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.10.0.0 - 2026-03-07
+    - NEW: Stretch your API credits to the limit; new persistent API cache option to reuse API results
+      for commercial flights when the same flight appears again
+        - Useful for very busy sites with consistent scheduled flights
+        - Sacrifices some accuracy for extended functionality
+        - Flight duration will be unavailable when information is served by this cache
+        - Does not cache general aviation flights
+        - Disabled by default
+    - Additional API data is now available in the state file
+    - NEW: Frame rate setting for the SHOW_EVEN_MORE_INFO marquee to tweak its scrolling speed
+    - FlightGazer skips the load-in pause when running as a service or inside tmux, making restarts faster
+        - Other minor startup ordering optimizations
+    - Adaptive plane switching times based on tracking area; as RANGE gets larger each aircraft
+      is given more time on the display
+        - Only affects cases with 3 or more aircraft in the area
+    - The operators generator is now smarter and updates only the changes/additions provided by the FAA
+      instead of naively using their data
+        - Another operators database update to latest FlightGazer-airlines-db version
+    - Improve robustness of the web-app service when it runs an update and needs to restart itself
+        - The web-app installer script must be run manually to apply this new change
+    - Web-app installer script will also update the service file when an update is run manually
+    - Minor tweaks to the 3x5 font for better readability and consistency
+    - Minor logging output and interactive output tweaks
+    - Added support for new settings added in RGBMatrixEmulator v0.15.2
+    - Long overdue Version bump
+
 v.9.9.5 - 2026-02-25
     - Watchdog tweaks to handle long running sessions with sporadic dump1090 timeouts
 

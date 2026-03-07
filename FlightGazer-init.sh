@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.9.9.3
+# Version = v.10.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -101,7 +101,8 @@ emulator_heredoc() {
         "quality": 50,
         "image_border": true,
         "debug_text": false,
-        "image_format": "JPEG"
+        "image_format": "JPEG",
+        "open_immediately": false
     },
     "pi5": {
       "_comment": "For use with the pi5 adapter only.",
@@ -611,7 +612,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		emulator_heredoc
 		chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/emulator_config.json" >/dev/null 2>&1
 		echo "    > RGBMatrixEmulator settings created."
-	elif [ $(wc -l < "${BASEDIR}/emulator_config.json") -ne 32 ]; then # count the lines in the heredoc in this script
+	elif [ $(wc -l < "${BASEDIR}/emulator_config.json") -ne 33 ]; then # count the lines in the heredoc in this script
 		echo "  > Updating RGBMatrixEmulator settings..."
 		emulator_heredoc
 		chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/emulator_config.json" >/dev/null 2>&1

@@ -26,6 +26,11 @@ These used to be listed as part of the main readme file, but has been separated 
   - Thus, the flyby count has a bias towards lower numbers
 - The current algorithm in place was designed for the way FlightGazer does its polling, which is *stateless*
 
+### Processes that need to run in an elevated `tmux` instance will get killed if the FlightGazer service is stopped/restarted
+- Because FlightGazer needs to run as root and inside `tmux` when it's running as a service, any other processes that need to both run elevated and with `tmux` will get attached to the existing `tmux` server.
+- When the service is restarted or stopped, systemd will kill the `tmux` server, as expected.
+- The only workaround is to not use other processes that rely on this combinaton, or, simply running FlightGazer on its own dedicated system.
+
 ## Previous Issues
 ### Duplicate entries for the same aircraft
 - On rare occasions are times when there will be two entries of the same aircraft

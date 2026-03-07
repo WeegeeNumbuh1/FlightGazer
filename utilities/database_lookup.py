@@ -58,7 +58,7 @@ class DatabaseHandler:
                     raise KeyError
                 return True
             except sqlite3.Error as e:
-                database_logger.error(f"{e}")
+                database_logger.exception(f"{e}")
                 self._connection = None
                 self.database_version = ''
                 return False
@@ -86,7 +86,7 @@ class DatabaseHandler:
                 self.average_speed = sum(self._access_times) / len(self._access_times)
                 self.queries += 1
             except sqlite3.Error as e:
-                database_logger.error(f"{e}")
+                database_logger.exception(f"{e}")
                 self.query_errors += 1
         else:
             database_logger.debug("Attempt to query database with no connection.")

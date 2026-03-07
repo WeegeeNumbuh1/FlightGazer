@@ -3,8 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: January 2026
-# Released in conjunction with Flightgazer version: v.9.9.3
+# Last updated: v.10.0.0
 
 import sys
 
@@ -147,12 +146,12 @@ def normalize(s: str) -> str:
         return s
 
 def fg_db_fetcher() -> dict:
-    """ Grab and parse the FlightGazer aircraft database.
+    """ Grab and parse the FlightGazer airlines database.
     Returns a dictionary in a form similar to the tar1090-db """
     """ Header: '3Ltr','Company','Country','Telephony','FriendlyName' """
     global fg_db_verstr
     download_start = perf_counter()
-    print("Pulling additional data from the FlightGazer-aircraft-db database...")
+    print("Pulling additional data from the FlightGazer-airlines-db database...")
     try:
         dataset2 = requests.get(fg_db, headers=HTML_header, timeout=5)
         dataset2.raise_for_status()
@@ -220,8 +219,9 @@ print(f"Writing to {write_path}...")
 
 write_start = perf_counter()
 date_gen_str = datenow.strftime("%Y-%m-%dT%H:%M:%SZ")
-icaos = set()
+
 def write_new():
+    icaos = set()
     with open(write_path, 'w', encoding='utf-8') as file:
         entrycount = 0
         file.write(header_str)
@@ -234,28 +234,86 @@ def write_new():
             for row in rows:
                 cols = row.find_all('td')
                 if len(cols) > 0:
-                    ICAO_name = strip_accents(cols[0].text.strip().upper())
+                    ICAO_name = cols[0].text.strip().upper()
                     if ICAO_name in icaos:
                         continue
                     icaos.add(ICAO_name)
-                    friendly = ''
                     entry: dict = data_fg_db.get(ICAO_name, {})
-                    friendly = strip_accents(entry.get('FriendlyName', ''))
+                    friendly = entry.get('FriendlyName', '')
 
                     section_row = {
-                        '3Ltr': normalize(cols[0].text),
-                        'Company': normalize(cols[1].text),
-                        'Country': normalize(cols[2].text),
-                        'Telephony': normalize(cols[3].text),
-                        'FriendlyName': normalize(friendly),
+                        '3Ltr': cols[0].text,
+                        'Company': cols[1].text,
+                        'Country': cols[2].text,
+                        'Telephony': cols[3].text,
+                        'FriendlyName': friendly,
                     }
 
-                    file.write(f"    {section_row},\n")
+                    file.write(f"    {normalize(strip_accents(section_row))},\n")
                     j += 1
 
             file.write(f"] # {j} entries.\n\n")
             entrycount += j
-            print(f"Wrote table '{alphabet[i]}' with {j} entries.")
+            print(f"Wrote table \'{alphabet[i]}\' with {j} entries.")
+
+        file.write(f"# {entrycount} entries in total.\n")
+
+    print(f"A total of {entrycount} entries were written in "
+        f"{(perf_counter() - write_start):.2f} seconds.")
+    print(f"Resulting file size: {(write_path.stat().st_size) / (1024):.3f} KiB.")
+
+def write_update():
+    """ Update an already-existing operators database.
+    The original database must be loaded before using this. """
+    icaos = set()
+    with open(write_path, 'w', encoding='utf-8') as file:
+        entrycount = 0
+        file.write(header_str)
+        file.write(f"GENERATED = '{date_gen_str}'\n")
+        file.write(f"# Used FlightGazer-airlines-db: {fg_db_verstr}\n\n")
+        for i, table in enumerate(soup.find_all('table')):
+            rows = table.find_all('tr')
+            file.write(f"{alphabet[i]}_TABLE = [\n")
+            j = 0
+            accumulator = {}
+            accumulator_FAA = []
+
+            old_table: list = getattr(op, f'{alphabet[i]}_TABLE')
+            for item in old_table:
+                accumulator[item['3Ltr']] = item
+
+            # parse over the list we got from the FAA
+            for row in rows:
+                cols = row.find_all('td')
+                if len(cols) > 0:
+                    ICAO_name = cols[0].text.strip().upper()
+                    if ICAO_name in icaos:
+                        continue
+                    icaos.add(ICAO_name)
+                    entry: dict = data_fg_db.get(ICAO_name, {})
+                    friendly = entry.get('FriendlyName', '')
+
+                    section_row = {
+                        '3Ltr': ICAO_name,
+                        'Company': normalize(strip_accents(cols[1].text)),
+                        'Country': normalize(strip_accents(cols[2].text)),
+                        'Telephony': normalize(strip_accents(cols[3].text)),
+                        'FriendlyName': friendly,
+                    }
+                    accumulator_FAA.append(section_row)
+
+            # merge, including changes from their end
+            for item in accumulator_FAA:
+                accumulator[item['3Ltr']] = item
+
+            to_write = sorted(accumulator.values(), key=lambda x: x['3Ltr'])
+            for result in to_write:
+                file.write(f"    {result},\n")
+                j += 1
+
+            file.write(f"] # {j} entries.\n\n")
+            entrycount += j
+            print(f"Wrote table \'{alphabet[i]}\' with {j} entries.")
 
         file.write(f"# {entrycount} entries in total.\n")
 
@@ -264,7 +322,10 @@ def write_new():
     print(f"Resulting file size: {(write_path.stat().st_size) / (1024):.3f} KiB.")
 
 try:
-    write_new()
+    if old_version is None:
+        write_new()
+    else:
+        write_update()
 except Exception as e:
     print(f"Failed to generate new database:\n{e}")
     restore_old()
