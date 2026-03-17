@@ -208,7 +208,7 @@ class APICacheHandler:
             database_logger.warning("Attempt to prune database with no connection.")
             return
 
-        database_logger.debug(f"Pruning database for entries older than {self.stale_age} days...")
+        database_logger.debug(f"Pruning database for entries older than {round(self.stale_age / 86400, 1)} days...")
         cursor = self._connection.cursor()
         try:
             linecount_start = self._connection.execute("SELECT COUNT(*) FROM results;").fetchone()

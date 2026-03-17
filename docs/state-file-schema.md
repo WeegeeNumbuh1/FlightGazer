@@ -3,7 +3,7 @@
 <a id="readme-top"></a>
 
 ## Preface
-The `current_state.json` is written to `/run/FlightGazer` when the main FlightGazer python script is running, by default.<br>
+The `current_state.json` file is written to `/run/FlightGazer` when the main FlightGazer python script is running, by default.<br>
 It is updated at the end of each update interval `LOOP_INTERVAL` (by default 2 seconds, can be 1 if `FASTER_REFRESH` is set).
 Atomicity is not guaranteed.
 
@@ -33,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 213 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.10.0.0 and newer*
+> *There are a total of 220 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.10.1.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -223,12 +223,29 @@ Latest result as received by the API.
 | `DestinationInfo` | Array with destination airport name and city, or nulls | array | ["Los Angeles Intl", "Los Angeles"] |
 | `Departure` | ISO time the aircraft first became airborne or was detected by the API, or null | str, null | "2025-01-01T12:12:12+00:00" |
 | `Type` | What type of flight this is, or null | str, null | "General_Aviation" |
+| `Diverted` | Represents if the current flight is part of a diversion route, empty if false | array | (see `Diverted` subkey below) |
 | `Status` | Internal FlightGazer API status flag (0 = success, 1 = blocked/no data, 2 = non-200 HTTP result, 3 = connection failure, 4 = sourced from cache) | int | 0 |
 | `APIAccessed` | Monotonic timestamp of when this API call was executed | float | 654211.4865 |
 
-> *13 keys*
+> *14 keys*
+
+#### `Diverted` subkey
+> FlightGazer v.10.1.0 or newer
+
+Represents the multiple legs of a route when its been diverted. This key is empty if a diversion isn't present.
+| key| description | schema | example |
+| --- | --- | --- | --- |
+| `orig` | The original airport the flight departed from | str | KBOS |
+| `orig_div` | The airport which a diverted flight departed from, only applicable if `type` is "diverted_from" | str, null | KDTW |
+| `dest` | The intended destination of the original flight | str | KMDW |
+| `dest_div` | The airport which a flight is currently diverting to, only applicable if `type` is "diverted_to" | str, null | null |
+| `type` | Which leg of the route the currently operating flight is in, either "diverted_to" or "diverted_from" | str | "diverted_from" |
+
+> *5 keys*
 
 ### `api_cache_stats` subkey
+> FlightGazer v.10.0.0 or newer
+
 Performance stats for the persistent API cache subsystem. This key is null if the API is unavailable or the `API_PERSISTENT_CACHE` setting is disabled.
 | key| description | schema | example |
 | --- | --- | --- | --- |
@@ -306,10 +323,10 @@ Represents the internal data sent to the display to render. This key is null if 
 | `Country` | Two-letter ISO country code of the aircraft based on ICAO | str | "US" |
 | `Latitude` | Formatted latitude for the aircraft | str | "40.123N" |
 | `Longitude` | Formatted longitude for the aircraft | str | "73.142E" |
-| `Track` | Track in degrees for on-screen, with associated direction arrow | str | "T◣241°" |
+| `Track` | Ground track in degrees, with associated direction arrow | str | "T◣241°" |
 | `VertSpeed` | Formatted vertical speed for display | str | "V+4000" |
 | `RSSI` | Formatted signal strength for display. Not strictly negative (can be positive for the case of UAT signals) | str | "-18.1" |
-| `AircraftInfo` | String representing aircraft info and journey data, if available; aircraft description \| operator/owner \-\-\- detailed journey details/other messages | str | "2025 BOEING 787-8 Dreamliner \| United Airlines \-\-\- San Francisco to Singapore (San Francisco Intl to Singapore Changi)" |
+| `AircraftInfo` | String representing aircraft info and journey data, if available; presented in the format: aircraft description \| operator/owner \-\-\- detailed journey details/other messages | str | "2025 BOEING 787-8 Dreamliner \| United Airlines \-\-\- San Francisco to Singapore (San Francisco Intl to Singapore Changi)" |
 | `is_UAT` | Data for this aircraft was sourced from dump978 | bool | false |
 
 > *15 keys*
@@ -318,6 +335,7 @@ Represents the internal data sent to the display to render. This key is null if 
 ## `weather_data`
 Weather information returned by the OpenWeatherMap API for the site location.<br>
 <b>Note: This key is only present if the Weather API is enabled.</b>
+> FlightGazer v.9.6.0 or newer
 
 | key | description | schema | example |
 | --- | --- | --- | --- |
@@ -359,6 +377,7 @@ Various runtime flags and stats for this current running session of FlightGazer.
 | `last_console_print_time_ms` | Time taken to print the last console output (milliseconds) | float | 12.611 |
 | `last_json_export_time_ms` | Time taken to serialize and write the previous iteration of the state file (milliseconds) | float | 3.479 |
 | `total_data_processed_GiB` | Total amount of data processed by FlightGazer in GiB | float | 28.412553 |
+| `total_API_data_received_MiB` | Total amount of data received by the API(s) in MiB | float | 3.476 |
 | `estimated_time_offset_sec` | Estimated offset (seconds) between this process and dump1090 | float | 0.004321 |
 | `verbose_mode` | True if verbose logging is enabled | bool | false |
 | `inside_tmux` | Whether this instance is running inside a `tmux` session | bool | true |
@@ -377,7 +396,7 @@ Various runtime flags and stats for this current running session of FlightGazer.
 | `memory_MiB` | Process memory usage in MiB | float | 15.34 |
 | `pid` | System PID for the current process | int | 1234 |
 
-> *21 keys*
+> *22 keys*
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `time_now`

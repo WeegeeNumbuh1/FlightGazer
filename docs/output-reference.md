@@ -5,7 +5,7 @@
 *This document is equivalent to the tables available in the web-app, under the "Help &amp; Reference" page.*
 
 ## Output Reference and Troubleshooting
-*Valid for FlightGazer v.9.7.0 and newer*
+*Valid for FlightGazer v.10.1.0 and newer*
 
 | Output | Meaning / Cause | Remedy / Information |
 |---|---|---|
@@ -14,6 +14,8 @@
 | **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
 | **Journey**<br><code>N/A ▶ ---</code> | - Aircraft blocked from tracking\.<br>- Aircraft detected before API was able to\. | For aircraft that are not blocked from tracking: try using a lower FLYBY_STALENESS value\. |
 | **Journey**<br><code>latitude ▶ longitude</code> | API returned a result that could not be associated with an airport\. | Rare, but normal occurrence\. |
+| **Journey**<br><code>ABC ▶ -DEF</code> | This flight was diverted to this destination\. | Rare, but normal occurrence\. |
+| **Journey**<br><code>-DEF ▶ GHI</code> | This flight was diverted and is now flying to its intended destination\. | Rare, but normal occurrence\. |
 | **Journey**<br><code>!API ▶ FAIL</code> | API call for this flight failed\. | - API service may be down, wait until the service is restored\.<br>-You might have been rate limited. If this keeps happening, try using a smaller RANGE\.<br>- You may have an issue with your API key\. Contact FlightAware\. |
 | **Journey**<br><code>\!CON ▶ FAIL</code> | Could not connect to the API\. | Check your network connection\. |
 | **Callsign**<br><code>\!ABC123</code> | This aircraft has declared an emergency. | Rare occurrence; FlightGazer will track this aircraft for as long as it's detected or the aircraft is no longer experiencing an emergency. |
