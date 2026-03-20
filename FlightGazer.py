@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.10.1.1 --- 2026-03-20'
+VERSION: str = 'v.10.1.2 --- 2026-03-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -5058,7 +5058,7 @@ class DisplayFeeder:
             journey_str = ""
             if not api_limiter_reached():
                 # no need to use a match statement here, elif good enough
-                if API_status == 0:
+                if API_status == 0 or API_status == 4:
                     if api_orig_name and api_dest_name:
                         jstr = []
                         if is_diverted == 'diverted_from':

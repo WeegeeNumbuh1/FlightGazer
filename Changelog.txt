@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.10.1.2 - 2026-03-20
+    - FIX: Fix missing detailed journey info in the scrolling marquee when a result
+      from the API persistent cache is used
+    - Update rgbmatrix install script to only update to the last commit that uses the now depreciated
+      build process
+
 v.10.1.1 - 2026-03-20
     - Adjust operator matching algorithm to handle Australian conventions
     - Tweak PIA logging to ignore aircraft on the ground

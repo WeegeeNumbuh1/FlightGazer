@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.9.9.3 (January 2026)
+# Last updated: v.10.1.2 (March 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -16,7 +16,8 @@ export PIP_ROOT_USER_ACTION=ignore
 GITUSER='https://github.com/hzeller'
 REPO='rpi-rgb-led-matrix'
 
-COMMIT=02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
+COMMIT=ef43b877570b727d771e13f287546f12fcf2217b
+# Previously: 02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
 # Previously: 3a5d753e91f40e24e6ae2041fac95946e7a81767
 # fixes an issue when using PIL >= 12 and allows building with Python >= 3.12
 
@@ -141,13 +142,13 @@ fi
 
 echo -e "> Downloading RGB matrix software...\n${FADE}"
 rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null # remove anything existing
-git clone --depth=1 $GITUSER/$REPO "$RGB_MATRIX_DIR"
-# uncomment the lines below AND comment out the line above
-# to use the specific commit at the top of this script
+# git clone --depth=1 $GITUSER/$REPO "$RGB_MATRIX_DIR"
+# comment the lines below AND uncomment out the line above
+# to use the latest commit (might break things)
 
-# curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
-# && unzip -q /tmp/$REPO-$COMMIT.zip\
-# && rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR"
+curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
+&& unzip -q /tmp/$REPO-$COMMIT.zip\
+&& rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR"
 
 if [ $? -ne 0 ]; then
 	echo -e "${RED}>>> ERROR: Failed to download from GitHub. Cannot continue.${NC}"
