@@ -5,12 +5,16 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.10.1.1 - 2026-03-20
+    - Adjust operator matching algorithm to handle Australian conventions
+    - Tweak PIA logging to ignore aircraft on the ground
+
 v.10.1.0 - 2026-03-16
     - NEW: When using the API, FlightGazer can now determine if a flight has been diverted
         - If the current flight is being diverted, the journey information will prefix the
           destination airport with a '-' to indicate this
         - If the current flight originates from an airport that wasn't the original airport, the
-          destination will have a '-' prefixed to it
+          origin will have a '-' prefixed to it
     - Overhauled the API parsing routines used since v.0.6.0 for this change to accommodate the diversion
       detection algorithm above
     - Added API data usage tracking which can be seen in the state file

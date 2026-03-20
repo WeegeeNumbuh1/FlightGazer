@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.10.1.0 --- 2026-03-16'
+VERSION: str = 'v.10.1.1 --- 2026-03-20'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -3953,7 +3953,7 @@ class AirplaneParser:
                                                 "has been detected by your ADS-B site and declared an emergency. "
                                                 f"(Squawking {entry['Squawk']}, {squawkdesc})")
                             freeze_frame_packet(entry, show_distance=True)
-                    if entry['TrackingFlag'] == 'PIA':
+                    if entry['TrackingFlag'] == 'PIA' and not entry['OnGround']:
                         PIA_this_poll = True
                         if not self._PIA_latch:
                             self._PIA_latch = True
@@ -4624,26 +4624,6 @@ class APIFetcher:
             api_cache.append(api_results)
             api_db_performance[2] = api_cache.errors
             api_db_performance[5] = api_cache.commits
-
-    """
-    def get_API_results_adsbdb():
-        \"\"\" Use the adsbdb API instead. How to integrate this is left as an exercise to the reader.
-        Do note that this API *cannot* handle general aviation or chartered flights, tends to have route
-        data that is outdated, incorrect, or missing, and sometimes will completely miss a few smaller regional airlines
-        (and their flights). This comes from the author's experience when trying to pick which
-        API was appropriate for use with this project. As having accurate API data along with being able to track general
-        aviation was a primary goal for this project, adsbdb was not rigorous enough to be used.
-        However, if you do want to use it in your own fork, this block of dead code remains here for you
-        to build upon. Have fun. \"\"\"
-
-        API_URL_adsbdb = "https://api.adsbdb.com/v0/callsign/"
-        flight_id = focus_plane_stats.get('Flight', "")
-        auth_header = {'Accept':"application/json; charset=UTF-8"}
-        query_string = API_URL_adsbdb + flight_id
-        response = requests.get(query_string, headers=auth_header, timeout=5)
-        response_json = response.json()
-        # do the rest :)
-    """
 
     def run_loop(self):
         def keep_alive():
@@ -5631,7 +5611,7 @@ class WriteState:
 @lru_cache(maxsize=500) # the maxsize is based on worst-case using NO_FILTER mode (roughly 500 aircraft)
 def operator_lookup(callsign: str) -> dict | None:
     """ Lookup the operator of a given callsign from our database. This will try to look at the cache first
-    from `callsign_lookup_cache` and then the lookup tables in `operators.py`. If there is a match, this function will
+    from `callsign_lookup_cache` and then the lookup tables from `operators.py`. If there is a match, this function will
     store the result in the cache for faster lookup, as it is expected this function will be called for each active plane inside
     the given RANGE and at every `LOOP_INTERVAL`. Worst case scenario is when `NO_FILTER` is enabled + very active ADS-B site (~300 planes).
     Dictionary keys are `3Ltr`, `Company`, `Country`, `Telephony`, and `FriendlyName`. """
@@ -5645,9 +5625,18 @@ def operator_lookup(callsign: str) -> dict | None:
         # "TORCH23" -> None
         # "0UTLAW75" -> None
         # "RPC1825" -> A conflict, this is actually a registration
-        if input is None or not input or len(input) < 3:
+        # "ABC" -> None | Note: in aussie-land, general aviation just uses the last
+        #                 three characters in the registration
+
+        if input is None or not input:
             return None
-        if input[:4].isalpha(): # if the first 4 characters are letters, this is likely a vanity callsign or military callsign
+        try:
+            if len(input.strip()) <= 3:
+                return None
+        except Exception:
+            return None
+        # if the first 4 characters are letters, this is likely a vanity callsign or military callsign
+        if input[:4].isalpha():
             return None
         if not (test_str := input[:3].upper()).isalpha():
             return None
