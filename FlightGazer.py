@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.10.1.2 --- 2026-03-20'
+VERSION: str = 'v.10.1.3 --- 2026-03-25'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -4575,13 +4575,13 @@ class APIFetcher:
                         case 'diverted_to':
                             div.append(divr_str.replace('_', ' '))
                             div.append(f" {diversion_info.get('dest_div', '')}, ")
-                            div.append(f"originally {diversion_info.get('dest', '')}, ")
+                            div.append(f"originally headed to {diversion_info.get('dest', '')}, ")
                             div.append(f"from {diversion_info.get('orig', '')}")
                         case 'diverted_from':
                             div.append(divr_str.replace('_', ' '))
                             div.append(f" {diversion_info.get('orig_div', '')}, ")
-                            div.append(f"originally {diversion_info.get('orig', '')}, ")
-                            div.append(f"to {diversion_info.get('dest', '')}")
+                            div.append(f"originally from {diversion_info.get('orig', '')}, ")
+                            div.append(f"now to its intended destination {diversion_info.get('dest', '')}")
                     main_logger.info("".join(div))
 
         # special case when the API returns a coordinate instead of an airport
@@ -4941,18 +4941,23 @@ class DisplayFeeder:
                         api_orig = result['OriginICAO']
                     else:
                         api_orig = result['Origin']
-                    if is_diverted == 'diverted_from':
-                        api_orig = '-' + api_orig
-                    if api_orig is None:
+
+                    if not api_orig:
                         api_orig = filler_text
+                    if api_orig and is_diverted == 'diverted_from':
+                        api_orig = '-' + api_orig
+
                     if PREFER_ICAO_CODES:
                         api_dest = result['DestinationICAO']
                     else:
                         api_dest = result['Destination']
-                    if is_diverted == 'diverted_to':
-                        api_dest = '-' + api_dest
-                    if api_dest is None:
+                    if not api_dest:
                         api_dest = filler_text
+                    # make sure we got a string to edit
+                    # (super edge case the API doesn't know where a flight is diverting to, for some reason)
+                    if api_dest and is_diverted == 'diverted_to':
+                        api_dest = '-' + api_dest
+
                     api_dpart_time = result['Departure']
                     if api_dpart_time is not None:
                         api_dpart_delta = strfdelta(

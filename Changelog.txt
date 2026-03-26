@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.10.1.3 - 2026-03-25
+    - Handle edge case when a diversion airport is not known
+    - Update operators database to latest FlightGazer-airlines-db version
+
 v.10.1.2 - 2026-03-20
     - FIX: Fix missing detailed journey info in the scrolling marquee when a result
       from the API persistent cache is used

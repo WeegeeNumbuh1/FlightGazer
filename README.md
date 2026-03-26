@@ -21,7 +21,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 > Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.<br>
 
 > Every text-based line in this project was typed by hand (beside the fonts and databases), including [documentation](./docs/).<br>
-> <b>*No LLM-generated code whatsoever.*</b> (my code lasagna is superior than its slop 😤)
+> <b>*No LLM-generated code whatsoever.*</b> (my code lasagna is superior to its slop 😤)
 
 <details open>
 <summary><b>Table of Contents</b></summary>
