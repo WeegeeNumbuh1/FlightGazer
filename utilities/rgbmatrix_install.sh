@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.10.1.2 (March 2026)
+# Last updated: v.11.0.0 (April 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -13,13 +13,13 @@ NC='\033[0m' # No Color
 FADE='\033[2m'
 BASEDIR=$(cd `dirname -- $0` && pwd)
 export PIP_ROOT_USER_ACTION=ignore
+export MAX_JOBS=1
+export CMAKE_BUILD_PARALLEL_LEVEL=1
 GITUSER='https://github.com/hzeller'
 REPO='rpi-rgb-led-matrix'
 
-COMMIT=ef43b877570b727d771e13f287546f12fcf2217b
-# Previously: 02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
-# Previously: 3a5d753e91f40e24e6ae2041fac95946e7a81767
-# fixes an issue when using PIL >= 12 and allows building with Python >= 3.12
+COMMIT=02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
+# IMPORTANT: the above commit is one of the last ones to support the old build process, don't change it
 
 echo -ne "\033]0;rgbmatrix installer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to the rgbmatrix installer! (for FlightGazer)${NC}"
@@ -96,15 +96,19 @@ fi
 echo "**********************************************************"
 if [ "$PI5" = true ]; then
 	sleep 2s
-	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5.${NC} The install will continue, however."
-	echo "It is recommended to use RGBMatrixEmulator (running FlightGazer with the -e flag)"
-	echo "if you wish to use an RGB display with the RPi5, for now."
+	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5.${NC}."
+	echo "For now, it's recommended to use RGBMatrixEmulator (running FlightGazer with the -e flag)"
+	echo "if you wish to use an RGB display with the RPi5."
 	echo "Refer to the FlightGazer README file for more guidance."
+	sleep 5
+	echo "Installation automatically cancelled, no changes have been made."
+	exit 1
 fi
 sleep 5s
 echo "Starting soon... (press Ctrl+C to cancel this install now)"
 sleep 10s
 
+STARTMONOTONIC=$(cat /proc/uptime | awk '{print $1}')
 echo -e "\n${GREEN}>>> Starting the rgbmatrix install...${NC}"
 read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
 echo "> Determining the home directory..."
@@ -121,6 +125,7 @@ echo -e "${NC}> Checking/installing prerequisites... (this might take some time)
 apt-cache --generate pkgnames | \
 grep --line-regexp --fixed-strings \
 	-e make \
+	-e cmake \
 	-e gcc \
 	-e g++ \
 	-e python3-dev \
@@ -134,21 +139,15 @@ grep --line-regexp --fixed-strings \
 echo -e "${NC}> Dependency install complete.${FADE}"
 
 if [ -d "$RGB_MATRIX_DIR" ]; then
-	echo "> An existing install of the rgbmatrix library is present."
+	echo -e "${NC}> An existing install of the rgbmatrix library is present.${FADE}"
 	echo "  > Backing this folder up to 'rpi-rgb-led-matrix_old'..."
 	rm -rf "${USER_HOME}/rpi-rgb-led-matrix_old" 2>&1 >/dev/null
 	mv "$RGB_MATRIX_DIR" "${USER_HOME}/rpi-rgb-led-matrix_old"
 fi
 
-echo -e "> Downloading RGB matrix software...\n${FADE}"
+echo -e "${NC}> Downloading RGB matrix software...\n${FADE}"
 rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null # remove anything existing
-# git clone --depth=1 $GITUSER/$REPO "$RGB_MATRIX_DIR"
-# comment the lines below AND uncomment out the line above
-# to use the latest commit (might break things)
-
-curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
-&& unzip -q /tmp/$REPO-$COMMIT.zip\
-&& rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR"
+git clone --depth=1 $GITUSER/$REPO "$RGB_MATRIX_DIR"
 
 if [ $? -ne 0 ]; then
 	echo -e "${RED}>>> ERROR: Failed to download from GitHub. Cannot continue.${NC}"
@@ -160,44 +159,79 @@ if [ $? -ne 0 ]; then
 	echo "Done. Try running this script at a later time."
 	exit 1
 fi
-echo -e "\n${GREEN}>>> Building RGB matrix software..."
+STAGEA=$(cat /proc/uptime | awk '{print $1}')
+echo -e "\n${GREEN}>>> Installing python library..."
 echo -e "${ORANGE}(This will take a few minutes)\n${NC}${FADE}"
 cd "$RGB_MATRIX_DIR"
-make clean
-make build-python
-echo -e "${NC}> Build complete."
-echo -e "${GREEN}>>> Installing python library...${NC}"
-cd bindings/python
-pip install . --use-pep517 --break-system-packages
+pip install . --break-system-packages
 if [ $? -ne 0 ]; then
-	echo -e "${RED}>>> RGB-Matrix python installation failed!${NC}"
-	echo "FlightGazer may still be able to use rgbmatrix, however."
-	exit 1
-fi
-echo -e "${GREEN}>>> Configuring the system...${NC}"
-chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$RGB_MATRIX_DIR" >/dev/null 2>&1
-# below taken from https://github.com/MLB-LED-Scoreboard/mlb-led-scoreboard/blob/master/install.sh
-if [ ! -f '/etc/modprobe.d/blacklist-rgbmatrix.conf' ]; then
-	echo "> Sound blacklist file not found, creating."
-	echo "blacklist snd_bcm2835" | tee /etc/modprobe.d/blacklist-rgbmatrix.conf
-	modprobe -r snd_bcm2835
-	depmod -a
-else
-	echo "> Sound blacklist file found, skipping creation."
-fi
-if grep -q isolcpus=3 "/boot/cmdline.txt" || grep -q isolcpus=3 "/boot/firmware/cmdline.txt" 2>/dev/null; then
-	echo "> isolcpus=3 found in cmdline.txt"
-else
-	read -d . VERSION < /etc/debian_version
-	if [ "$VERSION" -lt "12" ]; then
-		echo "> adding isolcpus=3 to /boot/cmdline.txt"
-		sed -i '$ s/$/ isolcpus=3/' /boot/cmdline.txt
-	else
-		echo "> adding isolcpus=3 to /boot/firmware/cmdline.txt"
-		sed -i '$ s/$/ isolcpus=3/' /boot/firmware/cmdline.txt
+	echo -e "\n${ORANGE}>>> Installation failed, trying an older version of rgbmatrix...${NC}"
+	rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null
+	curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
+	&& unzip -q /tmp/$REPO-$COMMIT.zip\
+	&& rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR" >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo -e "${RED}>>> ERROR: Failed to download from GitHub. Cannot continue.${NC}"
+		echo "Undoing changes..."
+		rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null
+		if [ -d "${USER_HOME}/rpi-rgb-led-matrix_old" ]; then
+			mv "${USER_HOME}/rpi-rgb-led-matrix_old" "$RGB_MATRIX_DIR"
+		fi
+		echo "Done. Try running this script at a later time."
+		exit 1
+	fi
+	echo -e "\n${GREEN}>>> Building RGB matrix software..."
+	echo -e "${ORANGE}(This will take a few minutes)\n${NC}${FADE}"
+	cd "$RGB_MATRIX_DIR"
+	make clean
+	make build-python
+	echo -e "${NC}> Build complete."
+	echo -e "${GREEN}>>> Installing python library...${NC}"
+	cd bindings/python
+	pip install . --use-pep517 --break-system-packages
+	if [ $? -ne 0 ]; then
+		echo -e "${RED}>>> RGB-Matrix python installation failed!${NC}"
+		echo "FlightGazer may still be able to use rgbmatrix, however."
+		exit 1
 	fi
 fi
+STAGEB=$(cat /proc/uptime | awk '{print $1}')
+STAGEADELTA=$(awk "BEGIN {print $STAGEB - $STAGEA}")
+echo -e "${NC}> Install took ${STAGEADELTA} seconds."
+echo -e "${GREEN}>>> Configuring the system...${NC}"
+chown -Rf ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$RGB_MATRIX_DIR" >/dev/null 2>&1
+if [ "$PI5" = true ]; then
+	echo "> Detected this as a Raspberry Pi 5, not modifying system settings."
+else
+	# below taken from https://github.com/MLB-LED-Scoreboard/mlb-led-scoreboard/blob/master/install.sh
+	if [ ! -f '/etc/modprobe.d/blacklist-rgbmatrix.conf' ]; then
+		echo "> Sound blacklist file not found, creating."
+		echo "blacklist snd_bcm2835" | tee /etc/modprobe.d/blacklist-rgbmatrix.conf
+		modprobe -r snd_bcm2835
+		depmod -a
+	else
+		echo "> Sound blacklist file found, skipping creation."
+	fi
+	if grep -q isolcpus=3 "/boot/cmdline.txt" \
+	|| grep -q isolcpus=3 "/boot/firmware/cmdline.txt" \
+	|| grep -q isolcpus=domain,managed_irq,3 "/boot/cmdline.txt" \
+	|| grep -q isolcpus=domain,managed_irq,3 "/boot/firmware/cmdline.txt" 2>/dev/null; then
+		echo "> CPU isolation configuration found in cmdline.txt"
+	else
+		read -d . VERSION < /etc/debian_version
+		if [ "$VERSION" -lt "12" ]; then
+			echo "> CPU isolation configuration written to /boot/cmdline.txt"
+			sed -i '$ s/$/ isolcpus=domain,managed_irq,3 nohz_full=3 rcu_nocbs=3 irqaffinity=0,1,2 idle=poll/' /boot/cmdline.txt
+		else
+			echo "> CPU isolation configuration written to /boot/firmware/cmdline.txt"
+			sed -i '$ s/$/ isolcpus=domain,managed_irq,3 nohz_full=3 rcu_nocbs=3 irqaffinity=0,1,2 idle=poll/' /boot/firmware/cmdline.txt
+		fi
+	fi
+fi
+DONETIME=$(cat /proc/uptime | awk '{print $1}')
+TOTALTIME=$(awk "BEGIN {print $DONETIME - $STARTMONOTONIC}")
 echo -e "${GREEN}>>> RGB-Matrix successfully installed!${NC}"
+echo -e "${NC}> Total install time took ${TOTALTIME} seconds."
 if [ $RGBMATRIX_PRESENT -ne 0 ]; then
 	echo "You might need to reboot your system to use the"
 	echo "rgbmatrix library."

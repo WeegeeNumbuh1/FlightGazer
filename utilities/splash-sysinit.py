@@ -1,10 +1,9 @@
 # FlightGazer system init splash screen
 # Shows a splash screen while we wait for the system to load up.
-# Requires that the rgb-matrix library is present and it's assumed that this
-# is started very early in the boot process (right after filesystems are available).
+# It's assumed that this is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.9.7.5
+# Last updated: v.11.0.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -12,21 +11,39 @@ if __name__ != '__main__':
     print("This file cannot be loaded as a module.")
     sys.exit(1)
 
+log_prefix = 'FlightGazer boot splash: '
 import signal
+from time import sleep, monotonic
 
 def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
-    print("FlightGazer boot splash screen: successfully stopped.")
+    print(f"{log_prefix}successfully stopped (SIGTERM'd). Runtime: {monotonic() - starttime:.3f} seconds.")
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, sigterm_handler)
-from time import sleep
+print(f"{log_prefix}Firing up...")
+starttime = monotonic()
+print(f"{log_prefix}Script start: about {starttime:.1f} seconds after system start")
 from pathlib import Path
 import os
 import threading
 import subprocess
+from collections import deque
 os.environ["PYTHONUNBUFFERED"] = "1"
 CURRENT_DIR = Path(__file__).resolve().parent
+
+try:
+    result = subprocess.run(['systemctl', 'is-active', 'flightgazer'], capture_output=True, text=True)
+    cmd = "ps aux | grep '[F]lightGazer\\.py' | awk '{print $2}'"
+    result2 = subprocess.check_output(cmd, shell=True).strip().decode()
+    if result.returncode == 0 and result.stdout.strip() == 'active' or result2:
+        print(f"{log_prefix}ERROR: FlightGazer main service is already running.")
+        sys.exit(1)
+except Exception:
+    print(f"{log_prefix}ERROR: Could not determine running state of the system.")
+    print(f"{log_prefix}Splash screen will not run.")
+    sys.exit(1)
+
 if os.name != 'nt':
     try:
         PATH_OWNER = CURRENT_DIR.owner()
@@ -37,24 +54,64 @@ if os.name != 'nt':
 else:
     PATH_OWNER = None
     OWNER_HOME = Path.home()
-try:
+
+emu_settings = Path(CURRENT_DIR, '..', 'emulator_config.json')
+SERVICE_PATH = Path('/etc/systemd/system/flightgazer.service')
+use_emulator = False
+adapter = None
+if emu_settings.is_file():
+    with open(emu_settings, 'r') as f:
+        for line in f:
+            if '"display_adapter":' in line.strip():
+                adapter = line.strip()
+                break
+serv_lines = ''
+if SERVICE_PATH.is_file():
     try:
-        from rgbmatrix import graphics
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    except ImportError:
-        # handle case when rgbmatrix is not installed and maybe is present in the home directory
-        if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
-            sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
+        with open(SERVICE_PATH, 'r', encoding='utf-8') as f:
+            serv_lines = f.readlines()
+    except Exception:
+        serv_lines = ''
+exec_line = ''
+for line in serv_lines:
+    if line.strip().startswith('ExecStart='):
+        exec_line = line.strip()
+if exec_line and ' -e' in exec_line and adapter and 'pi5' in adapter:
+    use_emulator = True
+
+if not use_emulator:
+    try:
+        try:
             from rgbmatrix import graphics
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
-except Exception: # if the hardware display can't be loaded, don't bother showing the splash screen
-    print("FlightGazer boot splash screen: ERROR: No display driver found. Splash screen is not available.")
-    sys.exit(1)
+        except ImportError:
+            # handle case when rgbmatrix is not installed and maybe is present in the home directory
+            if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists():
+                sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
+                from rgbmatrix import graphics
+                from rgbmatrix import RGBMatrix, RGBMatrixOptions
+
+    except Exception: # if the hardware display can't be loaded, don't bother showing the splash screen
+        print(f"{log_prefix}ERROR: No display driver found. Splash screen is unavailable.")
+        sys.exit(1)
+else:
+    try:
+        os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+        from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+        RGBMatrixEmulatorConfig.CONFIG_PATH = emu_settings
+        from RGBMatrixEmulator import graphics
+        from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+    except ImportError:
+        print(f"{log_prefix}ERROR: Failed to load emulator. Splash screen is unavailable.")
+        sys.exit(1)
+
+if use_emulator:
+    print(f"{log_prefix}Using the Emulator with the Raspberry Pi5 mode.")
 
 # debugging stuff
 # os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
 # from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-# RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
+# RGBMatrixEmulatorConfig.CONFIG_PATH = emu_settings
 # from RGBMatrixEmulator import graphics
 # from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 
@@ -88,18 +145,6 @@ if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load
 else:
     config = config_default
 
-try:
-    result = subprocess.run(['systemctl', 'is-active', 'flightgazer'], capture_output=True, text=True)
-    cmd = "ps aux | grep '[F]lightGazer\.py' | awk '{print $2}'"
-    result2 = subprocess.check_output(cmd, shell=True).strip().decode()
-    if result.returncode == 0 and result.stdout.strip() == 'active' or result2:
-        print("FlightGazer boot splash screen: ERROR: FlightGazer main service is already running.")
-        sys.exit(1)
-except Exception:
-    print("FlightGazer boot splash screen: ERROR: Could not determine running state of the system.")
-    print("FlightGazer boot splash screen: Splash screen will not run.")
-    sys.exit(1)
-
 NO_TEXT_SPLASH = False
 try:
     loaded_font = graphics.Font()
@@ -107,21 +152,31 @@ try:
     loaded_font.LoadFont(f"{CURRENT_DIR}/../fonts/3x3.bdf")
     loaded_font_2.LoadFont(f"{CURRENT_DIR}/../fonts/4x5.bdf")
 except FileNotFoundError:
-    print("FlightGazer boot splash screen: ERROR: Could not find font files.")
-    print("FlightGazer boot splash screen: This isn't good. This means FlightGazer may not load either.")
+    print(f"{log_prefix}ERROR: Could not find font files.")
+    print(f"{log_prefix}This isn't good. This means FlightGazer may not load either.")
     sys.exit(1)
+
+def hue2rgb(norm: float) -> tuple[int, int, int]:
+    """ Given a normalized hue angle (0 = 0, 1 = 360 deg) and assuming 100% saturation,
+    returns a tuple of 8 bit RGB values.
+    Derived from https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB_alternative """
+    rp = (5 + norm * 6) % 6
+    gp = (3 + norm * 6) % 6
+    bp = (1 + norm * 6) % 6
+    r = 1 - max(min(rp, 4 - rp, 1), 0)
+    g = 1 - max(min(gp, 4 - gp, 1), 0)
+    b = 1 - max(min(bp, 4 - bp, 1), 0)
+
+    return round(r * 255), round(g * 255), round(b * 255)
 
 TIMING_CONTROL = 0
 def timing():
     global TIMING_CONTROL
-    sleep(30)
-    # the below used to do something, but is left here in case
-    # there needs to be another feature that looks for this exact value
+    wait_time = 60
+    sleep(wait_time)
     TIMING_CONTROL = 1
-    sleep(15)
-    TIMING_CONTROL = 2
-    print("FlightGazer boot splash screen: 45 seconds have passed since this has started.")
-    print("FlightGazer boot splash screen: Assuming we have not reached multi-user.target yet.")
+    print(f"{log_prefix}{wait_time} seconds have passed since this has started.")
+    print(f"{log_prefix}Assuming we have not reached multi-user.target yet.")
 
 threading.Thread(target=timing, daemon=True).start()
 
@@ -156,12 +211,20 @@ class SplashText():
     def run(self):
 
         self.double_buffer = self.matrix.CreateFrameCanvas()
-        print("FlightGazer boot splash screen: successfully started.")
-
         _skip_frames = 0
+
+        # generate the color array for the progress bar
+        c_spectrum = deque()
+        for i in range(self.matrix.width):
+            c_spectrum.append(
+                hue2rgb((i + 1) / self.matrix.width)
+            )
+        undraw_starting = False
+
+        print(f"{log_prefix}successfully started after {monotonic() - starttime:.3f} seconds.")
         while True:
             # the fade effect
-            if TIMING_CONTROL < 2:
+            if TIMING_CONTROL < 1:
                 delta = 5
             else:
                 delta = 1
@@ -179,15 +242,27 @@ class SplashText():
                     self.top_text_color_dir = True
                 else:
                     self.matrix.brightness -= delta
-            # spinner effect
-            _skip_frames += 1
-            if _skip_frames % 3 == 0:
-                self.spinner_index += 1
-                if self.spinner_index >= len(self.spinner):
-                    self.spinner_index = 0
-                _skip_frames = 0
 
-            if TIMING_CONTROL >= 2 and not NO_TEXT_SPLASH:
+            # rainbow loading bar at the bottom
+            for i, pt in enumerate(c_spectrum):
+                self.double_buffer.SetPixel(
+                    i, 31, pt[0], pt[1], pt[2]
+                )
+
+            if TIMING_CONTROL < 1:
+                c_spectrum.rotate(1)
+            else:
+                # slow down the animation but keep the frame rate
+                _skip_frames += 1
+                if _skip_frames % 3 == 0:
+                    c_spectrum.rotate(1)
+                    # the old spinner logic (kept here)
+                    # self.spinner_index += 1
+                    # if self.spinner_index >= len(self.spinner):
+                    #     self.spinner_index = 0
+                    _skip_frames = 0
+
+            if TIMING_CONTROL >= 1 and not NO_TEXT_SPLASH:
                 _ = graphics.DrawText(
                     self.double_buffer,
                     loaded_font,
@@ -217,7 +292,7 @@ class SplashText():
                 "SYSTEM",
             )
 
-            if TIMING_CONTROL < 2:
+            if TIMING_CONTROL < 1:
                 _ = graphics.DrawText(
                     self.double_buffer,
                     loaded_font_2,
@@ -230,16 +305,19 @@ class SplashText():
                 )
             else:
                 # undraw
-                _ = graphics.DrawText(
-                    self.double_buffer,
-                    loaded_font_2,
-                    16,
-                    12,
-                    graphics.Color(
-                        0, 0, 0
-                    ),
-                    "STARTING",
-                )
+                if not undraw_starting:
+                    # do this once
+                    _ = graphics.DrawText(
+                        self.double_buffer,
+                        loaded_font_2,
+                        16,
+                        12,
+                        graphics.Color(
+                            0, 0, 0
+                        ),
+                        "STARTING",
+                    )
+                    undraw_starting = True
 
                 _ = graphics.DrawText(
                     self.double_buffer,
@@ -252,19 +330,6 @@ class SplashText():
                     "READY",
                 )
 
-            # _ = graphics.DrawText(
-            #     self.double_buffer,
-            #     loaded_font,
-            #     15,
-            #     27,
-            #     graphics.Color(
-            #         self.matrix.brightness,
-            #         self.matrix.brightness,
-            #         self.matrix.brightness
-            #     ),
-            #     self.spinner[self.spinner_index],
-            # )
-
             self.double_buffer = self.matrix.SwapOnVSync(self.double_buffer)
             sleep(0.04)
 
@@ -272,6 +337,6 @@ if __name__ == "__main__":
     try:
         image_scroller = SplashText()
         image_scroller.run()
-    except (KeyboardInterrupt, SystemExit):
-        print("FlightGazer boot splash screen: successfully stopped.")
+    except KeyboardInterrupt:
+        print(f"{log_prefix}successfully stopped. Runtime: {monotonic() - starttime:.3f} seconds")
         sys.exit(0)

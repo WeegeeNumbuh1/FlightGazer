@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.9.7.4
+# Last updated: v.11.0.0
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -19,12 +19,20 @@ from datetime import datetime, timezone
 from getpass import getuser
 from platform import uname
 import re
+import socket
+import os
 script_start = perf_counter()
 CURRENT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.db")
 URL = 'https://raw.githubusercontent.com/wiedehopf/tar1090-db/csv/aircraft.csv.gz'
 TYPES_URL = "https://github.com/wiedehopf/tar1090-db/raw/refs/heads/master/db/icao_aircraft_types2.js"
 leading_icao_chars = '0123456789ABCDEF'
+
+# service specific stuff
+SYSTEMD_NOTIFY_SOCKET = os.environ.get('NOTIFY_SOCKET')
+INIT_PROGRESS_FILE = Path('/run/FlightGazer/init_progress') # for the splash screen
+# note for the splash screen values: 55-94% as this is run in the 3rd stage of initialization
+init_progress_percentage = 55
 
 if __name__ != '__main__':
     print("This script cannot be imported as a module.")
@@ -37,6 +45,28 @@ except ImportError:
     print("This script requires the 'requests' module.")
     print("You can install it using 'pip install requests'.")
     sys.exit(1)
+
+def update_init_progress() -> None:
+    """ Update the progress file, if it exists.
+    Reads the global `init_progress_percentage` """
+    if INIT_PROGRESS_FILE.is_file():
+        try:
+            with open(INIT_PROGRESS_FILE, 'w') as fi:
+                fi.write(f'{int(round(init_progress_percentage))}')
+        except Exception:
+            pass
+
+def systemd_notify(message: str) -> None:
+    """ Pulled from FlightGazer """
+    notify_socket = SYSTEMD_NOTIFY_SOCKET
+    if not notify_socket:
+        return
+
+    if notify_socket.startswith('@'):
+        notify_socket = '\0' + notify_socket[1:]
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM | socket.SOCK_CLOEXEC) as sock:
+        sock.sendto(message.encode(), notify_socket)
 
 current_db_ver = None
 if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
@@ -60,6 +90,8 @@ if OUTPUT_FILE.exists():
     print(f"Database already exists, current version: {current_db_ver}")
 else:
     print("Database is not present.")
+init_progress_percentage += 3 # 58
+update_init_progress()
 
 try:
     get_db_ver = requests.get("https://raw.githubusercontent.com/wiedehopf/tar1090-db/refs/heads/csv/version", timeout=5)
@@ -118,6 +150,8 @@ except requests.RequestException as e:
     print("Continuing without aircraft types data.\n"
           "This may affect the accuracy of aircraft type descriptions for some ICAO addresses.")
 
+init_progress_percentage += 4 # 62
+update_init_progress()
 """ Programmer's notes: The way the original version of this script handled the database was to:
 decompress the gzip, load the CSV into a list, load the types data and convert it into a dict,
 fill-in the missing data in the CSV with the types, then write it all to the database, all in memory.
@@ -153,6 +187,8 @@ print(f"Processing took {csv_time:.2f} seconds "
       f"({int(total_rows / csv_time)} "
       "rows/sec).")
 print(f"Total rows to process: {total_rows}")
+init_progress_percentage += 8 # 70
+update_init_progress()
 
 def iter_types_from_js_bytes(content_bytes):
     """ Stream-parse a JS object like { 'TYPE': ['desc', ...], ... } from the gzipped bytes.
@@ -219,6 +255,7 @@ def process_aircraft_data(response_content, types_map=None, batch_size=1):
     to the tables in the database be incorrectly written with entries being mixed between
     them and the amount of table rows rounded to the closest multiple of the batch size. """
     print("Committing to database...")
+    global init_progress_percentage
 
     batch = []
     processed_count = 0
@@ -249,6 +286,8 @@ def process_aircraft_data(response_content, types_map=None, batch_size=1):
             if current_percentage >= last_percentage + 10:
                 print(f"{int(current_percentage)}% complete ({processed_count}/{total_rows})")
                 last_percentage = (current_percentage // 10) * 10
+                init_progress_percentage += 2.4
+                update_init_progress()
             yield batch, icao[0]
             batch = []
 
@@ -326,6 +365,8 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
     print("Estimated time: "
           f"{round(csv_time * 2.6, 1)}-"
           f"{round(csv_time * 5.5, 1)} seconds.") # from testing
+    # extend the timeout based on how fast we're running through this
+    systemd_notify(f"EXTEND_TIMEOUT_USEC={int(round(csv_time * 7_500_000, 0))}")
     write_start = perf_counter() # actually start the timing from here
     # process aircraft data straight from the gzipped files (this is CPU-bound)
     for batch, leading_char in process_aircraft_data(response.content, types_map):

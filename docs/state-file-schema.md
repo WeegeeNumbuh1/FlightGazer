@@ -33,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 220 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.10.1.0 and newer*
+> *There are a total of 223 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.11.0.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -105,7 +105,7 @@ Short dictionary describing the receiver's computed statistics.
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `plane_stats`
-Represents aircraft-specific stats. Any aircraft within the designated tracking area are also described here in the `relevant_planes` key.
+Represents aircraft-specific and selection algorithm stats. Any aircraft within the designated tracking area are also described here in the `relevant_planes` key.
 
 | key | description | schema | example |
 | --- | --- | --- | --- |
@@ -114,13 +114,17 @@ Represents aircraft-specific stats. Any aircraft within the designated tracking 
 | `flybys_today` | Number of aircraft that were tracked in the configured tracking area today (resets at midnight) | int | 98 |
 | `last_unique_plane` | Record for the last aircraft seen today - see the `last_unique_plane` section below | object, null | {"ID": "a00002", "Time": 4780.658841, "Flyby": 98} |
 | `aircraft_selections` | Total times the aircraft selection algorithm has changed the focused aircraft | int | 1260 |
-| `rare_selection_events` | Count of times the selection algorithm used the rare-events compensation logic (aircraft count changed when an aircraft needed to be selected) | int | 24 |
+| ~~`rare_selection_events`~~ | **[DEPRECIATED v.11.0.0]**<br>Count of times the selection algorithm used the rare-events compensation logic (aircraft count changed when an aircraft needed to be selected) | int | 24 |
 | `high_priority_events` | Count of selection overrides triggered by aircraft entering the high-priority dome around the site (<0.4 nmi line-of-sight) | int | 4 |
 | `average_relevant_planes_in_area` | Average number of tracked aircraft present in the tracking area; >= 1 | float | 1.624 |
 | `average_algorithm_active_time_sec` | Average amount of time the selection algorithm remains active (seconds) | float | 138.91 |
 | `algorithm_use_today` | Total time the selection algorithm has been used today (HH:MM:SS) | str | "02:12:31" |
+| `distant_detected_today` | True if an aircraft was detected farther than typical ADS-B range, else false | bool | True |
+| `distant_time_today` | Time spent detecting aircraft outside of typical ADS-B range (HH:MM:SS) | str | "00:02:34" |
 | `no_filter` | Whether FlightGazer is currently running in `NOFILTER` mode | bool | false |
 | `focus_plane_iter` | How many cycles the selection algorithm is active, 0 if no aircraft are present | int | 21 |
+| `focus_plane_screen_time_sec` | How long the current focus aircraft has been displayed, in seconds | int | 48 |
+| `focus_plane_TTL_sec` | Assigned time limit in seconds for the current focus aircraft by the selection algorithm; `focus_plane_screen_time_sec` can be greater than this value when there is only one aircraft in the tracking area or the high priority override is in effect | int | 125 |
 | `focus_plane_ids_discard` | List of aircraft IDs previously tracked by the selection algorithm | array | ["a00002", "..."] |
 | `focus_plane_ids_scratch` | Scratchpad list of currently tracked aircraft IDs for the selection algorithm | array | ["a00002", "ad8421", ...] |
 | `focus_plane` | ICAO hex of the currently focused aircraft (or null if none available) | str, null | "a00002" |
@@ -128,7 +132,7 @@ Represents aircraft-specific stats. Any aircraft within the designated tracking 
 | `in_range` | Number of relevant aircraft in the current `relevant_planes` array | int | 3 |
 | `relevant_planes` | Detailed list of nested objects describing each tracked aircraft the tracking area, null if `NOFILTER` mode is enabled | array, null | (see `relevant_planes` subkey below) |
 
-> *18 keys*
+> *21 keys, 1 depreciated*
 
 ### `relevant_planes` subkey
 An array of nested objects which represents current data for each aircraft considered for detailed tracking. The array is empty when there are no aircraft available. This key is null if running in `NOFILTER` mode.
@@ -201,7 +205,7 @@ Represents API-related information from FlightAware.
 | `api_cost_limit_reached` | Whether the configured API cost limit was reached today | bool | false |
 | `api_daily_limit_reached` | Whether the configured daily API call limit was reached today | bool | false |
 | `api_schedule_triggered` | Whether the API schedule has currently disabled calls | bool | false |
-| `last_api_response_time_ms` | Last API call round-trip time (milliseconds) | float | 1260.5 |
+| `last_api_response_time_ms` | Last API call round-trip time (milliseconds). If the last API result is served by the persistent cache, refer to `api_cache_stats.last_response_time.ms` instead | float | 1260.5 |
 | `last_api_result` | The last API result; null if the API hasn't been used | object, null | (see `last_api_result` subkey below) |
 | `api_cache_stats` | Array of performance statistics for the API cache, null if the `API_PERSISTENT_CACHE` setting is disabled | array, null | (see `api_cache_stats` subkey below) |
 

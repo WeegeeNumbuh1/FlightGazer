@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.9.7.0
+# Last updated: v.11.0.0
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -239,7 +239,7 @@ color_migrator () {
 	# read colors.py from current install from and including "# CONFIG_START" line to end of file
 	sed -n '/# CONFIG_START/,$p' "$file2"
 }
-echo -e "${NC}${GREEN}>>> Migrating settings...${NC}${FADE}"
+echo -e "${NC}${GREEN}>>> Preparing configuration...${NC}${FADE}"
 # get current owner of the install directory
 read -r OWNER_OF_FGDIR GROUP_OF_FGDIR <<<$(stat -c "%U %G" "${BASEDIR}")
 echo -e "> ${BASEDIR} | Owner: ${OWNER_OF_FGDIR}, Group: ${GROUP_OF_FGDIR}"
@@ -254,7 +254,7 @@ if [ -f "$BASEDIR/config.py" ] && [ ! -f "$BASEDIR/config.yaml" ]; then
 	OLDER_BUILD=1
 else
 	time_now=$(date '+%Y-%m-%d %H:%M')
-	echo -e "\n--- FlightGazer settings migration log. ${time_now} ---" >> "$MIGRATE_LOG"
+	echo -e "\n--- FlightGazer migration log. ${time_now} ---" >> "$MIGRATE_LOG"
 	if [ $RESET_FLAG -eq 0 ]; then
 		"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/settings_migrator.py" "${BASEDIR}/config.yaml" "${TEMPPATH}/config.yaml" | tee -a "$MIGRATE_LOG"
 		if [ $? -ne 0 ]; then
@@ -288,6 +288,17 @@ if [ $RESET_FLAG -eq 0 ]; then
 		echo -e "\n> Older version of colors.py detected. Updating to newer version in this update."
 	fi
 fi
+if [ -f "${BASEDIR}/utilities/service_updater.py" ]; then
+	echo "> Checking service file..." | tee -a "$MIGRATE_LOG"
+	"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/service_updater.py" "${TEMPPATH}/FlightGazer-init.sh" | tee -a "$MIGRATE_LOG"
+	if [ $? -eq 0 ]; then
+		systemctl daemon-reload
+		echo "> Service update completed." | tee -a "$MIGRATE_LOG"
+	else
+		echo -e "\n${ORANGE}> Could not update service to newest version, no changes have been made.${NC}" | tee -a "$MIGRATE_LOG"
+	fi
+fi
+echo -e "\n--- Migration prep to ${VER_STR} finished ---" >> "$MIGRATE_LOG"
 cp -f "${BASEDIR}/flybys.csv" "${TEMPPATH}/flybys.csv" >/dev/null 2>&1 # copy flyby stats file if present
 cp -f "${BASEDIR}/config.yaml" "${TEMPPATH}/config_old.yaml" >/dev/null 2>&1 # create backup of old config file
 echo -e "${NC}${GREEN}>>> Installing latest version of FlightGazer... ${NC}${FADE}"
@@ -310,7 +321,7 @@ if [ $? -ne 0 ]; then
 else
 	nohup systemctl start flightgazer.service &
 	disown # orphan the above process once the script exits so that the web interface knows this script is actually done
-	echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for the display to start as the system prepares itself!"
+	echo -e "> FlightGazer started.\n${ORANGE}> It may take a few minutes for it to start as the system prepares itself!"
 fi
 rm -rf "$TEMPPATH" >/dev/null 2>&1 # clean up after ourselves
 if [ $WEB_UPDATE -eq 1 ]; then

@@ -5,6 +5,74 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.0.0 - 2026-04-15
+    - Significant overhaul of the aircraft selection algorithm for improved selection stability and "intelligence"
+        - Each aircraft is now given a fixed timeslot for how long it will be tracked based on
+          current traffic at the time of selection
+            - The algorithm up to this change was timer-based, with its expiry influenced by the existing traffic load
+              at every update. A long standing shortcoming with this approach would lead to aircraft having
+              inconsistent display time when the timer changed because of traffic load, especially near
+              times when an aircraft selection occurred
+                - This selection algorithm was based on the implementation conjured in v.0.4.0 with a
+                  bunch of stuff bolted onto it to make the selection process "smarter"
+        - Further improved the actual selection process with normalized, weighted factors instead of a naive sort
+            - Aircraft are now selected primarily by the shortest line-of-sight distance, with approach rate now
+              taking a lesser influence in the selection
+        - Overhauled the approach rate calculations to handle the usual case when an aircraft doesn't send
+          a position update between polls and to provide the selection algorithm more accurate data
+        - With this change, when there is only one aircraft in the area and it has been tracked for the majority
+          of the time (going over its timeslot), any new aircraft that enters the tracking area
+          will immediately be selected unlike in the previous method where the algorithm must wait until it was
+          allowed to select the other aircraft
+        - The (quite frankly, janky) "rare selection" compensation algorithm has been fully removed
+          as it is no longer needed with this new algorithm implementation
+            - The "rare_selection_events" key in the state file no longer exists because of this
+        - Adapted dependencies such as the progress bar on the active aircraft display and the Interactive output
+          to handle this new algorithm
+        - This overhaul was long overdue, and this change was initially brainstormed back in v.8.0.0
+    - Changed the systemd service type to handle the long standing issue when handling crashes and
+      not reporting it as a failure
+        - The initialization script and the main python file now can recognize when its running
+          as a service and adapts accordingly
+        - The service now attempts to restart itself if it encounters an abnormal failure such as a crash
+          instead of failing and remaining dead
+        - Improved crash detection when running inside of tmux and the main tmux server is terminated abnormally
+        - The service is now more resilient during low memory situations with more aggressive resource priority
+        - Service timeout is now lowered from 12 minutes down to 5
+        - Any update to this version or newer from a previous version will not immediately update the service file, but any
+          subsequent updates will do so
+    - NEW: Splash screen now has a progress bar when running an update to reassure any flight gazers that the process isn't stuck
+        - First thought about during the v.6.0.0 update but now fully implemented here
+        - Splash screen also respects when the initialization script is started with the Emulate flag
+    - When running an update, a newly designed service updater can automatically update the service configuration as needed
+        - Addresses shortcoming highlighted in v.2.4.0
+    - Initialization script improvements:
+        - The script now skips running system package updates following an update to speedup setup,
+          however, this is still used when a force check (-c) is run
+        - When using a force check, the service definition is also updated as well by utilizing the service updater
+        - More accurate and precise duration measurement unaffected by clock changes
+    - Boot splash screen improvements:
+        - A new color-cycling loading bar because fancy
+        - Automatically loading RGBMatrixEmulator if both the configuration file is configured to use the Pi5 adapter
+          and if the main FlightGazer service file also has the emulation mode enabled
+        - Extended the switchover time to 1 minute from 45 seconds
+    - Updated the rgbmatrix install script:
+        - It now supports the newer method of Python installation used by that project
+        - An installation attempt on a Raspberry Pi 5 will automatically cancel and refer the user to use the emulator
+    - If the main python script encounters a fault, it's able to dump the crash information and will copy it to
+      the main log upon program restart
+    - Aircraft are now sorted by their hex address for position stability in the interactive print readout,
+      especially useful when running in NO_FILTER mode
+    - Extended pause when there's a failure trying to retreive dump1090 data to 10 seconds from 5
+    - Increased network timeout tolerance when reading a remote dump1090 instance
+    - Reduced logging spam when a misbehaving client connects to the emulator
+    - Minor Interactive mode console output touchups
+    - Minor tweaks to the migration log output
+    - The time spent tracking distant aircraft outside of typical ADS-B range is now available in the state file
+    - Update operators database to latest FlightGazer-airlines-db version
+    - Fix minor issue with PIA logging
+    - Biggest changes since v.5.0.0
+
 v.10.1.3 - 2026-03-25
     - Handle edge case when a diversion airport is not known
     - Update operators database to latest FlightGazer-airlines-db version

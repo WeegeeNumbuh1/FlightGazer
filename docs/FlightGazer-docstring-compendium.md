@@ -69,6 +69,8 @@ If you'd like to see descriptions for all the globals used in the script, those 
 ## Selection Algorithm Notes
 > *tl;dr this code is cooked, bro. Must've been an Italian in a past life with how much spaghetti is in here.*<br>
 
+> **LAST UPDATED: \< v.11.0.0**
+
     The selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
     and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
     It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
@@ -245,6 +247,7 @@ If you'd like to see descriptions for all the globals used in the script, those 
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information
     - v.8.2.1: More "flexible" attribute setting
     - v.8.2.0: Add support for additional rgbmatrix options for different setups

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.10.1.3 --- 2026-03-25'
+VERSION: str = 'v.11.0.0 --- 2026-04-15'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -59,6 +59,7 @@ import socket
 import logging
 import unicodedata
 import traceback
+import faulthandler
 
 if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
@@ -136,9 +137,33 @@ if os.environ.get('TMUX') is not None or 'tmux' in os.environ.get('TERM', ''):
     INSIDE_TMUX: bool = True
 else:
     INSIDE_TMUX = False
+SYSTEMD_NOTIFY_SOCKET = os.environ.get('NOTIFY_SOCKET')
+if (SYSTEMD_WATCHDOG_SEC := os.environ.get('WATCHDOG_USEC')):
+    SYSTEMD_WATCHDOG_SEC = int(SYSTEMD_WATCHDOG_SEC) / 2000000
+THIS_PID = os.getpid()
 
 # =========== Initialization I =============
 # ==========================================
+
+def systemd_notify(message: str) -> None:
+    """ Send a notification to systemd via `NOTIFY_SOCKET`.
+    Uses the global `SYSTEMD_NOTIFY_SOCKET` for the actual socket.
+    Safe to use even if this script isn't using systemd or the notify type.
+    ### Sources:
+    - https://oneuptime.com/blog/post/2026-03-02-how-to-use-systemd-type-notify-for-ready-signaling-on-ubuntu/view
+    - https://man7.org/linux/man-pages/man3/sd_notify.3.html
+    """
+    notify_socket = SYSTEMD_NOTIFY_SOCKET
+    if not notify_socket:
+        return
+
+    if notify_socket.startswith('@'):
+        notify_socket = '\0' + notify_socket[1:]
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM | socket.SOCK_CLOEXEC) as sock:
+        sock.sendto(message.encode(), notify_socket)
+
+systemd_notify(f'MAINPID={THIS_PID}')
 
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
@@ -226,20 +251,48 @@ if PATH_OWNER:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\' (owned by \'{PATH_OWNER}\')")
 else:
     main_logger.info(f"We are running in \'{CURRENT_DIR}\'")
-main_logger.info(f"Using: \'{CURRENT_EXE}\' as \'{CURRENT_USER}\' with PID: {os.getpid()}")
+main_logger.info(f"Using: \'{CURRENT_EXE}\' as \'{CURRENT_USER}\' with PID: {THIS_PID}")
 main_logger.debug(">>> Verbose mode enabled. <<<")
 main_logger.debug(f"Python version: {sys.version}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
+if SYSTEMD_NOTIFY_SOCKET:
+    main_logger.debug(f"Running with systemd: notify socket at {SYSTEMD_NOTIFY_SOCKET} "
+                      f"and with a watchdog of {SYSTEMD_WATCHDOG_SEC} seconds")
+    systemd_notify(f'STATUS=Main script started.')
 main_logger.info("Running integrity checks...")
+
 BAD_SEMAPHORE_FILE = Path("/run/FlightGazer/not_good")
+STATE_FILE = Path("/run/FlightGazer/current_state.json")
+FAULTDUMP = Path("/run/FlightGazer/dumpy")
 # check if the last shutdown was caused by an error
 if BAD_SEMAPHORE_FILE.exists():
     main_logger.error("FlightGazer's last shutdown was caused by a "
                       "critical error or was running in a degraded state and not shut down properly.")
     main_logger.error("If this error keeps appearing in the log, please report this problem to the developer.")
     write_bad_state_semaphore(False, bypass=True)
+if STATE_FILE.is_file() and STATE_FILE.stat().st_size > 0:
+    main_logger.error("FlightGazer may have crashed unexpectedly at last runtime, was killed by the system, or not shut down properly.")
+    main_logger.error("If this error keeps appearing in the log, please report this problem to the developer.")
+    STATE_FILE.unlink()
+if FAULTDUMP.is_file() and FAULTDUMP.stat().st_size > 0:
+    main_logger.info("FlightGazer managed to save a traceback of its previous crash.")
+    main_logger.info(f"The first 200 lines have been copied to the logfile at {LOGFILE}.")
+    with open(FAULTDUMP, 'r') as df:
+        with open(LOGFILE, 'a') as lf:
+            lf.write("***** BEGIN FLIGHTGAZER CRASH DUMP *****\n")
+            for _ in range(200):
+                ln = df.readline().strip()
+                if not ln:
+                    break
+                lf.write(ln)
+            else:
+                lf.write("\n...the output of this crash has been truncated.\n")
+            lf.write("\n***** END OF CRASH DUMP *****\n")
+    del df, lf, ln
+    FAULTDUMP.unlink()
+
 main_logger.debug("Loading modules...")
 # external imports
 try:
@@ -301,6 +354,7 @@ BEYOND_LOS_LIMIT = 290
 """ Criteria for determining if a plane is detected beyond typical LOS limits for ADS-B, in nautical miles. """
 
 # load in all the display-related modules
+EMULATOR_CONFIG = Path(CURRENT_DIR, 'emulator_config.json')
 DISPLAY_IS_VALID: bool = True
 if not NODISPLAY_MODE:
     main_logger.debug("Loading display drivers...")
@@ -332,16 +386,44 @@ if not NODISPLAY_MODE:
 
         if EMULATE_DISPLAY:
             import types
+            emu_adapter_type = None
+            if EMULATOR_CONFIG.is_file():
+                emu_ = ''
+                with open(EMULATOR_CONFIG, 'r') as f:
+                    for line in f:
+                        if '"display_adapter":' in line:
+                            emu_ = line.strip()
+                            break
+                if 'browser' in emu_:
+                    emu_adapter_type = 'browser'
+                elif 'pi5' in emu_:
+                    emu_adapter_type = 'pi5'
+                elif 'raw' in emu_:
+                    emu_adapter_type = 'raw'
+                else:
+                    emu_adapter_type = 'other'
+                del emu_, f, line
             try:
                 # monkey patch this so it loads the config file from our running directory
                 os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
                 from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, "emulator_config.json")
-
+                RGBMatrixEmulatorConfig.CONFIG_PATH = EMULATOR_CONFIG
+                match emu_adapter_type:
+                    case 'browser':
+                        main_logger.info("Emulator will be loaded using the browser adapter.")
+                    case 'pi5':
+                        main_logger.warning("Emulator will be loaded using the Pi5 adapter. This is experimental!")
+                    case 'raw':
+                        main_logger.warning("Emulator will be loaded with the raw display adapter. This is untested.")
+                    case _:
+                        main_logger.warning("Emulator will be loaded using a different adapter type. This is not supported!")
                 from RGBMatrixEmulator import graphics
                 # the below line monkey patches imports to use the emulator even if rgbmatrix is installed
                 sys.modules['rgbmatrix'] = types.SimpleNamespace(graphics=graphics)
                 from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+                # handle case when a really, really slow client can't handle the emulator in the browser
+                # and it sets off a wave of WebSocketClosedError spam in the log
+                logging.getLogger("tornado").setLevel(logging.CRITICAL)
                 logging.getLogger("tornado.access").setLevel(logging.WARNING) # suppress some of the access logging details
                 logging.getLogger("PIL.Image").setLevel(logging.INFO)
                 main_logger.debug("RGBMatrixEmulator successfully imported.")
@@ -648,13 +730,19 @@ receiver_stats: dict = {'Gain': None, 'Noise': None, 'Strong': None}
 # active plane stuff
 relevant_planes: list[dict] = []
 """ List of planes and associated stats found inside area of interest (refer to `main_loop_generator.dump1090_loop()` for keys) """
-relevant_planes_last: list[dict] = []
-""" `relevant_planes` data from the last loop. Only used when `NOFILTER_MODE` is False. Used for the plane selector algorithm.
-Becomes empty if `relevant_planes` is empty (eg: showing the clock) """
+relevant_planes_approach_rate_tracking = deque(maxlen=5)
+""" Sliding window history of `relevant_planes_list` data used for the plane selector algorithm.
+Each entry is a list of dicts representing each plane with the keys `ID`, `SlantRange`, and `Timestamp`.
+Cleared when there are no active planes in the area. """
 focus_plane: str = ""
 """ Current plane in focus, selected by `AirplaneParser.plane_selector()`. Defaults to an empty string when no active plane is selected. """
 focus_plane_stats: dict = {}
 """ Extracted stats for `focus_plane` from `relevant_planes`, done by `AirplaneParser.plane_selector()` """
+focus_plane_TTL: int = 0
+""" Assigned focus time limit (time to live) of the current `focus_plane` by the selection algorithm. """
+focus_plane_infocus: int = 0
+""" The cumulative loop time the current `focus_plane` has been in focus.
+Note that this value can exceed `focus_plane_TTL` """
 focus_plane_iter: int = 0
 """ Variable that increments per loop when `AirplaneParser` is active. Resets to 0 when not. """
 focus_plane_ids_scratch: set[str] = set()
@@ -780,7 +868,7 @@ is_readsb: bool = False
 """ Tweak text output if we're connected to wiedehopf's readsb instead of dump1090 """
 really_active_adsb_site: bool = False
 """ Indicates that the currently connected dump1090 instance encounters a lot of traffic.
-Controls the rare event log printout. Set by `runtime_accumulators_reset()` """
+Formerly controlled the rare event log printout. Set by `runtime_accumulators_reset()` """
 really_really_active_adsb_site: bool = False
 """ You like planes, bro? """
 dump1090_receiver_version: str = ''
@@ -839,9 +927,6 @@ process_time: list[float] = [0., 0. ,0. ,0.]
 """ [dump1090 response, filter data, API response, frame render] ms """
 selection_events: int = 0
 """ Track amount of times the plane selector is triggered. """
-algorithm_rare_events: int = 0
-""" Count of times the rare events section of the selection algorithm is used.
-Controlled by `AirplaneParser`. """
 high_priority_events: int = 0
 """ Count of how many selection overrides were triggered """
 algorithm_daily_runtime: int = 0
@@ -873,6 +958,9 @@ database_ver: str | None = None
 """ Current version of the database. None if there's no connection to the database. """
 resource_usage: list = [0., 0., None]
 """ [CPU (normalized) and memory usage (MiB) of this running process, along with CPU temp (None if not available)] """
+determination_symphony: int = 0
+""" How long we've been tracking distant aircraft, in seconds. Cumulative until reset at midnight.
+*「大きく開(ひら)いたdistance」* """
 #--- watchdog control and counters
 dump1090_failures: int = 0
 """ Track amount of times we fail to read dump1090 data. """
@@ -932,20 +1020,27 @@ match UNITS:
 def has_key(book, key) -> bool:
     return (key in book)
 
-def sigterm_handler(signum, frame):
-    """ Handle cleanup: shutdown worker threads, write out last stats, and exit this program. """
-    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
+def cleanup() -> None:
+    """ Shutdown procedures taken before we exit. Needs to be run inside of a signal handler. """
     exit_time = datetime.datetime.now()
     end_time = round(time.monotonic() - START_TIME, 3)
+    systemd_notify('STATUS=Shutdown.')
+    systemd_notify('STOPPING=1')
     # write to the console (done this way to prevent reentrancy (is that even a word?))
-    os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
-    os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
-    os.write(sys.stdout.fileno(), str.encode("Shutting down... "))
+    try:
+        os.write(sys.stdout.fileno(), str.encode(f"\n- Exit signal commanded at {exit_time}\n"))
+        os.write(sys.stdout.fileno(), str.encode(f"  Script ran for {timedelta_clean(end_time)}\n"))
+        os.write(sys.stdout.fileno(), str.encode("Shutting down... "))
+    except OSError as e:
+        main_logger.error(f"{e}: Could not write to stdout! (Controlling terminal probably no longer exists)")
     # shutdown all threads
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
     # final cleanup
     flyby_stats()
+    if is_posix:
+        faulthandler.disable()
+    FAULTDUMP.unlink(missing_ok=True)
     if DATABASE_CONNECTED: db.close()
     if API_cache_present: api_cache.close()
     if state_json:
@@ -956,9 +1051,26 @@ def sigterm_handler(signum, frame):
         dxing_log()
     main_logger.info(f"- Exit signal commanded at {exit_time}")
     main_logger.info(f"  Script ran for {timedelta_clean(end_time)}")
-    os.write(sys.stdout.fileno(), b"Done.\n")
+    try:
+        os.write(sys.stdout.fileno(), b"Done.\n")
+    except OSError:
+        pass
     main_logger.info("FlightGazer is shutdown.")
+
+def sigterm_handler(signum, frame):
+    """ Exiting normally. """
+    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
+    cleanup()
+    systemd_notify('EXIT_STATUS=0')
     sys.exit(0)
+
+def abnormal_handler(signum, frame):
+    """ Not exiting cleanly, something upstream probably stopped working """
+    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
+    main_logger.critical("Caught a SIGHUP, attempting to cleanly shutdown...")
+    cleanup()
+    systemd_notify('EXIT_STATUS=1')
+    sys.exit(1)
 
 def register_signal_handler(loop, handler, signal, sender) -> None:
     """ Thread communication enabler. """
@@ -1136,7 +1248,7 @@ def dxing_log() -> None:
     if not combined_feed:
         if dis >= 400:
             data0.append("*** Frame this and tell everyone! *** ")
-        elif 350 < dis < 400:
+        elif 340 < dis < 400:
             data0.append("Absolutely insane! ")
         else:
             data0.append("Exciting! ")
@@ -2069,12 +2181,11 @@ def perf_monitoring() -> None:
 def runtime_accumulators_reset() -> None:
     """ Resets `unique_planes_seen` and other daily accumulators.
     Also is responsible to the API cost polling. (this function is scheduled to run at midnight) """
-    algorithm_rare_events_now = algorithm_rare_events
     date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=10)).strftime('%Y-%m-%d')
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
-    global algorithm_daily_runtime, dump1090_failures
+    global algorithm_daily_runtime, dump1090_failures, determination_symphony
     total_plane_count = len(unique_planes_seen)
     timestamp = time.monotonic()
 
@@ -2116,11 +2227,7 @@ def runtime_accumulators_reset() -> None:
             daily_stats_str_2.append("Events:")
             if high_priority_events > 0:
                 daily_stats_str_2.append(f" {high_priority_events} high-priority overrides occurred.")
-            daily_stats_str_2.append(f" {selection_events} aircraft selections")
-            if algorithm_rare_events_now > 0:
-                daily_stats_str_2.append(f", of which {algorithm_rare_events_now} were rare selections.")
-            else:
-                daily_stats_str_2.append(".")
+            daily_stats_str_2.append(f" {selection_events} aircraft selections.")
             main_logger.info(f"{''.join(daily_stats_str_2)}")
 
     if (
@@ -2136,8 +2243,6 @@ def runtime_accumulators_reset() -> None:
     ):
         main_logger.info("This appears to be a rather active ADS-B site. "
                          "Very nice setup you have here, hopefully you're sharing your data!")
-        main_logger.debug(">>> To prevent spamming the log any further, rare selection event "
-                         "logging will be disabled until FlightGazer is restarted.")
         really_active_adsb_site = True
 
     if (
@@ -2180,6 +2285,8 @@ def runtime_accumulators_reset() -> None:
 
     if super_far_plane:
         dxing_log()
+        main_logger.debug("Time spent detecting distant aircraft: "
+                          f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
 
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(
@@ -2206,7 +2313,8 @@ def runtime_accumulators_reset() -> None:
         FOLLOW_THIS_AIRCRAFT_SPOTTED = False
     if dump1090_failures > 0 and watchdog_triggers == 0:
         dump1090_failures -= 1
-        main_logger.info("Notice: sporadic timeout(s) detected today, decreasing occurrence count by 1.")
+        main_logger.info("Notice: sporadic timeout(s) detected today, "
+                         f"decreasing occurrence count by 1 (now at {dump1090_failures}).")
 
     if API_cache_present:
         api_cache.prune()
@@ -2427,31 +2535,43 @@ class PrintToConsole:
                     print(filter_stat_str_1)
         if range_too_large:
             filter_stat_str_1 = (f"{yellow_warning}***** Aircraft activity is too high. "
-                                 f"Consider lowering RANGE and HEIGHT_LIMIT *****{rst}\n")
+                                 f"Consider lowering RANGE and HEIGHT_LIMIT *****{rst}")
             print(filter_stat_str_1)
         if combined_feed:
             print(f"{yellow_warning}***** FlightGazer is only meant for single sites. "
                   f"This might be a combined feed. *****{rst}\n")
 
         if focus_plane_iter != 0:
-            # reflects plane selection algorithm
-            select_divisor = 1
-            if plane_count == 2:
-                select_divisor = plane_latch_times[0]
-            elif plane_count == 3:
-                select_divisor = plane_latch_times[1]
-            elif plane_count >= 4:
-                select_divisor = plane_latch_times[2]
-            next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
+
+            next_select = focus_plane_iter + (focus_plane_TTL - focus_plane_infocus)
             # algorithm state
+            algo_header = []
             if plane_count == 1 and not selection_override:
-                print(f"{fade}[Inside focus loop {focus_plane_iter}]{rst}\n")
+                algo_header.append(f"{fade}[Inside focus loop {focus_plane_iter}]")
+                if VERBOSE_MODE:
+                    algo_header.append(f" | TTL values: {focus_plane_infocus}, {focus_plane_TTL}\n")
+                else:
+                    algo_header.append(f"{rst}\n")
+                print(''.join(algo_header))
             elif selection_override and plane_count > 0:
-                print(f"{fade}[Inside focus loop {focus_plane_iter}, watching: "
-                      f"{yellow_warning}\'{focus_plane}\'{rst} (High priority)\n")
+                algo_header.append(
+                    f"{fade}[Inside focus loop {focus_plane_iter}, watching: "
+                    f"{yellow_warning}\'{focus_plane}\'{rst} (High priority){fade}]"
+                )
+                if VERBOSE_MODE:
+                    algo_header.append(f" | TTL values: {focus_plane_infocus}, {focus_plane_TTL}\n")
+                else:
+                    algo_header.append(f"{rst}\n")
+                print(''.join(algo_header))
             else:
-                print(f"{fade}[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, "
-                      f"watching: {white_highlight}\'{focus_plane}\'{rst}\n")
+                algo_header.append(
+                    f"{fade}[Inside focus loop {focus_plane_iter}, next switch on loop {next_select}, "
+                    f"watching: {white_highlight}\'{focus_plane}\'{rst}{fade}]")
+                if VERBOSE_MODE:
+                    algo_header.append(f" | TTL values: {focus_plane_infocus}, {focus_plane_TTL}\n")
+                else:
+                    algo_header.append(f"{rst}\n")
+                print(''.join(algo_header))
             if len(focus_plane_ids_scratch) > 0:
                 print(f"{fade}Aircraft scratchpad: {focus_plane_ids_scratch}{rst}")
             elif len(focus_plane_ids_scratch) == 0:
@@ -2678,7 +2798,7 @@ class PrintToConsole:
         noise_str = "N/A"
         loud_str = "N/A"
         if receiver_stats['Gain'] is not None:
-            gain_str = f"{receiver_stats['Gain']}dB"
+            gain_str = f"{receiver_stats['Gain']}"
         if receiver_stats['Noise'] is not None:
             noise_str = f"{receiver_stats['Noise']}dB"
         if receiver_stats['Strong'] is not None:
@@ -2747,9 +2867,8 @@ class PrintToConsole:
         flyby_str.append(f"> Total {flybytext} today: {len(unique_planes_seen)}")
         if not NOFILTER_MODE:
             flyby_str.append(f" | Aircraft selections: {selection_events}")
-            if VERBOSE_MODE or algorithm_rare_events > 0 or high_priority_events > 0:
-                flyby_str.append(f" | Events: {algorithm_rare_events} rare selections, "
-                                 f"{high_priority_events} High-Priority")
+            if VERBOSE_MODE or high_priority_events > 0:
+                flyby_str.append(f" | Events: {high_priority_events} High-Priority")
                 flyby_str.append(f" | Plane load: {plane_load[0]:.3f}")
                 if VERBOSE_MODE:
                     flyby_str.append(f", {plane_load[1]:.1f}s")
@@ -3128,7 +3247,7 @@ def main_loop_generator() -> None:
                     main_logger.debug(f"{e}")
                     raise
             else:
-                _req = session.get(source, headers=USER_AGENT, timeout=LOOP_INTERVAL * 0.9)
+                _req = session.get(source, headers=USER_AGENT, timeout=LOOP_INTERVAL * 1.9)
                 load_end = round((time.perf_counter() - load_start) * 1000, 3)
                 _req.raise_for_status()
                 filesize = len(_req.content)
@@ -3628,26 +3747,48 @@ def main_loop_generator() -> None:
                         if really_far:
                             farplanes.append(loop_packet)
         # end of the main loop
+        planes.sort(key=lambda x: x['ID'])
 
         if farplanes:
             dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE, sender=main_loop_generator)
         else: # tell DistantDeterminator that there are no distant planes right now
             dispatcher.send(message=farplanes, signal=REALLY_FAR_PLANE2, sender=main_loop_generator)
 
-        if not NOFILTER_MODE and relevant_planes_last:
-            # calculate approach rate for each plane based on the last loop's data
+        if not NOFILTER_MODE:
+            # calculate approach rate for each plane based on previous data
             for plane in planes:
                 try:
-                    for last_plane in relevant_planes_last:
-                        if plane['ID'] == last_plane['ID']:
-                            # calculate approach rate in speed units (negative = moving away)
-                            plane['ApproachRate'] = round(
-                                ((last_plane['SlantRange'] - plane['SlantRange']) * 3600 /
-                                (plane['Timestamp'] - last_plane['Timestamp'])), 3 # always positive
-                            )
-                            break
-                except KeyError: # shouldn't happen, but just in case
-                    main_logger.debug("KeyError in approach rate calculation")
+                    approach_rate_history = []
+                    # note: higher indices indicate older data
+                    sl_history = []
+                    ts_history = []
+                    for entry in relevant_planes_approach_rate_tracking:
+                        for planeid in entry:
+                            if planeid['ID'] == plane['ID']:
+                                sl_history.append(planeid['SlantRange'])
+                                ts_history.append(planeid['Timestamp'])
+                                continue
+
+                    if len(sl_history) <= 1 or len(ts_history) <= 1:
+                        plane['ApproachRate'] == 0.0
+                        continue
+
+                    for i in range(len(sl_history) - 1):
+                        approach_rate_interval = (
+                            (sl_history[i + 1] - sl_history[i]) * 3600 /
+                            (ts_history[i] - ts_history[i + 1])
+                        )
+                        approach_rate_history.append(approach_rate_interval)
+
+                    if len(approach_rate_history) > 0:
+                        plane['ApproachRate'] = round(
+                            sum(approach_rate_history) / len(approach_rate_history), 3
+                        )
+                    else:
+                        plane['ApproachRate'] = 0.0
+
+                except (KeyError, IndexError): # shouldn't happen, but just in case
+                    main_logger.debug("KeyError or IndexError in approach rate calculation")
                     plane['ApproachRate'] = 0.0
                     break
 
@@ -3662,7 +3803,7 @@ def main_loop_generator() -> None:
 
     def loop():
         """ Do the loop """
-        global general_stats, relevant_planes, unique_planes_seen, relevant_planes_last
+        global general_stats, relevant_planes, unique_planes_seen
         global process_time, dump1090_failures, process_time2, runtime_sizes
         sequential_failures = 0 # if we don't get processed data, this increments and we can tell the data poller is in a bad state
         failures_delta = 0 # handle a mix of sequentual failures and normal failures
@@ -3677,15 +3818,25 @@ def main_loop_generator() -> None:
                 if dump1090_data is None:
                     general_stats = {'Tracking': 0, 'Range': 0.}
                     relevant_planes.clear()
-                    relevant_planes_last.clear()
+                    relevant_planes_approach_rate_tracking.clear()
                     runtime_sizes[0] = 0
                     if DUMP1090_IS_AVAILABLE: raise TimeoutError
                 start_time = time.perf_counter()
                 if DUMP1090_IS_AVAILABLE:
                     if not NOFILTER_MODE and relevant_planes:
-                        relevant_planes_last = relevant_planes.copy() # required for the selection algorithm
-                    else: # keep `relevant_planes_last` empty otherwise
-                        relevant_planes_last.clear()
+                        # store pertinent data needed for the selection algorithm before we get new data
+                        last_data = []
+                        for plane in relevant_planes:
+                            last_data.append(
+                                {
+                                    'ID': plane.get('ID'),
+                                    'SlantRange': plane.get('SlantRange'),
+                                    'Timestamp': plane.get('Timestamp')
+                                }
+                            )
+                        relevant_planes_approach_rate_tracking.appendleft(last_data)
+                    else:
+                        relevant_planes_approach_rate_tracking.clear()
                     general_stats, relevant_planes = dump1090_loop(dump1090_data)
                     sequential_failures = 0 # reset to 0 when there is data
                 process_time[1] = round((time.perf_counter() - start_time)*1000, 3)
@@ -3723,7 +3874,7 @@ def main_loop_generator() -> None:
                 else:
                     main_logger.warning(f"{dump1090} service timed out. This is occurrence {dump1090_failures}.")
 
-                if sequential_failures > (dump1090_failures_to_watchdog_trigger // 2):
+                if sequential_failures > (dump1090_failures_to_watchdog_trigger // 3):
                     if USING_FILESYSTEM:
                         main_logger.error(f"{dump1090} keeps failing to connect. The local service may be down.")
                     else:
@@ -3738,7 +3889,7 @@ def main_loop_generator() -> None:
                     # What using `failures_delta` does: assume above scenario, now the above block should trigger at 59 instead
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
 
-                time.sleep(5)
+                time.sleep(10)
                 continue
 
             except KeyboardInterrupt:
@@ -3788,8 +3939,6 @@ class AirplaneParser:
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
         self._last_plane_count: int = 0
         """ Count of planes in `relevant_planes` from the previous loop """
-        self.rare_occurrences: int = 0
-        self._date_of_last_rare_message: str = ""
         self.plane_count_avg: float = 0. # average amount of planes tracked when `focus_plane_iter` > 0
         self.algorithm_active_time_avg: float = 0. # average duration the algorithm is in an active state before it resets
         self._plane_counts = deque(maxlen=int(1800 / LOOP_INTERVAL)) # track current plane count, per loop, up to 30 minutes
@@ -3797,95 +3946,98 @@ class AirplaneParser:
         self._range_too_large = False
         self._PIA_latch = False
         self._distressed_latch = False # latches until there are no more planes to track
+        self.timetolive_dict: dict = {}
+        """ Internal dictionary that tracks planes in the area and assigns a set duration of focus time.
+        Each key is the hex ID and each value is a list with index 0 being the current tracking duration
+        and index 1 being the TTL value. Ex: `{'a00002': [67, 98], 'abcdef': [24, 42], ...}` """
         self.run_loop()
 
     def plane_selector(self, message):
         """ Select a plane! """
+        """ Fear the mutation of all these globals! """
         global focus_plane, focus_plane_stats, focus_plane_iter
         global focus_plane_ids_scratch, focus_plane_ids_discard, FOLLOW_THIS_AIRCRAFT_SPOTTED
-        global process_time, selection_events, algorithm_rare_events, selection_override
+        global process_time, selection_events, selection_override
         global high_priority_events, plane_load, range_too_large, tracking_distress_call
         global algorithm_daily_runtime
+        global focus_plane_infocus, focus_plane_TTL
         start_time = time.perf_counter()
         relevant_planes_local_copy = relevant_planes.copy()
         plane_count = len(relevant_planes_local_copy)
         get_plane_list: list = []
+        """ List of all plane ID's in this loop """
         focus_plane_i: str = ""
+        """ The current focus plane when this loop started,
+        what will become the previously selected plane """
         override_plane: bool = False
+        """ True when we skip the normal selection process """
         follow_flag: bool = False
         """ Internal flag to indicate a plane is within the `high_priority_dome` """
         high_priority_dome: float = 0.4 * distance_multiplier
         override_init: bool = selection_override
         range_buffer = RANGE #- (0.01 * distance_multiplier)
-        # add a small buffer to allow the daily stats logging (in `runtime_accumulators_reset()`)
-        # to read the `algorithm_rare_events` value before we reset it, in the case there's a plane in the area
-        # when midnight comes around
-        date_now_str = (datetime.datetime.now() - datetime.timedelta(seconds=5)).strftime('%Y-%m-%d')
-        last_rare_occurrences = self.rare_occurrences
-        rare_message_cutoff = 5
-        # algorithm stuff; note how these are initialized before `focus_plane_iter` is incremented
-        next_select_table = [0,0,0]
-        loops_to_next_select = [0,0,0]
-        for i, value in enumerate(plane_latch_times):
-            next_select_table[i] = ((focus_plane_iter // value) + 1) * value
-            loops_to_next_select[i] = value - (focus_plane_iter % value)
 
-        def rare_message():
-            """ Print a 'rare message' in the log.
-            Under very specific conditions in real-world testing, this occurs up to 3% of the time.
-            v.9.3.0 and newer: this now just triggers the the 'high usage' message under normal working conditions. """
-            self.rare_occurrences += 1
-            if not really_active_adsb_site:
-                if self.rare_occurrences <= rare_message_cutoff:
-                    main_logger.debug(f"Rare event! Aircraft count changed from {self._last_plane_count} "
-                                     f"to {plane_count} as we were about to select another one.")
-                    main_logger.debug(f">>> Occured on loop {focus_plane_iter} "
-                                      f"(selection event {selection_events + 1}) -> "
-                                      f"selection tables: {next_select_table} {loops_to_next_select}")
-                if self.rare_occurrences == rare_message_cutoff and date_now_str == self._date_of_last_rare_message:
-                    main_logger.info("Traffic in the area is very high and the selection algorithm is being used extensively.")
-                    main_logger.debug(">>> Suppressing further \'rare event\' messages for the rest of the day.")
-                    main_logger.debug("    (Aircraft selection is still working normally)")
-            self._date_of_last_rare_message = date_now_str
-
-        def select():
+        def select() -> str:
             """ Our main plane selection algorithm. """
             """ tl;dr this code is cooked, bro. Must've been an Italian in a past life with how much spaghetti is in here.
-            Programmer's Notes: The following selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
-            and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
-            It is designed this way in conjunction with the `focus_plane_api_results` cache and `focus_plane_iter` modulo filters to minimize making new API calls.
-            Additionally, it avoids the complications associated with trying to use a queue to handle `relevant_planes` per data update.
-            The algorithm keeps track of already tracked planes and switches the focus to planes that haven't been tracked yet.
-            `RANGE` should be relatively small giving us less possible concurrent planes to handle at a time, as the more planes are in the area,
-            the higher the chance some planes will not be tracked whatsoever due to the latching time.
 
-            - v.5.0.0 improvement: the algorithm now prioritizes selecting a plane that has the highest `ApproachRate` when choosing a new focus plane with the use of
-            `prioritizer()`. The `ApproachRate` value is already pre-calculated from the main `LOOP`.
-            - v.8.0.0 improvement: if a plane is estimated to leave the area on the next loop, it is ignored when we need to select another focus plane.
-
-            A built-in metric on tracking the overall selection "efficiency" is by watching the value of 'Aircraft selections' in Interactive Mode introduced in v.2.4.0.
-            The value should almost always be equal to or greater than the amount of flybys over the course of a day; a value lower than flybys means that some planes
-            were not tracked whatsoever (very unlikely) or that FlightGazer was recently restarted and reinitialized to the last saved flyby count (more likely).
-            A much higher value (1.5x-3x) is reflective of a very active area being monitored as the rate of switching increases to accommodate for increased traffic.
-
-            An additional metric, "plane load", was also introduced in v.9.0.0, which measures the average amount of relevant planes the selection algorithm has to choose from
-            when active over a sliding window of the last 500 loop cycles. When using the default RANGE and HEIGHT_LIMIT, along with a site deemed "really really active"
-            (see `runtime_accumulators_reset()`), this value has been emperically seen to hover around 1.8-2.3. If a site is sized too large for the aircraft activity in the area,
-            this value will be higher than this value range and the algorithm has to switch faster to handle the traffic.
-            Index 1 of `plane_load` is a measure of how long the algorithm is active on average; with the default RANGE and HEIGHT_LIMIT, a jetliner inside this zone takes about 1 minute
-            and a general aviation plane takes roughly 2.5 minutes to traverse the area. Being inline with parallel runways at a busy airport this average can go up to 3-5 minutes.
-            """
-            global focus_plane, focus_plane_ids_discard, focus_plane_ids_scratch
+            Programmer's Notes: [v.11.0.0] Actually, this section improved a lot from what was here before. Almost like unbaking a burnt cake.
+            There was a huge docstring here, it now lives in the docstring-compendium file in the docs folder of this project. """
+            global focus_plane_ids_discard, focus_plane_ids_scratch
             def prioritizer(available_ids: list | set) -> str:
-                """ Select based on highest approach rate. Returns the ID of the plane that satisfies this. """
-                relevant_planes_local_copy.sort(key=lambda x: x['ApproachRate'], reverse=True) # sort by approach rate
-                for plane in relevant_planes_local_copy:
-                    if (plane['ID'] not in focus_plane_ids_discard
-                        and plane['ApproachRate'] != 0 # skip any plane that has an undetermined speed or just entered the area
-                    ):
-                        return plane['ID'] # first result
+                """ Select based on a weighted score derived from closest line-of-sight and approach rate.
+                `available_ids` is only used as a fallback when this cannot pick a plane. """
+                hexes = []
+                approach_rates = []
+                LOS_vals = []
+                weighted_vals = []
+                # make sure these two add to 1
+                LOS_weight = 0.6
+                appr_weight = 0.4
+                for entry in relevant_planes_local_copy:
+                    hexes.append(entry['ID'])
+                    approach_rates.append(entry['ApproachRate'])
+                    LOS_vals.append(entry['SlantRange'])
+                appr_max = max(approach_rates)
+                appr_min = min(approach_rates)
+                appr_rng = appr_max - appr_min
+                LOS_max = max(LOS_vals)
+                LOS_min = min(LOS_vals)
+                LOS_rng = LOS_max - LOS_min
+                for i, val in enumerate(approach_rates):
+                    if appr_rng > 0:
+                        # scales between -1 and 1 to influence the selector at the end
+                        # to avoid negative approach rates.
+                        # "fixes" the case when the scratchpad is cleared and we start
+                        # selecting planes again and the selector algorithm picks a plane that's
+                        # just about to leave the area not dropped by the position estimator culling
+                        approach_rates[i] = (-1 + (2 * (val - appr_min) / appr_rng)) * appr_weight
+                    else:
+                        approach_rates[i] = 0
+                for i, val in enumerate(LOS_vals):
+                    if LOS_rng > 0:
+                        # closer to the site has a higher priority, so we invert this
+                        LOS_vals[i] = (1 - ((val - LOS_min) / LOS_rng)) * LOS_weight
+                    else:
+                        LOS_vals[i] = 0
+                for i, val in enumerate(LOS_vals):
+                    try:
+                        weighted_vals.append(round(val + approach_rates[i], 3))
+                    except IndexError:
+                        weighted_vals.append(val)
+                # range for weighted values = [-`appr_weight`, 1]
+                w = dict(zip(hexes, weighted_vals))
+                weights = dict(sorted(w.items(), key=lambda x: x[1], reverse=True))
 
-                # if we can't find a plane with a non-zero approach rate, just return a random one
+                for plane, weight in weights.items():
+                    if (
+                        plane != focus_plane_i # don't pick the previous plane
+                        and plane not in focus_plane_ids_discard # don't pick anything we've already seen
+                    ):
+                        # main_logger.debug(f'Picked {plane} | weights: {weights}')
+                        return plane # first result that works
+
+                # fallback: just return a random one
                 if len(available_ids) > 0:
                     return random.choice(list(available_ids))
                 else:
@@ -3895,30 +4047,44 @@ class AirplaneParser:
             for entry in relevant_planes_local_copy:
                 if entry['FutureDistance'] and entry['FutureDistance'] > range_buffer:
                     focus_plane_ids_discard.add(entry['ID'])
-                    main_logger.debug(f"Detected aircraft \'{entry['Flight']}\' ({entry['ID']}) leaving area "
-                                        f"(Est. next distance: {entry['FutureDistance']:.4f}) "
-                                        "when we needed to select a new focus plane.")
+                    main_logger.debug(
+                        f"Detected aircraft \'{entry['Flight']}\' ({entry['ID']}) leaving area "
+                        f"(Est. next distance: {entry['FutureDistance']:.4f}) "
+                        "when we needed to select a new focus plane."
+                    )
             discard_list = list(focus_plane_ids_discard)
             for id in discard_list: # remove all previously focused planes from the global list
                 focus_plane_ids_scratch.discard(id)
             scratch_list = list(focus_plane_ids_scratch)
-            if len(focus_plane_ids_scratch) > 0:
-                focus_plane = prioritizer(scratch_list)
-            elif len(focus_plane_ids_scratch) == 0:
+            if len(scratch_list) > 0:
+                focus_plane_ = prioritizer(scratch_list)
+            else:
                 whatever_else = set(get_plane_list)
-                whatever_else.discard(focus_plane_i) # remove the current focus plane from the list of planes to choose from
-                focus_plane = prioritizer(whatever_else)
+                whatever_else.discard(focus_plane_i)
+                focus_plane_ = prioritizer(whatever_else) # recall, this tries to avoid any plane leaving the area
                 focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
+
+            return focus_plane_
+
+        def update_ttl(fp: str) -> None:
+            """ Update the time to live value for the selected focus plane.
+            The crux of how this algorithm works. """
+            if not fp:
+                return
+            if not (fp_times := self.timetolive_dict.get(f'{fp}')):
+                return
+            if plane_count <= 2:
+                fp_times[1] = fp_times[0] + plane_latch_times[0]
+            elif plane_count == 3:
+                fp_times[1] = fp_times[0] + plane_latch_times[1]
+            elif plane_count > 3:
+                fp_times[1] = fp_times[0] + plane_latch_times[2]
+            self.timetolive_dict[f'{fp}'] = fp_times
 
         focus_plane_i = focus_plane # get previously assigned focus plane into this loop's copy
 
         if not NOFILTER_MODE:
             if plane_count > 0:
-                if self._date_of_last_rare_message and date_now_str != self._date_of_last_rare_message: # reset count
-                    if self.rare_occurrences >= rare_message_cutoff and not really_active_adsb_site:
-                        main_logger.debug("Re-enabling \'rare message\' printout (this marks the first flyby of the day).")
-                    self.rare_occurrences = 0
-
                 # our initial pre-filter
                 focus_plane_ids_scratch.clear()
                 PIA_this_poll = False
@@ -3949,19 +4115,25 @@ class AirplaneParser:
                                     squawkdesc = "General Emergency"
                                 case _:
                                     squawkdesc = ""
-                            main_logger.warning(f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
-                                                "has been detected by your ADS-B site and declared an emergency. "
-                                                f"(Squawking {entry['Squawk']}, {squawkdesc})")
+                            main_logger.warning(
+                                f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
+                                "has been detected by your ADS-B site and declared an emergency. "
+                                f"(Squawking {entry['Squawk']}, {squawkdesc})"
+                            )
                             freeze_frame_packet(entry, show_distance=True)
                     if entry['TrackingFlag'] == 'PIA' and not entry['OnGround']:
                         PIA_this_poll = True
                         if not self._PIA_latch:
                             self._PIA_latch = True
-                            main_logger.info(f"Very rare event! Tracking PIA aircraft \'{entry['Flight']}\' "
-                                                f"(ID: {entry['ID']}, aircraft type: {entry['CategoryDesc']})")
+                            main_logger.info(
+                                f"Very rare event! Tracking PIA aircraft \'{entry['Flight']}\' "
+                                f"(ID: {entry['ID']}, aircraft type: {entry['CategoryDesc']})"
+                            )
+                    # update the TTL dict for any new planes (important)
+                    _ = self.timetolive_dict.setdefault(entry['ID'], [0, 0])
 
-                    if not PIA_this_poll and self._PIA_latch:
-                        self._PIA_latch = False
+                if not PIA_this_poll and self._PIA_latch:
+                    self._PIA_latch = False
 
                 focus_plane_iter += 1
                 if focus_plane_iter > 1:
@@ -3982,6 +4154,7 @@ class AirplaneParser:
                         # get the first plane that will for certain remain in the area
                         if entry['FutureDistance'] and entry['FutureDistance'] < range_buffer:
                             focus_plane = entry['ID']
+                            update_ttl(focus_plane)
                             break
                     else:
                         focus_plane = ''
@@ -3992,52 +4165,36 @@ class AirplaneParser:
                 # Note this will never run if the above block executed, except when encountering a "glancing" approach;
                 # in that case, the `select()` function has logic to handle this (removes that kind of plane)
                 if focus_plane and focus_plane not in get_plane_list:
-                    select()
+                    focus_plane = select()
+                    update_ttl(focus_plane)
 
                 if plane_count > 1:
+                    focus_plane_times_i = self.timetolive_dict.get(f'{focus_plane_i}')
                     if not override_plane:
-                        # control our latching time based on how many planes are present in the area;
-                        # if a new plane enters the area or the number of planes changes,
-                        # switch focus plane only when modulo hits zero OR
-                        # if we were about to switch to another plane, but at this very loop
-                        # the plane count changes, which would throw off the modulo
-                        if (
-                            (plane_count <= 4 and self._last_plane_count > 1)
-                            and self._last_plane_count != plane_count
-                        ):
-                            # avoid times when the next select loop associated with the last plane count
-                            # matches the next select loop associated with the current plane count
-                            # due to the values being common multiples of each other
-                            # eg: next_select_table = [150, 150, 156]
-                            #                          ^    ^
-                            #                          |    +-- last plane count    | 3 planes
-                            #                          +------- current plane count | 2 planes
-                            last_plane_count_i = 4 if self._last_plane_count > 4 else self._last_plane_count # avoid IndexError
-                            if (next_select_table[plane_count - 2] != next_select_table[last_plane_count_i - 2]):
-                                if self._last_plane_count == 2 and loops_to_next_select[0] == 1:
-                                    select()
-                                    rare_message()
-                                if self._last_plane_count == 3 and loops_to_next_select[1] == 1:
-                                    select()
-                                    rare_message()
-                                if self._last_plane_count > 3 and loops_to_next_select[2] == 1:
-                                    select()
-                                    rare_message()
-                        else:
-                            if plane_count == 2 and focus_plane_iter % plane_latch_times[0] == 0:
-                                select()
-                            if plane_count == 3 and focus_plane_iter % plane_latch_times[1] == 0:
-                                select()
-                            if plane_count > 3 and focus_plane_iter % plane_latch_times[2] == 0:
-                                select()
+                        if not focus_plane_times_i:
+                            focus_plane = select()
+                            update_ttl(focus_plane)
+                        elif focus_plane_times_i[0] >= focus_plane_times_i[1]:
+                            update_ttl(focus_plane_i)
+                            focus_plane = select()
+                            if focus_plane != focus_plane_i and focus_plane:
+                                update_ttl(focus_plane)
+
                     else:
                         relevant_planes_local_copy.sort(key=lambda x: x['SlantRange'], reverse=False) # sort by slant range
                         for plane in relevant_planes_local_copy:
                             focus_plane = plane['ID'] # pick the first one
+                            update_ttl(focus_plane)
                             break
 
                 # finally, extract the plane stats to `focus_plane_stats` for use elsewhere
+                # and update the infocus time
                 if focus_plane:
+                    focus_plane_times = self.timetolive_dict.get(f'{focus_plane}')
+                    focus_plane_times[0] += 1
+                    focus_plane_infocus = focus_plane_times[0]
+                    focus_plane_TTL = focus_plane_times[1]
+                    self.timetolive_dict[f'{focus_plane}'] = focus_plane_times
                     for entry in relevant_planes_local_copy: # find our focus plane in `relevant_planes`
                         if entry and focus_plane == entry.get('ID', ''):
                             focus_plane_stats = entry
@@ -4050,7 +4207,7 @@ class AirplaneParser:
                         entry = relevant_planes_local_copy[0]
                         main_logger.debug(f"No plane available to select. \'{entry['Flight']}\' ({entry['ID']}) did not meet any valid criteria.")
                         main_logger.debug(f"POS: {entry['Distance']}, Est POS: {entry['FutureDistance']}, SPD: {entry['Speed']}, "
-                                            f"TRK: {entry['Track']}, A-RATE: {entry['ApproachRate']}, ALT: {entry['Altitude']}")
+                                          f"TRK: {entry['Track']}, A-RATE: {entry['ApproachRate']}, ALT: {entry['Altitude']}")
                     else:
                         main_logger.debug(f"No plane available to select ({plane_count} did not meet any valid criteria)")
                 self._last_plane_count = plane_count
@@ -4124,11 +4281,14 @@ class AirplaneParser:
                     focus_plane = ""
                     focus_plane_iter = 0
                     focus_plane_stats.clear()
+                    focus_plane_infocus = 0
+                    focus_plane_TTL = 0
                     focus_plane_ids_scratch.clear()
                     focus_plane_ids_discard.clear()
                     selection_override = False
                     operator_lookup.cache_clear()
                     database_lookup.cache_clear()
+                    self.timetolive_dict.clear()
 
                     self._last_plane_count = 0
                     if self._distressed_latch:
@@ -4137,8 +4297,6 @@ class AirplaneParser:
                     self._distressed_latch = False # always reset once there are no more planes
 
         process_time[1] = round(process_time[1] + (time.perf_counter() - start_time)*1000, 3)
-        if last_rare_occurrences != self.rare_occurrences:
-            algorithm_rare_events = self.rare_occurrences # export this value
 
         # this triggers the DisplayFeeder and PrintToConsole
         dispatcher.send(message='', signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
@@ -4316,6 +4474,9 @@ class APIFetcher:
             api_db_performance[3] = api_cache.average_speed
             api_db_performance[4] = api_cache.last_access_speed
             api_db_performance[6] = api_cache.hits
+            # substitute the last api response time with the cache
+            # if API_status == 4:
+            #     process_time[2] = api_cache.last_access_speed
 
         # === begin all the API-related stuff ===
         auth_header = {'x-apikey':API_KEY, 'Accept':"application/json; charset=UTF-8"}
@@ -5202,12 +5363,15 @@ class dump1090Watchdog:
             main_logger.error(f"If this is a remote {dump1090} connection, please check your internet connectivity.")
             main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
             main_logger.error("Please correct the underlying issue and restart FlightGazer.")
+            systemd_notify(f'STATUS=DEGRADED: No longer parsing {dump1090} data.')
             return
         main_logger.error(f">>> Suspending checking {dump1090} for 15 minutes. This is occurrence: {watchdog_triggers}.")
+        systemd_notify(f'STATUS=DEGRADED: {dump1090} parsing temporarily suspended due to internal watchdog.')
         time.sleep(900)
         main_logger.info(f"Re-enabling {dump1090} readout.")
         write_bad_state_semaphore(False)
         DUMP1090_IS_AVAILABLE = True
+        systemd_notify('STATUS=Normal operation.')
 
     def run_loop(self):
         def keep_alive():
@@ -5430,15 +5594,20 @@ class WriteState:
                 'flybys_today': len(unique_planes_seen),
                 'last_unique_plane': unique_planes_seen[-1] if unique_planes_seen else None,
                 'aircraft_selections': selection_events,
-                'rare_selection_events': algorithm_rare_events,
                 'high_priority_events': high_priority_events,
                 'average_relevant_planes_in_area': round(plane_load[0], 3),
                 'average_algorithm_active_time_sec': round(plane_load[1], 1),
                 'algorithm_use_today': strfdelta(algorithm_daily_runtime,
                                                  fmt='{H:02}:{M:02}:{S:02}',
                                                  inputtype='s'),
+                'distant_detected_today': True if super_far_plane else False,
+                'distant_time_today': strfdelta(determination_symphony,
+                                                 fmt='{H:02}:{M:02}:{S:02}',
+                                                 inputtype='s'),
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
+                'focus_plane_screen_time_sec': focus_plane_infocus * LOOP_INTERVAL,
+                'focus_plane_TTL_sec': focus_plane_TTL * LOOP_INTERVAL,
                 'focus_plane_ids_discard': list(focus_plane_ids_discard),
                 'focus_plane_ids_scratch': list(focus_plane_ids_scratch),
                 'focus_plane': focus_plane if focus_plane else None,
@@ -6123,7 +6292,7 @@ class DistantDeterminator():
         self.run_loop()
 
     def comparator(self, message: list):
-        global super_far_plane, combined_feed
+        global super_far_plane, combined_feed, determination_symphony
         if not message or not isinstance(message, list):
             self._detected = False
             return
@@ -6141,6 +6310,7 @@ class DistantDeterminator():
         else:
             return
         self._far_time_increment =+ 1
+        determination_symphony = self._far_time_increment * LOOP_INTERVAL
         if (
             # if we've detected really distant aircraft for longer than 15 hours
             self._far_time_increment * LOOP_INTERVAL >= 54000 # this is really lenient to account for times of widespread ducting
@@ -6157,12 +6327,14 @@ class DistantDeterminator():
             super_far_plane = farthest
 
     def reset_distance(self, message):
+        global determination_symphony
         if self.last_max_distance != 0:
             main_logger.debug(f"Farthest distance detected was {self.last_max_distance} {distance_unit}. This value has been reset to 0.")
         else:
             main_logger.debug("No distant aircraft detected today.")
         self.last_max_distance = 0
         self._far_time_increment = 0
+        determination_symphony = 0
 
     def debug_switch(self, message):
         if self._detected:
@@ -6539,6 +6711,12 @@ class wx_API():
         conditions_desc = current_weather.get('description')
 
         conditions = wx_id_to_string(current_weather.get('id'))
+        # probably the rarest easter egg you can encounter here
+        if conditions == '!TRN':
+            main_logger.error(
+                "\"I've a feeling we\'re not in Kansas anymore...\" "
+                "(You should probably seek shelter right now)"
+            )
 
         # Recall units:
         # 0 = Aeronautical (°C, kt, ft, mi, hPa)
@@ -6662,6 +6840,13 @@ class wx_API():
 
         return True
 
+def systemd_watchdog() -> None:
+    """ Thread that notifies the systemd watchdog when present. """
+    main_logger.debug("systemd watchdog thread started.")
+    while True:
+        systemd_notify('WATCHDOG=1')
+        time.sleep(SYSTEMD_WATCHDOG_SEC)
+
 # ========== Display Superclass ============
 # ==========================================
 
@@ -6729,6 +6914,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information
     - v.8.2.1: More "flexible" attribute setting
     - v.8.2.0: Add support for additional rgbmatrix options for different setups
@@ -6867,6 +7053,10 @@ class Display(
         self._last_marquee_pos = None
         self._marquee_pos = 1
         self._marquee_init_decrement = None
+        # additional progress bar logic
+        self._focus_plane_next_switch = 0
+        self._focus_plane_switch_delta = 0
+
         # switch between ENHANCED_READOUT and normal readout
         self._enhanced_readout_last = ENHANCED_READOUT_INIT
 
@@ -8466,33 +8656,39 @@ class Display(
     def s_switch_progress(self, count):
         if not DISPLAY_SWITCH_PROGRESS_BAR or not self.active_plane_display:
             self._last_switch_progress_bar = None
+            self._focus_plane_next_switch = 0
+            self._focus_plane_switch_delta = 0
             return True
 
         plane_count_now = len(relevant_planes)
         BASELINE_Y = 31
         X_START = 0
 
-        # below taken from `print_to_console()`
-        select_divisor = 1
-        if plane_count_now == 2:
-            select_divisor = plane_latch_times[0]
-        elif plane_count_now == 3:
-            select_divisor = plane_latch_times[1]
-        elif plane_count_now >= 4:
-            select_divisor = plane_latch_times[2]
-        next_select = ((focus_plane_iter // select_divisor) + 1) * select_divisor
-        # calculate the fill length based on the current iteration, the planned next select iteration, the associated latch time,
-        # and screen width, then align the result to the nearest pixel
-        # this moves the progress bar leftward as the next select iteration approaches
+        # get our relative time to live
+        # note that with the new selection algorithm, the delta for determining how long
+        # of a bar to draw isn't fixed unlike the previous algorithm, so every time
+        # the next selection time is bumped up, we store it for the bar length calculation
+        next_select = focus_plane_iter + (focus_plane_TTL - focus_plane_infocus)
+        if next_select > self._focus_plane_next_switch:
+            self._focus_plane_next_switch = next_select
+            self._focus_plane_switch_delta = next_select - focus_plane_iter
+
         if plane_count_now < 2 or selection_override:
             fill_length = 0
         else:
-            fill_length = int(
-                round(
-                    ((next_select - focus_plane_iter)
-                    % (select_divisor + 1)
-                    ) / select_divisor * self.matrix.width, 0)
-            )
+            if (
+                focus_plane_TTL <= 0
+                or next_select == 0
+                or self._focus_plane_switch_delta == 0
+            ):
+                fill_length = 0
+            else:
+                # this moves the progress bar leftward as the next select iteration approaches
+                fill_length = int(
+                    round(
+                        ((focus_plane_TTL - focus_plane_infocus)
+                         / self._focus_plane_switch_delta) * self.matrix.width, 0)
+                )
 
         def draw_line(canvas, x_start:int, y_start:int, color, count:int):
             """ draw a horizontal line of given pixel length (this is not graphics.DrawLine) """
@@ -8820,7 +9016,12 @@ def main() -> None:
     syncing_stuff = threading.Thread(target=synchronizer, name='Synchronization-Thread', daemon=True)
     dxing_stuff = threading.Thread(target=DistantDeterminator, name='Distance-Watcher', daemon=True)
     # DXing -> https://en.wikipedia.org/wiki/DXing
+    watchdogging = threading.Thread(target=systemd_watchdog, name='Watchdogger', daemon=True)
     main_logger.info("Cleared for takeoff.")
+    systemd_notify('READY=1')
+    systemd_notify('STATUS=Normal operation.')
+    if SYSTEMD_WATCHDOG_SEC:
+        watchdogging.start()
 
     if INTERACTIVE and not INSIDE_TMUX:
         try:
@@ -8864,6 +9065,11 @@ def main() -> None:
     # register our loop breaker after the above setup
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
+    if is_posix:
+        if INSIDE_TMUX:
+            signal.signal(signal.SIGHUP, abnormal_handler)
+        else:
+            signal.signal(signal.SIGHUP, sigterm_handler)
 
     global dump1090
     dump1090 = "readsb" if is_readsb else "dump1090" # tweak our text output where necessary
@@ -8885,7 +9091,11 @@ def main() -> None:
     if INTERACTIVE:
         main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
     sys.excepthook = catcher
+    if is_posix:
+        faultdump_handle = open(FAULTDUMP, 'w')
+        faulthandler.enable(faultdump_handle, all_threads=True)
     if DUMP1090_JSON is None:
+        systemd_notify('STATUS=DEGRADED: No dump1090 connection.')
         main_logger.error("There is no connection to dump1090! FlightGazer may not be useful in its current state.")
         main_logger.info(">>> Please check your settings, network connection, "
                          "and/or the status of dump1090. Then, restart FlightGazer.")

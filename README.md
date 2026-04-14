@@ -164,9 +164,9 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 ## Setup
 ### ⚠️ Prerequisites (Important)
 
+Using this project assumes you have the following:
 <details><summary><b>Show/Hide All</b></summary>
 
-Using this project assumes you have the following:
 #### MINIMUM
 - A working `dump1090` instance or similar interface where `aircraft.json` can be read/accessed
   - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
@@ -174,15 +174,12 @@ Using this project assumes you have the following:
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️configuration) section)
   - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
 - The latest Python (>=3.10)
-- At least 100 MB of available disk space
+- At least 150 MB of available disk space
 - A working internet connection for setup
 - `git` needs to be installed
 - *for Linux distros:*
-  - Basic knowledge of how to use `bash` or similar terminal
-  - `ssh` access if running headless
-  - `apt` as the package manager
   - Root access (necessary for accessing the RGBMatrix hardware)
-  - `systemd` based system
+  - `bash`, `apt`, and `systemd` need to be present
 #### Highly Recommmended
 - The [rgbmatrix](https://github.com/hzeller/rpi-rgb-led-matrix) library installed and present on the system
   - You can use the initialization script to install this, see [this section](#optional-behaviors) after reading through the setup

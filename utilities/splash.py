@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.8.3.0
+# Last updated: v.11.0.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -15,7 +15,29 @@ import signal
 import argparse
 from pathlib import Path
 import os
+import threading
 CURRENT_DIR = Path(__file__).resolve().parent
+INIT_PROGRESS_FILE = Path('/run/FlightGazer/init_progress')
+init_progress_percentage = 0
+args_main = argparse.ArgumentParser()
+args_main.add_argument("image",
+                help="The image to display",
+                default=f"{Path(CURRENT_DIR, '..', 'FG-Splash.ppm')}"
+                )
+args_main.add_argument('-u', '--update',
+                action='store_true',
+                help="Changes text to 'Now Updating' instead of the default 'Now Loading'."
+                )
+args_main.add_argument('-e', '--emulate',
+                action='store_true',
+                help="Use the emulator instead of rgbmatrix."
+                )
+args_init = args_main.parse_args()
+if args_init.emulate:
+    EMULATE_DISPLAY: bool = True
+else:
+    EMULATE_DISPLAY = False
+
 if os.name != 'nt':
     try:
         PATH_OWNER = CURRENT_DIR.owner()
@@ -27,28 +49,25 @@ else:
     PATH_OWNER = None
     OWNER_HOME = Path.home()
 try:
-    try:
-        from rgbmatrix import graphics
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    except ImportError:
-        # handle case when rgbmatrix is not installed and maybe is present in the home directory
-        if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists:
-            sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
-            try:
-                from rgbmatrix import graphics
-                from rgbmatrix import RGBMatrix, RGBMatrixOptions
-            except ImportError:
-                os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
-                from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-                RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
-                from RGBMatrixEmulator import graphics
-                from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
-        else:
-            os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
-            from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-            RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
-            from RGBMatrixEmulator import graphics
-            from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+    if not EMULATE_DISPLAY:
+        try:
+            from rgbmatrix import graphics
+            from rgbmatrix import RGBMatrix, RGBMatrixOptions
+        except ImportError:
+            # handle case when rgbmatrix is not installed and maybe is present in the home directory
+            if (RGBMATRIX_DIR := Path(OWNER_HOME, "rpi-rgb-led-matrix")).exists:
+                sys.path.append(Path(RGBMATRIX_DIR, 'bindings', 'python'))
+                try:
+                    from rgbmatrix import graphics
+                    from rgbmatrix import RGBMatrix, RGBMatrixOptions
+                except ImportError:
+                    EMULATE_DISPLAY = True
+    if EMULATE_DISPLAY:
+        os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
+        from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
+        RGBMatrixEmulatorConfig.CONFIG_PATH = Path(CURRENT_DIR, '..', 'emulator_config.json')
+        from RGBMatrixEmulator import graphics
+        from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 except Exception: # if display can't be loaded, don't bother showing the splash screen
     print("FG-Splash: Error: No display driver found. Splash screen is not available.")
     sys.exit(1)
@@ -98,6 +117,25 @@ def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
     sys.exit(0)
 
+def check_progress():
+    """ Check the initialization progress file when running an update. """
+    global init_progress_percentage
+    if INIT_PROGRESS_FILE.is_file():
+        try:
+            with open(INIT_PROGRESS_FILE, 'rb') as fi:
+                right_now = fi.read(5).decode('utf-8').strip()
+                # note, further calculations can handle float
+                if not right_now:
+                    init_progress_percentage = 0
+                else:
+                    init_progress_percentage = float(right_now)
+        except Exception:
+            pass
+def progress_checker():
+    while True:
+        check_progress()
+        sleep(0.5)
+
 NO_TEXT_SPLASH = False
 try:
     loaded_font = graphics.Font()
@@ -107,15 +145,7 @@ except FileNotFoundError:
 
 class ImageScroller():
     def __init__(self, *args, **kwargs):
-        self.parser = argparse.ArgumentParser()
-        self.parser.add_argument("image",
-                      help="The image to display",
-                      default=f"{Path(CURRENT_DIR, '..', 'FG-Splash.ppm')}"
-                      )
-        self.parser.add_argument('-u', '--update',
-                      action='store_true',
-                      help="Changes text to 'Now Updating' instead of the default 'Now Loading'."
-                      )
+        self.parser = args_main
         self.args = self.parser.parse_args()
         signal.signal(signal.SIGTERM, sigterm_handler) # register signal handler
         if self.args.update:
@@ -128,6 +158,7 @@ class ImageScroller():
         # self.spinner = ['|', '/', '-', '\\'] # spinner for the text
         self.spinner = ['◥', '◢', '◣', '◤',]
         self.spinner_index = 0
+        self.progress_color = graphics.Color(227, 110, 0) # orange, like Rin Hoshizora or Matikanefukukitaru
 
         # Run with the following rgbmatrix options.
         # nb: If these settings end up not working, then we simply won't have a splash screen
@@ -150,6 +181,22 @@ class ImageScroller():
         options.hardware_mapping = "adafruit-hat-pwm" if config['HAT_PWM_ENABLED'] else "adafruit-hat"
         options.disable_hardware_pulsing = False if config['HAT_PWM_ENABLED'] else True
         self.matrix = RGBMatrix(options=options)
+
+    def draw_line(self, canvas, x_start:int, y_start:int, color, count:int):
+        """ Pulled from FlightGazer """
+        if count is None:
+            count = 0
+        if count > self.matrix.width:
+            count = self.matrix.width
+        indicator_color = color
+        for i in range(count):
+            canvas.SetPixel(
+                x_start + i,
+                y_start,
+                indicator_color.red,
+                indicator_color.green,
+                indicator_color.blue
+            )
 
     def run(self):
         if not 'image' in self.__dict__:
@@ -195,6 +242,11 @@ class ImageScroller():
             self.double_buffer.SetImage(self.image, xpos)
             self.double_buffer.SetImage(self.image, xpos - img_width)
 
+            # calculate the progress bar length
+            fill_length = int(
+                round((init_progress_percentage / 100) * self.matrix.width, 0)
+            )
+
             if not NO_TEXT_SPLASH:
                 _ = graphics.DrawText(
                     self.double_buffer,
@@ -231,11 +283,14 @@ class ImageScroller():
                     self.spinner[self.spinner_index],
                 )
 
+            if self.args.update:
+                self.draw_line(self.double_buffer, 0, 31, self.progress_color, fill_length)
             self.double_buffer = self.matrix.SwapOnVSync(self.double_buffer)
             sleep(0.04)
 
 if __name__ == "__main__":
     try:
+        threading.Thread(target=progress_checker, daemon=True).start()
         image_scroller = ImageScroller()
         image_scroller.run()
     except (KeyboardInterrupt, SystemExit):
