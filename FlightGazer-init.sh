@@ -2,10 +2,11 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.10.1.3
+# Version = v.11.0.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
+STARTMONOTONIC=$(cat /proc/uptime | awk '{print $1}')
 BASEDIR=$(cd `dirname -- $0` && pwd)
 export PYTHONUNBUFFERED=1
 export PIP_ROOT_USER_ACTION=ignore # hide pip complaining we're using root
@@ -17,6 +18,7 @@ NC='\033[0m' # No Color
 FADE='\033[2m'
 WHITEHIGH='\033[0;30;47m'
 CHECK_FILE="${VENVPATH}/first_run_complete"
+CHECK_FILE2="${VENVPATH}/sys_dependencies_checked"
 THIS_FILE="${BASEDIR}/FlightGazer-init.sh"
 LOGFILE="${BASEDIR}/FlightGazer-log.log"
 DB_DOWNLOADER="${BASEDIR}/utilities/aircraft_db_fetcher.py"
@@ -83,6 +85,43 @@ cleanup() {
 	kill -INT "$$"
 }
 
+servicefile_heredoc() {
+# SERVICE_FILE_START
+	cat <<- EOF > /etc/systemd/system/flightgazer.service
+	[Unit]
+	# SERVICE_FILE_VERSION=11.0.0
+	# The above is used for the FlightGazer update routines
+	Description=FlightGazer service
+	After=multi-user.target
+	Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
+	StartLimitBurst=2
+	StartLimitIntervalSec=60s
+
+	[Service]
+	User=root
+	# Note: unless the -t flag is used, DO NOT use interactive flags unless you want to spam the logs
+	ExecStart=bash "${THIS_FILE}" -t
+	ExecStop=-tmux send-keys -t FlightGazer C-c || true
+	ExecStop=sleep 1s
+	Type=notify
+	WatchdogSec=10
+	NotifyAccess=all
+	TimeoutStartSec=300
+	TimeoutStopSec=5
+	OOMScoreAdjust=-500
+	Nice=-8
+	IOSchedulingClass=best-effort
+	IOSchedulingPriority=0
+	Restart=on-abnormal
+	RestartSec=5s
+
+	[Install]
+	WantedBy=multi-user.target
+	Also=flightgazer-bootsplash.service
+	EOF
+# SERVICE_FILE_END
+}
+
 emulator_heredoc() {
 	cat << EOF > "${BASEDIR}/emulator_config.json"
 {
@@ -120,6 +159,28 @@ emulator_heredoc() {
     "emulator_title": "FlightGazer - Emulated"
 }
 EOF
+}
+
+bootsplashservice_heredoc () {
+	cat <<- EOF > /etc/systemd/system/flightgazer-bootsplash.service
+	[Unit]
+	Description=FlightGazer boot splash screen
+	DefaultDependencies=no
+	After=local-fs.target
+	Before=network.target
+	RefuseManualStart=true
+	Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
+
+	[Service]
+	User=root
+	ExecStart="${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash-sysinit.py"
+	Type=simple
+	Restart=no
+
+	[Install]
+	# start real early
+	WantedBy=sysinit.target
+	EOF
 }
 
 DFLAG=""
@@ -206,6 +267,13 @@ if [[ $(ps aux | grep '[F]lightGazer\.py' | awk '{print $2}') ]]; then
 	exit 1
 fi
 
+# when running as a service, ignore any flags that shouldn't be handled
+if [ -n "${NOTIFY_SOCKET+x}" ]; then
+	CFLAG=false
+	MFLAG=false
+	LFLAG=false
+fi
+
 if [ "$MFLAG" = true ]; then
 	if [ -f "${BASEDIR}/utilities/rgbmatrix_install.sh" ]; then
 		echo -e "${GREEN}>>> Starting the rgbmatrix install script.${NC}"
@@ -230,11 +298,18 @@ fi
 
 # Startup checks
 echo -e "${GREEN}>>> Checking dependencies, let's begin.${NC}"
+if [ -n "${NOTIFY_SOCKET+x}" ]; then
+	systemd-notify --status="Running initialization/setup" >/dev/null 2>&1
+fi
 echo -e "${FADE}"
 if [ -n "$VFLAG" ]; then
 	echo ">> Verbose mode enabled, additional info will be printed. <<"
 	echo ">> Running startup checks..."
 	echo -e "  >> Current directory: ${BASEDIR}"
+fi
+
+if [ -n "$VFLAG" ] && [ -n "${NOTIFY_SOCKET+x}" ]; then
+	echo "  >> Running under systemd with a notify socket available"
 fi
 
 if [ ! -f "${BASEDIR}/FlightGazer.py" ]; then
@@ -479,131 +554,150 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo -e "  > ${USER_HOME}"
 fi
 
+PROGRESS_FILE=/run/FlightGazer/init_progress
+if [ -d "/run" ]; then
+	if [ ! -d "/run/FlightGazer" ]; then
+		mkdir "/run/FlightGazer" >/dev/null 2>&1
+	fi
+fi
+update_progress() {
+	if [ -f "$PROGRESS_FILE" ]; then
+		echo $1 > $PROGRESS_FILE
+	fi
+}
+
+sysdep=false
 # start the splash screen
 # note that if this is a fresh install and the rgbmatrix software framework doesn't exist, the splash screen won't run
 if [ "$DFLAG" != "-d" ]; then
 	if [ -n "$VFLAG" ]; then
 		echo "  >> Starting splash screen..."
 	fi
+	# only do the progress monitoring if the splash screen is allowed to run
+	touch $PROGRESS_FILE >/dev/null 2>&1
 	if [ ! -d "$VENVPATH" ]; then
 		# if the rgbmatrix library is already installed on first install, this may run
 		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
-			nohup python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u >/dev/null 2>&1 &
+			python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u ${EFLAG} >/dev/null 2>&1 &
+			update_progress 0
 		else
-			nohup python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" >/dev/null 2>&1 &
+			python3 "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" ${EFLAG} >/dev/null 2>&1 &
+			rm $PROGRESS_FILE >/dev/null 2>&1
 		fi
 	else
 		if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
-			nohup "${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u >/dev/null 2>&1 &
+			"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" -u ${EFLAG} >/dev/null 2>&1 &
+			update_progress 0
 		else
-			nohup "${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" >/dev/null 2>&1 &
+			"${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash.py" "${BASEDIR}/FG-Splash.ppm" ${EFLAG} >/dev/null 2>&1 &
+			rm $PROGRESS_FILE >/dev/null 2>&1
 		fi
 	fi
 fi
 
 if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
-	echo "  > Updating package lists..."
-	echo "    > \"apt-get update\""
-	echo "      (this may take some time if this hasn't been run in awhile)"
-	if [ -n "$VFLAG" ]; then
-		apt-get update
-	else
-		apt-get update >/dev/null
-	fi
-	echo "    > \"dpkg --configure -a\""
-	dpkg --configure -a >/dev/null
-	echo ""
-	echo "  > Installing needed dependencies..."
-	echo "    [ python3-dev python3-venv python3-numpy libjpeg-dev tmux ]"
-	echo "    (this might also take awhile if these components aren't installed, please wait.)"
-	# should speed up things
-	# https://askubuntu.com/a/1333505
-	if [ -n "$VFLAG" ]; then
-		apt-cache --generate pkgnames | \
-		grep --line-regexp --fixed-strings \
-		-e python3-dev \
-		-e python3-venv \
-		-e python3-numpy \
-		-e libjpeg-dev \
-		-e tmux \
-		| xargs apt-get install -y
-	else
-		apt-cache --generate pkgnames | \
-		grep --line-regexp --fixed-strings \
-		-e python3-dev \
-		-e python3-venv \
-		-e python3-numpy \
-		-e libjpeg-dev \
-		-e tmux \
-		| xargs apt-get install -y >/dev/null
-	fi
-	echo -e "${FADE}"
-	echo "  > Creating systemd services..."
-	if [ ! -f "/etc/systemd/system/flightgazer.service" ] && [ "$LFLAG" = false ]; then
-		cat <<- EOF > /etc/systemd/system/flightgazer.service
-		[Unit]
-		Description=FlightGazer service
-		After=multi-user.target
-		Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
-
-		[Service]
-		User=root
-		# Note: unless the -t flag is used, DO NOT use interactive flags unless you want to spam the logs
-		ExecStart=bash "${THIS_FILE}" -t
-		ExecStop=-tmux send-keys -t FlightGazer C-c || true
-		ExecStop=sleep 1s
-		Type=forking
-		TimeoutStartSec=720
-		TimeoutStopSec=5
-
-		[Install]
-		WantedBy=multi-user.target
-		Also=flightgazer-bootsplash.service
-		EOF
-
-		cat <<- EOF > /etc/systemd/system/flightgazer-bootsplash.service
-		[Unit]
-		Description=FlightGazer boot splash screen
-		DefaultDependencies=no
-		After=local-fs.target
-		Before=network.target
-		RefuseManualStart=true
-		Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
-
-		[Service]
-		User=root
-		ExecStart="${VENVPATH}/bin/python3" "${BASEDIR}/utilities/splash-sysinit.py"
-		Type=simple
-		Restart=no
-
-		[Install]
-		# start real early
-		WantedBy=sysinit.target
-		EOF
-		echo -e "${FADE}"
-		systemctl daemon-reload >/dev/null 2>&1
-		systemctl enable flightgazer.service 2>&1
-		if [ $RGBMATRIX_PRESENT -eq 0 ] || [ $RGBMATRIX_PRESENT -eq 3 ]; then
-			echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
-			systemctl enable flightgazer-bootsplash.service 2>&1
-			echo -e "${NC}    > Note: If you do not want the boot splash, use the command"
-			echo -e "      systemctl disable flightgazer-bootsplash.service${FADE}"
-		else
-			echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
-			systemctl disable flightgazer-bootsplash.service 2>&1
+	if [ ! -f "$CHECK_FILE2" ] || [ "$CFLAG" = true ]; then
+		echo "  > Updating package lists..."
+		echo "    > \"apt-get update\""
+		echo "      (this may take some time if this hasn't been run in awhile)"
+		if [ -n "${NOTIFY_SOCKET+x}" ]; then
+			systemd-notify EXTEND_TIMEOUT_USEC=60000000 >/dev/null 2>&1
 		fi
-		systemctl status flightgazer.service --no-pager
-		echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
-		echo -e "${RED}    > Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
-		echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
-		sleep 5s
-		echo -e "    ${NC}> Don't want it there? Run the uninstall script,"
-		echo -e "      move this directory (${BASEDIR})"
-		echo -e "      to where you want it, then run this script again.${FADE}"
-		sleep 5s
+		if [ -n "$VFLAG" ]; then
+			apt-get update -o Acquire::http::Timeout="5" -o Acquire::https::Timeout="5" -o Acquire::ftp::Timeout="5" -o Acquire::Retries="2"
+		else
+			apt-get update -o Acquire::http::Timeout="5" -o Acquire::https::Timeout="5" -o Acquire::ftp::Timeout="5" -o Acquire::Retries="2" >/dev/null
+		fi
+		echo "    > \"dpkg --configure -a\""
+		dpkg --configure -a >/dev/null
+		echo ""
+		echo "  > Installing needed dependencies..."
+		echo "    [ python3-dev python3-venv python3-numpy libjpeg-dev tmux ]"
+		echo "    (this might also take awhile if these components aren't installed, please wait.)"
+		# should speed up things
+		# https://askubuntu.com/a/1333505
+		if [ -n "$VFLAG" ]; then
+			apt-cache --generate pkgnames | \
+			grep --line-regexp --fixed-strings \
+			-e python3-dev \
+			-e python3-venv \
+			-e python3-numpy \
+			-e libjpeg-dev \
+			-e tmux \
+			| xargs apt-get install -y
+		else
+			apt-cache --generate pkgnames | \
+			grep --line-regexp --fixed-strings \
+			-e python3-dev \
+			-e python3-venv \
+			-e python3-numpy \
+			-e libjpeg-dev \
+			-e tmux \
+			| xargs apt-get install -y >/dev/null
+		fi
+		echo -e "${FADE}"
+		if [ -d "$VENVPATH" ]; then
+			touch "$CHECK_FILE2"
+		fi
+		sysdep=true
+
+		echo "  > Creating systemd services..."
+		updateservice=true
+		# note this will only run on initial install, never through the service
+		if [ ! -f "/etc/systemd/system/flightgazer.service" ] && [ "$LFLAG" = false ]; then
+			updateservice=false
+			servicefile_heredoc
+			bootsplashservice_heredoc
+			echo -e "${FADE}"
+			systemctl daemon-reload >/dev/null 2>&1
+			systemctl enable flightgazer.service 2>&1
+			if [ $RGBMATRIX_PRESENT -eq 0 ] || [ $RGBMATRIX_PRESENT -eq 3 ]; then
+				echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
+				systemctl enable flightgazer-bootsplash.service 2>&1
+				echo -e "${NC}    > Note: If you do not want the boot splash, use the command"
+				echo -e "      systemctl disable flightgazer-bootsplash.service${FADE}"
+			else
+				echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
+				systemctl disable flightgazer-bootsplash.service 2>&1
+			fi
+			echo -e "${NC}"
+			systemctl status flightgazer.service --no-pager
+			echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
+			echo -e "    ${WHITEHIGH}> Do not move the FlightGazer directory!${ORANGE} (${BASEDIR})${NC}"
+			echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
+			sleep 5s
+			echo -e "    ${NC}> Don't want it there? Run the uninstall script,"
+			echo -e "      move this directory (${BASEDIR})"
+			echo -e "      to where you want it, then run this script again.${FADE}"
+			sleep 5s
+		else
+			echo "    > Service already exists or we are running"
+			echo "      in Live/Demo mode, skipping service creation."
+		fi
+		if [ -f "${BASEDIR}/utilities/service_updater.py" ] && [ "$updateservice" = true ] && [ "$LFLAG" = false ]; then
+			echo -e "${FADE}"
+			echo "  > Updating systemd services..."
+			python3 "${BASEDIR}/utilities/service_updater.py" "${THIS_FILE}"
+			if [ $? -eq 0 ]; then
+				systemctl daemon-reload >/dev/null 2>&1
+				systemctl enable flightgazer.service 2>&1
+				if [ $RGBMATRIX_PRESENT -eq 0 ] || [ $RGBMATRIX_PRESENT -eq 3 ]; then
+					echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
+					systemctl enable flightgazer-bootsplash.service 2>&1
+					echo -e "${NC}    > Note: If you do not want the boot splash, use the command"
+					echo -e "      systemctl disable flightgazer-bootsplash.service${FADE}"
+				else
+					echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
+					systemctl disable flightgazer-bootsplash.service 2>&1
+				fi
+				echo -e "${NC}${FADE}  > Service updated to current definition in this initialization script."
+			else
+				echo -e "${NC}${ORANGE}  > Failed to update services, no changes made.${NC}${FADE}"
+			fi
+		fi
+
 	else
-		echo "    > Service already exists or we are running"
-		echo "      in Live/Demo mode, skipping service creation."
+		echo "  > System dependencies already exist, skipping checks."
 	fi
 
 	# make a config file for the emulator to prevent harmless error spam and to
@@ -620,7 +714,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		echo "    > RGBMatrixEmulator settings updated."
 	fi
 fi
-if [ ! -d "$VENVPATH" ]; then
+if [ ! -d "$VENVPATH" ] || [ ! -d "${VENVPATH}/bin" ]; then
 	mkdir "${VENVPATH}"
 	echo ""
 	echo "  > Making virtual environment... (this may take awhile)"
@@ -639,9 +733,11 @@ if [ ! -d "$VENVPATH" ]; then
 	# fi
 fi
 echo ""
-STAGEA=$(date '+%s')
+STAGEA=$(cat /proc/uptime | awk '{print $1}')
+STAGEADELTA=$(awk "BEGIN {print $STAGEA - $STARTMONOTONIC}")
 if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
-	echo -e "${NC}Stage 1 of setup took $((STAGEA - STARTTIME)) seconds.${FADE}"
+	update_progress 4
+	echo -e "${NC}Stage 1 of setup took ${STAGEADELTA} seconds.${FADE}"
 fi
 
 if command -v tmux 2>&1 >/dev/null; then
@@ -656,6 +752,7 @@ fi
 echo -e "${NC}> System image ready.${FADE}"
 echo -n "> We have: "
 "${VENVPATH}/bin/python3" -VV
+update_progress 6
 
 CHECKMARK="${GREEN}${FADE} [ Done ]${NC}"
 # install dependencies
@@ -670,48 +767,67 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	if [ $INTERNET_STAT -eq 0 ]; then
 		echo -e "${FADE}${VERB_TEXT}pip"
 		"${VENVPATH}/bin/python3" -m pip install --upgrade pip >/dev/null
+		update_progress 10
 
 		if [ $RGBMATRIX_PRESENT -eq 3 ]; then
 			echo -e "${FADE}${VERB_TEXT}rgbmatrix"
-			"${VENVCMD}" install -e "${USER_HOME}/rpi-rgb-led-matrix/bindings/python" --use-pep517 >/dev/null
+			export MAX_JOBS=1
+			export CMAKE_BUILD_PARALLEL_LEVEL=1
+			if [ -n "${NOTIFY_SOCKET+x}" ]; then
+				systemd-notify EXTEND_TIMEOUT_USEC=240000000 >/dev/null 2>&1
+			fi
+			"${VENVCMD}" install -e "${USER_HOME}/rpi-rgb-led-matrix/" >/dev/null
+			if [ $? -ne 0 ]; then
+				echo -e "${NC}> Install did not work, trying an older method...${FADE}"
+				"${VENVCMD}" install -e "${USER_HOME}/rpi-rgb-led-matrix/bindings/python" --use-pep517 >/dev/null
+			fi
 		fi
 		echo -e "${CHECKMARK}"
 
 		echo -e "${FADE}${VERB_TEXT}requests"
 		"${VENVCMD}" install --upgrade requests >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 16
 
 		echo -e "${FADE}${VERB_TEXT}pydispatcher"
 		"${VENVCMD}" install --upgrade pydispatcher >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 19
 
 		echo -e "${FADE}${VERB_TEXT}schedule"
 		"${VENVCMD}" install --upgrade schedule >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 22
 
 		echo -e "${FADE}${VERB_TEXT}suntime"
 		"${VENVCMD}" install --upgrade suntime >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 25
 
 		echo -e "${FADE}${VERB_TEXT}psutil"
 		"${VENVCMD}" install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 28
 
 		echo -e "${FADE}${VERB_TEXT}yaml"
 		"${VENVCMD}" install --upgrade ruamel.yaml >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 31
 
 		echo -e "${FADE}${VERB_TEXT}orjson"
 		"${VENVCMD}" install --upgrade orjson >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 34
 
 		echo -e "${FADE}${VERB_TEXT}BeautifulSoup"
 		"${VENVCMD}" install --upgrade beautifulsoup4 >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 37
 
 		echo -e "${FADE}${VERB_TEXT}fake-useragent"
 		"${VENVCMD}" install --upgrade fake-useragent >/dev/null
 		echo -e "${CHECKMARK}"
+		update_progress 40
 
 		if [ "$VERB_TEXT" == "Installing: " ]; then
 			echo -e "${FADE}(The next install may take some time, please be patient.)"
@@ -726,6 +842,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			"${VENVCMD}" install RGBMatrixEmulator --upgrade >/dev/null
 		fi
 		echo -e "${CHECKMARK}"
+		update_progress 45
 
 		if [ $WEB_INT -eq 1 ]; then
 			echo -e "${FADE}Web-app components:"
@@ -734,17 +851,21 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			echo "${VERB_TEXT}Flask"
 			"${VENVCMD}" install --upgrade Flask >/dev/null
 			echo -e "${CHECKMARK}"
+			update_progress 48
 
 			echo -e "${FADE}${VERB_TEXT}gunicorn"
 			"${VENVCMD}" install --upgrade gunicorn >/dev/null
 			echo -e "${CHECKMARK}"
+			update_progress 51
 
 			echo -e "${FADE}(Starting web-app service...)"
 			systemctl start flightgazer-webapp >/dev/null 2>&1
 		fi
 		echo -e "${NC}░░░▒▒▓▓ Completed ▓▓▒▒░░░\n${FADE}"
+		update_progress 55
 	else
 		echo -e "${ORANGE}  Skipping due to no internet.${NC}${FADE}"
+		update_progress 50
 	fi
 	if [ -n "$VFLAG" ]; then
 		echo "Generating list of installed packages..."
@@ -762,12 +883,14 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		-ie "beautifulsoup4"\
 		-ie "fake-useragent")
 		echo -e "Detected package versions:\n${PIPPKGS}"
+		update_progress 55
 	fi
 	touch "$LOGFILE"
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$LOGFILE" >/dev/null 2>&1
 	chmod -f 644 "${LOGFILE}" >/dev/null 2>&1
-	STAGEB=$(date '+%s')
-	echo -e "${NC}Stage 2 of setup took $((STAGEB - STAGEA)) seconds.${FADE}"
+	STAGEB=$(cat /proc/uptime | awk '{print $1}')
+	STAGEBDELTA=$(awk "BEGIN {print $STAGEB - $STAGEA}")
+	echo -e "${NC}Stage 2 of setup took ${STAGEBDELTA} seconds.${FADE}"
 	# start the database updater/generator
 	echo -e "${NC}> Fetching latest aircraft database...${FADE} (this might take some time)"
 	if [ -f "$DB_DOWNLOADER" ]; then
@@ -787,6 +910,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo -e "${NC}${ORANGE}> Unable to check or generate aircraft database"
 		echo "  due to downloader script missing.${NC}${FADE}"
 	fi
+	update_progress 94
 	echo -e "${NC}> Checking operators database...${FADE}"
 	if [ -f "$OP_DOWNLOADER" ]; then
 		"${VENVPATH}/bin/python3" "$OP_DOWNLOADER"
@@ -797,15 +921,19 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			echo "in your console."
 		else
 			echo -e "${NC}> Database management successfully completed."
-			chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${OP_DOWNLOADER}" >/dev/null 2>&1
+			chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/utilities/operators.py" >/dev/null 2>&1
 		fi
 	else
 		echo -e "${NC}${ORANGE}> Unable to check or generate operators database"
 		echo "  due to the generator script missing.${NC}${FADE}"
 	fi
+	update_progress 99
 
 	if [ $INTERNET_STAT -eq 0 ]; then
 		touch $CHECK_FILE
+		if [ "$sysdep" = true ]; then
+			touch $CHECK_FILE2
+		fi
 	fi
 fi
 
@@ -819,8 +947,9 @@ if [ -f "$LOGFILE" ]; then
 	fi
 fi
 
-ENDTIME=$(date '+%s')
-echo "Setup/Initialization took $((ENDTIME - STARTTIME)) seconds."
+ENDTIME=$(cat /proc/uptime | awk '{print $1}')
+ENDTIMEDELTA=$(awk "BEGIN {print $ENDTIME - $STARTMONOTONIC}")
+echo "Setup/Initialization took ${ENDTIMEDELTA} seconds."
 echo -e "${NC}"
 echo -e "${GREEN}>>> Dependencies check complete."
 if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
@@ -830,6 +959,7 @@ if [ $SKIP_CHECK -eq 1 ] && [ "$DFLAG" = "" ] && [ "$CFLAG" = false ]; then
 fi
 echo -e "${ORANGE}>>> Entering main loop!${NC}"
 kill -15 $(ps aux | grep '[s]plash.py' | awk '{print $2}') > /dev/null 2>&1
+rm $PROGRESS_FILE >/dev/null 2>&1
 trap - INT # reset the signal handler
 
 echo -ne "${FADE}"
@@ -858,11 +988,38 @@ else
 		# always have the -i interactive flag in use if no other options are given
 		echo -e "${GREEN}> We're running in an interactive shell. Program output will be shown.${NC}${FADE}"
 		if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 \"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
-			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
-			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
+			tmux new-session -d -s FlightGazer "\"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
 			sleep 1s
-			exit 0
+			echo "Waiting for main process..."
+			sleep 5s
+			if [ -n "${NOTIFY_SOCKET+x}" ]; then
+				echo "The system is now supervising the main process as FlightGazer was started as a service."
+				echo "Any message such as 'Supervising process which is not our child' is safe to ignore."
+				if tmux has-session -t FlightGazer 2>/dev/null; then
+					echo ">>> Successfully started in tmux."
+					echo "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!"
+				else
+					echo ">>> Main script failed to load! Check the logs."
+					exit 1
+				fi
+				exit 0
+				# while tmux has-session -t FlightGazer 2>/dev/null; do
+				# 	sleep 5s
+				# done
+				# echo "Warning: session closed unexpectedly. Check the logs."
+				# echo "If you manually stopped FlightGazer from within tmux, you can ignore this warning."
+				# exit 1
+			else
+				if tmux has-session -t FlightGazer 2>/dev/null; then
+					echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
+					echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
+					sleep 1s
+					exit 0
+				else
+					echo -e "${NC}${RED}>>> Main script failed to load! Check the logs.${NC}"
+					exit 1
+				fi
+			fi
 		else
 			trap interrupt SIGINT SIGTERM SIGHUP
 			echo -e "${GREEN}  Running in tmux is recommended for extended runs!\n${NC}${FADE}"
@@ -872,17 +1029,52 @@ else
 				sleep 2s
 			fi
 			TRADITIONAL_START=true
-			nice -n -4 ionice -c 2 -n 2 "${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} & child_pid=$!
-			wait "$child_pid"
+			if [ -n "${NOTIFY_SOCKET+x}" ] && [ "$TMUX_AVAIL" = false ]; then
+				echo -e "\n${NC}${RED}>>> Warning: Detected as running as a service. Please use the tmux (-t) option for ExecStart.${NC}"
+				"${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" ${EFLAG} ${VFLAG} & child_pid=$!
+				wait "$child_pid"
+			else
+				"${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG} & child_pid=$!
+				wait "$child_pid"
+			fi
 		fi
 	else
 		# edit the entry in /etc/systemd/system/flightgazer.service manually if you want to start with additional flags
 		# then use `systemctl daemon-reload` to use the updated settings
 		if [ "$TMUX_AVAIL" = true ] && [ "$TFLAG" = true ]; then
-			tmux new-session -d -s FlightGazer "nice -n -4 ionice -c 2 -n 2 \"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
-			echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
-			echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
-			# keep-alive, assuming this is a simple systemd service
+			tmux new-session -d -s FlightGazer "\"${VENVPATH}/bin/python3\" \"${BASEDIR}/FlightGazer.py\" -i ${DFLAG} ${EFLAG} ${FFLAG} ${VFLAG}"
+			sleep 1s
+			echo "Waiting for main process..."
+			sleep 5s
+			if [ -n "${NOTIFY_SOCKET+x}" ]; then
+				echo "The system is now supervising the main process as FlightGazer was started as a service."
+				echo "Any message such as 'Supervising process which is not our child' is safe to ignore."
+				if tmux has-session -t FlightGazer 2>/dev/null; then
+					echo ">>> Successfully started in tmux."
+					echo "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!"
+				else
+					echo -e "${NC}${RED}>>> Main script failed to load! Check the logs.${NC}"
+					exit 1
+				fi
+				exit 0
+				# while tmux has-session -t FlightGazer 2>/dev/null; do
+				# 	sleep 5s
+				# done
+				# echo "Warning: session closed unexpectedly. Check the logs."
+				# echo "If you manually stopped FlightGazer from within tmux, you can ignore this warning."
+				# exit 1
+			else
+				if tmux has-session -t FlightGazer 2>/dev/null; then
+					echo -e "${NC}${ORANGE}>>> Successfully started in tmux."
+					echo -e "    Use 'sudo tmux attach' or 'sudo tmux attach -d -t FlightGazer' to see the output!${NC}\n"
+					sleep 1s
+					exit 0
+				else
+					echo -e "${NC}${RED}>>> Main script failed to load! Check the logs.${NC}"
+					exit 1
+				fi
+			fi
+			# keep-alive back when this was a Type=simple systemd service
 			# we watch the amount of processes running that match the script name
 			# and if we terminate it internally we break out and tell systemd we shutdown gracefully
 			# while [ $(ps aux | grep '[F]lightGazer.py' | awk '{print $2}' | wc -l) -ne 0 ];
@@ -895,7 +1087,10 @@ else
 			trap terminate SIGTERM
 			TRADITIONAL_START=true
 			# don't parse arguments that enable interactive modes
-			nice -n -4 ionice -c 2 -n 2 "${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" ${EFLAG} ${VFLAG} & child_pid=$!
+			"${VENVPATH}/bin/python3" "${BASEDIR}/FlightGazer.py" ${EFLAG} ${VFLAG} & child_pid=$!
+			if [ -n "${NOTIFY_SOCKET+x}" ] && [ "$TMUX_AVAIL" = false ]; then
+				echo -e "\n${NC}${RED}>>> Warning: Detected as running as a service. Please use the tmux (-t) option for ExecStart.${NC}"
+			fi
 			wait "$child_pid"
 		fi
 	fi

@@ -7,8 +7,8 @@ with the release schedule in Section 1-1-6
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer """
 
-GENERATED = '2026-03-26T01:26:34Z'
-# Used FlightGazer-airlines-db: 2026-03-23
+GENERATED = '2026-04-13T20:43:37Z'
+# Used FlightGazer-airlines-db: 2026-04-13
 
 A_TABLE = [
     {'3Ltr': 'AAA', 'Company': 'AVICON AVIATION CONSULTANTS & AGENTS', 'Country': 'PAKISTAN', 'Telephony': '', 'FriendlyName': 'Avicon Aviation Consultants & Agents'},
@@ -2095,7 +2095,7 @@ G_TABLE = [
     {'3Ltr': 'GAL', 'Company': 'ALIANZA GLANCELOT, C.A. (ALBATROS AIRLINES)', 'Country': 'VENEZUELA', 'Telephony': 'ERRANTE', 'FriendlyName': 'Alianza Glancelot'},
     {'3Ltr': 'GAM', 'Company': 'GERMAN ARMY', 'Country': 'GERMANY', 'Telephony': 'GERMAN ARMY', 'FriendlyName': 'German Army'},
     {'3Ltr': 'GAO', 'Company': 'LIAT (2020) LIMITED', 'Country': 'ANTIGUA AND BARBUDA', 'Telephony': 'SOAR', 'FriendlyName': 'Liat Air'},
-    {'3Ltr': 'GAP', 'Company': 'AIR PHILIPPINES CORPORATION', 'Country': 'PHILIPPINES', 'Telephony': 'AIRPHIL', 'FriendlyName': 'Air Philippines'},
+    {'3Ltr': 'GAP', 'Company': 'AIR PHILIPPINES CORPORATION', 'Country': 'PHILIPPINES', 'Telephony': 'AIRPHIL', 'FriendlyName': 'PAL Express'},
     {'3Ltr': 'GAR', 'Company': 'GLORY AIRLINE', 'Country': 'NIGERIA', 'Telephony': 'GLORY AIR', 'FriendlyName': 'Glory Airline'},
     {'3Ltr': 'GAS', 'Company': 'GALENA AIR SERVICE (GALENA, AK)', 'Country': 'UNITED STATES', 'Telephony': 'GALENA AIR SERVICE', 'FriendlyName': 'Galena Air Service'},
     {'3Ltr': 'GAT', 'Company': 'GULF AIR INC. (NEW IBERIA, LA)', 'Country': 'UNITED STATES', 'Telephony': 'GULF TRANS', 'FriendlyName': 'Gulf Air'},
@@ -3925,9 +3925,9 @@ N_TABLE = [
     {'3Ltr': 'NUB', 'Company': 'NOMAD AVIATION (EUROPE) LTD', 'Country': 'MALTA', 'Telephony': 'VALLETTA', 'FriendlyName': 'Nomad Aviation'},
     {'3Ltr': 'NUK', 'Company': 'STRAIT AIR (2000) LTD', 'Country': 'CANADA', 'Telephony': 'NANUCK', 'FriendlyName': 'Strait Air'},
     {'3Ltr': 'NUL', 'Company': 'AEROSERVICIOS DE NUEVO LEON, S.A. DE C.V.', 'Country': 'MEXICO', 'Telephony': 'SERVICIOS NUEVOLEON', 'FriendlyName': 'Aeroservicios De Nuevo Leon'},
-    {'3Ltr': 'NUM', 'Company': 'NOMAD AVIATION AG', 'Country': 'SWITZERLAND', 'Telephony': 'NOMADJET', 'FriendlyName': 'Nomad Aviation AG'},
+    {'3Ltr': 'NUM', 'Company': 'NOMAD AVIATION AG', 'Country': 'SWITZERLAND', 'Telephony': 'NOMADJET', 'FriendlyName': 'Nomad Aviation'},
     {'3Ltr': 'NUR', 'Company': 'NAWRS AIR', 'Country': 'LIBYA', 'Telephony': '', 'FriendlyName': 'Nawrs Air'},
-    {'3Ltr': 'NUS', 'Company': 'NORTHERN ILLINOIS FLIGHT CENTER, INC. (LAKE IN THE HILLS, IL)', 'Country': 'UNITED STATES', 'Telephony': 'ENJET', 'FriendlyName': 'Northern Illinois Flight Center'},
+    {'3Ltr': 'NUS', 'Company': 'NORTHERN ILLINOIS FLIGHT CENTER, INC. (LAKE IN THE HILLS, IL)', 'Country': 'UNITED STATES', 'Telephony': 'ENJET', 'FriendlyName': 'N-Jet'},
     {'3Ltr': 'NVA', 'Company': 'AEROCLUB DE ALBACETE', 'Country': 'SPAIN', 'Telephony': '', 'FriendlyName': 'Aeroclub de Albacete'},
     {'3Ltr': 'NVC', 'Company': 'NAV CANADA', 'Country': 'CANADA', 'Telephony': 'NAV CAN', 'FriendlyName': 'Nav Canada'},
     {'3Ltr': 'NVD', 'Company': 'AVION EXPRESS', 'Country': 'LITHUANIA', 'Telephony': 'NORDVIND', 'FriendlyName': 'Avion Express'},
