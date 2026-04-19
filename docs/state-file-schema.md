@@ -119,13 +119,13 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | `average_relevant_planes_in_area` | Average number of tracked aircraft present in the tracking area; >= 1 | float | 1.624 |
 | `average_algorithm_active_time_sec` | Average amount of time the selection algorithm remains active (seconds) | float | 138.91 |
 | `algorithm_use_today` | Total time the selection algorithm has been used today (HH:MM:SS) | str | "02:12:31" |
-| `distant_detected_today` | True if an aircraft was detected farther than typical ADS-B range, else false | bool | True |
+| `distant_detected_today` | True if an aircraft was detected farther than typical ADS-B range, else false | bool | true |
 | `distant_time_today` | Time spent detecting aircraft outside of typical ADS-B range (HH:MM:SS) | str | "00:02:34" |
 | `no_filter` | Whether FlightGazer is currently running in `NOFILTER` mode | bool | false |
 | `focus_plane_iter` | How many cycles the selection algorithm is active, 0 if no aircraft are present | int | 21 |
 | `focus_plane_screen_time_sec` | How long the current focus aircraft has been displayed, in seconds | int | 48 |
 | `focus_plane_TTL_sec` | Assigned time limit in seconds for the current focus aircraft by the selection algorithm; `focus_plane_screen_time_sec` can be greater than this value when there is only one aircraft in the tracking area or the high priority override is in effect | int | 125 |
-| `focus_plane_ids_discard` | List of aircraft IDs previously tracked by the selection algorithm | array | ["a00002", "..."] |
+| `focus_plane_ids_discard` | List of aircraft IDs previously tracked by the selection algorithm | array | ["a00002", ...] |
 | `focus_plane_ids_scratch` | Scratchpad list of currently tracked aircraft IDs for the selection algorithm | array | ["a00002", "ad8421", ...] |
 | `focus_plane` | ICAO hex of the currently focused aircraft (or null if none available) | str, null | "a00002" |
 | `high_priority_plane` | True if the currently focused aircraft is in the high-priority dome | bool | false |
@@ -394,7 +394,7 @@ Various runtime flags and stats for this current running session of FlightGazer.
 | `range_too_large` | True if configured `RANGE`/`HEIGHT_LIMIT` combination is too large for local traffic, keeping the selection algorithm needlessly active | bool | false |
 | `combined_feed` | True if multiple dump1090 feeds are being combined on this currently connected instance | bool | false |
 | `display_failures` | Count of display failures for this session (null if display disabled) | int, null | 0 |
-| `unhandled_errors` | Number of times an unexpected error was caught | int | 0 |
+| `other_errors` | Number of times an unexpected error was caught. Previously named `unhandled_errors` for versions < v.11.1.0 | int | 0 |
 | `cpu_percent` | CPU usage percent for this process (normalized) | float | 18.41 |
 | `cpu_temp_C` | CPU temperature in Celsius, if available; otherwise null | float, null | 50.3 |
 | `memory_MiB` | Process memory usage in MiB | float | 15.34 |

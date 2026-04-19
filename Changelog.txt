@@ -5,6 +5,23 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.1.0 - 2026-04-19
+    - NEW: Ignore specific hex IDs from tracking
+    - Tweaked selection algorithm timing to work exactly like the previous implementation
+        - In the last Release, the new algorithm would wait an additional refresh cycle/loop
+          after it should've ran instead of running exactly when it needed to
+    - "TIS-B Other" type broadcasts are tracked again, reverting change done in v.2.4.0
+        - Numerous and significant filtering improvements and options have been incorporated since
+          that version, now the only broadcast types excluded are "tisb_trackfile" and "other"
+    - Fixed minor issue with calculating total tracking time for distant aircraft
+    - Limit how often the API can spam the log for failures
+    - Lowered tolerance for the combined feed heuristic
+    - Operators database generator now can handle the case it is interrupted or attempts
+      to load in a malformed/incomplete operators database
+    - Additional internal signaling improvements
+    - The initialization script can automatically install the rgbmatrix library if the virtual environment
+      needs to be rebuilt and the files already exist
+
 v.11.0.0 - 2026-04-15
     - Significant overhaul of the aircraft selection algorithm for improved selection stability and "intelligence"
         - Each aircraft is now given a fixed timeslot for how long it will be tracked based on

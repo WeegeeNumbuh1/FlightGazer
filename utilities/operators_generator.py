@@ -3,7 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: v.10.0.0
+# Last updated: v.11.1.0
 
 import sys
 
@@ -32,7 +32,7 @@ if write_path.exists():
     try:
         import operators as op
         old_version = op.GENERATED
-    except (ImportError, AttributeError) as e:
+    except AttributeError:
         # older version of the file
         search_line = '# Generated on:'
         old_version_raw = ''
@@ -46,6 +46,8 @@ if write_path.exists():
             old_version = 'T'.join(old_version_raw.split()[3:]) + 'Z'
         else:
             print("Could not determine when this file was generated.")
+    except (ImportError, SyntaxError):
+        print("Could not load existing file.")
 
     if old_version:
         try:
@@ -211,7 +213,7 @@ if not data_fg_db:
     sys.exit(1)
 
 # make a backup
-if write_path.exists():
+if write_path.exists() and 'operators' in sys.modules:
     print(f"Backing up current database as '{write_path}.old'...")
     write_path.rename(f"{write_path}.old")
 

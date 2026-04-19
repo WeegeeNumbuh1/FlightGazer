@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.0.0
+# Version = v.11.1.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -418,6 +418,7 @@ if [ -n "$VFLAG" ]; then
 	echo -e "  >> Is this a RPi5?: ${PI5}"
 fi
 
+venv_rebuild=false
 if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv_check.py" ]; then
 	if [ -n "$VFLAG" ]; then
 		echo "  >> Checking validity of virtual environment..."
@@ -428,6 +429,10 @@ if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv
 		echo "    It will be rebuilt this session."
 		echo ""
 		rm -rf "$VENVPATH" >/dev/null 2>&1
+		venv_rebuild=true
+		if [ -n "${NOTIFY_SOCKET+x}" ]; then
+			systemd-notify EXTEND_TIMEOUT_USEC=300000000 >/dev/null 2>&1
+		fi
 	fi
 	if [ -n "$VFLAG" ]; then
 		echo "  >> venv check complete"
@@ -769,7 +774,8 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		"${VENVPATH}/bin/python3" -m pip install --upgrade pip >/dev/null
 		update_progress 10
 
-		if [ $RGBMATRIX_PRESENT -eq 3 ]; then
+		# try to install the rgbmatrix library if the venv breaks
+		if [ $RGBMATRIX_PRESENT -eq 3 ] || [ "$venv_rebuild" = true ] && [ -d "${USER_HOME}/rpi-rgb-led-matrix" ]; then
 			echo -e "${FADE}${VERB_TEXT}rgbmatrix"
 			export MAX_JOBS=1
 			export CMAKE_BUILD_PARALLEL_LEVEL=1

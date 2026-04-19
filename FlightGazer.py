@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.0.0 --- 2026-04-15'
+VERSION: str = 'v.11.1.0 --- 2026-04-19'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -565,8 +565,9 @@ UNITS_WX: int|None = 0
 PREFER_ICAO_CODES: bool = False
 EXTENDED_DETAILS: bool = False
 DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
-SCROLLING_SPEED: int = 25 # new setting!
-API_PERSISTENT_CACHE: bool = False # new setting!
+SCROLLING_SPEED: int = 25
+API_PERSISTENT_CACHE: bool = False
+IGNORE_AIRCRAFT_ICAOS: set | str = '' # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -639,6 +640,7 @@ default_settings: dict = {
     "DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT": DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT,
     "SCROLLING_SPEED": SCROLLING_SPEED,
     "API_PERSISTENT_CACHE": API_PERSISTENT_CACHE,
+    "IGNORE_AIRCRAFT_ICAOS": IGNORE_AIRCRAFT_ICAOS,
 }
 """ Dict of default settings """
 
@@ -767,6 +769,9 @@ Valid keys are {
 `OriginInfo` and `DestinationInfo` are lists in the order of [name, city] either as strings or None.
 `Diverted` is a subdict either empty or with keys that can be seen in
 `APIFetcher.get_API_results().flight_selector()`. """
+api_results_waiting: bool = False
+""" True if the API fetch thread is currently fetching a result, False otherwise.
+Controls if other threads can trigger the API fetcher outside of the normal signaling chain. """
 unique_planes_seen: list[dict] = []
 """ List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
 Keys are {`ID`, `Time`, `Flyby`} """
@@ -973,12 +978,13 @@ watchdog_setpoint: int = 3
 """ How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 display_failures: int = 0
 """ Track how many times the display broke """
-unhandled_errors: int = 0
-""" How many uncaught errors have occurred (tracked to prevent log spamming) """
+unexpected_oops: int = 0
+""" How many errors we didn't expect have occurred (tracked to prevent log spamming) """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
 PLANE_SELECTED: str = "plane-in-range"
+FORCE_REFRESH_API: str = "api-result-stale"
 PLANE_SELECTOR_DONE: str = "there-is-plane-data"
 LOOP_WORK_COMPLETE: str = "loop-done"
 END_THREADS: str = "terminate"
@@ -1230,12 +1236,12 @@ def strip_accents(s: str, skip_fallback: bool = False) -> str:
 def catcher(exctype, value, tb):
     """ Catch unhandled exceptions and dump to log.
     https://stackoverflow.com/a/73119119 """
-    global unhandled_errors
-    unhandled_errors += 1
+    global unexpected_oops
+    unexpected_oops += 1
     cutoff = 50
-    if unhandled_errors < cutoff:
+    if unexpected_oops < cutoff:
         main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
-    elif unhandled_errors == cutoff:
+    elif unexpected_oops == cutoff:
         main_logger.error(f"Unhandled error count has reached {cutoff}, suppressing further errors to prevent log spam.")
         # there really shouldn't be this many unhandled errors
         write_bad_state_semaphore(True)
@@ -1303,12 +1309,12 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
                     f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
                     )
 
-def extract_API_results(API_results: list, ID: str) -> dict | None:
+def extract_API_results(API_results: list, ID: str, no_trigger=True) -> dict | None:
     """ Extract the API result corresponding to the given `ID` and with a
     timestamp no older than `FLYBY_STALENESS`.
     Returns `None` if no match, encounters some kind of error, or `ID`
     is Falsy. This function will also trigger the API fetcher if it encounters
-    a stale API result. """
+    a stale API result, unless `no_trigger` is False. """
     if not ID:
         return None
     reference_time = time.monotonic()
@@ -1320,8 +1326,8 @@ def extract_API_results(API_results: list, ID: str) -> dict | None:
                 else: # don't use stale API results
                     # force the API fetcher to refresh the result
                     # see the "Thread Signaling Layout" docstring on how this is handled
-                    if not api_limiter_reached():
-                        dispatcher.send(message='', signal=PLANE_SELECTED, sender=extract_API_results)
+                    if not api_limiter_reached() and not no_trigger:
+                        dispatcher.send(message='', signal=FORCE_REFRESH_API, sender=extract_API_results)
                         main_logger.debug("Encountered stale API result for "
                                       f"\'{ID}\', triggering API fetcher.")
                     return None
@@ -1618,6 +1624,7 @@ def configuration_check() -> None:
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS, SCROLLING_SPEED
     global UNITS_WX, OPENWEATHER_API_KEY
+    global IGNORE_AIRCRAFT_ICAOS
     global database_lookup_cache, focus_plane_api_results, plane_latch_times
 
     def switchtime_calc(num: float) -> tuple[int]:
@@ -1823,6 +1830,25 @@ def configuration_check() -> None:
             FOLLOW_THIS_AIRCRAFT = ""
     else:
         FOLLOW_THIS_AIRCRAFT = ""
+
+    if IGNORE_AIRCRAFT_ICAOS:
+        ign_list = IGNORE_AIRCRAFT_ICAOS.split(",")
+        ign_set = set()
+        for icao_ in ign_list:
+            icao_i = icao_.strip()
+            if len(icao_i) != 6:
+                continue
+            try:
+                test2 = int(icao_i, 16)
+                if test2 >= 0:
+                    ign_set.add(icao_i)
+            except Exception:
+                continue
+        IGNORE_AIRCRAFT_ICAOS = ign_set
+        main_logger.info(f"Successfully added {len(IGNORE_AIRCRAFT_ICAOS)} out of"
+                         f" {len(ign_list)} aircraft to ignore.")
+    else:
+        IGNORE_AIRCRAFT_ICAOS = ''
 
     if not FLYBY_STATS_ENABLED:
         main_logger.info("Flyby stats will not be written.")
@@ -2162,16 +2188,12 @@ def perf_monitoring() -> None:
     the API fetcher outside of the normal signaling path. This occurs
     when the API result expires while the focus plane is selected and there
     are no other planes in the area to naturally cause AirplaneParser to
-    initiate the normal work chain. When running normally, both DisplayFeeder
-    and PrintToConsole will try to trigger the API fetcher almost simultaneously,
-    however, as signal calls are queued, only the first call will succeed. The
-    subsequent call will then cause the handler to finish early as there is now
-    a result from the previous call. With the lasagna architecture in place,
-    the next loop or two (depending on how fast the API responds) will read
-    the result of this forced API refresh, as designed. Additional note:
+    initiate the normal work chain. In this case, only DisplayFeeder is able to
+    use extract_API_results() with the trigger flag. Additional note:
     when the normal signal chain is traversed with a stale entry in the results deque,
     the API fetcher will handle the signal from AirplaneParser first, then
-    the calls from extract_API_results() will follow.
+    the calls from extract_API_results() will follow, as long as `api_results_waiting`
+    is False.
 
 6 = API_Scheduler() will trigger an API call if `focus_plane` is present and the thread
     switches API access "on" when it was previously "off"
@@ -2519,7 +2541,9 @@ class PrintToConsole:
             if not NOFILTER_MODE:
                 filt_algo_str.append(f"{fade}Filters enabled: <{RANGE}{distance_unit}, <{HEIGHT_LIMIT}{altitude_unit}")
                 if FOLLOW_THIS_AIRCRAFT:
-                    filt_algo_str.append(f", or \'{FOLLOW_THIS_AIRCRAFT}\'")
+                    filt_algo_str.append(f", + \'{FOLLOW_THIS_AIRCRAFT}\'")
+                if IGNORE_AIRCRAFT_ICAOS:
+                    filt_algo_str.append(f", ignoring {len(IGNORE_AIRCRAFT_ICAOS)} aircraft")
                 active_time = strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')
                 filt_algo_str.append(f" | Active time today: {active_time}")
                 filt_algo_str.append(f"{rst}")
@@ -3476,7 +3500,7 @@ def main_loop_generator() -> None:
             # ===== get bare minimum info =====
             seen_pos = a.get('seen_pos')
             broadcast_type = a.get('type', 'None')
-            hex = a.get('hex', "?")
+            hex_ = a.get('hex', "?")
             squawk = a.get('squawk')
             priority_value = a.get(
                 'priority',
@@ -3487,8 +3511,9 @@ def main_loop_generator() -> None:
             if (
                 seen_pos is None
                 or seen_pos > LOCATION_TIMEOUT
+                or hex_ in IGNORE_AIRCRAFT_ICAOS
                 or (not NOFILTER_MODE
-                    and priority_value > 10)
+                    and priority_value > 11)
             ):
                 continue
             total += 1
@@ -3535,7 +3560,7 @@ def main_loop_generator() -> None:
             bypass_all = False
             if (
                 NOFILTER_MODE
-                or hex == FOLLOW_THIS_AIRCRAFT
+                or hex_ == FOLLOW_THIS_AIRCRAFT
                 or is_distressed
                 or really_far
             ):
@@ -3647,12 +3672,12 @@ def main_loop_generator() -> None:
                     else:
                         futdis = None
                     emitter = category_description.get(a.get('category'), "None")
-                    iso_code = getICAO(hex).upper()
+                    iso_code = getICAO(hex_).upper()
                     # This key is sometimes present in some readsb setups (eg: adsb.im images).
                     # Because it reads from a much more updated database, we try to use it first
                     registration = a.get('r')
                     if registration is None:
-                        registration = reg_lookup(hex)
+                        registration = reg_lookup(hex_)
                     # see if we can lookup who runs this plane
                     if (operator_result := operator_lookup(flight)) is not None:
                         if not (operator := operator_result['Company']):
@@ -3685,18 +3710,18 @@ def main_loop_generator() -> None:
                         if registration is not None:
                             flight = registration
                         else:
-                            flight = hex
+                            flight = hex_
                     else:
                         flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
 
                     if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
-                        flyby_tracker(hex)
-                        flyby = flyby_extractor(hex)
+                        flyby_tracker(hex_)
+                        flyby = flyby_extractor(hex_)
                     else: # do not append really far planes when operating normally
                         flyby = 0
 
                     loop_packet = {
-                        "ID": hex,
+                        "ID": hex_,
                         "Flight": flight,
                         "Country": iso_code,
                         "Altitude": alt,
@@ -3736,7 +3761,7 @@ def main_loop_generator() -> None:
                     }
 
                     if DATABASE_CONNECTED:
-                        database_data = database_lookup(hex)
+                        database_data = database_lookup(hex_)
                         if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
                             planes.append(data_arbitrator(loop_packet, database_data))
                         if really_far:
@@ -4059,10 +4084,10 @@ class AirplaneParser:
             if len(scratch_list) > 0:
                 focus_plane_ = prioritizer(scratch_list)
             else:
+                focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
                 whatever_else = set(get_plane_list)
                 whatever_else.discard(focus_plane_i)
                 focus_plane_ = prioritizer(whatever_else) # recall, this tries to avoid any plane leaving the area
-                focus_plane_ids_discard.clear() # reset this set so that we can start cycling though planes again
 
             return focus_plane_
 
@@ -4174,7 +4199,8 @@ class AirplaneParser:
                         if not focus_plane_times_i:
                             focus_plane = select()
                             update_ttl(focus_plane)
-                        elif focus_plane_times_i[0] >= focus_plane_times_i[1]:
+                        # the -1 at the end causes this to run *at* the TTL value, not after
+                        elif focus_plane_times_i[0] >= focus_plane_times_i[1] - 1:
                             update_ttl(focus_plane_i)
                             focus_plane = select()
                             if focus_plane != focus_plane_i and focus_plane:
@@ -4316,9 +4342,11 @@ class APIFetcher:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=AirplaneParser.plane_selector)
-        register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=extract_API_results)
-        register_signal_handler(self.loop, self.get_API_results, signal=PLANE_SELECTED, sender=API_Scheduler)
+        register_signal_handler(self.loop, self.get_API_results, signal=FORCE_REFRESH_API, sender=extract_API_results)
+        register_signal_handler(self.loop, self.get_API_results, signal=FORCE_REFRESH_API, sender=API_Scheduler)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        self._error_tracking: int = 0
+        self._error_spam_limit = 50
         self.run_loop()
 
     def get_API_results(self, message):
@@ -4354,7 +4382,7 @@ class APIFetcher:
         """
         global process_time, focus_plane_api_results, api_hits
         global API_daily_limit_reached, estimated_api_cost, API_KEY, API_cost_limit_reached
-        global api_db_performance, runtime_sizes
+        global api_db_performance, runtime_sizes, api_results_waiting
         if (
             API_KEY is None
             or not API_KEY
@@ -4453,6 +4481,7 @@ class APIFetcher:
             # main_logger.debug(f"Wait complete, ENHANCED_READOUT: {ENHANCED_READOUT}")
         if ENHANCED_READOUT: return
 
+        api_results_waiting = True
         # check if this flight exists in the long-term cache before actually hitting the API
         if API_cache_present:
             cache_result = api_cache.fetch(flight_name)
@@ -4691,25 +4720,37 @@ class APIFetcher:
             except requests.exceptions.HTTPError as e:
                 api_hits[1] += 1
                 API_status = 2
-                main_logger.warning(f"API call for \'{flight_name}\' failed. {e}")
+                if VERBOSE_MODE or (self._error_tracking < self._error_spam_limit and not VERBOSE_MODE):
+                    main_logger.warning(f"API call for \'{flight_name}\' failed. {e}")
+                self._error_tracking += 1
             except requests.exceptions.ConnectionError as e:
                 api_hits[1] += 1
                 API_status = 3
                 if not VERBOSE_MODE:
-                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error.")
+                    if self._error_tracking < self._error_spam_limit:
+                        main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error.")
                 else:
                     main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection error. [ {e} ]")
+                self._error_tracking += 1
             except requests.exceptions.Timeout as e:
                 api_hits[1] += 1
                 API_status = 3
                 if not VERBOSE_MODE:
-                    main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout.")
+                    if self._error_tracking < self._error_spam_limit:
+                        main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout.")
                 else:
                     main_logger.warning(f"API call for \'{flight_name}\' failed due to a connection timeout. [ {e} ]")
+                self._error_tracking += 1
             except Exception as e:
                 api_hits[1] += 1
                 API_status = 3
-                main_logger.exception(f"API call for \'{flight_name}\' failed or invalid.")
+                if self._error_tracking < self._error_spam_limit:
+                    main_logger.exception(f"API call for \'{flight_name}\' failed or invalid.")
+                self._error_tracking += 1
+
+            if self._error_tracking == self._error_spam_limit:
+                main_logger.warning("*** API keeps failing! *** Please check the service or internet connection.")
+                main_logger.info(">>> Suppressing further API warning messages.")
 
             # extract our results and do the diversion checking
             # why go through the hassle? to keep the API cache accurate (when used)
@@ -4745,6 +4786,7 @@ class APIFetcher:
                             div.append(f"now to its intended destination {diversion_info.get('dest', '')}")
                     main_logger.info("".join(div))
 
+        api_results_waiting = False
         # special case when the API returns a coordinate instead of an airport
         # format is: "L 000.00000 000.00000" (no leading zeros, ordered latitude longitude)
         if origin is not None and origin.startswith("L "):
@@ -5094,7 +5136,10 @@ class DisplayFeeder:
             # don't use API results if the plane is on the ground or
             # we hit any of the API limiters
             if not focus_plane_stats['OnGround'] or not api_limiter_reached():
-                result = extract_API_results(focus_plane_api_results, focus_plane)
+                if api_results_waiting:
+                    result = extract_API_results(focus_plane_api_results, focus_plane, no_trigger=True)
+                else:
+                    result = extract_API_results(focus_plane_api_results, focus_plane, no_trigger=False)
                 if result:
                     res_div: dict = result.get('Diverted', {})
                     is_diverted = res_div.get('type', '')
@@ -5727,7 +5772,7 @@ class WriteState:
                 'range_too_large': range_too_large,
                 'combined_feed': combined_feed,
                 'display_failures': None if NODISPLAY_MODE else display_failures,
-                'unhandled_errors': unhandled_errors,
+                'other_errors': unexpected_oops,
                 'cpu_percent': resource_usage[0],
                 'cpu_temp_C': resource_usage[2],
                 'memory_MiB': resource_usage[1],
@@ -5952,7 +5997,7 @@ def API_Scheduler() -> None:
             main_logger.debug(f"API_SCHEDULE toggled - API calls disabled: {API_schedule_triggered}")
             if not API_schedule_triggered and focus_plane:
                 main_logger.debug(f"Focus plane \'{focus_plane}\' currently being tracked when enabling API; triggering an API call.")
-                dispatcher.send(message='', signal=PLANE_SELECTED, sender=API_Scheduler)
+                dispatcher.send(message='', signal=FORCE_REFRESH_API, sender=API_Scheduler)
         time.sleep(10)
 
 class synchronizer():
@@ -6309,11 +6354,11 @@ class DistantDeterminator():
             break
         else:
             return
-        self._far_time_increment =+ 1
+        self._far_time_increment += 1
         determination_symphony = self._far_time_increment * LOOP_INTERVAL
         if (
-            # if we've detected really distant aircraft for longer than 15 hours
-            self._far_time_increment * LOOP_INTERVAL >= 54000 # this is really lenient to account for times of widespread ducting
+            # if we've detected really distant aircraft for longer than 9 hours
+            self._far_time_increment * LOOP_INTERVAL >= 32400 # this is really lenient to account for times of widespread ducting
             and not combined_feed
         ):
             main_logger.warning(f"{dump1090} might be configured as a combined feed. FlightGazer is only meant for single site feeds.")
@@ -9035,20 +9080,20 @@ def main() -> None:
             if random.randint(0,1) == 1 and (DISPLAY_IS_VALID and not EMULATE_DISPLAY):
                 interactive_wait_time -= 5
                 time.sleep(5)
-                print("Protip: If you're not using a physical RBG-Matrix display,\n"
-                    "        use RGBMatrixEmulator to see the display on a webpage instead!")
+                print("\x1b[3mProtip\x1b[0m: If you're not using a physical RBG-Matrix display,\n"
+                    "------- use RGBMatrixEmulator to see the display on a webpage instead!")
             if random.randint(0,1) == 1:
                 interactive_wait_time -= 5
                 time.sleep(5)
                 if random.randint(0,1) == 1:
-                    print("\nDid you know? The color gradient in the FlightGazer logo comes from the\n"
-                        "              color scale used on the dump1090 map that corresponds to plane altitude.")
+                    print("\n\x1b[3mDid you know?\x1b[0m The color gradient in the FlightGazer logo comes from the\n"
+                        "------------- color scale used on the dump1090 map that corresponds to plane altitude.")
                 else:
                     print("\nCheck the FlightGazer logo closely. Notice something?")
             if random.randint(0,1) == 1:
                 interactive_wait_time -= 5
                 time.sleep(5)
-                print("\nIf you are reading this, WeegeeNumbuh1 says: \"Hi. Thanks for using this program!\"")
+                print("\nIf you are reading this, WeegeeNumbuh1 says: \"\x1b[3mHi. Thanks for using this program!\x1b[0m\"")
 
             time.sleep(interactive_wait_time)
             del interactive_wait_time

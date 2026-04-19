@@ -1,6 +1,6 @@
 """ Helper module that detects if the rgbmatrix library is present on the system.
 Use the exit codes to determine if this is true.
-0 = Installed and accessible globally
+0 = Installed and accessible
 1 = Not installed
 3 = Present but needs to be installed in a virtual environment """
 import sys

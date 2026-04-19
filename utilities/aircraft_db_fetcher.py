@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.0.0
+# Last updated: v.11.1.0
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -366,7 +366,7 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
           f"{round(csv_time * 2.6, 1)}-"
           f"{round(csv_time * 5.5, 1)} seconds.") # from testing
     # extend the timeout based on how fast we're running through this
-    systemd_notify(f"EXTEND_TIMEOUT_USEC={int(round(csv_time * 7_500_000, 0))}")
+    systemd_notify(f"EXTEND_TIMEOUT_USEC={int(round(csv_time * 8_000_000, 0))}")
     write_start = perf_counter() # actually start the timing from here
     # process aircraft data straight from the gzipped files (this is CPU-bound)
     for batch, leading_char in process_aircraft_data(response.content, types_map):

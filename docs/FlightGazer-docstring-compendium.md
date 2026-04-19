@@ -2,7 +2,7 @@
 > Intended audience: developers and the code-curious
 
 ## Preface
-*These docstrings reside inside the main python file and exist here for "easier" access.*<br>
+*These docstrings reside inside the main python file and exist here for "easier" access, unless otherwise noted.*<br>
 *Future releases may eventually remove these docstrings from the main script, but as of this document, they still remain there.*
 
 It's recommended to have this open in another window or screen in order to maintain your sanity pouring through the great lasagna I cooked up. Or, maybe you're just curious and questioning to yourself how I even came up with these overly convoluted approaches. (Answer: idk, lmao)<br>
@@ -52,16 +52,12 @@ If you'd like to see descriptions for all the globals used in the script, those 
         the API fetcher outside of the normal signaling path. This occurs
         when the API result expires while the focus plane is selected and there
         are no other planes in the area to naturally cause AirplaneParser to
-        initiate the normal work chain. When running normally, both DisplayFeeder
-        and PrintToConsole will try to trigger the API fetcher almost simultaneously,
-        however, as signal calls are queued, only the first call will succeed. The
-        subsequent call will then cause the handler to finish early as there is now
-        a result from the previous call. With the lasagna architecture in place,
-        the next loop or two (depending on how fast the API responds) will read
-        the result of this forced API refresh, as designed. Additional note:
+        initiate the normal work chain. In this case, only DisplayFeeder is able to
+        use extract_API_results() with the trigger flag. Additional note:
         when the normal signal chain is traversed with a stale entry in the results deque,
         the API fetcher will handle the signal from AirplaneParser first, then
-        the calls from extract_API_results() will follow.
+        the calls from extract_API_results() will follow, as long as `api_results_waiting`
+        is False.
 
     6 = API_Scheduler() will trigger an API call if `focus_plane` is present and the thread
         switches API access "on" when it was previously "off"
@@ -69,7 +65,7 @@ If you'd like to see descriptions for all the globals used in the script, those 
 ## Selection Algorithm Notes
 > *tl;dr this code is cooked, bro. Must've been an Italian in a past life with how much spaghetti is in here.*<br>
 
-> **LAST UPDATED: \< v.11.0.0**
+> **LAST UPDATED: \< v.11.0.0, no longer exists in main script.**
 
     The selector algorithm is rather naive, but it works for occurrences when there is more than one plane in the area
     and we want to put some effort into trying to go through all of them without having to flip back and forth constantly at every data update.
