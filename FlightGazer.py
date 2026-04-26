@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.1.0 --- 2026-04-19'
+VERSION: str = 'v.11.1.1 --- 2026-04-26'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -279,18 +279,18 @@ if STATE_FILE.is_file() and STATE_FILE.stat().st_size > 0:
 if FAULTDUMP.is_file() and FAULTDUMP.stat().st_size > 0:
     main_logger.info("FlightGazer managed to save a traceback of its previous crash.")
     main_logger.info(f"The first 200 lines have been copied to the logfile at {LOGFILE}.")
-    with open(FAULTDUMP, 'r') as df:
+    with open(FAULTDUMP, 'r', encoding='utf-8') as df:
         with open(LOGFILE, 'a') as lf:
             lf.write("***** BEGIN FLIGHTGAZER CRASH DUMP *****\n")
-            for _ in range(200):
-                ln = df.readline().strip()
-                if not ln:
+            for i, df_ in enumerate(df):
+                ln = df_.strip()
+                if i >= 199:
                     break
                 lf.write(ln)
-            else:
+            if i >= 199:
                 lf.write("\n...the output of this crash has been truncated.\n")
             lf.write("\n***** END OF CRASH DUMP *****\n")
-    del df, lf, ln
+    del df, df_, lf, ln, i
     FAULTDUMP.unlink()
 
 main_logger.debug("Loading modules...")
@@ -2335,8 +2335,7 @@ def runtime_accumulators_reset() -> None:
         FOLLOW_THIS_AIRCRAFT_SPOTTED = False
     if dump1090_failures > 0 and watchdog_triggers == 0:
         dump1090_failures -= 1
-        main_logger.info("Notice: sporadic timeout(s) detected today, "
-                         f"decreasing occurrence count by 1 (now at {dump1090_failures}).")
+        main_logger.info(f"Lowering timeout count by 1 (now at {dump1090_failures}).")
 
     if API_cache_present:
         api_cache.prune()
@@ -3233,14 +3232,17 @@ def main_loop_generator() -> None:
     'B1': 'Glider/Sailplane',
     'B2': 'Lighter-than-air',
     'B3': 'Parachutist/Skydiver',
-    'B4': 'Ultralight',
+    'B4': 'Ultralight/Hang-Glider/Paraglider',
     'B6': 'Unmanned Aerial Vehicle',
     'B7': 'Space Vehicle',
     'C1': 'Surface Vehicle (Emergency)',
     'C2': 'Surface Vehicle (Service)',
-    'C3': 'Point Obstacle',
+    'C3': 'Fixed Ground Obstacle',
     'C4': 'Cluster Obstacle',
     'C5': 'Line Obstacle',
+    'A0': 'Powered Aircraft (Unspecified)',
+    'B0': 'Unpowered Aircraft (Unspecified)',
+    'C0': 'Vehicle or Ground Installation (Unspecified)'
     }
 
     def dump1090_heartbeat() -> list | None:
@@ -3675,8 +3677,7 @@ def main_loop_generator() -> None:
                     iso_code = getICAO(hex_).upper()
                     # This key is sometimes present in some readsb setups (eg: adsb.im images).
                     # Because it reads from a much more updated database, we try to use it first
-                    registration = a.get('r')
-                    if registration is None:
+                    if (registration := a.get('r')) is None:
                         registration = reg_lookup(hex_)
                     # see if we can lookup who runs this plane
                     if (operator_result := operator_lookup(flight)) is not None:

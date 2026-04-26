@@ -5,6 +5,13 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.1.1 - 2026-04-26
+    - Adjust settings migrator to handle new setting
+    - Add additional ADS-B categories for fallback
+    - Improve crash file copying to log
+    - Update operators database to latest FlightGazer-airlines-db version
+    - All 1's in the version number (last happened: 2024-11-23)
+
 v.11.1.0 - 2026-04-19
     - NEW: Ignore specific hex IDs from tracking
     - Tweaked selection algorithm timing to work exactly like the previous implementation

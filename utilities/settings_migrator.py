@@ -2,7 +2,7 @@
 # Designed for use with versions >= 2.0.0
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.9.6.1
+# Last updated: v.11.1.1
 # By WeegeeNumbuh1
 
 import sys
@@ -65,18 +65,21 @@ for settings_key in new_config:
         # never read them anyway
         if settings_key == "CONFIG_VERSION": continue
         if new_config[settings_key] != user_settings[settings_key]:
+            prefix_str = f"Changing {settings_key}: {new_config[settings_key]} -> "
             match settings_key:
                 case "API_KEY" if user_settings["API_KEY"]:
-                    print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
+                    print(f"{prefix_str}<provided key>")
                 case "API_SCHEDULE" if user_settings["API_SCHEDULE"]: # this is a huge dict (heh), don't print it
                     print(f"Changing {settings_key}: <default schedule> -> <provided schedule>")
                 case "OPENWEATHER_API_KEY" if user_settings["OPENWEATHER_API_KEY"]:
-                    print(f"Changing {settings_key}: {new_config[settings_key]} -> <provided key>")
+                    print(f"{prefix_str}<provided key>")
+                case "IGNORE_AIRCRAFT_ICAOS" if user_settings["IGNORE_AIRCRAFT_ICAOS"]:
+                    print(f"{prefix_str}<provided list>")
                 case _:
-                    print(f"Changing {settings_key}: {new_config[settings_key]} -> {user_settings[settings_key]}")
+                    print(f"{prefix_str}{user_settings[settings_key]}")
             new_config[settings_key] = user_settings[settings_key]
     except KeyError: # settings key in new config does not exist in the older config
-        print(f"New setting in this configuration: {settings_key}")
+        print(f"*** New setting in this configuration *** --> {settings_key}")
 print("All other settings are the same as the default settings.")
 
 try:

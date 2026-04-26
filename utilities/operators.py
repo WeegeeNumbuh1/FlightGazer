@@ -7,8 +7,8 @@ with the release schedule in Section 1-1-6
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer """
 
-GENERATED = '2026-04-13T20:43:37Z'
-# Used FlightGazer-airlines-db: 2026-04-13
+GENERATED = '2026-04-26T23:06:16Z'
+# Used FlightGazer-airlines-db: 2026-04-26
 
 A_TABLE = [
     {'3Ltr': 'AAA', 'Company': 'AVICON AVIATION CONSULTANTS & AGENTS', 'Country': 'PAKISTAN', 'Telephony': '', 'FriendlyName': 'Avicon Aviation Consultants & Agents'},
@@ -2906,7 +2906,7 @@ J_TABLE = [
     {'3Ltr': 'JPT', 'Company': 'PRIME JET (SCOTTSDALE, AZ)', 'Country': 'UNITED STATES', 'Telephony': 'PRIMETIME', 'FriendlyName': 'Prime Jet'},
     {'3Ltr': 'JPV', 'Company': 'JET POOL NETWORK LUFTVERKEHRS GMBH', 'Country': 'AUSTRIA', 'Telephony': 'JETPOOL', 'FriendlyName': 'Jet Pool Network'},
     {'3Ltr': 'JRC', 'Company': 'JETAIR CARIBBEAN (UNITED CARIBBEAN AIRLINES)', 'Country': 'NETHERLANDS', 'Telephony': 'JETAIR', 'FriendlyName': 'Jetair Caribbean'},
-    {'3Ltr': 'JRE', 'Company': 'LGM ENTERPRISES, LLC', 'Country': 'UNITED STATES', 'Telephony': 'JET SHARE', 'FriendlyName': 'LGM Enterprises'},
+    {'3Ltr': 'JRE', 'Company': 'LGM ENTERPRISES, LLC', 'Country': 'UNITED STATES', 'Telephony': 'JET SHARE', 'FriendlyName': 'flyExclusive'},
     {'3Ltr': 'JRH', 'Company': 'JR INVESTMENTS T/A HALSTEDS AVIATION CORPORATION', 'Country': 'ZIMBABWE', 'Telephony': 'BLUETIP', 'FriendlyName': 'Halsteds Aviation Corporation'},
     {'3Ltr': 'JRO', 'Company': 'JETAEROFUELS, LLC', 'Country': 'RUSSIAN FEDERATION', 'Telephony': '', 'FriendlyName': 'Jetaerofuels'},
     {'3Ltr': 'JRT', 'Company': 'JETRIGHT AIR MANAGEMENT, LLC', 'Country': 'UNITED STATES', 'Telephony': 'JETRIGHT', 'FriendlyName': 'JetRight'},
@@ -4620,7 +4620,7 @@ R_TABLE = [
     {'3Ltr': 'RMK', 'Company': 'SIMRIK AIRLINES PVT. LTD', 'Country': 'NEPAL', 'Telephony': 'SIMRIK AIR', 'FriendlyName': 'Simrik Airlines'},
     {'3Ltr': 'RMN', 'Company': 'CLASSIC FLIGHT TRAINING SERVICES LTD', 'Country': 'UNITED KINGDOM', 'Telephony': 'RAINMAN', 'FriendlyName': 'Classic Flight Training Services'},
     {'3Ltr': 'RMO', 'Company': 'ARM-AERO', 'Country': 'ARMENIA', 'Telephony': 'ARM-AERO', 'FriendlyName': 'Arm-Aero'},
-    {'3Ltr': 'RMS', 'Company': 'TAS AVIATION, INC. (DEFIANCE, OH)', 'Country': 'UNITED STATES', 'Telephony': 'TASS AIR', 'FriendlyName': 'Tas Aviation'},
+    {'3Ltr': 'RMS', 'Company': 'TAS AVIATION, INC. (DEFIANCE, OH)', 'Country': 'UNITED STATES', 'Telephony': 'TASS AIR', 'FriendlyName': 'TAS Aviation'},
     {'3Ltr': 'RMT', 'Company': 'RAM AIRCRAFT CORPRATION (WACO, TX)', 'Country': 'UNITED STATES', 'Telephony': 'RAM FLIGHT', 'FriendlyName': 'Ram Aircraft Corporation'},
     {'3Ltr': 'RMU', 'Company': 'C.S.P., SOCIETE', 'Country': 'MAURITANIA', 'Telephony': 'AIR-MAUR', 'FriendlyName': 'CSP Societe'},
     {'3Ltr': 'RMX', 'Company': 'AIR MASTER', 'Country': 'EGYPT', 'Telephony': 'AIR MASTER', 'FriendlyName': 'Air Master'},

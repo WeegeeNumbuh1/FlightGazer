@@ -2,7 +2,7 @@
 # Updates the service definition as necessary depending on the update.
 # Only designed to be used by the updater script "update.sh"
 # Usage outside of that environment can lead to unexpected results.
-# Last updated: v.11.0.0
+# Last updated: v.11.1.1
 # By WeegeeNumbuh1
 
 import sys
@@ -61,6 +61,9 @@ for opt in STARTUP_OPTIONS:
 if not (flags_desc := ', '.join(flags)):
     flags_desc = None
 exec_path = None
+# note: if the filepath isn't encapsulated in quotes,
+# we're still fine because we just copy over the line,
+# not the parsed version here
 for exec_split in exec_line.split('"'):
     if 'FlightGazer-init.sh' in exec_split:
         exec_path = exec_split.strip()

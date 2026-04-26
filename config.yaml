@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.1.0 # do not modify this
+CONFIG_VERSION: v.11.1.1 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -181,8 +181,8 @@ BRIGHTNESS: 65
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
 # [Integer: 0 ~ 100, null, or empty]
 # When there is an active aircraft, use a different brightness level. Useful for grabbing attention.
-# Overrides all other brightness settings when an aircraft is being tracked. This value does not depend if
-# ENABLE_TWO_BRIGHTNESS is enabled.
+# Overrides all other brightness settings when an aircraft is being tracked.
+# This value does not depend if ENABLE_TWO_BRIGHTNESS is enabled.
 # If you do not want the brightness to change, set this to null or an empty value.
 
 DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: false
@@ -267,7 +267,7 @@ IGNORE_AIRCRAFT_ICAOS: ''
 # [Comma-separated string]
 # Provide a list of comma separated ICAO hexes to ignore from tracking. This setting does not support pattern matching.
 # Leave this as '' or empty to not use this feature.
-# Example: "a00002,c97ef2,4cc088"
+# Examples: 'a00002,c97ef2,4cc088' 'ADFB94'
 
 FASTER_REFRESH: false
 # [true/false]

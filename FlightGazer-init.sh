@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.1.0
+# Version = v.11.1.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -428,6 +428,9 @@ if [ -d "$VENVPATH" ] && [ -f "$CHECK_FILE" ] && [ -f "${BASEDIR}/utilities/venv
 		>&2 echo -e "\n${NC}${RED}>>> WARNING: The virtual environment is broken.${NC}"
 		echo "    It will be rebuilt this session."
 		echo ""
+		if [ $WEB_INT -eq 1 ]; then
+			systemctl stop flightgazer-webapp.service >/dev/null 2>&1
+		fi
 		rm -rf "$VENVPATH" >/dev/null 2>&1
 		venv_rebuild=true
 		if [ -n "${NOTIFY_SOCKET+x}" ]; then

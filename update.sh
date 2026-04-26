@@ -262,6 +262,7 @@ else
 		fi
 	else
 		mv "${BASEDIR}/config.yaml" "${BASEDIR}/config_old.yaml" >/dev/null 2>&1
+		chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/config_old.yaml" >/dev/null 2>&1
 		echo "> Settings have been reset to default during this update." | tee -a "$MIGRATE_LOG"
 		echo "  Please reconfigure as necessary." | tee -a "$MIGRATE_LOG"
 		echo "  Your previous configuration has been backed up as: ${BASEDIR}/config_old.yaml" | tee -a "$MIGRATE_LOG"
@@ -277,6 +278,7 @@ if [ $RESET_FLAG -eq 0 ]; then
 			echo "Done." | tee -a "$MIGRATE_LOG"
 		else
 			mv "${BASEDIR}/setup/colors.py" "${BASEDIR}/setup/colors.bak" >/dev/null 2>&1
+			chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "${BASEDIR}/setup/colors.bak" >/dev/null 2>&1
 			echo -e "\n${ORANGE}> There is a line count mismatch between the latest version and the current installed version." | tee -a "$MIGRATE_LOG"
 			echo "  The latest version will overwrite your current color settings to default so that FlightGazer can work." | tee -a "$MIGRATE_LOG"
 			echo "  Please reconfigure as necessary." | tee -a "$MIGRATE_LOG"
