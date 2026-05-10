@@ -3,7 +3,7 @@
 # It's assumed that this is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.11.0.0
+# Last updated: v.11.1.2
 # By: WeegeeNumbuh1
 
 import sys
@@ -107,13 +107,6 @@ else:
 
 if use_emulator:
     print(f"{log_prefix}Using the Emulator with the Raspberry Pi5 mode.")
-
-# debugging stuff
-# os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
-# from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
-# RGBMatrixEmulatorConfig.CONFIG_PATH = emu_settings
-# from RGBMatrixEmulator import graphics
-# from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 
 try:
     from ruamel.yaml import YAML
@@ -220,6 +213,7 @@ class SplashText():
                 hue2rgb((i + 1) / self.matrix.width)
             )
         undraw_starting = False
+        buffer_undraw_count = 0
 
         print(f"{log_prefix}successfully started after {monotonic() - starttime:.3f} seconds.")
         while True:
@@ -306,7 +300,7 @@ class SplashText():
             else:
                 # undraw
                 if not undraw_starting:
-                    # do this once
+                    # write to both buffers
                     _ = graphics.DrawText(
                         self.double_buffer,
                         loaded_font_2,
@@ -317,7 +311,9 @@ class SplashText():
                         ),
                         "STARTING",
                     )
-                    undraw_starting = True
+                    buffer_undraw_count += 1
+                    if buffer_undraw_count == 2:
+                        undraw_starting = True
 
                 _ = graphics.DrawText(
                     self.double_buffer,

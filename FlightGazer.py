@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.1.1 --- 2026-04-26'
+VERSION: str = 'v.11.1.2 --- 2026-05-09'
 import os
 os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
@@ -2392,6 +2392,8 @@ def runtime_accumulators_reset() -> None:
             main_logger.warning("Unable to query API usage, will try again in 24 hours.")
             if API_COST_LIMIT is not None:
                 main_logger.info(f">>> Running on the assumption that ${API_COST_LIMIT - api_usage_cost_sofar:.2f} of credit remains.")
+                api_usage_cost_baseline = api_usage_cost_sofar
+                estimated_api_cost = 0.
 
 def flyby_stats() -> None:
     """ If `FLYBY_STATS_ENABLED` is true, write the gathered stats from our flybys to a csv file.

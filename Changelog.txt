@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.1.2 - 2026-05-09
+    - Improve cost calculation handling when the API cost polling fails
+    - Fix bootsplash flickering when the second waiting stage is reached
+
 v.11.1.1 - 2026-04-26
     - Adjust settings migrator to handle new setting
     - Add additional ADS-B categories for fallback

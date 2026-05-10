@@ -10,8 +10,7 @@
 <!-- end title section -->
 
 ## About
-This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but supplements flight information of
-nearby aircraft with **real-time ADS-B** ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data from [dump1090](https://github.com/flightaware/dump1090) and dump978.<br>
+This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but entirely driven by **real-time ADS-B** ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data emitted by aircraft.<br>
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
 
@@ -21,7 +20,7 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 > Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.<br>
 
 > Every text-based line in this project was typed by hand (beside the fonts and databases), including [documentation](./docs/).<br>
-> <b>*No LLM-generated code whatsoever.*</b> (my code lasagna is superior to its slop 😤)
+> <b>*No LLM-generated code whatsoever.*</b> (I prefer thinking with my own flesh and blood)
 
 <details open>
 <summary><b>Table of Contents</b></summary>
@@ -169,7 +168,7 @@ Using this project assumes you have the following:
 
 #### MINIMUM
 - A working `dump1090` instance or similar interface where `aircraft.json` can be read/accessed
-  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb), [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, `dump1090-fa`, `dump1090-mutability`
+  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb) **(RECOMMENDED)**, [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, [`dump1090-fa`](https://github.com/flightaware/dump1090), `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️configuration) section)
   - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
@@ -435,6 +434,7 @@ See the [Output Reference](./docs/output-reference.md) document.
   - Flask
   - gunicorn
 - Downloads the `tar1090-db` aircraft database and generates a sqlite3 database that can be used by FlightGazer
+- Checks the `operators.py` operators database and updates it if necessary
 - Writes `first_run_complete` blank file to `etc/FlightGazer-pyvenv` to show initial setup is done
 - Runs main python script with desired flags
 
