@@ -39,9 +39,8 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.1.2 --- 2026-05-09'
+VERSION: str = 'v.11.2.0 --- 2026-05-23'
 import os
-os.environ["PYTHONUNBUFFERED"] = "1"
 import argparse
 import sys
 import math
@@ -60,6 +59,7 @@ import logging
 import unicodedata
 import traceback
 import faulthandler
+from io import BufferedWriter
 
 if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
@@ -254,6 +254,7 @@ else:
 main_logger.info(f"Using: \'{CURRENT_EXE}\' as \'{CURRENT_USER}\' with PID: {THIS_PID}")
 main_logger.debug(">>> Verbose mode enabled. <<<")
 main_logger.debug(f"Python version: {sys.version}")
+main_logger.debug(f"Text output buffering at startup: {isinstance(sys.__stdout__.buffer, BufferedWriter)}")
 if LOGFILE != Path(CURRENT_DIR, "FlightGazer-log.log"):
     main_logger.error(f"***** Could not write log file! Using temp directory: {LOGFILE} *****")
 main_logger.info(f"Running inside tmux?: {INSIDE_TMUX}")
@@ -396,8 +397,6 @@ if not NODISPLAY_MODE:
                             break
                 if 'browser' in emu_:
                     emu_adapter_type = 'browser'
-                elif 'pi5' in emu_:
-                    emu_adapter_type = 'pi5'
                 elif 'raw' in emu_:
                     emu_adapter_type = 'raw'
                 else:
@@ -411,8 +410,6 @@ if not NODISPLAY_MODE:
                 match emu_adapter_type:
                     case 'browser':
                         main_logger.info("Emulator will be loaded using the browser adapter.")
-                    case 'pi5':
-                        main_logger.warning("Emulator will be loaded using the Pi5 adapter. This is experimental!")
                     case 'raw':
                         main_logger.warning("Emulator will be loaded with the raw display adapter. This is untested.")
                     case _:
@@ -1044,11 +1041,11 @@ def cleanup() -> None:
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
     # final cleanup
     flyby_stats()
+    if DATABASE_CONNECTED: db.close()
+    if API_cache_present: api_cache.close()
     if is_posix:
         faulthandler.disable()
     FAULTDUMP.unlink(missing_ok=True)
-    if DATABASE_CONNECTED: db.close()
-    if API_cache_present: api_cache.close()
     if state_json:
         state_json.unlink(missing_ok=True)
         write_bad_state_semaphore(False)
@@ -2144,6 +2141,22 @@ def perf_monitoring() -> None:
             resource_usage[2] = cpu_temp
             time.sleep(5)
 
+def aircraft_db_checker() -> None:
+    """ Function that checks the aircraft database periodically
+    (assumed to be run from the scheduler) """
+    global database_ver, database_stats, database_lookup_cache
+    if DATABASE_CONNECTED:
+        _ = db.connect()
+        old_db_ver = database_ver
+        database_ver = db.database_version
+        if database_ver != old_db_ver:
+            database_stats[0] = db.queries
+            database_stats[1] = db.query_misses
+            database_stats[2] = db.query_errors
+            database_stats[3] = db.average_speed
+            database_stats[4] = db.last_access_speed
+            database_lookup_cache.clear()
+
 # =========== Program Setup III ============
 # ===========( Core Functions )=============
 """ ----- Thread Signaling Layout -----
@@ -2477,6 +2490,9 @@ class PrintToConsole:
         asyncio.set_event_loop(self.loop)
         register_signal_handler(self.loop, self.print_to_console, signal=PLANE_SELECTOR_DONE, sender=AirplaneParser.plane_selector)
         register_signal_handler(self.loop, self.end_thread, signal=END_THREADS, sender=sigterm_handler)
+        if INTERACTIVE:
+            sys.stdout.reconfigure(line_buffering=True)
+        main_logger.debug(f"Text output is buffered: {isinstance(sys.stdout.buffer, BufferedWriter)}")
         self.run_loop()
 
     def print_to_console(self, message) -> None:
@@ -3006,7 +3022,7 @@ class PrintToConsole:
         # verbose stats line 4 (database stuff)
         if (VERBOSE_MODE or NOFILTER_MODE) and DATABASE_CONNECTED:
             print(
-                "> Database stats since start: "
+                "> Database stats: "
                 f"Total queries: {database_stats[0]}, empty results: {database_stats[1]},"
                 f" errors: {database_stats[2]} | Retrieval times:"
                 f" {database_stats[3]:.3f} ms avg, {database_stats[4]:.3f} ms last"
@@ -3035,10 +3051,10 @@ class PrintToConsole:
         # user reminder line
         if INSIDE_TMUX:
             print(f">{italic} Use \'Ctrl+B D\' to detach from this session. "
-                  f"Ctrl+C to exit -and- quit FlightGazer.{rst}")
+                  f"Ctrl+C to exit -and- quit FlightGazer.{rst}", flush=True)
         else:
             print(f">{italic} Ctrl+C to exit -and- quit FlightGazer. "
-                  f"Closing this window will uncleanly terminate FlightGazer.{rst}")
+                  f"Closing this window will uncleanly terminate FlightGazer.{rst}", flush=True)
 
         process_time2[0] = round((time.perf_counter() - print_time_start)*1000, 3)
         dispatcher.send(message='', signal=LOOP_WORK_COMPLETE, sender=PrintToConsole.print_to_console)
@@ -4166,8 +4182,8 @@ class AirplaneParser:
                 focus_plane_iter += 1
                 if focus_plane_iter > 1:
                     algorithm_daily_runtime += LOOP_INTERVAL
-                if follow_flag and plane_count > 1:
-                    self._plane_counts.append(plane_count - 1) # don't count the FOLLOW_THIS_AIRCRAFT plane
+                if (follow_flag or self._distressed_latch) and plane_count > 1:
+                    self._plane_counts.append(plane_count - 1) # don't count the exceptions that override tracking
                 else:
                     self._plane_counts.append(plane_count)
 
@@ -4280,7 +4296,7 @@ class AirplaneParser:
                     iter_time > 1800
                     and not follow_flag
                     and not self._distressed_latch
-                    and self.plane_count_avg > 1.6
+                    and self.plane_count_avg > 2
                 ):
                     warn_reason = f'Tracking for longer than 30 minutes (Average: {self.plane_count_avg:.2f} aircraft)'
                 if not self._range_too_large and warn_reason:
@@ -4290,7 +4306,7 @@ class AirplaneParser:
                     main_logger.warning("might be too large for the aircraft activity in your area. ***")
                     main_logger.warning(f"Reason: {warn_reason}")
                     main_logger.warning("************************************************************")
-                    main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT.")
+                    main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT and/or enabling the NO_GROUND_TRACKING setting.")
                     self._range_too_large = True
                     range_too_large = self._range_too_large
 
@@ -4959,35 +4975,41 @@ class DisplayFeeder:
         rise_set.append("▼")
         rise_set.append(sunset)
 
-        # first section of receiver stats
-        # "G____"
-        recv_str.append("G")
-        if receiver_stats['Gain'] is not None:
-            recv_str.append(f"{receiver_stats['Gain']}".rjust(4))
-        else:
-            recv_str.append(filler_text.rjust(4))
-        recv_str.append(" ")
-        # second section of receiver stats
-        # "N____"
-        recv_str.append("N")
-        if receiver_stats['Noise'] is not None:
-            recv_str.append(f"{abs(receiver_stats['Noise'])}".rjust(4))
-        else:
-            recv_str.append(filler_text.rjust(4))
-        recv_str.append(" ")
-        # third section of receiver stats
-        # "L__%" or "L---"
-        recv_str.append("L")
-        if receiver_stats['Strong'] is not None:
-            strong_rounded = int(round(receiver_stats['Strong'], 0))
-            if strong_rounded >= 100:
-                recv_str.append("99%") # cap at 99%
+        if DUMP1090_IS_AVAILABLE:
+            # first section of receiver stats
+            # "G____"
+            recv_str.append("G")
+            if receiver_stats['Gain'] is not None:
+                recv_str.append(f"{receiver_stats['Gain']}".rjust(4))
             else:
-                recv_str.append(f"{strong_rounded}")
-                recv_str.append("%")
+                recv_str.append(filler_text.rjust(4))
+            recv_str.append(" ")
+            # second section of receiver stats
+            # "N____"
+            recv_str.append("N")
+            if receiver_stats['Noise'] is not None:
+                recv_str.append(f"{abs(receiver_stats['Noise'])}".rjust(4))
+            else:
+                recv_str.append(filler_text.rjust(4))
+            recv_str.append(" ")
+            # third section of receiver stats
+            # "L__%" or "L---"
+            recv_str.append("L")
+            if receiver_stats['Strong'] is not None:
+                strong_rounded = int(round(receiver_stats['Strong'], 0))
+                if strong_rounded >= 100:
+                    recv_str.append("99%") # cap at 99%
+                else:
+                    recv_str.append(f"{strong_rounded}")
+                    recv_str.append("%")
+            else:
+                recv_str.append(filler_text)
+            receiver_string = "".join(recv_str)
         else:
-            recv_str.append(filler_text)
-        receiver_string = "".join(recv_str)
+            # Shown when watchdog is triggered or there's no initial connection.
+            # Also is the message shown when the final watchdog kick has happened
+            # and FlightGazer needs to be restarted
+            receiver_string = "NO ADS-B DATA!"
 
         if WX_API_data:
             # Current conditions (temp, prevailing weather, wind dir + speed)
@@ -5396,6 +5418,7 @@ class dump1090Watchdog:
     def watchdog(self, message):
         global DUMP1090_IS_AVAILABLE, relevant_planes, watchdog_triggers
         global lockstep_corrector, dump1090_json_age
+        global CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW, CLOCK_CENTER_ROW_2ROWS
         DUMP1090_IS_AVAILABLE = False
 
         # indirectly let the other threads know that dump1090 is not available
@@ -5412,6 +5435,12 @@ class dump1090Watchdog:
             main_logger.error(f"If {dump1090} is running on this machine, please check the {dump1090} service.")
             main_logger.error("Please correct the underlying issue and restart FlightGazer.")
             systemd_notify(f'STATUS=DEGRADED: No longer parsing {dump1090} data.')
+            # override the center row on the display with a message about no ads-b data
+            if DISPLAY_IS_VALID and not CLOCK_CENTER_ROW_CYCLE:
+                CLOCK_CENTER_ENABLED = True
+                CLOCK_CENTER_ROW_2ROWS = False
+                CLOCK_CENTER_ROW['ROW1'] = 2
+                CLOCK_CENTER_ROW['ROW2'] = None
             return
         main_logger.error(f">>> Suspending checking {dump1090} for 15 minutes. This is occurrence: {watchdog_triggers}.")
         systemd_notify(f'STATUS=DEGRADED: {dump1090} parsing temporarily suspended due to internal watchdog.')
@@ -8992,6 +9021,7 @@ if DATABASE_FILE.exists():
         if db.is_connected():
             main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
             database_ver = db.database_version
+            schedule.every().hour.do(aircraft_db_checker)
         else:
             main_logger.error("Could not connect to the database.")
     except ImportError:

@@ -59,6 +59,7 @@ class APICacheHandler:
                     Time INTEGER
                     );
                 """)
+                self._connection.commit()
                 linecount: tuple = self._connection.execute("SELECT COUNT(*) FROM results;").fetchone()
                 database_logger.info(f"Amount of entries in database: {linecount[0]}")
                 cursor.close()

@@ -86,12 +86,6 @@ except ImportError:
     print("This script requires the 'beautifulsoup4' module.")
     print("You can install it using 'pip install beautifulsoup4'.")
     sys.exit(1)
-try:
-    from fake_useragent import UserAgent
-except ImportError:
-    print("This script requires the 'fake_useragent' module.")
-    print("You can install it using 'pip install fake-useragent'.")
-    sys.exit(1)
 
 FAA_source = 'https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3_section_3.html'
 fg_db = 'https://github.com/WeegeeNumbuh1/FlightGazer-airlines-db/raw/refs/heads/master/operators.csv'
@@ -104,8 +98,6 @@ with the release schedule in Section 1-1-6
 (https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap1_section_1.html).
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer \"\"\"\n\n"""
-user = UserAgent(browsers=['Chrome', 'Edge', 'Firefox'], platforms='desktop')
-HTML_header = {'User-Agent': str(user.random)}
 fg_db_verstr = 'Unknown'
 
 def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
@@ -155,7 +147,7 @@ def fg_db_fetcher() -> dict:
     download_start = perf_counter()
     print("Pulling additional data from the FlightGazer-airlines-db database...")
     try:
-        dataset2 = requests.get(fg_db, headers=HTML_header, timeout=5)
+        dataset2 = requests.get(fg_db, timeout=5)
         dataset2.raise_for_status()
         download_end = (perf_counter() - download_start)
         if dataset2.status_code != 200:
@@ -167,7 +159,7 @@ def fg_db_fetcher() -> dict:
     print(f"Successfully downloaded {(download_size / (1024 * 1024)):.2f} "
          f"MiB of data in {download_end:.2f} seconds.")
     try:
-        db_ver = requests.get(fg_db_ver, headers=HTML_header, timeout=5)
+        db_ver = requests.get(fg_db_ver, timeout=5)
         fg_db_verstr = db_ver.text.strip()
         print(f"Using database version: {fg_db_verstr}")
     except Exception:
@@ -191,7 +183,7 @@ def restore_old():
 print("Downloading data from the FAA...")
 try:
     download1 = perf_counter()
-    dataset = requests.get(FAA_source, headers=HTML_header, timeout=5)
+    dataset = requests.get(FAA_source, timeout=5)
     dataset.raise_for_status()
 except Exception as e:
     print(f"Failed to get data: {e}")

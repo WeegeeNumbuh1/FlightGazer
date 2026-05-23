@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.1.1
+# Version = v.11.2.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -658,20 +658,23 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 			bootsplashservice_heredoc
 			echo -e "${FADE}"
 			systemctl daemon-reload >/dev/null 2>&1
+			if [ -f "${BASEDIR}/utilities/ac_db_service_installer.sh" ]; then
+				bash "${BASEDIR}/utilities/ac_db_service_installer.sh"
+			fi
 			systemctl enable flightgazer.service 2>&1
 			if [ $RGBMATRIX_PRESENT -eq 0 ] || [ $RGBMATRIX_PRESENT -eq 3 ]; then
-				echo -e "${NC}${FADE}    > rgb-matrix library present, enabling boot splash..."
+				echo -e "${NC}${FADE}    > rgbmatrix library present, enabling boot splash..."
 				systemctl enable flightgazer-bootsplash.service 2>&1
 				echo -e "${NC}    > Note: If you do not want the boot splash, use the command"
 				echo -e "      systemctl disable flightgazer-bootsplash.service${FADE}"
 			else
-				echo -e "${NC}${FADE}    > rgb-matrix library not present, keeping boot splash disabled..."
+				echo -e "${NC}${FADE}    > rgbmatrix library not present, keeping boot splash disabled..."
 				systemctl disable flightgazer-bootsplash.service 2>&1
 			fi
 			echo -e "${NC}"
 			systemctl status flightgazer.service --no-pager
 			echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
-			echo -e "    ${WHITEHIGH}> Do not move the FlightGazer directory!${ORANGE} (${BASEDIR})${NC}"
+			echo -e "    ${WHITEHIGH}> Do not move the FlightGazer directory!${NC}${ORANGE} (${BASEDIR})${NC}"
 			echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
 			sleep 5s
 			echo -e "    ${NC}> Don't want it there? Run the uninstall script,"
@@ -794,49 +797,44 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo -e "${CHECKMARK}"
 
 		echo -e "${FADE}${VERB_TEXT}requests"
-		"${VENVCMD}" install --upgrade requests >/dev/null
+		"${VENVCMD}" install --upgrade requests --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 16
+		update_progress 17
 
 		echo -e "${FADE}${VERB_TEXT}pydispatcher"
-		"${VENVCMD}" install --upgrade pydispatcher >/dev/null
+		"${VENVCMD}" install pydispatcher==2.0.7 --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 19
+		update_progress 20
 
 		echo -e "${FADE}${VERB_TEXT}schedule"
-		"${VENVCMD}" install --upgrade schedule >/dev/null
+		"${VENVCMD}" install schedule==1.2.2 --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 22
+		update_progress 23
 
 		echo -e "${FADE}${VERB_TEXT}suntime"
-		"${VENVCMD}" install --upgrade suntime >/dev/null
+		"${VENVCMD}" install suntime==1.3.2 --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 25
+		update_progress 26
 
 		echo -e "${FADE}${VERB_TEXT}psutil"
-		"${VENVCMD}" install --upgrade psutil >/dev/null
+		"${VENVCMD}" install --upgrade psutil --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 28
+		update_progress 29
 
 		echo -e "${FADE}${VERB_TEXT}yaml"
-		"${VENVCMD}" install --upgrade ruamel.yaml >/dev/null
+		"${VENVCMD}" install ruamel.yaml==0.19.1 --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 31
+		update_progress 32
 
 		echo -e "${FADE}${VERB_TEXT}orjson"
-		"${VENVCMD}" install --upgrade orjson >/dev/null
+		"${VENVCMD}" install --upgrade orjson --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 34
+		update_progress 35
 
 		echo -e "${FADE}${VERB_TEXT}BeautifulSoup"
-		"${VENVCMD}" install --upgrade beautifulsoup4 >/dev/null
+		"${VENVCMD}" install --upgrade beautifulsoup4 --quiet >/dev/null
 		echo -e "${CHECKMARK}"
-		update_progress 37
-
-		echo -e "${FADE}${VERB_TEXT}fake-useragent"
-		"${VENVCMD}" install --upgrade fake-useragent >/dev/null
-		echo -e "${CHECKMARK}"
-		update_progress 40
+		update_progress 38
 
 		if [ "$VERB_TEXT" == "Installing: " ]; then
 			echo -e "${FADE}(The next install may take some time, please be patient.)"
@@ -844,12 +842,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		else
 			echo -e "${FADE}${VERB_TEXT}RGBMatrixEmulator"
 		fi
-		if [ "$PI5" = true ]; then
-			# RPi 5, install the pi5 specific version
-			"${VENVCMD}" install --upgrade RGBMatrixEmulator[pi5] >/dev/null
-		else
-			"${VENVCMD}" install RGBMatrixEmulator --upgrade >/dev/null
-		fi
+		"${VENVCMD}" install --upgrade RGBMatrixEmulator >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 45
 
@@ -858,12 +851,12 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			systemctl stop flightgazer-webapp >/dev/null 2>&1
 			echo "(Web-app service stopped, it will be restarted after this.)"
 			echo "${VERB_TEXT}Flask"
-			"${VENVCMD}" install --upgrade Flask >/dev/null
+			"${VENVCMD}" install --upgrade Flask==3.1.3 --quiet >/dev/null
 			echo -e "${CHECKMARK}"
 			update_progress 48
 
 			echo -e "${FADE}${VERB_TEXT}gunicorn"
-			"${VENVCMD}" install --upgrade gunicorn >/dev/null
+			"${VENVCMD}" install gunicorn==26.0.0 --quiet >/dev/null
 			echo -e "${CHECKMARK}"
 			update_progress 51
 
@@ -889,8 +882,7 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		-ie "orjson"\
 		-ie "gunicorn"\
 		-ie "Flask"\
-		-ie "beautifulsoup4"\
-		-ie "fake-useragent")
+		-ie "beautifulsoup4")
 		echo -e "Detected package versions:\n${PIPPKGS}"
 		update_progress 55
 	fi

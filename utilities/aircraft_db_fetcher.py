@@ -4,7 +4,7 @@ Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-databas
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.1.0
+# Last updated: v.11.2.0
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -21,9 +21,12 @@ from platform import uname
 import re
 import socket
 import os
+from shutil import chown
 script_start = perf_counter()
 CURRENT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.db")
+if os.name == 'posix':
+    DB_OWNER = OUTPUT_FILE.owner()
 URL = 'https://raw.githubusercontent.com/wiedehopf/tar1090-db/csv/aircraft.csv.gz'
 TYPES_URL = "https://github.com/wiedehopf/tar1090-db/raw/refs/heads/master/db/icao_aircraft_types2.js"
 leading_icao_chars = '0123456789ABCDEF'
@@ -77,14 +80,25 @@ if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
 
 if OUTPUT_FILE.exists():
     _result = None
-    _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}?mode=ro", uri=True)
+    _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}", uri=True)
     _connection.row_factory = sqlite3.Row
     _cursor = _connection.execute("SELECT * FROM DB_INFO ORDER BY ROWID ASC LIMIT 1")
     _result = _cursor.fetchone()
+    _cursor = _connection.execute("PRAGMA journal_mode;")
+    journal_mode = dict(_cursor.fetchone()).get('journal_mode', 'Unknown')
+    # convert older databases to write ahead logging
+    if journal_mode != 'wal':
+        _connection.execute("PRAGMA journal_mode = WAL;")
+        _connection.commit()
+    else:
+        # clean-up the -shm and -wal files
+        _connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
     _cursor.close()
     _connection.close()
     if _result is not None:
         current_db_ver = dict(_result).get('version', 'unknown')
+        if os.name == 'posix':
+            chown(OUTPUT_FILE, user=DB_OWNER)
     else:
         current_db_ver = "unknown"
     print(f"Database already exists, current version: {current_db_ver}")
@@ -309,13 +323,14 @@ machine_name = (f"\'{machine.node}\', running {machine.system} "
                 f"{machine.release} [ {machine.version} on {machine.machine} ]")
 license_string = "Open Data Commons Attribution License"
 
-# Initialize database tables
+# now we do the actual database stuff
 with sqlite3.connect(OUTPUT_FILE) as conn:
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.commit()
     cursor = conn.cursor()
 
     print("Initializing tables...")
     table_start = perf_counter()
-    # Create tables
     for char in leading_icao_chars:
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS ICAO_{char} (
@@ -376,8 +391,13 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, batch)
 
-    conn.commit()
+    if journal_mode == 'wal':
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+
 conn.close()
+
+if os.name == 'posix':
+    chown(OUTPUT_FILE, user=DB_OWNER)
 
 print(f"{(OUTPUT_FILE.stat().st_size) / (1024 * 1024):.3f} MiB of records "
       f"written to database in {perf_counter() - write_start:.2f} seconds.")

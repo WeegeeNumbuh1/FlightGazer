@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.10.0.0
+# Last updated: v.11.2.0
 # by: WeegeeNumbuh1
 
 BASEDIR=$(cd `dirname -- $0` && pwd)
@@ -65,10 +65,10 @@ fi
 venv_install() {
 	VENVCMD="${VENVPATH}/bin/pip3"
 	echo -e "${FADE}> Flask..."
-	"${VENVCMD}" install --upgrade Flask >/dev/null
+	"${VENVCMD}" install Flask==3.1.3 --quiet >/dev/null
 	echo "Done."
 	echo -e "${FADE}> gunicorn..."
-	"${VENVCMD}" install --upgrade gunicorn >/dev/null
+	"${VENVCMD}" install gunicorn==26.0.0 --quiet >/dev/null
 	echo -e "Done.${NC}"
 }
 

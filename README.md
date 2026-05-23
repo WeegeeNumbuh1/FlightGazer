@@ -86,13 +86,13 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
 
 ### Summary
-- Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!
+- **Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!**
   - Shows an aircraft's callsign (or registration as fallback), distance and direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
-  - With v.6.0.0 and newer, you can see additional info like aircraft type, airline, and owner, all without needing API access
+  - Additional info like aircraft type, airline, and owner, is available without needing API access
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
-- It's a neat looking clock when there aren't any aircraft flying overhead
+- **It's a neat looking clock when there aren't any aircraft flying overhead**
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
 - Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
@@ -349,8 +349,8 @@ A viable setup if not using an RGB Matrix display is to:
 > <b>Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
 > <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
 
-#### Raspberry Pi 5 support
-Refer to the [Running on a Raspberry Pi 5 document](./docs/using-this-on-a-Raspberry-Pi-5.md).
+#### Raspberry Pi 5 (and newer) support
+Refer to the [this document](./docs/using-this-on-a-Raspberry-Pi-5.md).
 
 ### Using FlightGazer's Data
 
@@ -416,11 +416,12 @@ See the [Output Reference](./docs/output-reference.md) document.
 - Create a new systemd service `flightgazer.service` if not present
   - Also creates a systemd service for the boot splash screen `flightgazer-bootsplash.service` as well, only if
     the `rgbmatrix` library is present
+  - Additionally installs `flightgazer-acdb-updater.service` and its timer to maintain the aircraft database in the background on a weekly basis
 - Write out `RGBMatrixEmulator` config file
 - Makes virtual python environment at `etc/FlightGazer-pyvenv`
 - Updates `pip` as necessary and installs the following python packages in the virtual environment:
   - rgbmatrix (if it's not installed globally and is present in the user's folder)
-  - requests
+  - requests (usually provided in Raspberry Pi OS)
   - pydispatcher
   - schedule
   - psutil (usually provided in Raspberry Pi OS)
@@ -428,7 +429,6 @@ See the [Output Reference](./docs/output-reference.md) document.
   - ruamel.yaml
   - orjson
   - beautifulsoup4
-  - fake-useragent
   - RGBMatrixEmulator<br>
 *if the web app is installed as well:*
   - Flask
@@ -601,6 +601,7 @@ If there's something not addressed here, please reach out to me directly.
 - Other "FlightGazer"-like projects:
   - [This one off of Reddit](https://old.reddit.com/r/ADSB/comments/1py0a9z/my_custom_adsb_approach_display_video/)
   - [A modified 'its-a-plane' version](https://www.etsy.com/listing/4346934119/aviation-whats-flying-overhead-display) (Etsy)
+- [MamboMonitor](https://github.com/WeegeeNumbuh1/MamboMonitor), an [umamusume](https://umamusume.com/) meme gif player that repurposes some of the code from this project
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Highlights Across Media

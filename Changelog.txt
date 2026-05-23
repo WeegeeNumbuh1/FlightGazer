@@ -5,6 +5,26 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.0 - 2026-05-23
+    - NEW: Aircraft database is now checked weekly for updates with a new background service
+        - For existing installs: The new functionality can be installed with a new script
+          in the utilities directory, "ac_db_service_installer.sh"
+        - New installs will automatically install this service
+        - If this service isn't installed, the database still gets updated following a FlightGazer
+          update or after 3 months, as usual
+    - Refactor Pi5 support as rgbmatrix now supports it, along with RGBMatrixEmulator v0.16.5 depreciating support
+        - rgbmatrix install script will now allow installation on a Pi5, reverting v.11.0.0 change
+    - If the connection to dump1090 causes FlightGazer to reach its final watchdog kick, the center row on the
+      display will be overridden to show a message about this
+        - When the center row is set to display receiver stats and the watchdog is kicked, a more useful message
+          is shown instead of just dashes
+    - Tweak aircraft load tracking algorithm to handle distressed aircraft
+    - Add support for reconnecting to the aircraft database if it's updated while FlightGazer is running
+    - Most Python external dependencies are now fixed and only update as required with FlightGazer updates
+        - Remove fake_useragent from required modules, which was only used by the operators_generator script
+          back in v.8.1.2 and no longer needed in v.9.9.3
+    - Minor text output optimizations
+
 v.11.1.2 - 2026-05-09
     - Improve cost calculation handling when the API cost polling fails
     - Fix bootsplash flickering when the second waiting stage is reached

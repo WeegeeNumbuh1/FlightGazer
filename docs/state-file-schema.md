@@ -266,12 +266,12 @@ Performance stats for the persistent API cache subsystem. This key is null if th
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `database_stats`
-Represents stats for the aircraft database.
+Represents stats for the aircraft database. These stats (besides error count) are reset if it's determined that database has changed while FlightGazer is running.
 
 | key| description | schema | example |
 | --- | --- | --- | --- |
 | `database_connected` | Whether a connection to the local database exists and is valid | bool | true |
-| `database_version` | Version string of the database when first connected (null if no connection at startup) | str, null | "3.14.1769" |
+| `database_version` | Version string of the database. Can change if the database is updated while FlightGazer is running (null if no connection at startup) | str, null | "3.14.1769" |
 | `total_queries` | Total number of database queries performed | int | 324 |
 | `empty_results` | Count of queries that returned no data | int | 21 |
 | `errors` | Number of failed database queries | int | 0 |

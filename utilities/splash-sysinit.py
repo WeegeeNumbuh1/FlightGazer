@@ -3,7 +3,7 @@
 # It's assumed that this is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.11.1.2
+# Last updated: v.11.2.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -76,7 +76,7 @@ exec_line = ''
 for line in serv_lines:
     if line.strip().startswith('ExecStart='):
         exec_line = line.strip()
-if exec_line and ' -e' in exec_line and adapter and 'pi5' in adapter:
+if exec_line and ' -e' in exec_line:
     use_emulator = True
 
 if not use_emulator:
@@ -106,7 +106,7 @@ else:
         sys.exit(1)
 
 if use_emulator:
-    print(f"{log_prefix}Using the Emulator with the Raspberry Pi5 mode.")
+    print(f"{log_prefix}Using the Emulator.")
 
 try:
     from ruamel.yaml import YAML

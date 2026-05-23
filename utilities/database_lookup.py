@@ -21,23 +21,42 @@ class DatabaseHandler:
         self._connection = None
         self._access_times = deque(maxlen=50)
         self.average_speed = 0.0
+        self.journal_mode = ''
         self.database_version = ''
 
     def connect(self) -> bool:
         """ Connect to the database that was provided when this class was instanced.
-        Opens the database as read-only.
         Returns `False` if the database fails to connect, `True` otherwise (includes when trying to establish a new connection with
-        a currently existing connection). """
+        a currently existing connection). If this method is used again on an already existing connection,
+        this will check if the database was updated since initialization and update database stats. """
         if self._connection is not None:
-            database_logger.warning(f"{self.database_path} is already connected! Only one connection is allowed at a time.")
+            cursor = self._connection.execute("SELECT * FROM DB_INFO ORDER BY ROWID ASC LIMIT 1")
+            result = cursor.fetchone()
+            cursor.close()
+            last_ver = self.database_version
+            if result is not None:
+                result = dict(result)
+                new_ver = result['version']
+                if new_ver != last_ver:
+                    database_logger.info(f"Database changed! {last_ver} -> {new_ver} "
+                                         f"(created on: {result['created_date']})")
+                    # we don't reset the error counts
+                    self.database_version = new_ver
+                    self.queries = 0
+                    self.query_misses = 0
+                    self.last_access_speed = 0.0
+                    self._access_times.clear()
+                    self.average_speed = 0.0
             return True
         else:
             try:
                 database_logger.debug(f"SQLite ver {sqlite3.sqlite_version}")
-                self._connection = sqlite3.connect(f"file:{self.database_path}?mode=ro", uri=True, timeout=self._timeout, check_same_thread=False)
+                self._connection = sqlite3.connect(f"file:{self.database_path}?mode=rw", uri=True, timeout=self._timeout, check_same_thread=False)
                 self._connection.row_factory = sqlite3.Row
                 cursor = self._connection.execute("SELECT * FROM DB_INFO ORDER BY ROWID ASC LIMIT 1")
                 result = cursor.fetchone()
+                cursor = self._connection.execute("PRAGMA journal_mode;")
+                self.journal_mode: str = dict(cursor.fetchone()).get('journal_mode', 'Unknown')
                 cursor.close()
                 if result is not None:
                     result = dict(result)
@@ -47,6 +66,7 @@ class DatabaseHandler:
                         f"Version: {self.database_version}, "
                         f"created on: {result['created_date']}"
                     )
+                    database_logger.debug(f"Database journaling: {self.journal_mode}")
                     # reset the stats upon connection
                     self.queries = 0
                     self.query_misses = 0

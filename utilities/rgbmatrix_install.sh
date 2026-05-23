@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.11.0.0 (April 2026)
+# Last updated: v.11.2.0 (May 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -94,16 +94,6 @@ else
 	echo "the rgbmatrix display, if it's not configured already."
 fi
 echo "**********************************************************"
-if [ "$PI5" = true ]; then
-	sleep 2s
-	echo -e "${ORANGE}> Notice: rgbmatrix may not work with a Raspberry Pi 5.${NC}."
-	echo "For now, it's recommended to use RGBMatrixEmulator (running FlightGazer with the -e flag)"
-	echo "if you wish to use an RGB display with the RPi5."
-	echo "Refer to the FlightGazer README file for more guidance."
-	sleep 5
-	echo "Installation automatically cancelled, no changes have been made."
-	exit 1
-fi
 sleep 5s
 echo "Starting soon... (press Ctrl+C to cancel this install now)"
 sleep 10s
@@ -169,7 +159,7 @@ if [ $? -ne 0 ]; then
 	rm -rf "$RGB_MATRIX_DIR" 2>&1 >/dev/null
 	curl -L $GITUSER/$REPO/archive/$COMMIT.zip -o /tmp/$REPO-$COMMIT.zip\
 	&& unzip -q /tmp/$REPO-$COMMIT.zip\
-	&& rm /tmp/$REPO-$COMMIT.zip && mv /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR" >/dev/null 2>&1
+	&& rm /tmp/$REPO-$COMMIT.zip && mv -f /tmp/$REPO-$COMMIT "$RGB_MATRIX_DIR" >/dev/null 2>&1
 	if [ $? -ne 0 ]; then
 		echo -e "${RED}>>> ERROR: Failed to download from GitHub. Cannot continue.${NC}"
 		echo "Undoing changes..."
