@@ -1,10 +1,11 @@
 """ This script imports the `aircraft.csv.gz` file that's kept up-to-date from wiedehopf's `tar1090-db` repository
 (https://github.com/wiedehopf/tar1090-db/tree/csv) and converts it into a sqlite3 database.
-Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-database/index.php) for maintaining the actual database.
+Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-database/index.php)
+and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.2.0
+# Last updated: v.11.2.1
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -195,12 +196,19 @@ def stream_csv_from_gzip(content):
 
 print("Enumerating the data...")
 csv_processing_start = perf_counter()
-total_rows = count_csv_rows(response.content)
+try:
+    total_rows = count_csv_rows(response.content)
+except Exception as e:
+    print(f"ERROR: Failed to parse database! - {e}")
+    sys.exit(1)
 csv_time = perf_counter() - csv_processing_start
 print(f"Processing took {csv_time:.2f} seconds "
       f"({int(total_rows / csv_time)} "
       "rows/sec).")
 print(f"Total rows to process: {total_rows}")
+if total_rows == 0:
+    print("ERROR: 0 rows returned - There is no data to parse!")
+    sys.exit(1)
 init_progress_percentage += 8 # 70
 update_init_progress()
 
@@ -374,7 +382,14 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
     # process types data if available
     types_map = None
     if types_data_available:
-        types_map = process_types_data(types_response)
+        try:
+            types_map = process_types_data(types_response)
+        except Exception as e:
+            print(f"Failed to parse types data - {e}")
+            print("Continuing without aircraft types data.\n"
+                  "This may affect the accuracy of aircraft type descriptions for some ICAO addresses.")
+            types_data_available = False
+            types_map = None
 
     print(f"Writing to \'{OUTPUT_FILE}\'.")
     print("Estimated time: "

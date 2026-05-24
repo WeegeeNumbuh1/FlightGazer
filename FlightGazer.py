@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.2.0 --- 2026-05-23'
+VERSION: str = 'v.11.2.1 --- 2026-05-24'
 import os
 import argparse
 import sys
@@ -3449,8 +3449,9 @@ def main_loop_generator() -> None:
 
         def data_arbitrator(loop_packet_dict: dict, database_result: dict) -> dict:
             """ Compares the data from database to the current data of the loop's data and
-            updates values to the database's result if applicable. Returns the loop data dictionary with these values. """
-            if loop_packet_dict['Registration'] is None and database_result['reg']:
+            updates values to the database's result if applicable. Returns the loop data dictionary with these values.
+            This assumes the database data is the most accurate available. """
+            if database_result['reg']:
                 loop_packet_dict['Registration'] = database_result['reg']
             # eliminate false positive result when an aircraft has a callsign that corresponds to an airline
             # see: comments in `operator_lookup()`
@@ -3543,8 +3544,7 @@ def main_loop_generator() -> None:
             lon = a.get('lon')
             nac_p = a.get('nac_p')
             if lat == lon == 0: # prefilter for case when there's an invalid location
-                lat = None
-                lon = None
+                lat = lon = None
             if LOCATION_IS_SET and lat is not None:
                 # readsb does this calculation already, try to use it first
                 distance = a.get('r_dst')
@@ -3693,10 +3693,24 @@ def main_loop_generator() -> None:
                         futdis = None
                     emitter = category_description.get(a.get('category'), "None")
                     iso_code = getICAO(hex_).upper()
-                    # This key is sometimes present in some readsb setups (eg: adsb.im images).
-                    # Because it reads from a much more updated database, we try to use it first
-                    if (registration := a.get('r')) is None:
+                    # Grab some stuff from readsb-generated jsons if we're not using
+                    # our own database
+                    if not DATABASE_CONNECTED:
+                        if (registration := a.get('r')) is None:
+                            registration = reg_lookup(hex_)
+                        owner = a.get('ownOp')
+                        adesc = a.get('desc')
+                        atype = a.get('t')
+                        if not atype:
+                            atype = "None"
+                        ayear = a.get('year')
+                        if adesc and ayear:
+                            adesc = f"{ayear} {adesc}"
+                    else:
+                        owner = adesc = ayear = None
+                        atype = "None"
                         registration = reg_lookup(hex_)
+
                     # see if we can lookup who runs this plane
                     if (operator_result := operator_lookup(flight)) is not None:
                         if not (operator := operator_result['Company']):
@@ -3709,15 +3723,6 @@ def main_loop_generator() -> None:
                         operator = None
                         telephony = None
                         op_friend = None
-                    # if tar1090 long database is enabled, grab some of the info
-                    owner = a.get('ownOp')
-                    adesc = a.get('desc')
-                    atype = a.get('t')
-                    if not atype:
-                        atype = "None"
-                    ayear = a.get('year')
-                    if adesc and ayear:
-                        adesc = f"{ayear} {adesc}"
                     if (
                         flight is None
                         or flight == "        " # when dump1090 reports an empty callsign, it's 8 spaces

@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.1 - 2026-05-24
+    - FlightGazer now relies on the main aircraft database for aircraft info and only will fallback on reading
+      this data from the tar1090/readsb aircraft.json when there is no database connection
+    - Additions to the aircraft database generator to make it more resilient to any future database structure
+      changes
+
 v.11.2.0 - 2026-05-23
     - NEW: Aircraft database is now checked weekly for updates with a new background service
         - For existing installs: The new functionality can be installed with a new script

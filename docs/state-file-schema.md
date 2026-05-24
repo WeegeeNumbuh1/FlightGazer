@@ -34,7 +34,7 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`time_now`](#time_now)
 
 > *There are a total of 223 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.11.0.0 and newer*
+> *Valid for FlightGazer v.11.2.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
