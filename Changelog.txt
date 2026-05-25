@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.2 - 2026-05-24
+    - Change the aircraft database check to Tuesday from Monday
+        - Only affects new installs or manually running the install script again
+    - The operators database generator now checks to make sure the source webpage is in the expected layout
+
 v.11.2.1 - 2026-05-24
     - FlightGazer now relies on the main aircraft database for aircraft info and only will fallback on reading
       this data from the tar1090/readsb aircraft.json when there is no database connection

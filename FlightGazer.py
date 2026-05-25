@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.2.1 --- 2026-05-24'
+VERSION: str = 'v.11.2.2 --- 2026-05-24'
 import os
 import argparse
 import sys

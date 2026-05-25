@@ -3,7 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: v.11.1.0
+# Last updated: v.11.2.2
 
 import sys
 
@@ -67,6 +67,8 @@ if write_path.exists():
             print(f"Could not determine when this file was generated.\n{e}")
     else:
         print("Could not determine when this file was generated.")
+else:
+    print("Operators database not found!")
 
 print("Continuing update.")
 # load in all the other modules
@@ -197,7 +199,36 @@ print("Parsing HTML...")
 parse_start = perf_counter()
 html = dataset.text
 soup = bs(html, 'html.parser')
-print(f"Data parsed in {(perf_counter() - parse_start):.2f} seconds.")
+header_names = []
+table_count = 0
+header_concat = ''
+header_last = ''
+# make sure the page is in the layout we expect
+for _, table in enumerate(soup.find_all('table')):
+    # peek at the header row (should be 3Ltr, Company, Country, Telephony)
+    for col_ in table.find('tr').find_all('th'):
+        col_name: str = col_.text.strip()
+        header_names.append(col_name)
+    header_concat = ''.join(header_names)
+    if len(header_names) != 4:
+        header_names.clear()
+        continue
+    header_names.clear()
+    # check that the header rows are consistent across tables
+    if not header_last:
+        header_last = header_concat
+    else:
+        if header_concat != header_last:
+            continue
+    table_count += 1
+
+print(f"Data parsed in {(perf_counter() - parse_start):.2f} seconds. "
+      f"Found {table_count} pertinent tables.")
+if table_count != 26:
+    print("Error: Received different amount of tables than expected. Cannot continue.")
+    print("It seems like the FAA rearranged the site, please contact the developer to fix this.")
+    sys.exit(1)
+
 data_fg_db = fg_db_fetcher()
 if not data_fg_db:
     print("Failed to fetch data from the FlightGazer-airlines-db database.")

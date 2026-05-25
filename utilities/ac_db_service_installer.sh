@@ -21,12 +21,12 @@ EOF
 timer_heredoc() {
 	cat <<- EOF > /etc/systemd/system/flightgazer-acdb-updater.timer
 	[Unit]
-	Description=Updates the FlightGazer aircraft database at 2 AM every Monday
+	Description=Updates the FlightGazer aircraft database some time between 2~3 AM every Tuesday
 	Documentation="https://github.com/WeegeeNumbuh1/FlightGazer"
 	After=flightgazer.service
 
 	[Timer]
-	OnCalendar=Mon *-*-* 02:00:00
+	OnCalendar=Tue *-*-* 02:00:00
 	Persistent=false
 	RandomizedDelaySec=3600
 
