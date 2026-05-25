@@ -23,6 +23,7 @@ import re
 import socket
 import os
 from shutil import chown
+from argparse import ArgumentParser
 script_start = perf_counter()
 CURRENT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.db")
@@ -49,6 +50,19 @@ except ImportError:
     print("This script requires the 'requests' module.")
     print("You can install it using 'pip install requests'.")
     sys.exit(1)
+
+args_main = ArgumentParser()
+args_main.add_argument('-r', '--rebuild',
+                action='store_true',
+                help=("Rebuild the database. "
+                      "Useful to ensure entries are sorted by their hex. "
+                      "Takes longer on slow systems.")
+                )
+args_init = args_main.parse_args()
+if args_init.rebuild:
+    REBUILD: bool = True
+else:
+    REBUILD = False
 
 def update_init_progress() -> None:
     """ Update the progress file, if it exists.
@@ -79,9 +93,11 @@ if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
     jrnl.unlink(missing_ok=True)
     OUTPUT_FILE.unlink(missing_ok=True)
 
+db_size_old = 0
 if OUTPUT_FILE.exists():
+    db_size_old = OUTPUT_FILE.stat().st_size
     _result = None
-    _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}", uri=True)
+    _connection = sqlite3.connect(f"file:{OUTPUT_FILE.as_posix()}?mode=rw", uri=True)
     _connection.row_factory = sqlite3.Row
     _cursor = _connection.execute("SELECT * FROM DB_INFO ORDER BY ROWID ASC LIMIT 1")
     _result = _cursor.fetchone()
@@ -89,10 +105,10 @@ if OUTPUT_FILE.exists():
     journal_mode = dict(_cursor.fetchone()).get('journal_mode', 'Unknown')
     # convert older databases to write ahead logging
     if journal_mode != 'wal':
-        _connection.execute("PRAGMA journal_mode = WAL;")
+        _connection.execute("PRAGMA journal_mode=WAL;")
         _connection.commit()
     else:
-        # clean-up the -shm and -wal files
+        # clean-up the -shm and -wal files if a previous update did not fully commit
         _connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
     _cursor.close()
     _connection.close()
@@ -269,16 +285,12 @@ def process_types_data(types_response) -> dict:
           f"with {len(types_map)} types available.")
     return types_map
 
-def process_aircraft_data(response_content, types_map=None, batch_size=1):
-    """ Stream & process aircraft data and yield batches to insert into the database.
-    While having a large batch size improves write performance, leaving it to 1 means
-    this handles each row individually and the database writer section can sort the
-    row to the correct table. Having the size be anything different will lead
-    to the tables in the database be incorrectly written with entries being mixed between
-    them and the amount of table rows rounded to the closest multiple of the batch size. """
+def process_aircraft_data(response_content, types_map=None, batch_size=10000):
+    """ Stream & process aircraft data and yield batches to insert into the database. """
     print("Committing to database...")
     global init_progress_percentage
 
+    batches = {char: [] for char in leading_icao_chars}
     batch = []
     processed_count = 0
     empty_desc = 0
@@ -298,24 +310,31 @@ def process_aircraft_data(response_content, types_map=None, batch_size=1):
                 entry_updates += 1
 
         icao = row['icao']
-        if icao[0] in leading_icao_chars:
-            batch.append((
-                row['icao'], row['reg'], row['type'], row['flags'],
-                row['desc'], row['year'], row['ownop']
-            ))
+        if not icao:
+            continue
+        leading_char = icao[0]
+        if leading_char not in leading_icao_chars:
+            continue
 
-        if len(batch) >= batch_size:
-            if current_percentage >= last_percentage + 10:
-                print(f"{int(current_percentage)}% complete ({processed_count}/{total_rows})")
-                last_percentage = (current_percentage // 10) * 10
-                init_progress_percentage += 2.4
-                update_init_progress()
-            yield batch, icao[0]
-            batch = []
+        batches[leading_char].append((
+            row['icao'], row['reg'], row['type'], row['flags'],
+            row['desc'], row['year'], row['ownop']
+        ))
+
+        if len(batches[leading_char]) >= batch_size:
+            yield batches[leading_char], leading_char
+            batches[leading_char] = []
+
+        if current_percentage >= last_percentage + 10:
+            print(f"{int(current_percentage)}% complete ({processed_count}/{total_rows})")
+            last_percentage = (current_percentage // 10) * 10
+            init_progress_percentage += 2.4
+            update_init_progress()
 
     # yield remaining batch
-    if batch:
-        yield batch, batch[-1][0][0]
+    for leading_char, batch in batches.items():
+        if batch:
+            yield batch, leading_char
 
     if types_map:
         print(f"Filled {entry_updates} out of {empty_desc} "
@@ -333,8 +352,7 @@ license_string = "Open Data Commons Attribution License"
 
 # now we do the actual database stuff
 with sqlite3.connect(OUTPUT_FILE) as conn:
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.commit()
+    conn.execute("PRAGMA journal_mode=WAL;")
     cursor = conn.cursor()
 
     print("Initializing tables...")
@@ -351,33 +369,10 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
                 ownop TEXT
             );
         """)
-        cursor.execute(f"DELETE FROM ICAO_{char}")
-    print(f"Table initialization took {perf_counter() - table_start:.2f} seconds.")
-
-    # check if we're using an older database that doesn't have this column
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='DB_INFO';")
-    info_table_exists = cursor.fetchone()
-    if info_table_exists:
-        cursor.execute(f"PRAGMA table_info(DB_INFO);")
-        db_info_cols = [col[1] for col in cursor.fetchall()]
-        if 'license' not in db_info_cols:
-            cursor.execute("DROP TABLE IF EXISTS DB_INFO;")
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS DB_INFO (
-            version TEXT PRIMARY KEY,
-            created_date TEXT,
-            created_by TEXT,
-            machine TEXT,
-            license TEXT
-        );
-    """)
-
-    cursor.execute("DELETE FROM DB_INFO")
-    cursor.execute("""
-        INSERT INTO DB_INFO (version, created_date, created_by, machine, license)
-        VALUES (?, ?, ?, ?, ?)
-        """, (db_ver, date_now, username, machine_name, license_string))
+        if REBUILD:
+            print("Rebuilding.")
+            cursor.execute(f"DELETE FROM ICAO_{char}")
+            print(f"Table initialization took {perf_counter() - table_start:.2f} seconds.")
 
     # process types data if available
     types_map = None
@@ -405,17 +400,49 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
             (icao, reg, type, flags, desc, year, ownop)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, batch)
+        conn.commit()
+
+    # check if we're using an older database that doesn't have this column
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='DB_INFO';")
+    info_table_exists = cursor.fetchone()
+    if info_table_exists:
+        cursor.execute(f"PRAGMA table_info(DB_INFO);")
+        db_info_cols = [col[1] for col in cursor.fetchall()]
+        if 'license' not in db_info_cols:
+            cursor.execute("DROP TABLE IF EXISTS DB_INFO;")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS DB_INFO (
+            version TEXT PRIMARY KEY,
+            created_date TEXT,
+            created_by TEXT,
+            machine TEXT,
+            license TEXT
+        );
+    """)
+
+    cursor.execute("DELETE FROM DB_INFO")
+    cursor.execute("""
+        INSERT INTO DB_INFO (version, created_date, created_by, machine, license)
+        VALUES (?, ?, ?, ?, ?)
+        """, (db_ver, date_now, username, machine_name, license_string))
+
+    conn.commit()
 
     if journal_mode == 'wal':
+        print("Cleaning up...")
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    total_changes = conn.total_changes
 
 conn.close()
 
 if os.name == 'posix':
     chown(OUTPUT_FILE, user=DB_OWNER)
 
-print(f"{(OUTPUT_FILE.stat().st_size) / (1024 * 1024):.3f} MiB of records "
+db_size_new = OUTPUT_FILE.stat().st_size
+print(f"{db_size_new / (1024 * 1024):.3f} MiB of records "
       f"written to database in {perf_counter() - write_start:.2f} seconds.")
+print(f"Deltas: {(db_size_new - db_size_old) / 1024:.2f} KiB, {total_changes} changes.")
 print("\n***** Done. *****")
 print(f"Total wall time: {perf_counter() - script_start:.2f} seconds.")
 print("Database importer exiting...")

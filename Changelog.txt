@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.3 - 2026-05-25
+    - Fix issue with aircraft database updater running into locked database conflicts
+    - Improvements to the aircraft database updater speed (more noticeable on slower systems)
+
 v.11.2.2 - 2026-05-24
     - Change the aircraft database check to Tuesday from Monday
         - Only affects new installs or manually running the install script again
