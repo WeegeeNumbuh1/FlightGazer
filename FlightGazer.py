@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.2.3 --- 2026-05-25'
+VERSION: str = 'v.11.2.4 --- 2026-05-26'
 import os
 import argparse
 import sys
@@ -2156,6 +2156,7 @@ def aircraft_db_checker() -> None:
             database_stats[3] = db.average_speed
             database_stats[4] = db.last_access_speed
             database_lookup_cache.clear()
+            database_lookup.cache_clear()
 
 # =========== Program Setup III ============
 # ===========( Core Functions )=============

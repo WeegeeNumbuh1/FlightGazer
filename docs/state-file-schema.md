@@ -266,7 +266,7 @@ Performance stats for the persistent API cache subsystem. This key is null if th
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## `database_stats`
-Represents stats for the aircraft database. These stats (besides error count) are reset if it's determined that database has changed while FlightGazer is running.
+Represents stats for the aircraft database. These stats (besides error count) are reset if it's determined that the database updated while FlightGazer is running.
 
 | key| description | schema | example |
 | --- | --- | --- | --- |

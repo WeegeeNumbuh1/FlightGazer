@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.4 - 2026-05-26
+    - Tweak lookup cache when the aircraft database is updated while FlightGazer is running under NO_FILTER mode
+
 v.11.2.3 - 2026-05-25
     - Fix issue with aircraft database updater running into locked database conflicts
     - Improvements to the aircraft database updater speed (more noticeable on slower systems)

@@ -88,15 +88,16 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 ### Summary
 - **Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!**
   - Shows an aircraft's callsign (or registration as fallback), distance and direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
-  - With API access you also can see the origin and destination airport, as well as how long the aircraft has been flying
-  - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and RSSI
-  - Additional info like aircraft type, airline, and owner, is available without needing API access
+  - With FlightAware API access you also can also get the origin and destination airport, as well as how long the aircraft has been flying
+  - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and aircraft signal strength
+  - Additional info like aircraft type, airline, and owner, is available without needing any API access
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
+  - ***NOT*** reliant on [APIs for live aircraft data](https://github.com/ColinWaddell/FlightTracker/issues/33)
 - **It's a neat looking clock when there aren't any aircraft flying overhead**
   - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
 - Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
-- Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp)
+- Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp#what-it-looks-like)
 - Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
 - Robust and stable enough for 24/7/365 operation
@@ -140,6 +141,7 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Automatically tracks aircraft which report distress signals
 - [Unique tools](./utilities/) and [custom-developed fonts](./fonts/) that can be used in other projects (don't forget to credit me)
+- Integration with adsb.im images/docker containers
 - Adequate documentation
 
 </details>
@@ -155,6 +157,7 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 | <img src="media/FG_journey-plus-annotated.png" width="420" alt="FlightGazer journey plus"> | <b>Journey Plus</b><br>1.	Scrolling marquee (enabled with `Show Even More Info`) or aircraft ground track and vertical speed<br>2.	Ground track of the aircraft (or RSSI of signal when `Show Even More Info` is disabled)<br> |
 | <img src="media/FG_enhanced-readout-annotated.png" width="420" alt="FlightGazer enhanced readout"> | <b>Enhanced Readout</b><br>1.	Current position of the aircraft<br>2.	Ground track of the aircraft<br>3.	Current vertical speed of the aircraft<br>4.	RSSI – (Received Signal Strength Index) how strong of a signal from the aircraft as detected by the receiver (in dBFS) |
 
+*See also:* [Output Reference](./docs/output-reference.md).
 </div>
 
 </details>
@@ -168,7 +171,7 @@ Using this project assumes you have the following:
 
 #### MINIMUM
 - A working `dump1090` instance or similar interface where `aircraft.json` can be read/accessed
-  - Ex: [`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb) **(RECOMMENDED)**, [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, [`dump1090-fa`](https://github.com/flightaware/dump1090), `dump1090-mutability`
+  - Ex: [ADSB.im](https://adsb.im/home)/[`tar1090`](https://github.com/wiedehopf/tar1090)/[`readsb`](https://github.com/wiedehopf/readsb) **(RECOMMENDED)**, [`piaware`](https://www.flightaware.com/adsb/piaware/)/`skyaware`, [`dump1090-fa`](https://github.com/flightaware/dump1090), `dump1090-mutability`
     - Note: the script will automatically look at these locations and choose which one works
   - This script does not need to be on the same device that `dump1090` is running from (see [Configuration](#️configuration) section)
   - Your ADS-B decoder must output in aeronautical units (nautical miles, knots, feet)
@@ -272,8 +275,8 @@ When FlightGazer is installed, you can use the command `sudo systemctl start fli
 
 > [!IMPORTANT]
 > By default, the script is designed to run at boot (via systemd with `flightgazer.service`).<br>
-> It's much more convenient to check how FlightGazer is running through the web-app.
 >
+> It's much more convenient to check how FlightGazer is running through the web-app.<br>
 > However, you can also check its status with any of the following commands:
 > ```bash
 > sudo tmux attach -d -t FlightGazer # press 'Ctrl+B' then 'd' to close
@@ -347,10 +350,11 @@ A viable setup if not using an RGB Matrix display is to:
 
 > [!IMPORTANT]
 > <b>Running the emulator *is slow!*</b>, especially on single-board computers such as the Raspberry Pi.
-> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings. (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W)
+> <br><b>Animations might be choppy or laggy</b> depending on your system and enabled settings.<br>
+> (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W; a RPi4 can manage a decent 25-30 FPS)
 
 #### Raspberry Pi 5 (and newer) support
-Refer to the [this document](./docs/using-this-on-a-Raspberry-Pi-5.md).
+Refer to [this document](./docs/using-this-on-a-Raspberry-Pi-5.md).
 
 ### Using FlightGazer's Data
 
@@ -601,6 +605,7 @@ If there's something not addressed here, please reach out to me directly.
 - Other "FlightGazer"-like projects:
   - [This one off of Reddit](https://old.reddit.com/r/ADSB/comments/1py0a9z/my_custom_adsb_approach_display_video/)
   - [A modified 'its-a-plane' version](https://www.etsy.com/listing/4346934119/aviation-whats-flying-overhead-display) (Etsy)
+  - [`plane-tracker-rgb`](https://github.com/c0wsaysmoo/plane-tracker-rgb-pi/tree/main) (Discovered around end of May 2026, neat)
 - [MamboMonitor](https://github.com/WeegeeNumbuh1/MamboMonitor), an [umamusume](https://umamusume.com/) meme gif player that repurposes some of the code from this project
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
