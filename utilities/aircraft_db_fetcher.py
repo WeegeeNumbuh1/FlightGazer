@@ -5,7 +5,7 @@ and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.2.1
+# Last updated: v.11.2.5
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -396,9 +396,23 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
     # process aircraft data straight from the gzipped files (this is CPU-bound)
     for batch, leading_char in process_aircraft_data(response.content, types_map):
         cursor.executemany(f"""
-            INSERT OR REPLACE INTO ICAO_{leading_char}
+            INSERT INTO ICAO_{leading_char}
             (icao, reg, type, flags, desc, year, ownop)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(icao) DO UPDATE SET
+                reg = excluded.reg,
+                type = excluded.type,
+                flags = excluded.flags,
+                desc = excluded.desc,
+                year = excluded.year,
+                ownop = excluded.ownop
+            WHERE
+                reg != excluded.reg OR
+                type != excluded.type OR
+                flags != excluded.flags OR
+                desc != excluded.desc OR
+                year != excluded.year OR
+                ownop != excluded.ownop;
         """, batch)
         conn.commit()
 
@@ -440,8 +454,8 @@ if os.name == 'posix':
     chown(OUTPUT_FILE, user=DB_OWNER)
 
 db_size_new = OUTPUT_FILE.stat().st_size
-print(f"{db_size_new / (1024 * 1024):.3f} MiB of records "
-      f"written to database in {perf_counter() - write_start:.2f} seconds.")
+print(f"Modifications took {perf_counter() - write_start:.2f} seconds.")
+print(f"Database size: {db_size_new / (1024 * 1024):.3f} MiB ")
 print(f"Deltas: {(db_size_new - db_size_old) / 1024:.2f} KiB, {total_changes} changes.")
 print("\n***** Done. *****")
 print(f"Total wall time: {perf_counter() - script_start:.2f} seconds.")

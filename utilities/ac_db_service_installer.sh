@@ -40,6 +40,11 @@ if [ `id -u` -ne 0 ]; then
 	sleep 1s
 	exit 1
 fi
+systemctl list-unit-files flightgazer.service &>/dev/null
+if [ $? -ne 0 ]; then
+	echo ">>> ERROR: FlightGazer is not installed. Install it first."
+	exit 1
+fi
 echo "Installing aircraft database maintenance service..."
 service_heredoc
 timer_heredoc

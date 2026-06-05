@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.2.4 --- 2026-05-26'
+VERSION: str = 'v.11.2.5 --- 2026-06-05'
 import os
 import argparse
 import sys
@@ -2155,6 +2155,7 @@ def aircraft_db_checker() -> None:
             database_stats[2] = db.query_errors
             database_stats[3] = db.average_speed
             database_stats[4] = db.last_access_speed
+            # totally not confusing in any way
             database_lookup_cache.clear()
             database_lookup.cache_clear()
 
@@ -4302,6 +4303,7 @@ class AirplaneParser:
                     iter_time > 1800
                     and not follow_flag
                     and not self._distressed_latch
+                    and not really_really_active_adsb_site
                     and self.plane_count_avg > 2
                 ):
                     warn_reason = f'Tracking for longer than 30 minutes (Average: {self.plane_count_avg:.2f} aircraft)'
@@ -5869,8 +5871,9 @@ class WriteState:
 def operator_lookup(callsign: str) -> dict | None:
     """ Lookup the operator of a given callsign from our database. This will try to look at the cache first
     from `callsign_lookup_cache` and then the lookup tables from `operators.py`. If there is a match, this function will
-    store the result in the cache for faster lookup, as it is expected this function will be called for each active plane inside
+    store the result in the cache for faster lookup, as it's expected this function will be called for each active plane inside
     the given RANGE and at every `LOOP_INTERVAL`. Worst case scenario is when `NO_FILTER` is enabled + very active ADS-B site (~300 planes).
+    The LRU cache is used by the main loop and management handled by `AirplaneParser`. In NO_FILTER mode the LRU cache is never cleared.
     Dictionary keys are `3Ltr`, `Company`, `Country`, `Telephony`, and `FriendlyName`. """
     global callsign_lookup_cache
 
@@ -5918,7 +5921,8 @@ def operator_lookup(callsign: str) -> dict | None:
 def database_lookup(input: str) -> dict:
     """ Functions exactly like `operator_lookup` but with tweaks to handle the database output.
     Given an input ICAO hex, looks at the `database_lookup_cache` first, then uses the database module
-    to get a result and appends the result to the cache. Always returns a valid dictionary. """
+    to get a result and appends the result to the cache. Always returns a valid dictionary.
+    The LRU cache is used by the main loop and managed by `AirplaneParser` and `aircraft_db_checker()`. """
     global database_lookup_cache, database_stats
 
     def lookup(icao: str) -> dict:

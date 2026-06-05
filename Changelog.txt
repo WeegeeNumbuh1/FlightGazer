@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.2.5 - 2026-06-05
+    - Aircraft database generator now uses dramatically lower writes when updating the database
+        - Up to this point the generator simply rewrote all database entries
+    - Additional "tracking area is too large" algorithm tweaks
+
 v.11.2.4 - 2026-05-26
     - Tweak lookup cache when the aircraft database is updated while FlightGazer is running under NO_FILTER mode
 
