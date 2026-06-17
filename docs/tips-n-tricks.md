@@ -84,6 +84,7 @@ Example: `seconds_color = BLACK`
 <details name="tech-tips"><summary><b>Reduce flickering on a physical RGB matrix display</b></summary>
 <br>
 
+*Note, these apply to Raspberry Pi models \<= 4*
 - [Do the PWM mod](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#improving-flicker)
 - [Reserve a CPU core solely for the display](https://github.com/hzeller/rpi-rgb-led-matrix?tab=readme-ov-file#cpu-use)
 - Lower the value for `LED_PWM_BITS` (though `8` seems good enough)

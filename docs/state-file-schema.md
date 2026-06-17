@@ -33,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 223 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.11.2.0 and newer*
+> *There are a total of 224 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.11.3.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -89,17 +89,19 @@ Represents stats based on the ADS-B site and related hardware.
 | `json_processing_time_ms` | Time spent parsing/processing the dump1090 JSON (in milliseconds) | float | 1.351 |
 | `json_processing_rate_MiB_per_sec` | Data processing throughput for the dump1090 JSON | float | 162.145 |
 | `filtering_and_algorithm_time_ms` | Time spent filtering the incoming data and running the selection algorithm (in milliseconds) | float | 7.322 |
+| `is_airspy` | True if FlightGazer detects a running airspy setup on the system | bool | False |
 | `receiver_stats` | Short dictionary of averaged receiver metrics - see `receiver_stats` section below | object | {"Gain": 32.8, "Noise": -28.6, "Strong": 0.046} |
 
-> *17 keys*
+> *18 keys*
 
 ### `receiver_stats` subkey
 Short dictionary describing the receiver's computed statistics.
+
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `Gain` | Receiver gain (unitless value as reported from the receiver) | float, null | 32.8 |
 | `Noise` | Measured noise floor in decibels (negative value) | float, null | -28.6 |
-| `Strong` | Percent of packets deemed strong (>3dBFS) as a percentage | float, null | 0.046 |
+| `Strong` | Percent of packets deemed strong (>3dBFS) as a percentage. If `is_airspy` is true, then `Strong` is overloaded and represents the detected preamble filter value. | float, null | 0.046 |
 
 > *3 keys*
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

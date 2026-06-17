@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.11.0.0
+# Last updated: v.11.3.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -95,6 +95,21 @@ config_default = {
     'HAT_PWM_ENABLED': True,
     'LED_PWM_BITS': 8,
 }
+config_advanced = {
+    "ADV_LED_PWM_LSB": 130,
+    "ADV_LED_HARDWARE_MAPPING": None,
+    "ADV_LED_ROW_ADDRESS_TYPE": 0,
+    "ADV_LED_MULTIPLEXING": 0,
+    "ADV_LED_SCAN_MODE": 0,
+    "ADV_LED_DISABLE_HARDWARE_PULSING": None,
+    "ADV_LED_INVERSE_COLORS": False,
+    "ADV_LED_RGB_SEQUENCE": 'RGB',
+    "ADV_LED_PANEL_TYPE": '',
+    "ADV_LED_PIXEL_MAPPER_CONFIG": '',
+    "ADV_LED_LIMIT_REFRESH_RATE": 0,
+    "ADV_LED_DISABLE_BUSY_WAITING": False,
+    "ADV_LED_PWM_DITHER_BITS": 0,
+}
 if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load_config:
     try:
         config = yaml.load(open(CONFIG_FILE, 'r'))
@@ -108,6 +123,11 @@ if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load
                 or config[key] is None
             ):
                 config[key] = config_default[key]
+        for advanced_key in config_advanced:
+            try:
+                config_advanced[advanced_key] = config[advanced_key]
+            except Exception:
+                pass
     else:
         config = config_default
 else:
@@ -161,25 +181,52 @@ class ImageScroller():
         self.progress_color = graphics.Color(227, 110, 0) # orange, like Rin Hoshizora or Matikanefukukitaru
 
         # Run with the following rgbmatrix options.
-        # nb: If these settings end up not working, then we simply won't have a splash screen
-        #     which is not a huge issue.
+        # (uses technique from the main python script)
         options = RGBMatrixOptions()
-        options.rows = 32
-        options.cols = 64
-        options.chain_length = 1
-        options.parallel = 1
-        options.row_address_type = 0
-        options.multiplexing = 0
-        options.pwm_lsb_nanoseconds = 130
-        options.led_rgb_sequence = "RGB"
-        options.pixel_mapper_config = ""
-        options.show_refresh_rate = 0
-        options.pwm_bits = config['LED_PWM_BITS']
-        options.gpio_slowdown = config['GPIO_SLOWDOWN']
-        options.brightness = 100
-        options.drop_privileges = False
-        options.hardware_mapping = "adafruit-hat-pwm" if config['HAT_PWM_ENABLED'] else "adafruit-hat"
-        options.disable_hardware_pulsing = False if config['HAT_PWM_ENABLED'] else True
+        valid_attr = [elem for elem in dir(options) if not elem.startswith('__')]
+        attribute_assignment = {
+            'hardware_mapping': (
+                config_advanced['ADV_LED_HARDWARE_MAPPING']
+                if config_advanced['ADV_LED_HARDWARE_MAPPING']
+                else (
+                    "adafruit-hat-pwm"
+                    if config['HAT_PWM_ENABLED']
+                    else "adafruit-hat"
+                )
+            ),
+            'disable_hardware_pulsing': (
+                config_advanced['ADV_LED_DISABLE_HARDWARE_PULSING']
+                if config_advanced['ADV_LED_DISABLE_HARDWARE_PULSING']
+                else (False if config['HAT_PWM_ENABLED'] else True)
+            ),
+            'rows': 32,
+            'cols': 64,
+            'chain_length': 1,
+            'parallel': 1,
+            'rp1_pio': 1,
+            'row_address_type': config_advanced['ADV_LED_ROW_ADDRESS_TYPE'],
+            'multiplexing': config_advanced['ADV_LED_MULTIPLEXING'],
+            'brightness': 100,
+            'pwm_lsb_nanoseconds': config_advanced['ADV_LED_PWM_LSB'],
+            'led_rgb_sequence': config_advanced['ADV_LED_RGB_SEQUENCE'],
+            'pixel_mapper_config': config_advanced['ADV_LED_PIXEL_MAPPER_CONFIG'],
+            'show_refresh_rate': 0,
+            'pwm_bits': config['LED_PWM_BITS'],
+            'gpio_slowdown': config['GPIO_SLOWDOWN'],
+            'scan_mode': config_advanced['ADV_LED_SCAN_MODE'],
+            'inverse_colors': config_advanced['ADV_LED_INVERSE_COLORS'],
+            'panel_type': config_advanced['ADV_LED_PANEL_TYPE'],
+            'limit_refresh_rate_hz': config_advanced['ADV_LED_LIMIT_REFRESH_RATE'],
+            'disable_busy_waiting': config_advanced['ADV_LED_DISABLE_BUSY_WAITING'],
+            'pwm_dither_bits': config_advanced['ADV_LED_PWM_DITHER_BITS'],
+            'drop_privileges': False,
+            'emulator_title': "Starting FlightGazer..."
+        }
+        for attr in valid_attr:
+            try:
+                setattr(options, attr, attribute_assignment[attr])
+            except Exception:
+                pass
         self.matrix = RGBMatrix(options=options)
 
     def draw_line(self, canvas, x_start:int, y_start:int, color, count:int):
@@ -253,7 +300,7 @@ class ImageScroller():
                     loaded_font,
                     1,
                     31,
-                    graphics.Color(30, 30, 30),
+                    graphics.Color(40, 40, 40),
                     f"VER:{VER_STR}",
                 )
 

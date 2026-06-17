@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.2.5 --- 2026-06-05'
+VERSION: str = 'v.11.3.0 --- 2026-06-17'
 import os
 import argparse
 import sys
@@ -562,9 +562,9 @@ UNITS_WX: int|None = 0
 PREFER_ICAO_CODES: bool = False
 EXTENDED_DETAILS: bool = False
 DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
-SCROLLING_SPEED: int = 25
+SCROLLING_SPEED: int = 30
 API_PERSISTENT_CACHE: bool = False
-IGNORE_AIRCRAFT_ICAOS: set | str = '' # new setting!
+IGNORE_AIRCRAFT_ICAOS: set | str = ''
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -724,7 +724,9 @@ general_stats: dict = {'Tracking': 0, 'Range': 0}
 `general_stats` = {`Tracking`, `Range`} """
 receiver_stats: dict = {'Gain': None, 'Noise': None, 'Strong': None}
 """ Receiver stats (if available). None values for keys if data is unavailable.
-`receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage} """
+`receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage}.
+If an airspy setup is detected, `Strong` is overloaded and represents the preamble filter level,
+as float. """
 
 # active plane stuff
 relevant_planes: list[dict] = []
@@ -868,6 +870,8 @@ USING_THREADPOOL: bool = False
 """ Enabled when both dump1090 and dump978 are available; also indicates the threadpool is available """
 is_readsb: bool = False
 """ Tweak text output if we're connected to wiedehopf's readsb instead of dump1090 """
+is_airspy: bool = False
+""" Tweak outputs if we're connected to an airspy setup """
 really_active_adsb_site: bool = False
 """ Indicates that the currently connected dump1090 instance encounters a lot of traffic.
 Formerly controlled the rare event log printout. Set by `runtime_accumulators_reset()` """
@@ -1448,6 +1452,7 @@ def probe978() -> str | None:
     if PREFER_LOCAL and is_posix:
         file_locations = [
             "/run/skyaware978",
+            "/run/adsb-feeder-dump978/skyaware978",
             "/run/adsb-feeder-ultrafeeder/skyaware978",
             "/run/adsbexchange-978",
         ]
@@ -1461,7 +1466,9 @@ def probe978() -> str | None:
     locations = [
         CUSTOM_DUMP978_LOCATION,
         "http://localhost:8978",
-        "http://localhost/skyaware978"
+        "http://localhost/skyaware978",
+        "http://localhost/dump978",
+        "http://localhost:9780/skyaware978"
     ]
 
     for json_978 in locations:
@@ -1997,6 +2004,26 @@ def read_receiver_stats() -> None:
     # inspired by https://github.com/wiedehopf/graphs1090/blob/master/dump1090.py
     if not DUMP1090_IS_AVAILABLE: return # don't start this thread if, only at startup, dump1090 is unavailable
     global receiver_stats
+    global is_airspy
+
+    # check what kind of SDR we're using before running
+    airspy = False
+    rtlsdr_stats = Path(URL, 'stats.json')
+    airspy_stats_locations = [
+        Path('/run/airspy_adsb/stats.json'),
+        Path('/run/adsb-feeder-airspy/airspy_adsb/stats.json')
+    ]
+    airspy_stats = None
+    if USING_FILESYSTEM:
+        # we need to wait for the airspy service to fully warm up, especially at system start
+        time.sleep(15)
+        for air_s in airspy_stats_locations:
+            if air_s.is_file():
+                airspy_stats = air_s
+                airspy = True
+                is_airspy = True
+                main_logger.info(f"Detected an Airspy setup ({airspy_stats.absolute()}) running on this system.")
+                break
 
     while True:
         if watchdog_triggers > (watchdog_setpoint - 1):
@@ -2009,52 +2036,68 @@ def read_receiver_stats() -> None:
         noise_now = None
         loud_percentage = None
         if DUMP1090_IS_AVAILABLE:
-            try:
-                if USING_FILESYSTEM:
-                    with open(Path(URL, "stats.json"), 'rb') as stats_file:
+            if not airspy:
+                try:
+                    if USING_FILESYSTEM:
+                        with open(rtlsdr_stats, 'rb') as stats_file:
+                            if ORJSON_IMPORTED:
+                                stats = orjson.loads(stats_file.read())
+                            else:
+                                stats = json.load(stats_file)
+                    else:
+                        receiver_req = session.get(URL + '/data/stats.json', headers=USER_AGENT, timeout=5)
+                        receiver_req.raise_for_status()
+                        receiver_data = receiver_req.content
+                        if ORJSON_IMPORTED:
+                            stats = orjson.loads(receiver_data)
+                        else:
+                            stats = json.loads(receiver_data)
+
+                    if has_key(stats, 'last1min'):
+                        try:
+                            noise_now = stats['last1min']['local']['noise']
+                        except KeyError:
+                            noise_now = None
+                        try:
+                            messages1min = stats['last1min']['messages']
+                            loud_messages = stats['last1min']['local']['strong_signals']
+                            if messages1min == 0:
+                                loud_percentage = 0
+                            else:
+                                loud_percentage = round((loud_messages / messages1min) * 100, 3)
+                        except KeyError:
+                            loud_percentage = None
+                    else:
+                        noise_now = None
+                        loud_percentage = None
+
+                    if has_key(stats, 'gain_db'):
+                        gain_now = stats['gain_db']
+                    else:
+                        gain_now = None
+
+                except Exception:
+                    pass
+            else:
+                try:
+                    with open(airspy_stats) as stats_file:
                         if ORJSON_IMPORTED:
                             stats = orjson.loads(stats_file.read())
                         else:
                             stats = json.load(stats_file)
-                else:
-                    receiver_req = session.get(URL + '/data/stats.json', headers=USER_AGENT, timeout=5)
-                    receiver_req.raise_for_status()
-                    receiver_data = receiver_req.content
-                    if ORJSON_IMPORTED:
-                        stats = orjson.loads(receiver_data)
-                    else:
-                        stats = json.loads(receiver_data)
-
-                if has_key(stats, 'last1min'):
-                    try:
-                        noise_now = stats['last1min']['local']['noise']
-                    except KeyError:
-                        noise_now = None
-                    try:
-                        messages1min = stats['last1min']['messages']
-                        loud_messages = stats['last1min']['local']['strong_signals']
-                        if messages1min == 0:
-                            loud_percentage = 0
-                        else:
-                            loud_percentage = round((loud_messages / messages1min) * 100, 3)
-                    except KeyError:
-                        loud_percentage = None
-                else:
-                    noise_now = None
-                    loud_percentage = None
-
-                if has_key(stats, 'gain_db'):
-                    gain_now = stats['gain_db']
-                else:
-                    gain_now = None
-
-            except Exception:
-                pass
+                    gain_now = stats['gain']
+                    noise_now = stats['noise']['median']
+                    loud_percentage = stats['preamble_filter']
+                except Exception:
+                    pass
 
         receiver_stats['Gain'] = gain_now
         receiver_stats['Noise'] = noise_now
         receiver_stats['Strong'] = loud_percentage
-        time.sleep(5) # don't need to poll too often
+        if not airspy:
+            time.sleep(10) # don't need to poll too often
+        else:
+            time.sleep(60) # airspy stats only updates once a minute
 
 def suntimes() -> None:
     """ Update sunrise and sunset times """
@@ -2845,7 +2888,10 @@ class PrintToConsole:
         if receiver_stats['Noise'] is not None:
             noise_str = f"{receiver_stats['Noise']}dB"
         if receiver_stats['Strong'] is not None:
-            loud_str = f"{receiver_stats['Strong']:.1f}%"
+            if not is_airspy:
+                loud_str = f"{receiver_stats['Strong']:.1f}%"
+            else:
+                loud_str = f"{receiver_stats['Strong']:.1f}"
 
         # collate general info
         gen_info = []
@@ -2887,7 +2933,10 @@ class PrintToConsole:
         if combined_feed:
             plane_stats.append("*")
         plane_stats.append(f" {distance_unit} | ")
-        plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
+        if not is_airspy:
+            plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
+        else:
+            plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Preamble filter: {loud_str}")
         print("".join(plane_stats))
 
         # API status line
@@ -5002,16 +5051,28 @@ class DisplayFeeder:
             recv_str.append(" ")
             # third section of receiver stats
             # "L__%" or "L---"
-            recv_str.append("L")
-            if receiver_stats['Strong'] is not None:
-                strong_rounded = int(round(receiver_stats['Strong'], 0))
-                if strong_rounded >= 100:
-                    recv_str.append("99%") # cap at 99%
+            # if airspy: "PF__" or "PF -"
+            if not is_airspy:
+                recv_str.append("L")
+                if receiver_stats['Strong'] is not None:
+                    strong_rounded = int(round(receiver_stats['Strong'], 0))
+                    if strong_rounded >= 100:
+                        recv_str.append("99%") # cap at 99%
+                    else:
+                        recv_str.append(f"{strong_rounded}%")
                 else:
-                    recv_str.append(f"{strong_rounded}")
-                    recv_str.append("%")
+                    recv_str.append(filler_text)
             else:
-                recv_str.append(filler_text)
+                recv_str.append("PF")
+                if receiver_stats['Strong'] is not None:
+                    strong_rounded = int(round(receiver_stats['Strong'], 0))
+                    if strong_rounded >= 100:
+                        recv_str.append("99") # Airspy's preamble filter tops out at 60, but who knows
+                    else:
+                        recv_str.append(f"{strong_rounded}".rjust(2))
+                else:
+                    recv_str.append(" -")
+
             receiver_string = "".join(recv_str)
         else:
             # Shown when watchdog is triggered or there's no initial connection.
@@ -5670,6 +5731,7 @@ class WriteState:
                                /(process_time2[2] * 1048576), 3)
                 ),
                 'filtering_and_algorithm_time_ms': process_time[1],
+                'is_airspy': is_airspy,
                 'receiver_stats': receiver_stats,
             }
 
@@ -7055,6 +7117,7 @@ class Display(
             'cols': RGB_COLS,
             'chain_length': 1,
             'parallel': 1,
+            'rp1_pio': 1, # on RPi5, offload the physical display rendering to the southbridge (almost 0 CPU use!)
             'row_address_type': ADV_LED_ROW_ADDRESS_TYPE,
             'multiplexing': ADV_LED_MULTIPLEXING,
             'brightness': BRIGHTNESS, # initial brightness, this can change at runtime

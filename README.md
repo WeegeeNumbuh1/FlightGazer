@@ -203,7 +203,7 @@ Using this project assumes you have the following:
 
 </details>
 
-**tl;dr** You need a running `dump1090` instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
+**tl;dr** You need a running `dump1090` (or related) instance and if it's not running on the same device as FlightGazer you need to know a valid URL to access its data.<br>
 You don't actually need a physical RGB display, but it's recommended. You can install this hardware later if you choose to do so.<br>
 Other ADS-B decoders will not work. Your site location needs to be set for most of the functionality to work.<br>
 *Note:* FlightGazer will not work with UAT-only setups and assumes single-site decoders (not a combined feed).
@@ -231,6 +231,12 @@ To begin:
 git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
 cd FlightGazer
 ```
+
+If you already have rgbmatrix hardware set up:
+```bash
+sudo bash FlightGazer-init.sh -m
+```
+
 Now, choose either one of these methods:
 #### Using the web-app
 Run this command exactly:

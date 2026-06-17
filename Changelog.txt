@@ -5,6 +5,19 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.3.0 - 2026-06-17
+    - Improved support for Raspberry Pi 5 to offload display rendering from the CPU
+        - Splash screens now support the advanced rgbmatrix settings in the main config file
+        - Requires the latest rgbmatrix library as of this Release
+    - Improved support for Airspy receiver metrics
+    - Various fixes:
+        - Improve dump978 detection with SDR-Enthusiasts docker/adsb.im images
+        - Fix database generator early exit when no database exists
+        - Fix system setup check in initialization script when using Live/Demo mode
+        - Improve rgbmatrix install script on minimal OS installs (e.g. DietPi)
+    - Bump up default scrolling speed to 30 FPS when using the marquee
+    - Operators database update
+
 v.11.2.5 - 2026-06-05
     - Aircraft database generator now uses dramatically lower writes when updating the database
         - Up to this point the generator simply rewrote all database entries

@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.2.5 # do not modify this
+CONFIG_VERSION: v.11.3.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -118,12 +118,12 @@ SHOW_EVEN_MORE_INFO: true
 # If using JOURNEY_PLUS, this information will replace the default center readout
 # and relocate RSSI in the bottom right with the aircraft track (vertical speed is no longer shown).
 
-SCROLLING_SPEED: 25
+SCROLLING_SPEED: 30
 # [Integer: 10 ~ 50]
 # Adjust how fast the SHOW_EVEN_MORE_INFO scrolling marquee moves, in frames per second.
 # Higher speeds may not be achievable depending on system conditions and configurations,
 # especially if using the display emulator.
-# Recommended to keep this value between 20-30 for readability.
+# Recommended to keep this value between 20-40 for readability.
 
 EXTENDED_DETAILS: false
 # [true/false]

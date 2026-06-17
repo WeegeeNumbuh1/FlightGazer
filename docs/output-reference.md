@@ -25,12 +25,12 @@
 | **Show Even More Info**<br>"TIS-B Contact" | Traffic Information Service – Broadcast - broadcast information sent by ground stations corresponding to an aircraft; cannot be tied to a registration or aircraft type and is used for collision avoidance. | [More Information](https://en.wikipedia.org/wiki/Traffic_information_service_%E2%80%93_broadcast) |
 
 ## Clock Center Row and Abbreviations
-*Valid for FlightGazer v.9.6.0 and newer*
+*Valid for FlightGazer v.11.3.0 and newer*
 
 | Layout | Description |
 | --- | --- |
 | `▲--:-- ▼--:--` | Sunrise & Sunset |
-| `G##.# N##.# L##%` | `G` = Receiver gain<br>`N` = Noise (negative value, higher is better)<br>`L` = Loud signals (percentage, lower is better) |
+| `G##.# N##.# L##%`<br>*or*<br>`G##.# N##.# PF##` | `G` = Receiver gain<br>`N` = Noise (negative value, higher is better)<br>`L` = Loud signals (percentage, lower is better)<br>`PF` = (*Airspy only*) Preamble filter level |
 | `ABC wk## d###` | `ABC` = Month abbreviation<br>`wk` = Week number of the year<br>`d` = Day number of the year<br> |
 | `##.#° ABCD ▼##` | Outside temperature (Celcius or Fahrenheit)<br>`ABCD` = Prevailing weather condition<br>Wind direction and speed (knots, mph, or m/s) |
 | `D##° V#.# C####` | `D` = Dew point (same unit as temperature)<br>`V` = Visibility (miles or kilometers)<br>`C` = Estimated cloud base (feet or meters) |

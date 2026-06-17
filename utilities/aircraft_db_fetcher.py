@@ -5,7 +5,7 @@ and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.2.5
+# Last updated: v.11.3.0
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -28,7 +28,10 @@ script_start = perf_counter()
 CURRENT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = Path(f"{CURRENT_DIR}/database.db")
 if os.name == 'posix':
-    DB_OWNER = OUTPUT_FILE.owner()
+    try:
+        DB_OWNER = OUTPUT_FILE.owner()
+    except Exception:
+        DB_OWNER = None
 URL = 'https://raw.githubusercontent.com/wiedehopf/tar1090-db/csv/aircraft.csv.gz'
 TYPES_URL = "https://github.com/wiedehopf/tar1090-db/raw/refs/heads/master/db/icao_aircraft_types2.js"
 leading_icao_chars = '0123456789ABCDEF'
@@ -114,13 +117,14 @@ if OUTPUT_FILE.exists():
     _connection.close()
     if _result is not None:
         current_db_ver = dict(_result).get('version', 'unknown')
-        if os.name == 'posix':
+        if os.name == 'posix' and DB_OWNER:
             chown(OUTPUT_FILE, user=DB_OWNER)
     else:
         current_db_ver = "unknown"
     print(f"Database already exists, current version: {current_db_ver}")
 else:
     print("Database is not present.")
+    journal_mode = None
 init_progress_percentage += 3 # 58
 update_init_progress()
 
@@ -450,7 +454,7 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
 
 conn.close()
 
-if os.name == 'posix':
+if os.name == 'posix' and DB_OWNER:
     chown(OUTPUT_FILE, user=DB_OWNER)
 
 db_size_new = OUTPUT_FILE.stat().st_size

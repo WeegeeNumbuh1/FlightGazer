@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.2.5
+# Version = v.11.3.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -215,6 +215,7 @@ while getopts ':cdefhlmtv' opt; do
 		LFLAG=true
 		VENVPATH=/tmp/FlightGazer-pyvenv
 		CHECK_FILE=${VENVPATH}/first_run_complete
+		CHECK_FILE2=${VENVPATH}/sys_dependencies_checked
 		;;
 		m)
 		MFLAG=true
@@ -688,6 +689,8 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 		if [ -f "${BASEDIR}/utilities/service_updater.py" ] && [ "$updateservice" = true ] && [ "$LFLAG" = false ]; then
 			echo -e "${FADE}"
 			echo "  > Updating systemd services..."
+			# note: the service updater is run when using the update script so the below should only run
+			# when the -c flag is used
 			python3 "${BASEDIR}/utilities/service_updater.py" "${THIS_FILE}"
 			if [ $? -eq 0 ]; then
 				systemctl daemon-reload >/dev/null 2>&1
