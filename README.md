@@ -100,12 +100,15 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp#what-it-looks-like)
 - Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
+- Built to work with existing setups like [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Airplanes.Live](https://airplanes.live/image-guide/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), [ADSB.im](https://adsb.im/home), and likely even more
+  - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 - Robust and stable enough for 24/7/365 operation
 
 <details><summary><b>More Features</b></summary>
 
 ### Adaptive & flexible
 - Automatically switches to other aircraft if more than one is within the area
+  - Uses data such as future position estimation, approach velocity, distance, airspace traffic, timeshare allocation, and automatic priority overrides to intellegently select the most appropriate aircraft
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
 - Clock uses your system's locale for weekday/month abbreviations
@@ -119,8 +122,6 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
   - Every element on the display can have its color set
   - Switch between font styles
   - and more
-- Built to work with [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), and [ADSB.im](https://adsb.im/home) setups
-  - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 
 ### Other good stuff
 - Highly optimized and fast
@@ -226,7 +227,8 @@ There are two approaches:
 - Using the web-app (recommended)
 - Installing the traditional way (a little more involved)
 
-To begin:
+To begin:<br>
+First, get `ssh` access to your system. Once you have access to it, run the below commands:<br>
 ```
 git clone --depth=1 https://github.com/WeegeeNumbuh1/FlightGazer
 cd FlightGazer

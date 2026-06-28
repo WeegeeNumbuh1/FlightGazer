@@ -2,12 +2,12 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.3.0
+# Version = v.11.4.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
 STARTMONOTONIC=$(cat /proc/uptime | awk '{print $1}')
-BASEDIR=$(cd `dirname -- $0` && pwd)
+BASEDIR=$(cd $(dirname -- $0) && pwd)
 export PYTHONUNBUFFERED=1
 export PIP_ROOT_USER_ACTION=ignore # hide pip complaining we're using root
 VENVPATH=/etc/FlightGazer-pyvenv
@@ -245,7 +245,7 @@ if [ -f "${BASEDIR}/version" ]; then
 	# VERSION_MAJOR=$(echo "$VER_STR" | cut -d '.' -f1)
 	echo -e "    Version: ${VER_STR}"
 fi
-if [ `id -u` -ne 0 ]; then
+if [ $(id -u) -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
 	sleep 1s
 	exit 1

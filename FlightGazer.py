@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.3.0 --- 2026-06-17'
+VERSION: str = 'v.11.4.0 --- 2026-06-27'
 import os
 import argparse
 import sys
@@ -60,6 +60,7 @@ import unicodedata
 import traceback
 import faulthandler
 from io import BufferedWriter
+import concurrent.futures as CF
 
 if __name__ != '__main__':
     print("FlightGazer cannot be imported as a module.")
@@ -565,6 +566,7 @@ DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
 SCROLLING_SPEED: int = 30
 API_PERSISTENT_CACHE: bool = False
 IGNORE_AIRCRAFT_ICAOS: set | str = ''
+NO_DUMP978_SEARCH: bool = True # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -638,6 +640,7 @@ default_settings: dict = {
     "SCROLLING_SPEED": SCROLLING_SPEED,
     "API_PERSISTENT_CACHE": API_PERSISTENT_CACHE,
     "IGNORE_AIRCRAFT_ICAOS": IGNORE_AIRCRAFT_ICAOS,
+    "NO_DUMP978_SEARCH": NO_DUMP978_SEARCH,
 }
 """ Dict of default settings """
 
@@ -1432,6 +1435,7 @@ def probe1090() -> tuple[str | None, str | None]:
         "http://localhost/tar1090",
         "http://localhost/skyaware",
         "http://localhost/dump1090-fa",
+        "http://localhost:1090",
         "http://localhost:8080",
     ]
 
@@ -1453,13 +1457,12 @@ def probe978() -> str | None:
         file_locations = [
             "/run/skyaware978",
             "/run/adsb-feeder-dump978/skyaware978",
-            "/run/adsb-feeder-ultrafeeder/skyaware978",
             "/run/adsbexchange-978",
         ]
         for _, json_978 in enumerate(file_locations):
             if Path(json_978, "aircraft.json").is_file():
                 USING_FILESYSTEM_978 = True
-                main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
+                main_logger.info("A local working dump978 instance was found running on this system.")
                 return json_978 + '/aircraft.json'
         main_logger.debug("No local running instance of dump978 present on the system, falling back to using the network.")
 
@@ -1477,13 +1480,6 @@ def probe978() -> str | None:
         try:
             test1 = requests.get(json_978 + '/data/aircraft.json', headers=USER_AGENT, timeout=0.5)
             test1.raise_for_status()
-            if json_978 == CUSTOM_DUMP978_LOCATION:
-                main_logger.info("Successfully found dump978 at the custom location.")
-            else:
-                if CUSTOM_DUMP978_LOCATION:
-                    main_logger.info(f"Found a different dump978 instance instead, at \'{json_978}\'")
-                else:
-                    main_logger.info(f"dump978 detected as well, at \'{json_978}\'")
             return json_978 + '/data/aircraft.json'
         except Exception:
             continue
@@ -1495,11 +1491,10 @@ def dump1090_check() -> None:
     global DUMP1090_JSON, URL, DUMP978_JSON, DUMP1090_IS_AVAILABLE
     if CUSTOM_DUMP1090_LOCATION:
         main_logger.info(f"Custom dump1090 location is set: \'{CUSTOM_DUMP1090_LOCATION}\'")
-    main_logger.info("Searching for dump1090...")
-    if PREFER_LOCAL and not is_posix:
-        main_logger.info("PREFER_LOCAL is enabled but this is not a posix system. Falling back to using the network.")
-    for wait in range(3):
-        tries = 3 - wait
+
+    attempts = 4
+    for wait in range(1, attempts + 1):
+        tries = attempts - wait
         DUMP1090_JSON, URL = probe1090()
         if DUMP1090_JSON is not None:
             if URL == CUSTOM_DUMP1090_LOCATION:
@@ -1510,13 +1505,12 @@ def dump1090_check() -> None:
                 else:
                     main_logger.info(f"Found dump1090 at \'{URL}\'")
             DUMP1090_IS_AVAILABLE = True
-            break
+            return
         else:
-            main_logger.info("Could not find dump1090 json. dump1090 may not be loaded yet. "
-                             f"Waiting 10 seconds and trying {tries} more time(s).")
-            time.sleep(10)
-    else: # try it again one last time
-        DUMP1090_JSON, URL = probe1090()
+            if tries > 0:
+                main_logger.info("Could not find dump1090 json. dump1090 may not be loaded yet. "
+                                f"Waiting 10 seconds and trying {tries} more time(s).")
+                time.sleep(10)
 
     if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
@@ -1526,14 +1520,36 @@ def dump1090_check() -> None:
         else:
             main_logger.critical("dump1090 not found. Additionally, screen resources are missing!")
             # no need to write the semaphore here, it's done by the main thread
-    if DUMP1090_JSON:
-        if CUSTOM_DUMP978_LOCATION:
-            main_logger.info(f"Custom dump978 location is set: \'{CUSTOM_DUMP978_LOCATION}\'")
-        DUMP978_JSON = probe978() # we don't wait for this one as it's usually not present
-        if CUSTOM_DUMP978_LOCATION and DUMP978_JSON is None:
-            main_logger.warning("Could not find dump978.")
-    else:
-        DUMP978_JSON = None
+
+def dump978_check() -> None:
+    """ Check for dump978 as well. (should be run concurrently with `dump1090_check()` to save on load times)"""
+    global DUMP978_JSON
+    if CUSTOM_DUMP978_LOCATION:
+        main_logger.info(f"Custom dump978 location is set: \'{CUSTOM_DUMP978_LOCATION}\'")
+
+    attempts = 3
+    for wait in range(1, attempts + 1):
+        tries = attempts - wait
+        json_978 = probe978()
+        if json_978 is not None:
+            if json_978 == CUSTOM_DUMP978_LOCATION + '/data/aircraft.json':
+                main_logger.info("Successfully found dump978 at the custom location.")
+            else:
+                if CUSTOM_DUMP978_LOCATION:
+                    main_logger.info(f"Found a different dump978 instance instead, at \'{json_978}\'")
+                else:
+                    main_logger.info(f"Found dump978 at \'{json_978}\'")
+            DUMP978_JSON = json_978
+            return
+        else:
+            if tries > 0:
+                main_logger.info("Could not find dump978 json. dump978 may not be loaded yet. "
+                                f"Waiting 10 seconds and trying {tries} more time(s).")
+                time.sleep(10)
+
+    if not json_978:
+        main_logger.info("Failed to find dump978.")
+    DUMP978_JSON = json_978
 
 def read_1090_config() -> None:
     """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to. """
@@ -1887,6 +1903,9 @@ def configuration_check() -> None:
 
     if NO_GROUND_TRACKING and not NOFILTER_MODE:
         main_logger.info("NO_GROUND_TRACKING is enabled, FlightGazer will ignore aircraft on the ground.")
+
+    if not NO_DUMP978_SEARCH:
+        main_logger.info("NO_DUMP978_SEARCH is disabled, FlightGazer will search for both dump1090 and dump978.")
 
     if ORJSON_IMPORTED:
         main_logger.debug("orjson module imported and will be used for faster dump1090 json decoding.")
@@ -9059,14 +9078,29 @@ schedule.every().day.at("23:59:58").do(flyby_stats) # get us the day's total cou
 schedule.every().hour.do(get_ip) # in case the IP changes
 
 try:
-    dump1090_check()
+    if PREFER_LOCAL and not is_posix:
+        main_logger.info("PREFER_LOCAL is enabled but this is not a posix system. Falling back to using the network.")
+    if NO_DUMP978_SEARCH:
+        main_logger.info("Searching for dump1090...")
+        dump1090_check()
+    else:
+        main_logger.info("Beginning search for both dump1090 and dump978...")
+        with CF.ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="search-thread"
+            ) as search_thread_executor:
+            search_futures = [
+                search_thread_executor.submit(dump1090_check),
+                search_thread_executor.submit(dump978_check)
+                ]
+            for search_future in CF.as_completed(search_futures):
+                _ = search_future.result()
 except (ImportError, KeyboardInterrupt):
     main_logger.critical("Exit commanded before full initialization could complete.")
     sys.exit(1)
 
 if DUMP1090_JSON and DUMP978_JSON:
     main_logger.info("Both dump1090 and dump978 are available, setting up speed tweaks...")
-    import concurrent.futures as CF
     data_threadpool = CF.ThreadPoolExecutor(max_workers=2, thread_name_prefix="data-fetcher-worker")
     USING_THREADPOOL = True
     main_logger.info("Tweaks applied.")

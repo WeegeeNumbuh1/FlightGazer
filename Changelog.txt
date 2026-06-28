@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.0 - 2026-06-27
+    - Improved dump1090 and dump978 searching
+        - Designed to handle service startup delays at system start when a dual receiver setup is used
+        - With this reworked feature, a new setting (NO_DUMP978_SEARCH) to disable dump978 searching has been
+          added to shorten startup times (enabled by default)
+
 v.11.3.0 - 2026-06-17
     - Improved support for Raspberry Pi 5 to offload display rendering from the CPU
         - Splash screens now support the advanced rgbmatrix settings in the main config file
