@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.1 - 2026-07-05
+    - Fix issue when dump978 isn't searched and causes the main script to crash
+    - When installing the webapp on an adsb.im image (not the adsb.im app), webserver proxying is disabled to allow the
+      image to do the proxying natively
+    - Minor output tweaks for dump978 discovery
+
 v.11.4.0 - 2026-06-27
     - Improved dump1090 and dump978 searching
         - Designed to handle service startup delays at system start when a dual receiver setup is used

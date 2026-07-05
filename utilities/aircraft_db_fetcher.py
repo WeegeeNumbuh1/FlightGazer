@@ -5,7 +5,7 @@ and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.3.0
+# Last updated: v.11.4.1
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -361,6 +361,8 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
 
     print("Initializing tables...")
     table_start = perf_counter()
+    if REBUILD:
+        print("Rebuilding...")
     for char in leading_icao_chars:
         cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS ICAO_{char} (
@@ -374,9 +376,9 @@ with sqlite3.connect(OUTPUT_FILE) as conn:
             );
         """)
         if REBUILD:
-            print("Rebuilding.")
             cursor.execute(f"DELETE FROM ICAO_{char}")
-            print(f"Table initialization took {perf_counter() - table_start:.2f} seconds.")
+    if REBUILD:
+        print(f"Table initialization took {perf_counter() - table_start:.2f} seconds.")
 
     # process types data if available
     types_map = None

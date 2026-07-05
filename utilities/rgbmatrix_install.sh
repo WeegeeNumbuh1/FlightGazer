@@ -3,7 +3,7 @@
 # Installs the latest version of the rgbmatrix library
 # and makes it available as a system-wide Python module.
 # This will only build on a Raspberry Pi!
-# Last updated: v.11.3.0 (June 2026)
+# Last updated: v.11.4.1 (July 2026)
 # By: WeegeeNumbuh1
 
 GREEN='\033[0;32m'
@@ -11,7 +11,7 @@ ORANGE='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 FADE='\033[2m'
-BASEDIR=$(cd `dirname -- $0` && pwd)
+BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
 export PIP_ROOT_USER_ACTION=ignore
 export MAX_JOBS=1
 export CMAKE_BUILD_PARALLEL_LEVEL=1
@@ -24,7 +24,7 @@ COMMIT=02fb09a6099c84b7bc76cdfa231338d8ca81ed6d
 echo -ne "\033]0;rgbmatrix installer\007" # set window title
 echo -e "\n${ORANGE}>>> Welcome to the rgbmatrix installer! (for FlightGazer)${NC}"
 
-if [ `id -u` -ne 0 ]; then
+if [ $(id -u) -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
 	sleep 1s
 	exit 1

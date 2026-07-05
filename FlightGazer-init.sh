@@ -2,12 +2,12 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.4.0
+# Version = v.11.4.1
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
 STARTMONOTONIC=$(cat /proc/uptime | awk '{print $1}')
-BASEDIR=$(cd $(dirname -- $0) && pwd)
+BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
 export PYTHONUNBUFFERED=1
 export PIP_ROOT_USER_ACTION=ignore # hide pip complaining we're using root
 VENVPATH=/etc/FlightGazer-pyvenv

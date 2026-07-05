@@ -2,10 +2,10 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.11.2.0
+# Last updated: v.11.4.1
 # by: WeegeeNumbuh1
 
-BASEDIR=$(cd `dirname -- $0` && pwd)
+BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
 TEMPPATH=/tmp/FlightGazer-tmp
 VENVPATH=/etc/FlightGazer-pyvenv
 GREEN='\033[0;32m'
@@ -33,7 +33,7 @@ echo "                           _/    _/ _/    _/   _/     _/       _/         
 echo "                            _/_/_/   _/_/_/ _/_/_/_/   _/_/_/ _/          ";
 echo -e "${NC}"
 echo -e "\n${ORANGE}>>> FlightGazer Web Interface installer script started.${NC}"
-if [ `id -u` -ne 0 ]; then
+if [ $(id -u) -ne 0 ]; then
 	>&2 echo -e "${RED}>>> ERROR: This script must be run as root.${NC}"
 	sleep 1s
 	exit 1
@@ -60,6 +60,13 @@ wget -q --timeout=10 --spider http://github.com
 if [ $? -ne 0 ]; then
 	>&2 echo -e "${NC}${RED}>>> ERROR: Failed to connect to internet. Try again when there is internet connectivity.${NC}"
 	exit 1
+fi
+
+# only for production images; dev stuff or as an app won't apply
+if [ ! -f '/opt/adsb/os.adsb.feeder.image' ]; then
+	ADSBIM=0
+else
+	ADSBIM=1
 fi
 
 venv_install() {
@@ -219,77 +226,95 @@ if [ $? -eq 1 ]; then
 	| xargs apt-get install -y >/dev/null
 fi
 # https://stackoverflow.com/a/33550399
-NET_IF=`netstat -rn | awk '/^0.0.0.0/ {thif=substr($0,74,10); print thif;} /^default.*UG/ {thif=substr($0,65,10); print thif;}'`
-NET_IP=`ifconfig ${NET_IF} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1'`
+NET_IF=$(netstat -rn | awk '/^0.0.0.0/ {thif=substr($0,74,10); print thif;} /^default.*UG/ {thif=substr($0,65,10); print thif;}')
+NET_IP=$(ifconfig "${NET_IF}" | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
 
 # Programatically install entries for nginx, Apache, or lighttpd that redirects
 # port 9898 to the directory '/flightgazer'
-if command -v nginx >/dev/null 2>&1; then
-	echo -e "> Detected nginx. Configuring reverse proxy for FlightGazer webapp...${FADE}"
-	NGINX_CONF_PATH="/etc/nginx/sites-available/flightgazer-webapp"
-	cat <<- 'EOF' > $NGINX_CONF_PATH
-server {
-	listen 80;
-	server_name _;
-	location /flightgazer/ {
-		proxy_pass http://127.0.0.1:9898;
-		proxy_set_header Host $host;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto $scheme;
+if [ $ADSBIM -eq 0 ]; then
+	if command -v nginx >/dev/null 2>&1; then
+		echo -e "> Detected nginx. Configuring reverse proxy for FlightGazer webapp...${FADE}"
+		NGINX_CONF_PATH="/etc/nginx/sites-available/flightgazer-webapp"
+		cat <<- 'EOF' > $NGINX_CONF_PATH
+	server {
+		listen 80;
+		server_name _;
+		location /flightgazer/ {
+			proxy_pass http://127.0.0.1:9898;
+			proxy_set_header Host $host;
+			proxy_set_header X-Real-IP $remote_addr;
+			proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+			proxy_set_header X-Forwarded-Proto $scheme;
+		}
 	}
-}
-EOF
-	ln -sf $NGINX_CONF_PATH /etc/nginx/sites-enabled/flightgazer-webapp
-	nginx -t && systemctl reload nginx
-	echo -e "${NC}> nginx configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
-	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
-elif command -v apache2 >/dev/null 2>&1; then
-	echo -e "> Detected Apache. Configuring reverse proxy for FlightGazer webapp...${FADE}"
-	APACHE_CONF_PATH="/etc/apache2/sites-available/flightgazer-webapp.conf"
-	cat <<- 'EOF' > $APACHE_CONF_PATH
-<VirtualHost *:80>
-	ServerName localhost
-	ProxyPreserveHost On
-	ProxyPass /flightgazer/ http://127.0.0.1:9898/
-	ProxyPassReverse /flightgazer/ http://127.0.0.1:9898/
-</VirtualHost>
-EOF
-	a2enmod proxy proxy_http
-	a2ensite flightgazer-webapp
-	systemctl reload apache2
-	echo -e "${NC}> Apache configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
-	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
-elif command -v lighttpd >/dev/null 2>&1; then
-	echo -e "> Detected Lighttpd. Configuring reverse proxy for FlightGazer webapp...${FADE}"
-	LIGHTTPD_CONF_PATH="/etc/lighttpd/conf-available/98-flightgazer-webapp.conf"
-	cat <<- 'EOF' > $LIGHTTPD_CONF_PATH
-server.modules += ( "mod_proxy" )
-#url.rewrite-once = (
-#    "^/flightgazer/(.*)" => "/$1",
-#    "^/flightgazer$" => "/"
-#)
-$HTTP["url"] =~ "^/flightgazer($|/)" {
-    proxy.server = (
-        "/flightgazer" => ((
-            "host" => "127.0.0.1",
-            "port" => 9898
-        ))
-    )
-}
-EOF
-	lighttpd-enable-mod proxy
-	lighttpd-enable-mod flightgazer-webapp
-	systemctl restart lighttpd
-	echo -e "${NC}> Lighttpd configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
-	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
+	EOF
+		ln -sf $NGINX_CONF_PATH /etc/nginx/sites-enabled/flightgazer-webapp
+		nginx -t && systemctl reload nginx
+		echo -e "${NC}> nginx configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+		echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
+	elif command -v apache2 >/dev/null 2>&1; then
+		echo -e "> Detected Apache. Configuring reverse proxy for FlightGazer webapp...${FADE}"
+		APACHE_CONF_PATH="/etc/apache2/sites-available/flightgazer-webapp.conf"
+		cat <<- 'EOF' > $APACHE_CONF_PATH
+	<VirtualHost *:80>
+		ServerName localhost
+		ProxyPreserveHost On
+		ProxyPass /flightgazer/ http://127.0.0.1:9898/
+		ProxyPassReverse /flightgazer/ http://127.0.0.1:9898/
+	</VirtualHost>
+	EOF
+		a2enmod proxy proxy_http
+		a2ensite flightgazer-webapp
+		systemctl reload apache2
+		echo -e "${NC}> Apache configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+		echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
+	elif command -v lighttpd >/dev/null 2>&1; then
+		echo -e "> Detected Lighttpd. Configuring reverse proxy for FlightGazer webapp...${FADE}"
+		LIGHTTPD_CONF_PATH="/etc/lighttpd/conf-available/98-flightgazer-webapp.conf"
+		cat <<- 'EOF' > $LIGHTTPD_CONF_PATH
+	server.modules += ( "mod_proxy" )
+	#url.rewrite-once = (
+	#    "^/flightgazer/(.*)" => "/$1",
+	#    "^/flightgazer$" => "/"
+	#)
+	$HTTP["url"] =~ "^/flightgazer($|/)" {
+		proxy.server = (
+			"/flightgazer" => ((
+				"host" => "127.0.0.1",
+				"port" => 9898
+			))
+		)
+	}
+	EOF
+		lighttpd-enable-mod proxy
+		lighttpd-enable-mod flightgazer-webapp
+		systemctl restart lighttpd
+		echo -e "${NC}> Lighttpd configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+		echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
+	else
+		echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
+		echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
+		echo "You can still access the web interface at:"
+		echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
+		echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
+	fi
 else
-	echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
-	echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
-	echo "You can still access the web interface at:"
+	echo -e "${ORANGE}>>> Detected that this is an adsb.im image!${NC}"
+	echo "The webpage should be automatically proxied to:"
+	echo -e "${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
+	echo -e "or ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
+	echo ""
+	echo "You might need to restart the system or 'adsb-docker.service'"
+	echo "for the web-app to be proxied successfully."
+	sleep 3s
+	echo "A new 'FlightGazer' entry will be available at the main"
+	echo "adsb.im page and under the 'System' dropdown section."
+	sleep 5s
+	echo "If this fails, you can always reach the web-app at:"
 	echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
 	echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
 fi
+
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
 service_file
 systemctl enable flightgazer-webapp.service 2>&1

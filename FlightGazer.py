@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.0 --- 2026-06-27'
+VERSION: str = 'v.11.4.1 --- 2026-07-05'
 import os
 import argparse
 import sys
@@ -730,6 +730,10 @@ receiver_stats: dict = {'Gain': None, 'Noise': None, 'Strong': None}
 `receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage}.
 If an airspy setup is detected, `Strong` is overloaded and represents the preamble filter level,
 as float. """
+DUMP1090_JSON: str | None = None
+""" Where we're pulling dump1090 data from """
+DUMP978_JSON: str | None = None
+""" Where dump978 data is, if loaded """
 
 # active plane stuff
 relevant_planes: list[dict] = []
@@ -1451,7 +1455,8 @@ def probe1090() -> tuple[str | None, str | None]:
     return None, None
 
 def probe978() -> str | None:
-    """ Check if dump978 exists and returns its `URL` or None if not found. """
+    """ Check if dump978 exists and returns its `URL` or None if not found.
+    Will also set `USING_FILESYSTEM_978` when it detects a local dump978 setup. """
     global USING_FILESYSTEM_978
     if PREFER_LOCAL and is_posix:
         file_locations = [
@@ -1532,13 +1537,18 @@ def dump978_check() -> None:
         tries = attempts - wait
         json_978 = probe978()
         if json_978 is not None:
-            if json_978 == CUSTOM_DUMP978_LOCATION + '/data/aircraft.json':
+            if USING_FILESYSTEM_978:
+                json978str = f"{json_978[:-14]}"
+            else:
+                json978str = f"{json_978[:-19]}"
+
+            if json978str == CUSTOM_DUMP978_LOCATION:
                 main_logger.info("Successfully found dump978 at the custom location.")
             else:
                 if CUSTOM_DUMP978_LOCATION:
-                    main_logger.info(f"Found a different dump978 instance instead, at \'{json_978}\'")
+                    main_logger.info(f"Found a different dump978 instance instead, at \'{json978str}\'")
                 else:
-                    main_logger.info(f"Found dump978 at \'{json_978}\'")
+                    main_logger.info(f"Found dump978 at \'{json978str}\'")
             DUMP978_JSON = json_978
             return
         else:
@@ -1548,7 +1558,7 @@ def dump978_check() -> None:
                 time.sleep(10)
 
     if not json_978:
-        main_logger.info("Failed to find dump978.")
+        main_logger.info("Failed to find dump978. No UAT data will be used this session.")
     DUMP978_JSON = json_978
 
 def read_1090_config() -> None:
