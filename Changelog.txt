@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.2 - 2026-07-07
+    - Slight download speed improvements for the database fetcher and operators generator
+    - Improved logging for unhandled exceptions
+    - Minor logic tweaks to the updater script
+
 v.11.4.1 - 2026-07-05
     - Fix issue when dump978 isn't searched and causes the main script to crash
     - When installing the webapp on an adsb.im image (not the adsb.im app), webserver proxying is disabled to allow the

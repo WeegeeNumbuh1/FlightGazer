@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.1 --- 2026-07-05'
+VERSION: str = 'v.11.4.2 --- 2026-07-07'
 import os
 import argparse
 import sys
@@ -243,6 +243,23 @@ def write_bad_state_semaphore(write_the_file: bool, bypass: bool = False) -> Non
     except Exception:
         pass
 
+unexpected_oops: int = 0
+""" Amount of errors we didn't expect (tracked to prevent log spamming) """
+def catcher(exctype, value, tb):
+    """ Catch uncaught exceptions and dump to log.
+    https://stackoverflow.com/a/73119119 """
+    global unexpected_oops
+    unexpected_oops += 1
+    cutoff = 50
+    if unexpected_oops < cutoff:
+        main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
+    elif unexpected_oops == cutoff:
+        main_logger.error(f"Unhandled error count has reached {cutoff}, suppressing further errors to prevent log spam.")
+        main_logger.error("Please report this problem to the developer.")
+        # there really shouldn't be this many unhandled errors
+        write_bad_state_semaphore(True)
+
+sys.excepthook = catcher
 main_logger.info("==============================================================")
 main_logger.info("===                 Welcome to FlightGazer!                ===")
 main_logger.info("==============================================================")
@@ -986,8 +1003,6 @@ watchdog_setpoint: int = 3
 """ How many times the watchdog is allowed to be triggered before permanently disabling dump1090 tracking """
 display_failures: int = 0
 """ Track how many times the display broke """
-unexpected_oops: int = 0
-""" How many errors we didn't expect have occurred (tracked to prevent log spamming) """
 
 # hashable objects for our cross-thread signaling
 DATA_UPDATED: str = "updated-data"
@@ -1050,6 +1065,8 @@ def cleanup() -> None:
     # shutdown all threads
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
+    session.close()
+    if API_KEY: API_session.close()
     # final cleanup
     flyby_stats()
     if DATABASE_CONNECTED: db.close()
@@ -1240,19 +1257,6 @@ def strip_accents(s: str, skip_fallback: bool = False) -> str:
         return s
     else:
         return ''.join([s_ if s_.isascii() else "_" for s_ in s])
-
-def catcher(exctype, value, tb):
-    """ Catch unhandled exceptions and dump to log.
-    https://stackoverflow.com/a/73119119 """
-    global unexpected_oops
-    unexpected_oops += 1
-    cutoff = 50
-    if unexpected_oops < cutoff:
-        main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
-    elif unexpected_oops == cutoff:
-        main_logger.error(f"Unhandled error count has reached {cutoff}, suppressing further errors to prevent log spam.")
-        # there really shouldn't be this many unhandled errors
-        write_bad_state_semaphore(True)
 
 def dxing_log() -> None:
     """ If `super_far_plane` has data, print the contents to the log. """
@@ -9285,7 +9289,6 @@ def main() -> None:
     main_logger.info("=========================================")
     if INTERACTIVE:
         main_logger.removeHandler(main_logger.handlers[0]) # remove the logger stdout stream
-    sys.excepthook = catcher
     if is_posix:
         faultdump_handle = open(FAULTDUMP, 'w')
         faulthandler.enable(faultdump_handle, all_threads=True)

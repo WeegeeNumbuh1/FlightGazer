@@ -1,7 +1,7 @@
 #!/bin/bash
 {
 # Updater script for FlightGazer
-# Last updated: v.11.0.0
+# Last updated: v.11.4.2
 # by: WeegeeNumbuh1
 
 # Notice the '{' in the second line:
@@ -124,10 +124,14 @@ if [ -z $LATEST_VER ]; then
 else
 	echo -e "> Latest version available on GitHub: ${LATEST_VER}"
 fi
-if [ "$VER_STR" == "$LATEST_VER" ]; then
+if [ -z $LATEST_VER ]; then
+	echo ""
+	echo -e "> ${ORANGE}WARNING: only continue the update if you know what you're doing!${NC}"
+	echo ""
+elif [ "$VER_STR" == "$LATEST_VER" ]; then
 	echo "> The currently installed version is the same as what is available online."
 	echo "  Choosing to continue the update will cause FlightGazer"
-	echo "  to automatically check its dependencies on restart."
+	echo "  to automatically check its dependencies when it restarts."
 else
 	echo -e "> ${GREEN}An update is available!${NC}"
 fi

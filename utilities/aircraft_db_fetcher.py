@@ -5,7 +5,7 @@ and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.4.1
+# Last updated: v.11.4.2
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
@@ -89,6 +89,7 @@ def systemd_notify(message: str) -> None:
     with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM | socket.SOCK_CLOEXEC) as sock:
         sock.sendto(message.encode(), notify_socket)
 
+fetcher_session = requests.Session()
 current_db_ver = None
 if (jrnl := Path(f"{CURRENT_DIR}/database.db-journal")).exists():
     print("Warning: It appears this script was terminated before it could write\n"
@@ -129,7 +130,10 @@ init_progress_percentage += 3 # 58
 update_init_progress()
 
 try:
-    get_db_ver = requests.get("https://raw.githubusercontent.com/wiedehopf/tar1090-db/refs/heads/csv/version", timeout=5)
+    get_db_ver = fetcher_session.get(
+        "https://raw.githubusercontent.com/wiedehopf/tar1090-db/refs/heads/csv/version",
+        timeout=5
+    )
     get_db_ver.raise_for_status()
     if get_db_ver.status_code == 200:
         db_ver = get_db_ver.text.strip()
@@ -139,11 +143,13 @@ try:
 except requests.RequestException as e:
     print(f"Failed to fetch the database version from online: {e}")
     print(f"Unable to continue.")
+    fetcher_session.close()
     sys.exit(1)
 
 if current_db_ver is not None:
     print(f"Database version available online:        {db_ver}")
     if current_db_ver == db_ver:
+        fetcher_session.close()
         print("Database versions are the same, no need to update.")
         print("\n***** Done. *****")
         sys.exit(0)
@@ -153,14 +159,16 @@ if current_db_ver is not None:
 print("Downloading aircraft data from the tar1090-db repository...")
 download_start = perf_counter()
 try:
-    response = requests.get(URL, timeout=10)
+    response = fetcher_session.get(URL, timeout=10)
     download_end = (perf_counter() - download_start)
     response.raise_for_status()
     if response.status_code != 200:
         print(f"Failed to download the CSV file. Status code: {response.status_code}")
+        fetcher_session.close()
         sys.exit(1)
 except requests.RequestException as e:
     print(f"Failed to download the CSV file: {e}")
+    fetcher_session.close()
     sys.exit(1)
 download_size = len(response.content)
 print(f"Successfully downloaded {(download_size / (1024 * 1024)):.2f} "
@@ -172,7 +180,7 @@ print("Fetching aircraft types data...")
 types_data_available = False
 try:
     types_download_start = perf_counter()
-    types_response = requests.get(TYPES_URL, timeout=10)
+    types_response = fetcher_session.get(TYPES_URL, timeout=10)
     types_response.raise_for_status()
     if types_response.status_code != 200:
         print(f"Failed to download the aircraft types data. Status code: {types_response.status_code}")
@@ -185,6 +193,7 @@ except requests.RequestException as e:
     print("Continuing without aircraft types data.\n"
           "This may affect the accuracy of aircraft type descriptions for some ICAO addresses.")
 
+fetcher_session.close()
 init_progress_percentage += 4 # 62
 update_init_progress()
 """ Programmer's notes: The way the original version of this script handled the database was to:

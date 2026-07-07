@@ -3,7 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: v.11.2.2
+# Last updated: v.11.4.2
 
 import sys
 
@@ -101,6 +101,7 @@ with the release schedule in Section 1-1-6
 If you plan to use this module in other projects, please reference the original project:
 https://github.com/WeegeeNumbuh1/FlightGazer \"\"\"\n\n"""
 fg_db_verstr = 'Unknown'
+fetcher_session = requests.Session()
 
 def dict_lookup(list_of_dicts: list, key: str, search_term: str) -> dict | None:
     """ Function pulled directly from FlightGazer """
@@ -149,7 +150,7 @@ def fg_db_fetcher() -> dict:
     download_start = perf_counter()
     print("Pulling additional data from the FlightGazer-airlines-db database...")
     try:
-        dataset2 = requests.get(fg_db, timeout=5)
+        dataset2 = fetcher_session.get(fg_db, timeout=5)
         dataset2.raise_for_status()
         download_end = (perf_counter() - download_start)
         if dataset2.status_code != 200:
@@ -161,7 +162,7 @@ def fg_db_fetcher() -> dict:
     print(f"Successfully downloaded {(download_size / (1024 * 1024)):.2f} "
          f"MiB of data in {download_end:.2f} seconds.")
     try:
-        db_ver = requests.get(fg_db_ver, timeout=5)
+        db_ver = fetcher_session.get(fg_db_ver, timeout=5)
         fg_db_verstr = db_ver.text.strip()
         print(f"Using database version: {fg_db_verstr}")
     except Exception:
@@ -185,9 +186,10 @@ def restore_old():
 print("Downloading data from the FAA...")
 try:
     download1 = perf_counter()
-    dataset = requests.get(FAA_source, timeout=5)
+    dataset = fetcher_session.get(FAA_source, timeout=5)
     dataset.raise_for_status()
 except Exception as e:
+    fetcher_session.close()
     print(f"Failed to get data: {e}")
     print("Cannot continue, please try again at a later time.")
     sys.exit(1)
@@ -225,12 +227,14 @@ for _, table in enumerate(soup.find_all('table')):
 print(f"Data parsed in {(perf_counter() - parse_start):.2f} seconds. "
       f"Found {table_count} pertinent tables.")
 if table_count != 26:
+    fetcher_session.close()
     print("Error: Received different amount of tables than expected. Cannot continue.")
     print("It seems like the FAA rearranged the site, please contact the developer to fix this.")
     sys.exit(1)
 
 data_fg_db = fg_db_fetcher()
 if not data_fg_db:
+    fetcher_session.close()
     print("Failed to fetch data from the FlightGazer-airlines-db database.")
     print("Cannot continue, please try again at a later time.")
     sys.exit(1)
@@ -240,6 +244,7 @@ if write_path.exists() and 'operators' in sys.modules:
     print(f"Backing up current database as '{write_path}.old'...")
     write_path.rename(f"{write_path}.old")
 
+fetcher_session.close()
 print(f"Writing to {write_path}...")
 
 write_start = perf_counter()
