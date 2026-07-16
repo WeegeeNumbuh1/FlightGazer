@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.2 --- 2026-07-07'
+VERSION: str = 'v.11.4.3 --- 2026-07-16'
 import os
 import argparse
 import sys
@@ -245,16 +245,18 @@ def write_bad_state_semaphore(write_the_file: bool, bypass: bool = False) -> Non
 
 unexpected_oops: int = 0
 """ Amount of errors we didn't expect (tracked to prevent log spamming) """
+oops_cutoff: int = 50
+""" How many times we can spam the log for exceptions """
 def catcher(exctype, value, tb):
     """ Catch uncaught exceptions and dump to log.
     https://stackoverflow.com/a/73119119 """
     global unexpected_oops
     unexpected_oops += 1
-    cutoff = 50
-    if unexpected_oops < cutoff:
+    if unexpected_oops < oops_cutoff:
         main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
-    elif unexpected_oops == cutoff:
-        main_logger.error(f"Unhandled error count has reached {cutoff}, suppressing further errors to prevent log spam.")
+    elif unexpected_oops == oops_cutoff:
+        main_logger.exception(''.join(traceback.format_exception(exctype, value, tb)))
+        main_logger.error(f"Unhandled error count has reached {oops_cutoff}, suppressing further errors to prevent log spam.")
         main_logger.error("Please report this problem to the developer.")
         # there really shouldn't be this many unhandled errors
         write_bad_state_semaphore(True)
@@ -505,6 +507,70 @@ CORE_COUNT = os.cpu_count()
 if CORE_COUNT is None: CORE_COUNT = 1
 if psutil.LINUX:
     main_logger.debug(f"FlightGazer has been assigned to CPU {this_process.cpu_num()}")
+
+# make the scheduling thread more resilient
+class SafeScheduler(schedule.Scheduler):
+    """
+    An implementation of `Scheduler` that catches jobs that fail, logs their
+    exception tracebacks as errors, optionally reschedules the jobs for their
+    next run time, and keeps going.
+
+    Use this to run jobs that may or may not crash without worrying about
+    whether other jobs will run or if they'll crash the entire script.
+    ### Source:
+    https://gist.github.com/mplewis/8483f1c24f2d6259aef6?permalink_comment_id=3703372#gistcomment-3703372
+    """
+
+    def __init__(
+            self,
+            reschedule_on_failure=True,
+            minutes_after_failure=0,
+            seconds_after_failure=0
+        ):
+        """
+        If `reschedule_on_failure` is True, jobs will be rescheduled for their
+        next run as if they had completed successfully. If False, they'll run
+        on the next run_pending() tick.
+        """
+        self.reschedule_on_failure = reschedule_on_failure
+        self.minutes_after_failure = minutes_after_failure
+        self.seconds_after_failure = seconds_after_failure
+        super().__init__()
+
+    def _run_job(self, job):
+        global unexpected_oops
+        try:
+            super()._run_job(job)
+        except Exception as e:
+            unexpected_oops += 1
+            if unexpected_oops < oops_cutoff:
+                main_logger.exception(f"A job ran into this error: {e}")
+            elif unexpected_oops == oops_cutoff:
+                main_logger.exception(f"A job ran into this error: {e}")
+                main_logger.error(f"Error count has reached {oops_cutoff}, suppressing further errors to prevent log spam.")
+                main_logger.error("Please report this problem to the developer.")
+            if self.reschedule_on_failure:
+                if self.minutes_after_failure != 0 or self.seconds_after_failure != 0:
+                    main_logger.debug(
+                        f"Rescheduled in {self.minutes_after_failure} minutes "
+                        f"and {self.seconds_after_failure} seconds."
+                    )
+                    job.last_run = None
+                    job.next_run = (
+                        datetime.datetime.now()
+                        + datetime.timedelta(
+                            minutes=self.minutes_after_failure,
+                            seconds=self.seconds_after_failure
+                        )
+                    )
+                else:
+                    main_logger.debug("Rescheduled failed job.")
+                    job.last_run = datetime.datetime.now()
+                    job._schedule_next_run()
+            else:
+                main_logger.debug("Job canceled.")
+                self.cancel_job(job)
+main_scheduler = SafeScheduler()
 
 # =========== Settings Load-in =============
 # ==========================================
@@ -1112,7 +1178,7 @@ def register_signal_handler(loop, handler, signal, sender) -> None:
 def schedule_thread() -> None:
     """ Our schedule runner """
     while True:
-        schedule.run_pending()
+        main_scheduler.run_pending()
         time.sleep(1)
 
 def cls() -> None:
@@ -1330,8 +1396,8 @@ def extract_API_results(API_results: list, ID: str, no_trigger=True) -> dict | N
     if not ID:
         return None
     reference_time = time.monotonic()
-    for result_ in reversed(API_results):
-        try:
+    try:
+        for result_ in reversed(API_results):
             if result_ is not None and ID == result_['ID']:
                 if (reference_time - result_['APIAccessed'] < (FLYBY_STALENESS * 60)):
                     return result_
@@ -1341,12 +1407,17 @@ def extract_API_results(API_results: list, ID: str, no_trigger=True) -> dict | N
                     if not api_limiter_reached() and not no_trigger:
                         dispatcher.send(message='', signal=FORCE_REFRESH_API, sender=extract_API_results)
                         main_logger.debug("Encountered stale API result for "
-                                      f"\'{ID}\', triggering API fetcher.")
+                                    f"\'{ID}\', triggering API fetcher.")
                     return None
             elif result_ is None:
                 return None
-        except Exception: # if we bump into something else
-            return None
+    except Exception as e:
+        # very rare times the deque mutates during iteration and throws a RuntimeError.
+        # Don't want to bother with locks and stuff so we just try again when this is run
+        # at next loop
+        if VERBOSE_MODE:
+            main_logger.exception(f"{e}")
+        return None
     return None
 
 def clock_center_cycler() -> None:
@@ -2055,7 +2126,7 @@ def read_receiver_stats() -> None:
                 airspy_stats = air_s
                 airspy = True
                 is_airspy = True
-                main_logger.info(f"Detected an Airspy setup ({airspy_stats.absolute()}) running on this system.")
+                main_logger.info(f"Detected an Airspy setup ({str(airspy_stats.absolute())[:-11]}) running on this system.")
                 break
 
     while True:
@@ -4858,7 +4929,7 @@ class APIFetcher:
                 self._error_tracking += 1
 
             if self._error_tracking == self._error_spam_limit:
-                main_logger.warning("*** API keeps failing! *** Please check the service or internet connection.")
+                main_logger.error("*** API keeps failing! *** Please check the service or internet connection.")
                 main_logger.info(">>> Suppressing further API warning messages.")
 
             # extract our results and do the diversion checking
@@ -9085,11 +9156,11 @@ api_scheduling_thread.start()
 
 # define our scheduled tasks (our "one-shot" functions)
 # NB: order matters in how these are registered as these run sequentially when asked to run at the same time
-schedule.every().day.at("00:00").do(suntimes) # do this first since `runtime_accumulators_reset()` takes a few seconds
-schedule.every().day.at("00:00").do(runtime_accumulators_reset)
-schedule.every().hour.at(":00").do(flyby_stats)
-schedule.every().day.at("23:59:58").do(flyby_stats) # get us the day's total count before reset
-schedule.every().hour.do(get_ip) # in case the IP changes
+main_scheduler.every().day.at("00:00").do(suntimes) # do this first since `runtime_accumulators_reset()` takes a few seconds
+main_scheduler.every().day.at("00:00").do(runtime_accumulators_reset)
+main_scheduler.every().hour.at(":00").do(flyby_stats)
+main_scheduler.every().day.at("23:59:58").do(flyby_stats) # get us the day's total count before reset
+main_scheduler.every().hour.do(get_ip) # in case the IP changes
 
 try:
     if PREFER_LOCAL and not is_posix:
@@ -9128,7 +9199,7 @@ if DUMP1090_JSON is None and not DISPLAY_IS_VALID:
 
 read_1090_config()
 if LOCATION_IS_SET:
-    schedule.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
+    main_scheduler.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
 session = requests.Session()
 """ Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
 suntimes()
@@ -9142,7 +9213,7 @@ if DATABASE_FILE.exists():
         if db.is_connected():
             main_logger.info(f"Successfully connected to \'{DATABASE_FILE}\'")
             database_ver = db.database_version
-            schedule.every().hour.do(aircraft_db_checker)
+            main_scheduler.every().hour.do(aircraft_db_checker)
         else:
             main_logger.error("Could not connect to the database.")
     except ImportError:
@@ -9187,10 +9258,10 @@ if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
 
                 # recall that since the scheduler handles jobs in the order they're registered
                 # this will be the last job executed at the top of each hour
-                schedule.every().hour.at(":00").do(WX_stuff.get_weather)
-                schedule.every().hour.at(":15").do(WX_stuff.get_weather)
-                schedule.every().hour.at(":30").do(WX_stuff.get_weather)
-                schedule.every().hour.at(":45").do(WX_stuff.get_weather)
+                main_scheduler.every().hour.at(":00").do(WX_stuff.get_weather)
+                main_scheduler.every().hour.at(":15").do(WX_stuff.get_weather)
+                main_scheduler.every().hour.at(":30").do(WX_stuff.get_weather)
+                main_scheduler.every().hour.at(":45").do(WX_stuff.get_weather)
             else:
                 main_logger.info("OpenWeather API failed. Weather information will be unavailable.")
         else:
