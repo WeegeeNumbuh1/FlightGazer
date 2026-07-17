@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.11.4.3
+# Last updated: v.11.4.4
 # by: WeegeeNumbuh1
 
 BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
@@ -62,7 +62,7 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-# only for production releases; dev stuff won't apply
+# only for production adsb.im releases; dev stuff won't apply
 if [ -f '/opt/adsb/os.adsb.feeder.image' ] || [ -f '/opt/adsb/adsb.im.version' ]; then
 	ADSBIM=1
 else
@@ -103,6 +103,12 @@ service_file() {
 	EOF
 
 	systemctl daemon-reload 2>&1
+}
+
+adsbim_proxy() {
+	if [ -f "${BASEDIR}/web-app/utilities/adsbim-mod.sh" ]; then
+		bash "${BASEDIR}/web-app/utilities/adsbim-mod.sh"
+	fi
 }
 
 systemctl list-unit-files flightgazer-webapp.service >/dev/null
@@ -176,6 +182,7 @@ else
 		echo -e "${FADE}The web interface has been shut down."
 		echo "Checking service file..."
 		service_file
+		adsbim_proxy
 		venv_install
 		bash "${BASEDIR}/web-app/update-webapp.sh"
 		if [ $? -ne 0 ]; then
@@ -235,13 +242,11 @@ if [ $ADSBIM -eq 1 ]; then
 	echo -e "${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
 	echo -e "or ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 	echo ""
-	echo "You might need to restart the system or"
-	echo "use the command 'sudo systemctl restart adsb-setup adsb-docker'"
-	echo "for the web-app to be proxied successfully."
+	adsbim_proxy
 	sleep 3s
 	echo "A new 'FlightGazer' entry will be available at the main"
 	echo "adsb.im page and under the 'System' dropdown section."
-	sleep 5s
+	sleep 3s
 	echo "If this fails, you can always reach the web-app at:"
 	echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
 	echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
