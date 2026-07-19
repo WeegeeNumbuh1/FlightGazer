@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.4 --- 2026-07-17'
+VERSION: str = 'v.11.4.5 --- 2026-07-19'
 import os
 import argparse
 import sys
@@ -2059,7 +2059,7 @@ def configuration_check_api() -> None:
             api_use, api_cost = probe_API()
 
             if api_use is None:
-                main_logger.warning("Provided API Key failed to return a valid response.")
+                main_logger.error("API will not be used; provided API Key failed to return a valid response.")
                 API_KEY = ""
             else:
                 main_logger.info(f"API Key \'***{API_KEY[-5:]}\' is valid.")

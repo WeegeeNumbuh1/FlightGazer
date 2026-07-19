@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.5 - 2026-07-19
+    - Operators database update
+
 v.11.4.4 - 2026-07-17
     - Small update for the webapp install script to support webapp version v.1.1.0
 
