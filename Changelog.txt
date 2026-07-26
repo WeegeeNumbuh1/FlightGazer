@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.6 - 2026-07-26
+    - Slight improvement to dxing logic to handle low altitude aircraft (reverts change in v.8.2.1)
+    - Faster Airspy detection at startup
+
 v.11.4.5 - 2026-07-19
     - Operators database update
 

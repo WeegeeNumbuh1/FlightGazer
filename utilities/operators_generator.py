@@ -3,7 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: v.11.4.2
+# Last updated: v.11.4.6
 
 import sys
 
@@ -93,7 +93,7 @@ FAA_source = 'https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap3
 fg_db = 'https://github.com/WeegeeNumbuh1/FlightGazer-airlines-db/raw/refs/heads/master/operators.csv'
 fg_db_ver = 'https://github.com/WeegeeNumbuh1/FlightGazer-airlines-db/raw/refs/heads/master/version'
 header_str = """\"\"\" Importable python module for aviation callsign lookup.
-All data sourced from the Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3.
+All data sourced from the Federal Aviation Administration, Directive No. JO 7340.2, Chapter 3, Section 3.
 For the operators' friendly names, the FlightGazer-airlines-db was used.
 When comparing which version of the Directive was used, check the generation timestamp in this file
 with the release schedule in Section 1-1-6

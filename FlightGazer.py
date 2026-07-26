@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.5 --- 2026-07-19'
+VERSION: str = 'v.11.4.6 --- 2026-07-26'
 import os
 import argparse
 import sys
@@ -1345,9 +1345,12 @@ def dxing_log() -> None:
     else:
         main_logger.info(f"{''.join(data0)}")
     main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
+    dx_altitude = super_far_plane['Altitude'] / altitude_multiplier
     accuracy = super_far_plane['NavigationAccuracy']
     if accuracy and accuracy <= 1:
         main_logger.info(">>> Note: The aircraft reported an inaccurate position at the time of the following data packet.")
+    if dx_altitude < 10000:
+        main_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
     freeze_frame_packet(super_far_plane, show_distance=False)
 
 def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
@@ -2119,15 +2122,25 @@ def read_receiver_stats() -> None:
     ]
     airspy_stats = None
     if USING_FILESYSTEM:
+        sec_count = 0
+        wait_time = 5
+        wait_limit = 30
         # we need to wait for the airspy service to fully warm up, especially at system start
-        time.sleep(15)
-        for air_s in airspy_stats_locations:
-            if air_s.is_file():
-                airspy_stats = air_s
-                airspy = True
-                is_airspy = True
-                main_logger.info(f"Detected an Airspy setup ({str(airspy_stats.absolute())[:-11]}) running on this system.")
+        # we also don't want to immediately jump to reading dump1090/readsb stats if there actually is
+        # an airspy on this setup as those files won't have any of the signal stats
+        while sec_count <= wait_limit:
+            for air_s in airspy_stats_locations:
+                if air_s.is_file():
+                    airspy_stats = air_s
+                    airspy = True
+                    is_airspy = True
+                    main_logger.info(f"Detected an Airspy setup ({str(airspy_stats.absolute())[:-11]}) running on this system.")
+                    break
+            if airspy:
                 break
+            if sec_count < wait_limit:
+                time.sleep(wait_time)
+            sec_count += wait_time
 
     while True:
         if watchdog_triggers > (watchdog_setpoint - 1):
@@ -6554,9 +6567,9 @@ class DistantDeterminator():
             main_logger.debug(f"Detected aircraft beyond normal line-of-sight limit ({BEYOND_LOS_LIMIT} nmi) for ADS-B!")
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
         for packet in message:
-            # filter out general aviation with glitchy locations
+            # filter out grounded planes or any with indeterminate altitude
             # note: don't rely on NavigationAccuracy as it's sometimes unavailable
-            if packet['Altitude'] / altitude_multiplier < 10000:
+            if packet['Altitude'] == 0 or packet['OnGround']:
                 continue
             farthest = packet
             break

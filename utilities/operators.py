@@ -1,5 +1,5 @@
 """ Importable python module for aviation callsign lookup.
-All data sourced from the Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3.
+All data sourced from the Federal Aviation Administration, Directive No. JO 7340.2, Chapter 3, Section 3.
 For the operators' friendly names, the FlightGazer-airlines-db was used.
 When comparing which version of the Directive was used, check the generation timestamp in this file
 with the release schedule in Section 1-1-6

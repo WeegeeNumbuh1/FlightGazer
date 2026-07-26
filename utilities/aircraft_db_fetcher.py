@@ -1,11 +1,11 @@
 """ This script imports the `aircraft.csv.gz` file that's kept up-to-date from wiedehopf's `tar1090-db` repository
 (https://github.com/wiedehopf/tar1090-db/tree/csv) and converts it into a sqlite3 database.
-Additional credit goes to Mictronics (https://www.mictronics.de/aircraft-database/index.php)
+Additional credit goes to Mictronics (https://github.com/Mictronics/aircraft-database)
 and all the volunteers for maintaining the actual database.
 This script was created for use with the FlightGazer project (https://github.com/WeegeeNumbuh1/FlightGazer).
 This database is covered by the ODC-By License (https://opendatacommons.org/licenses/by/1-0/). """
 # by WeegeeNumbuh1
-# Last updated: v.11.4.2
+# Last updated: v.11.4.6
 
 print("********** FlightGazer Aircraft Database Importer **********\n")
 import csv
