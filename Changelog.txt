@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.4.7 - 2026-07-30
+    - Additional heuristics for filtering out low quality dxing data and dxing logging tweaks
+    - Minor output touchups to webapp install script
+
 v.11.4.6 - 2026-07-26
     - Slight improvement to dxing logic to handle low altitude aircraft (reverts change in v.8.2.1)
     - Faster Airspy detection at startup

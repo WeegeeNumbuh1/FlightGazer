@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.6 --- 2026-07-26'
+VERSION: str = 'v.11.4.7 --- 2026-07-30'
 import os
 import argparse
 import sys
@@ -1346,9 +1346,6 @@ def dxing_log() -> None:
         main_logger.info(f"{''.join(data0)}")
     main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     dx_altitude = super_far_plane['Altitude'] / altitude_multiplier
-    accuracy = super_far_plane['NavigationAccuracy']
-    if accuracy and accuracy <= 1:
-        main_logger.info(">>> Note: The aircraft reported an inaccurate position at the time of the following data packet.")
     if dx_altitude < 10000:
         main_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
     freeze_frame_packet(super_far_plane, show_distance=False)
@@ -2482,7 +2479,7 @@ def runtime_accumulators_reset() -> None:
 
     if super_far_plane:
         dxing_log()
-        main_logger.debug("Time spent detecting distant aircraft: "
+        main_logger.info("Time spent detecting distant aircraft today: "
                           f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
 
     if sum(api_hits) > 0: # if we used the API at all
@@ -6567,9 +6564,14 @@ class DistantDeterminator():
             main_logger.debug(f"Detected aircraft beyond normal line-of-sight limit ({BEYOND_LOS_LIMIT} nmi) for ADS-B!")
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
         for packet in message:
-            # filter out grounded planes or any with indeterminate altitude
-            # note: don't rely on NavigationAccuracy as it's sometimes unavailable
+            # heuristics for filtering out glitchy GA aircraft positions
+            if packet['RSSI'] > -15:
+                continue
             if packet['Altitude'] == 0 or packet['OnGround']:
+                continue
+            if packet['NavigationAccuracy'] and packet['NavigationAccuracy'] < 4:
+                continue
+            if packet['Speed'] and packet['Speed'] / speed_multiplier > 3000:
                 continue
             farthest = packet
             break

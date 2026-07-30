@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.11.4.4
+# Last updated: v.11.4.7
 # by: WeegeeNumbuh1
 
 BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
@@ -243,7 +243,6 @@ if [ $ADSBIM -eq 1 ]; then
 	echo -e "or ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 	echo ""
 	adsbim_proxy
-	sleep 3s
 	echo "A new 'FlightGazer' entry will be available at the main"
 	echo "adsb.im page and under the 'System' dropdown section."
 	sleep 3s
@@ -313,11 +312,13 @@ EOF
 	echo -e "${NC}> Lighttpd configured. Access via ${WHITEHIGH}http://$NET_IP/flightgazer${NC}"
 	echo -e "  or via ${WHITEHIGH}http://$HOSTNAME.local/flightgazer${NC}"
 else
-	echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
-	echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
-	echo "You can still access the web interface at:"
-	echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
-	echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
+	if [ $ADSBIM -eq 0 ]; then
+		echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
+		echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
+		echo "You can still access the web interface at:"
+		echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
+		echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
+	fi
 fi
 
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
