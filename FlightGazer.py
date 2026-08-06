@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.4.7 --- 2026-07-30'
+VERSION: str = 'v.11.5.0 --- 2026-08-06'
 import os
 import argparse
 import sys
@@ -4019,8 +4019,11 @@ def main_loop_generator() -> None:
         """ Do the loop """
         global general_stats, relevant_planes, unique_planes_seen
         global process_time, dump1090_failures, process_time2, runtime_sizes
+        global active_plane_display
         sequential_failures = 0 # if we don't get processed data, this increments and we can tell the data poller is in a bad state
         failures_delta = 0 # handle a mix of sequentual failures and normal failures
+        sporadic_suppress = 0 # delay actually triggering the timeout
+        sporadic_suppress_superlative = 3 # how long we can ignore timeouts
         while True:
             try:
                 loop_start = time.perf_counter()
@@ -4053,9 +4056,21 @@ def main_loop_generator() -> None:
                         relevant_planes_approach_rate_tracking.clear()
                     general_stats, relevant_planes = dump1090_loop(dump1090_data)
                     sequential_failures = 0 # reset to 0 when there is data
+                    sporadic_suppress = 0
                 process_time[1] = round((time.perf_counter() - start_time)*1000, 3)
 
             except TimeoutError:
+                sporadic_suppress += 1
+                if sporadic_suppress <= sporadic_suppress_superlative:
+                    main_logger.debug(
+                        f"Encountered a {dump1090} timeout, suppressing up to "
+                        f"{sporadic_suppress_superlative - sporadic_suppress + 1} more time(s)..."
+                    )
+                    print(f"\x1b[0m\x1b[0;30;47m*** Encountered a brief {dump1090} timeout, trying "
+                          f"{sporadic_suppress_superlative - sporadic_suppress + 1} more time(s)...\x1b[0m")
+                    time.sleep(5)
+                    continue
+
                 dump1090_failures += 1
                 sequential_failures += 1
                 failures_delta += 1
@@ -4069,6 +4084,8 @@ def main_loop_generator() -> None:
                 ):
                     failures_delta = dump1090_failures
 
+                if active_plane_display:
+                    active_plane_display = False
                 if INTERACTIVE:
                     cls()
                     print(f"FlightGazer: {dump1090} service timed out. This is occurrence {dump1090_failures}.")
@@ -4083,6 +4100,7 @@ def main_loop_generator() -> None:
                 # lockstep with `dump1090_failures`, however...
                 if failures_delta % dump1090_failures_to_watchdog_trigger == 0:
                     sequential_failures = 0
+                    sporadic_suppress = 0
                     main_logger.error(f"{dump1090} service has failed too many times ({dump1090_failures_to_watchdog_trigger}).")
                     dispatcher.send(message='', signal=KICK_DUMP1090_WATCHDOG, sender=main_loop_generator)
                 else:
@@ -4094,6 +4112,7 @@ def main_loop_generator() -> None:
                     else:
                         main_logger.error(f"{dump1090} keeps failing to connect. The network connection may be down.")
                     sequential_failures = 0
+                    sporadic_suppress = 0
                     failures_delta = 0
                     # ...if this block gets triggered, then we reset `failures_delta` to make sure the normal
                     # timeout logic block above doesn't trigger early
@@ -6571,7 +6590,7 @@ class DistantDeterminator():
                 continue
             if packet['NavigationAccuracy'] and packet['NavigationAccuracy'] < 4:
                 continue
-            if packet['Speed'] and packet['Speed'] / speed_multiplier > 3000:
+            if packet['Speed'] and packet['Speed'] / speed_multiplier > 2000:
                 continue
             farthest = packet
             break

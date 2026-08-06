@@ -10,11 +10,11 @@
 <!-- end title section -->
 
 ## About
-This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but entirely driven by **real-time ADS-B** ([Automatic Dependendent Surveillance - Broadcast](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)) and UAT (Universial Access Transceiver) data emitted by aircraft.<br>
+This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but entirely driven by **real-time [ADS-B](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)** (and optionally UAT) data emitted by aircraft. It was originally conceived as a way to log aircraft flyby counts and to get a glance at ADS-B receiver site metrics without the need to fire up a webpage.<br>
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
 
-Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run on other setups (your mileage may vary).
+Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can run on other setups (your mileage may vary).
 
 >[!NOTE]
 > Fun fact: this is also the [author](https://github.com/WeegeeNumbuh1)'s second-only Python project.<br>
@@ -29,26 +29,26 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can be run 
 - [What it looks like](#what-it-looks-like)
 - [Support the Author](#support-the-author)
 - [Features](#features)
-- [Setup](#️setup)
+- [Setup](#setup)
   - [Prerequisites (Important)](#️-prerequisites-important)
   - [Installation \& Getting Started](#installation--getting-started)
-  - [Configuration](#️configuration)
-- [Usage](#️usage)
-  - [Interactive Mode](#️interactive-mode)
+  - [Configuration](#configuration)
+- [Usage](#usage)
+  - [Interactive Mode](#interactive-mode)
   - [Optional Behaviors](#optional-behaviors)
   - [The Emulator](#the-emulator)
   - [Using FlightGazer's Data](#using-flightgazers-data)
   - [Shutting Down \& Restarting](#shutting-down--restarting)
-  - [Output Reference \& Meanings](#️output-reference--meanings)
+  - [Output Reference \& Meanings](#output-reference--meanings)
   - [Misc](#misc)
-- [How to Update](#️how-to-update)
+- [How to Update](#how-to-update)
 - [Uninstall](#uninstall)
 - [FAQ's](#frequently-asked-questions-not-really-but-they-could-pop-up)
 - [Known Issues](#known-issues-shortcomings-and-reporting-issues)
 - [Support \& Discussion](#support--discussion)
-- [Changelog \& Contributing](#️changelog-planned-features-and-contributing)
+- [Changelog \& Contributing](#changelog-planned-features-and-contributing)
 - [Additional Related/Similar Projects](#additional-relatedsimilar-projects)
-- [Highlights Across Media](#️highlights-across-media)
+- [Highlights Across Media](#highlights-across-media)
 - [License \& Warranty](#️-license--warranty)
 - [Acknowledgements](#acknowledgements)
 
@@ -93,21 +93,22 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
   - Additional info like aircraft type, airline, and owner, is available without needing any API access
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
   - ***NOT*** reliant on [APIs for live aircraft data](https://github.com/ColinWaddell/FlightTracker/issues/33)
-- **It's a neat looking clock when there aren't any aircraft flying overhead**
-  - When `dump1090` is running, shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
+- **It's a neat looking clock that displays your ADS-B site stats when there aren't any aircraft flying overhead**
+  - Shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
-- Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp#what-it-looks-like)
 - Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
+- [Repurpose/analyze FlightGazer's own realtime data](#using-flightgazers-data) for use elsewhere
+- Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
 - Built to work with existing setups like [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Airplanes.Live](https://airplanes.live/image-guide/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), [ADSB.im](https://adsb.im/home), and likely even more
   - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
 - Robust and stable enough for 24/7/365 operation
 
-<details><summary><b>More Features</b></summary>
+<details><summary><b>More Features!</b> (Show/Hide)</summary>
 
 ### Adaptive & flexible
-- Automatically switches to other aircraft if more than one is within the area
+- Automatically switches to other aircraft if more than one is within the area and is designed from the outset to handle high traffic
   - Uses data such as future position estimation, approach velocity, distance, airspace traffic, timeshare allocation, and automatic priority overrides to intellegently select the most appropriate aircraft
 - Does not need to run on the same hardware that `dump1090` is running from
 - Reads `dump978` data if it's present as well
@@ -138,7 +139,6 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
   - Keeps databases updated over time without having to update to the latest version of FlightGazer
 - Easily update to latest builds here on Github
   - Automagically migrate settings, even if new options appear or are removed in the future
-- Program state is [available as a json file](#using-flightgazers-data) for use elsewhere
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Automatically tracks aircraft which report distress signals
 - [Unique tools](./utilities/) and [custom-developed fonts](./fonts/) that can be used in other projects (don't forget to credit me)
@@ -362,13 +362,13 @@ A viable setup if not using an RGB Matrix display is to:
 > (expect about 8-12 FPS on a Raspberry Pi 3/Zero 2W; a RPi4 can manage a decent 25-30 FPS)
 
 #### Raspberry Pi 5 (and newer) support
-Refer to [this document](./docs/using-this-on-a-Raspberry-Pi-5.md).
+Refer to [this document](./docs/using-this-on-a-Raspberry-Pi-5.md). For RPi5, run FlightGazer as normal (no special changes needed).
 
 ### Using FlightGazer's Data
 
 When FlightGazer is running, it writes a JSON to `/run/FlightGazer/current_state.json` and updates every `LOOP_INTERVAL` (2 seconds by default).<br>
 Additionally, if you're using the web-app, this same JSON is also available at the `/data/current_state.json` endpoint.<br>
-You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
+You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack or as a Home Assistant integration) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
 
 See the [JSON details](./docs/state-file-schema.md) for a full explanation of this data.
 

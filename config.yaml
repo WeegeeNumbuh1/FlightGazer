@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.4.7 # do not modify this
+CONFIG_VERSION: v.11.5.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -255,7 +255,7 @@ CUSTOM_DUMP978_LOCATION: ''
 # [String]
 # URL of your dump978 install if it's in a different location or on a different network device.
 # If you're not using dump978, leave the value as ''.
-# ex: http://192.168.xxx.xxx:8978
+# ex: http://192.168.xxx.xxx:8978 or http://192.168.xxx.xxx:1091/skyaware978/
 
 FOLLOW_THIS_AIRCRAFT: ''
 # [String]
@@ -284,7 +284,7 @@ OPENWEATHER_API_KEY: ''
 # If you want to have weather information for your location, put your OpenWeatherMap API key here.
 # Leave as '' to not use this feature. The Weather API will not be used if the clock center row is
 # not configured to display weather data.
-# There's no need to subscribe to the One Call API 3.0, the basic free access version is sufficient.
+# There's no need to subscribe to the One Call API, the basic free access version is sufficient.
 # Don't have an API key?
 # https://openweathermap.org/price
 

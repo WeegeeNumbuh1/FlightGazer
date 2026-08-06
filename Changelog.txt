@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.5.0 - 2026-08-06
+    - Further improved timeout logic: now, blips of dump1090 timeouts are ignored unless it's actually serious
+        - If an active aircraft is being shown and the timeout counts are exceeded,
+          the display reverts to the clock sooner rather than waiting until the watchdog is triggered
+    - Release number bump
+
 v.11.4.7 - 2026-07-30
     - Additional heuristics for filtering out low quality dxing data and dxing logging tweaks
     - Minor output touchups to webapp install script
