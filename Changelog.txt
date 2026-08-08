@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.6.0 - 2026-08-08
+    - Events such as DXing and distressed aircraft tracking are now logged to another file instead of the main log
+        - This was done to preserve these kinds of entries and to keep the main log cleaner
+
 v.11.5.0 - 2026-08-06
     - Further improved timeout logic: now, blips of dump1090 timeouts are ignored unless it's actually serious
         - If an active aircraft is being shown and the timeout counts are exceeded,

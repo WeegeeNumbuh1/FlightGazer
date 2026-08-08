@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.5.0 --- 2026-08-06'
+VERSION: str = 'v.11.6.0 --- 2026-08-08'
 import os
 import argparse
 import sys
@@ -188,6 +188,7 @@ try:
 except OSError:
     CURRENT_USER = "< Unknown >"
 LOGFILE = Path(CURRENT_DIR, "FlightGazer-log.log")
+EVENTLOG = Path(CURRENT_DIR, "FlightGazer-events.log")
 try: # should basically work all the time since we're running as root, but this costs nothing
     LOGFILE.touch(mode=0o777, exist_ok=True)
     with open(LOGFILE, 'a') as f:
@@ -204,6 +205,10 @@ except PermissionError:
 
 logging_format = logging.Formatter(
     fmt='%(asctime)s.%(msecs)03d - %(threadName)s | %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    )
+logging_format2 = logging.Formatter(
+    fmt='%(asctime)s.%(msecs)03d | %(levelname)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     )
 
@@ -223,6 +228,14 @@ stdout_stream = logging.StreamHandler(sys.stdout)
 stdout_stream.setLevel(logging.NOTSET)
 stdout_stream.setFormatter(logging_format)
 main_logger.addHandler(stdout_stream)
+# also add in the event logs
+event_logger = logging.getLogger("FlightGazer-Events")
+if not VERBOSE_MODE:
+    event_logger.propagate = False
+event_stream = logging.FileHandler(EVENTLOG)
+event_stream.setLevel(logging.NOTSET)
+event_stream.setFormatter(logging_format2)
+event_logger.addHandler(event_stream)
 
 # When logging level is set to DEBUG, the requests library will spam the log for each time dump1090 is polled.
 # While verbosity is nice, this is excessive, so we bump up the logging level
@@ -313,6 +326,12 @@ if FAULTDUMP.is_file() and FAULTDUMP.stat().st_size > 0:
             lf.write("\n***** END OF CRASH DUMP *****\n")
     del df, df_, lf, ln, i
     FAULTDUMP.unlink()
+if EVENTLOG.exists() and EVENTLOG.stat().st_size == 0:
+    main_logger.info(f"Created new events log at \'{EVENTLOG}\'")
+    event_logger.info("Welcome to the beginning of the FlightGazer events log!")
+if VERBOSE_MODE:
+    # functionality like < v.11.6.0
+    main_logger.info("Notice: The event logger will have its logs included in this log as VERBOSE_MODE is set.")
 
 main_logger.debug("Loading modules...")
 # external imports
@@ -1144,7 +1163,7 @@ def cleanup() -> None:
         state_json.unlink(missing_ok=True)
         write_bad_state_semaphore(False)
     if super_far_plane and not combined_feed:
-        main_logger.info("Before exiting, there's this:")
+        event_logger.info("FlightGazer was shutting down, so before exiting there's this:")
         dxing_log()
     main_logger.info(f"- Exit signal commanded at {exit_time}")
     main_logger.info(f"  Script ran for {timedelta_clean(end_time)}")
@@ -1341,18 +1360,18 @@ def dxing_log() -> None:
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
     if dis >= 400:
-        main_logger.warning(f"{''.join(data0)}")
+        event_logger.warning(f"{''.join(data0)}")
     else:
-        main_logger.info(f"{''.join(data0)}")
-    main_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
+        event_logger.info(f"{''.join(data0)}")
+    event_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     dx_altitude = super_far_plane['Altitude'] / altitude_multiplier
     if dx_altitude < 10000:
-        main_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
+        event_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
     freeze_frame_packet(super_far_plane, show_distance=False)
 
 def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
-    """ Print the current plane data to the log. """
-    main_logger.info("Freeze-frame data:")
+    """ Print the current plane data to the event log. """
+    event_logger.info("Freeze-frame data:")
     data1 = []
     data1.append("   DESC: ")
     if (pdesc := packet['AircraftDesc']):
@@ -1378,10 +1397,10 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
     if (opea := packet['OperatorAKA']):
         data1.append(f" (a.k.a. \"{opea}\")")
 
-    main_logger.info(f"{''.join(data1)}")
+    event_logger.info(f"{''.join(data1)}")
     if show_distance:
-        main_logger.info(f"   DIST: {round(packet['Distance'])} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
-    main_logger.info(f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
+        event_logger.info(f"   DIST: {round(packet['Distance'])} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
+    event_logger.info(f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
                     f"DIR: {packet['DirectionDegrees']} ({packet['Direction'].strip()}) | ELV: {round(packet['Elevation'], 3)} deg | "
                     f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
                     f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
@@ -4332,7 +4351,7 @@ class AirplaneParser:
                     if entry['ID'] == FOLLOW_THIS_AIRCRAFT:
                         follow_flag = True
                         if FOLLOW_THIS_AIRCRAFT and not FOLLOW_THIS_AIRCRAFT_SPOTTED:
-                            main_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
+                            event_logger.info(f"Aircraft \'{FOLLOW_THIS_AIRCRAFT}\' first detected by FlightGazer today.")
                             freeze_frame_packet(entry, show_distance=True)
                             FOLLOW_THIS_AIRCRAFT_SPOTTED = True
                     if entry['Distressed']:
@@ -4348,7 +4367,7 @@ class AirplaneParser:
                                     squawkdesc = "General Emergency"
                                 case _:
                                     squawkdesc = ""
-                            main_logger.warning(
+                            event_logger.warning(
                                 f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
                                 "has been detected by your ADS-B site and declared an emergency. "
                                 f"(Squawking {entry['Squawk']}, {squawkdesc})"
@@ -4358,7 +4377,7 @@ class AirplaneParser:
                         PIA_this_poll = True
                         if not self._PIA_latch:
                             self._PIA_latch = True
-                            main_logger.info(
+                            event_logger.info(
                                 f"Very rare event! Tracking PIA aircraft \'{entry['Flight']}\' "
                                 f"(ID: {entry['ID']}, aircraft type: {entry['CategoryDesc']})"
                             )
@@ -4527,7 +4546,7 @@ class AirplaneParser:
 
                     self._last_plane_count = 0
                     if self._distressed_latch:
-                        main_logger.info("No longer detecting aircraft emergency (hopefully everyone involved is safe).")
+                        event_logger.info("No longer detecting aircraft emergency (hopefully everyone involved is safe).")
                         tracking_distress_call = ''
                     self._distressed_latch = False # always reset once there are no more planes
 
