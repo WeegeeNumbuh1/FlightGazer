@@ -5,6 +5,10 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.6.1 - 2026-08-09
+    - More tweaks to the dxing log and cutoff changes for some messages
+        - Exceptional events are logged immediately instead of waiting for the end-of-day summary
+
 v.11.6.0 - 2026-08-08
     - Events such as DXing and distressed aircraft tracking are now logged to another file instead of the main log
         - This was done to preserve these kinds of entries and to keep the main log cleaner

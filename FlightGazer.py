@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.6.0 --- 2026-08-08'
+VERSION: str = 'v.11.6.1 --- 2026-08-09'
 import os
 import argparse
 import sys
@@ -1348,18 +1348,21 @@ def dxing_log() -> None:
     if not super_far_plane or combined_feed: return
     data0 = []
     dis = super_far_plane['Distance'] / distance_multiplier
-    if not combined_feed:
-        if dis >= 400:
-            data0.append("*** Frame this and tell everyone! *** ")
-        elif 340 < dis < 400:
-            data0.append("Absolutely insane! ")
-        else:
-            data0.append("Exciting! ")
+    if dis >= 450:
+        data0.append("*** Frame this and tell everyone! *** ")
+    if 400 <= dis < 450:
+        data0.append("Call yourself the DXing master, ")
+    elif 340 < dis < 400:
+        data0.append("Absolutely insane! ")
+    else:
+        data0.append("Exciting! ")
     data0.append(f"\'{super_far_plane['Flight']}\' ({super_far_plane['ID']}, {super_far_plane['Country']}) ")
     data0.append(f"was detected {round(super_far_plane['Distance'], 3)} {distance_unit} away ")
     data0.append(f"({super_far_plane['Latitude']}, {super_far_plane['Longitude']}) on ")
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
-    if dis >= 400:
+    if dis >= 450:
+        event_logger.error(f"{''.join(data0)}")
+    if 400 <= dis < 450:
         event_logger.warning(f"{''.join(data0)}")
     else:
         event_logger.info(f"{''.join(data0)}")
@@ -2496,10 +2499,16 @@ def runtime_accumulators_reset() -> None:
         ]
         main_logger.info(f"{total_plane_count} flybys... {mythical[random.randint(0, len(mythical) - 1)]}")
 
-    if super_far_plane:
+    if super_far_plane and not combined_feed:
         dxing_log()
-        main_logger.info("Time spent detecting distant aircraft today: "
+        event_logger.info("Time spent detecting distant aircraft today: "
                           f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
+        if 3600 <= determination_symphony < 7200:
+            event_logger.info("There was notably widespread atmospheric ducting this day!")
+        elif 7200 <= determination_symphony < 14400:
+            event_logger.info("There was extensively widespread atmospheric ducting this day!")
+        elif determination_symphony >= 14400:
+            event_logger.info("There was absolutely insane ducting this day! Did the atmosphere open up a wormhole for you?")
 
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(
@@ -6590,9 +6599,10 @@ class DistantDeterminator():
         self.last_max_distance = 0
         self._far_time_increment = 0
         self._detected = False
+        self._really_really_far_plane = False
         self.run_loop()
 
-    def comparator(self, message: list):
+    def comparator(self, message: list[dict]):
         global super_far_plane, combined_feed, determination_symphony
         if not message or not isinstance(message, list):
             self._detected = False
@@ -6615,6 +6625,7 @@ class DistantDeterminator():
             break
         else:
             return
+        preempt_log_bypass = False
         self._far_time_increment += 1
         determination_symphony = self._far_time_increment * LOOP_INTERVAL
         if (
@@ -6628,9 +6639,25 @@ class DistantDeterminator():
                 main_logger.warning("Maximum range shown on the display will be capped to 300nmi or the equivalent.")
             combined_feed = True
         if farthest['Distance'] > self.last_max_distance:
+            # trigger the preemptive logging again if the max distance changes by this much
+            if (farthest['Distance'] - self.last_max_distance) / distance_multiplier >= 15:
+                preempt_log_bypass = True
             farthest.update({'Datetime': datetime.datetime.now()})
             self.last_max_distance = farthest['Distance']
             super_far_plane = farthest
+        # preemptive logging for a really far plane
+        if (
+            self.last_max_distance / distance_multiplier >= 425
+            and (not self._really_really_far_plane or preempt_log_bypass)
+            and not combined_feed
+            ):
+            self._really_really_far_plane = True
+            event_logger.info(f"Detected an exceptional DXing event so far today! This result is preliminary until confirmed at the end of the day.")
+            freeze_frame_packet(super_far_plane, show_distance=True)
+            event_logger.info("Time spent detecting distant aircraft as of now: "
+                    f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
+            if determination_symphony > 2700:
+                event_logger.info("There has been significant atmospheric ducting in your area!")
 
     def reset_distance(self, message):
         global determination_symphony
@@ -6641,6 +6668,7 @@ class DistantDeterminator():
         self.last_max_distance = 0
         self._far_time_increment = 0
         determination_symphony = 0
+        self._really_really_far_plane = False
 
     def debug_switch(self, message):
         if self._detected:
