@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.6.1 --- 2026-08-09'
+VERSION: str = 'v.11.6.2 --- 2026-08-20'
 import os
 import argparse
 import sys
@@ -2619,21 +2619,29 @@ def flyby_stats() -> None:
         if flyby_stats_present:
             # https://stackoverflow.com/a/54278929
             with open(FLYBY_STATS_FILE, 'rb') as f:
-                try: # handle the case of a one line file
+                try:
                     f.seek(-2, os.SEEK_END)
                     while f.read(1) != b'\n':
                         f.seek(-2, os.SEEK_CUR)
-                except OSError:
+                except OSError: # handle the case of a one line file
                     f.seek(0)
                 last_line = f.readline().decode()
+            if not last_line.strip():
+                main_logger.warning("Could not load last line from flyby stats file as it is empty. Assuming clean stats.")
+                return
             date_now_str = datetime.datetime.now().strftime('%Y-%m-%d')
-            last_date = (last_line.split(",")[0]).split(" ")[0] # splitting strftime('%Y-%m-%d %H:%M')
+            last_line_split = last_line.split(",")
+            last_date = (last_line_split[0]).split(" ")[0] # splitting strftime('%Y-%m-%d %H:%M')
             if date_now_str == last_date:
                 global api_hits, unique_planes_seen, estimated_api_cost
-                planes_seen = int(last_line.split(",")[1])
-                api_hits[0] = int(last_line.split(",")[2])
-                api_hits[1] = int(last_line.split(",")[3])
-                api_hits[2] = int(last_line.split(",")[4])
+                try:
+                    planes_seen = int(last_line_split[1])
+                    api_hits[0] = int(last_line_split[2])
+                    api_hits[1] = int(last_line_split[3])
+                    api_hits[2] = int(last_line_split[4])
+                except Exception:
+                    main_logger.error("Data from flyby stats file is malformed and could not be loaded.")
+                    return
                 estimated_api_cost = API_COST_PER_CALL * (api_hits[0] + api_hits[2])
                 for i in range(planes_seen):
                     # fill the set with filler values, we don't recall the last contents of `unique_planes_seen`
