@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.6.2 # do not modify this
+CONFIG_VERSION: v.11.7.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -145,6 +145,7 @@ CLOCK_CENTER_ROW:
 # 3 = Extended calendar info (month, week number, day of the year)
 # 4 = Current temperature, prevailing weather condition, wind direction and speed (requires OpenWeatherAPI)
 # 5 = Current dew point, visibility, estimated ceiling (requires OpenWeatherAPI)
+# 6 = Range statistics (root mean square average at the current moment and max distance detected in the day)
 
 CLOCK_CENTER_ROW_CYCLE: false
 # [true/false]

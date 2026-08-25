@@ -3,7 +3,7 @@ into a series of lookup tables separated by letter for use with FlightGazer or a
 Can be used to update the database in the future.
 To see changes on the FAA's side: https://www.faa.gov/air_traffic/publications/atpubs/cnt_html/chap0_cam.html """
 # by WeegeeNumbuh1
-# Last updated: v.11.4.6
+# Last updated: v.11.7.0
 
 import sys
 
@@ -156,7 +156,7 @@ def fg_db_fetcher() -> dict:
         if dataset2.status_code != 200:
             raise requests.HTTPError(f'Got status code {dataset2.status_code}') from None
     except Exception as e:
-        print(f"Failed get data: {e}")
+        print(f"Failed to get data: {e}")
         return {}
     download_size = len(dataset2.content)
     print(f"Successfully downloaded {(download_size / (1024 * 1024)):.2f} "
@@ -406,6 +406,8 @@ try:
             _ = entry['FriendlyName']
 
         print("Updated database successfully passed validity checks.")
+        if (backup := Path(f"{write_path}.old")).exists():
+            backup.unlink(missing_ok=True)
 
 except Exception as e:
     print(f"ERROR: New database failed check:\n{e}")

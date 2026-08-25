@@ -184,7 +184,7 @@ If you'd like to see descriptions for all the globals used in the script, those 
         it's not *that* big of a deal in the grand scheme of things, we basically just ignore it and focus on keeping drift in check)
 
 ## The `Display` Class
-> *Uses techniques from Colin Waddell's its-a-plane-python project but diverges significantly from his design.*
+> *Uses techniques from Colin Waddell's its-a-plane-python project (v1) but diverges significantly from his design.*
 
     This Display class is a huge mess, but it works and its structure has not changed since v.0.8.0.
     On a Raspberry Pi Zero 2W and using rgbmatrix, it takes about 4 ms to generate each frame.
@@ -243,6 +243,7 @@ If you'd like to see descriptions for all the globals used in the script, those 
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.7.0: Support new range stats for center row and add altitude change arrow
     - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information
     - v.8.2.1: More "flexible" attribute setting

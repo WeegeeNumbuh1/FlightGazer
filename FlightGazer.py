@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.6.2 --- 2026-08-20'
+VERSION: str = 'v.11.7.0 --- 2026-08-25'
 import os
 import argparse
 import sys
@@ -668,7 +668,7 @@ DISABLE_ACTIVE_BRIGHTNESS_AT_NIGHT: bool = False
 SCROLLING_SPEED: int = 30
 API_PERSISTENT_CACHE: bool = False
 IGNORE_AIRCRAFT_ICAOS: set | str = ''
-NO_DUMP978_SEARCH: bool = True # new setting!
+NO_DUMP978_SEARCH: bool = True
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -824,12 +824,14 @@ if FASTER_REFRESH:
 # =========== Global Variables =============
 # ==========================================
 
-general_stats: dict = {'Tracking': 0, 'Range': 0}
+general_stats: dict = {'Tracking': 0, 'Range': 0, 'Average': 0., 'Max': 0.}
 """ General dump1090 stats (updated per loop).
-`general_stats` = {`Tracking`, `Range`} """
+`general_stats` = {`Tracking`, `Range`, `Average`, `Max`} """
+general_stats_zeroed = general_stats.copy()
+""" Use for reinitializing `general_stats` """
 receiver_stats: dict = {'Gain': None, 'Noise': None, 'Strong': None}
 """ Receiver stats (if available). None values for keys if data is unavailable.
-`receiver_stats` = {`Gain`: float, `Noise`: float (negative), `Strong`: percentage}.
+`receiver_stats` = {`Gain`: float, `Noise`: float, `Strong`: percentage/float}.
 If an airspy setup is detected, `Strong` is overloaded and represents the preamble filter level,
 as float. """
 DUMP1090_JSON: str | None = None
@@ -881,8 +883,8 @@ api_results_waiting: bool = False
 """ True if the API fetch thread is currently fetching a result, False otherwise.
 Controls if other threads can trigger the API fetcher outside of the normal signaling chain. """
 unique_planes_seen: list[dict] = []
-""" List of nested dictionaries that tracks unique hex IDs of all plane flybys in a day.
-Keys are {`ID`, `Time`, `Flyby`} """
+""" List of nested dictionaries that tracks hex IDs of all plane flybys in a day.
+Keys are {`ID`, `Time`, `Flyby`}. Multiple entries of the same `ID` can exist, `Time` needs to be compared. """
 callsign_lookup_cache = deque([{}] * 100, maxlen=100)
 """ Cache of previously looked up callsigns.
 Newest entries are appended to the left of this deque.
@@ -914,12 +916,13 @@ idle_data_2: dict = {
     'SunriseSunset': "",
     'ReceiverStats': "",
     'WX_1': "",
-    'WX_2': ""
+    'WX_2': "",
+    'RangeStats': "",
 }
 """ Additional formatted dict for our Display driver.
 `idle_data_2` = {
     `SunriseSunset`, `ReceiverStats`,
-    `WX_1`,`WX_2`
+    `WX_1`,`WX_2`, `RangeStats`
 } """
 active_data: dict = {}
 """ Formatted dict for our Display driver. All strings unless noted.
@@ -1183,7 +1186,7 @@ def sigterm_handler(signum, frame):
 def abnormal_handler(signum, frame):
     """ Not exiting cleanly, something upstream probably stopped working """
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
-    main_logger.critical("Caught a SIGHUP, attempting to cleanly shutdown...")
+    main_logger.critical(f"Caught signal {signum} or a SIGHUP, attempting to cleanly shutdown...")
     cleanup()
     systemd_notify('EXIT_STATUS=1')
     sys.exit(1)
@@ -1467,22 +1470,21 @@ def clock_center_cycler() -> None:
     main_logger.debug("Cycler thread started and synchronizing to trigger when seconds end in zero.")
     sync_time = hook_line_and_syncer()
     main_logger.debug(f"Waited {round(sync_time, 3)} seconds. See you in an hour (or less).")
-    compensation = 0
+    compensation = 0.
+    options_wx = deque([1, 2, 3, 4, 5, 6])
+    options_no_wx = deque([1, 2, 3, 6])
+    if WX_API_data:
+        opt = options_wx
+    else:
+        opt = options_no_wx
     while True:
         time.sleep(10 - compensation)
         start = time.perf_counter()
         if not DISPLAY_IS_VALID:
             main_logger.debug("Center row cycler has exited as the display is no longer valid.")
             return
-        current_row = CLOCK_CENTER_ROW["ROW1"]
-        if WX_API_data:
-            limit = 5
-        else:
-            limit = 3
-        desired = current_row + 1
-        if desired > limit:
-            desired = 1 # recall, lowest valid option is this
-
+        opt.rotate(-1)
+        desired = opt[0]
         CLOCK_CENTER_ROW['ROW1'] = desired
 
         times_cycled += 1
@@ -1572,6 +1574,7 @@ def probe978() -> str | None:
         CUSTOM_DUMP978_LOCATION,
         "http://localhost:8978",
         "http://localhost/skyaware978",
+        "http://localhost:1091/skyaware978",
         "http://localhost/dump978",
         "http://localhost:9780/skyaware978"
     ]
@@ -1806,6 +1809,8 @@ def configuration_check() -> None:
                             main_logger.info(f"{key} for Clock center will display current weather info.")
                         case 5:
                             main_logger.info(f"{key} for Clock center will display extended weather info.")
+                        case 6:
+                            main_logger.info(f"{key} for Clock center will display range statistics.")
                         case _:
                             main_logger.warning(f"{key} for Clock center has an invalid setting. Nothing will be displayed.")
                             CLOCK_CENTER_ROW[key] = None
@@ -2401,7 +2406,7 @@ def runtime_accumulators_reset() -> None:
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
-    global algorithm_daily_runtime, dump1090_failures, determination_symphony
+    global algorithm_daily_runtime, dump1090_failures, determination_symphony, general_stats
     total_plane_count = len(unique_planes_seen)
     timestamp = time.monotonic()
 
@@ -2444,6 +2449,7 @@ def runtime_accumulators_reset() -> None:
             if high_priority_events > 0:
                 daily_stats_str_2.append(f" {high_priority_events} high-priority overrides occurred.")
             daily_stats_str_2.append(f" {selection_events} aircraft selections.")
+            daily_stats_str_2.append(f" Farthest distance detected: {general_stats['Max']} {distance_unit}.")
             main_logger.info(f"{''.join(daily_stats_str_2)}")
 
     if (
@@ -2531,6 +2537,7 @@ def runtime_accumulators_reset() -> None:
     super_far_plane.clear()
     # reset the distance tracker for `DistantDeterminator`
     dispatcher.send(message='', signal=MIDNIGHT_RESET, sender=runtime_accumulators_reset)
+    general_stats['Max'] = 0.
     if FOLLOW_THIS_AIRCRAFT_SPOTTED:
         FOLLOW_THIS_AIRCRAFT_SPOTTED = False
     if dump1090_failures > 0 and watchdog_triggers == 0:
@@ -3082,11 +3089,9 @@ class PrintToConsole:
         plane_stats.append(f"max range: {general_stats['Range']:.2f}")
         if combined_feed:
             plane_stats.append("*")
-        plane_stats.append(f" {distance_unit} | ")
-        if not is_airspy:
-            plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Strong signals: {loud_str}")
-        else:
-            plane_stats.append(f"Gain: {gain_str}, Noise: {noise_str}, Preamble filter: {loud_str}")
+        plane_stats.append(f" {distance_unit}")
+        plane_stats.append(f" (RMS {general_stats['Average']:.2f}")
+        plane_stats.append(f", peak {general_stats['Max']:.2f})")
         print("".join(plane_stats))
 
         # API status line
@@ -3129,6 +3134,12 @@ class PrintToConsole:
         if API_KEY:
             main_stat.append(f" | Last API response {process_time[2]:.3f} ms")
         print("".join(main_stat))
+
+        # receiver stuff
+        if not is_airspy:
+            print(f"> Receiver stats: Gain {gain_str}, Noise {noise_str}, Strong signals {loud_str}")
+        else:
+            plane_stats.append(f"> Receiver stats: Gain {gain_str}, Noise {noise_str}, Preamble filter {loud_str}")
 
         # weather stuff
         wx_str = []
@@ -3580,6 +3591,8 @@ def main_loop_generator() -> None:
         - dictionary: general stats to be updated per loop.
             - Tracking = total planes being tracked at current time
             - Range = maximum range of tracked planes from your location (in selected units)
+            - Average = root mean square of the distances for all tracked aircraft
+            - Max = farthest aircraft distance today
         - list: list of nested dictionaries that describes each plane found within `HEIGHT_LIMIT` and `RANGE` and updates per loop.
         If no planes are found or location is not set, this will return an empty list. With `NOFILTER_MODE` enabled, this is every plane
         detected by the receiver(s).
@@ -4044,10 +4057,23 @@ def main_loop_generator() -> None:
 
         if not ranges:
             max_range = 0
+            avg_range = 0.
         else:
             max_range = round(max(ranges), 2)
+            avg_range = round(
+                math.sqrt(
+                    sum(x**2 for x in ranges) / len(ranges)
+                ), 2
+            )
 
-        current_stats = {"Tracking": total, "Range": max_range}
+        current_max = general_stats['Max']
+        max_to_copy = current_max
+        if combined_feed:
+            max_to_copy = 0
+        elif max_range > current_max:
+            max_to_copy = max_range
+
+        current_stats = {"Tracking": total, "Range": max_range, "Average": avg_range, "Max": max_to_copy}
 
         return current_stats, planes
 
@@ -4069,7 +4095,7 @@ def main_loop_generator() -> None:
                     process_time2[2] = 0.
                     runtime_sizes[0] = 0
                 if dump1090_data is None:
-                    general_stats = {'Tracking': 0, 'Range': 0.}
+                    general_stats = general_stats_zeroed
                     relevant_planes.clear()
                     relevant_planes_approach_rate_tracking.clear()
                     runtime_sizes[0] = 0
@@ -4160,9 +4186,6 @@ def main_loop_generator() -> None:
 
                 time.sleep(10)
                 continue
-
-            except KeyboardInterrupt:
-                return
 
             except Exception as e:
                 dump1090_failures += 1
@@ -4375,20 +4398,26 @@ class AirplaneParser:
                         if not self._distressed_latch:
                             self._distressed_latch = True # note, this latch will only reset once there are no more planes
                             tracking_distress_call = entry['ID']
+                            escalated = False
                             match entry['Squawk']:
                                 case "7500":
                                     squawkdesc = "Aircraft Hijacking"
+                                    escalated = True
                                 case "7600":
                                     squawkdesc = "Radio Failure"
                                 case "7700":
                                     squawkdesc = "General Emergency"
                                 case _:
                                     squawkdesc = ""
-                            event_logger.warning(
+                            event_str = (
                                 f"Aircraft \'{entry['Flight']}\' ({tracking_distress_call}) "
                                 "has been detected by your ADS-B site and declared an emergency. "
                                 f"(Squawking {entry['Squawk']}, {squawkdesc})"
                             )
+                            if not escalated:
+                                event_logger.warning(event_str)
+                            else:
+                                event_logger.error(event_str)
                             freeze_frame_packet(entry, show_distance=True)
                     if entry['TrackingFlag'] == 'PIA' and not entry['OnGround']:
                         PIA_this_poll = True
@@ -5177,6 +5206,7 @@ class DisplayFeeder:
         receiver_string = ""
         rise_set = []
         recv_str = []
+        range_stats_str = ""
         if sunset_sunrise['Sunrise'] is not None and sunset_sunrise['Sunset'] is not None:
             if CLOCK_24HR:
                 sunrise = sunset_sunrise['Sunrise'].strftime("%H:%M")
@@ -5249,6 +5279,29 @@ class DisplayFeeder:
             # and FlightGazer needs to be restarted
             receiver_string = "NO ADS-B DATA!"
 
+        # Range stats
+        # Example: "Avg:67.9 Max:178"
+        # Average: we get 4 characters for this readout
+        a_now = general_stats['Average']
+        if a_now >= 999.5:
+            current_average = ">999"
+        elif 99.5 <= a_now < 999.5: # just get us the integer values
+            current_average = f"{a_now:.0f}"
+        elif 9.95 <= a_now < 99.5:
+            current_average = f"{a_now:.1f}"
+        elif 0 < r_now < 9.95:
+            current_average = f"{a_now:.2f}"
+        elif r_now == 0:
+            current_average = "0"
+        # Max: just use integers, 3 characters
+        max_now = general_stats['Max']
+        if max_now >= 999.5:
+            current_max = ">1k"
+        else:
+            current_max = f"{round(max_now, 0):.0f}"
+
+        range_stats_str = "Avg:" + current_average + " Max:" + current_max.rjust(2)
+
         if WX_API_data:
             # Current conditions (temp, prevailing weather, wind dir + speed)
             # Example: "47.3° OVRC ▼9 "
@@ -5299,7 +5352,8 @@ class DisplayFeeder:
             'SunriseSunset': "".join(rise_set),
             'ReceiverStats': receiver_string,
             'WX_1': wx1_str,
-            'WX_2': wx2_str
+            'WX_2': wx2_str,
+            'RangeStats': range_stats_str,
             }
 
         # active_stats
@@ -5907,6 +5961,7 @@ class WriteState:
             plane_stats = {
                 'currently_tracking': general_stats['Tracking'] if general_stats else 0,
                 'current_range': general_stats['Range'] if general_stats else 0,
+                'current_range_rms': general_stats['Average'] if general_stats else 0,
                 'flybys_today': len(unique_planes_seen),
                 'last_unique_plane': unique_planes_seen[-1] if unique_planes_seen else None,
                 'aircraft_selections': selection_events,
@@ -5920,6 +5975,7 @@ class WriteState:
                 'distant_time_today': strfdelta(determination_symphony,
                                                  fmt='{H:02}:{M:02}:{S:02}',
                                                  inputtype='s'),
+                'peak_distance_today': general_stats['Max'] if general_stats else 0,
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
                 'focus_plane_screen_time_sec': focus_plane_infocus * LOOP_INTERVAL,
@@ -7197,7 +7253,7 @@ class Display(
 ):
     """ Our Display driver. """
     """ Programmer's notes:
-    Uses techniques from Colin Waddell's its-a-plane-python project but diverges significantly from his design.
+    Uses techniques from Colin Waddell's its-a-plane-python project (v1) but diverges significantly from his design.
 
     This Display class is a huge mess, but it works and its structure has not changed since v.0.8.0.
     On a Raspberry Pi Zero 2W and using rgbmatrix, it takes about 4 ms to generate each frame.
@@ -7256,6 +7312,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.7.0: Support new range stats for center row and add altitude change arrow
     - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information
     - v.8.2.1: More "flexible" attribute setting
@@ -7383,6 +7440,7 @@ class Display(
         self._last_switch_progress_bar = None
         self._last_journey_plus_row = None
         self._last_uat_indicator = None
+        self._last_vertspeed_arrow = None
         # brightness control
         self._last_brightness = self.matrix.brightness
         # blinker variables for callsign (see `callsign_blinker()`)
@@ -7454,6 +7512,7 @@ class Display(
         self._callsign_blinker_cache = None
         self._callsign_blinker_cache_last = None
         self._callsign_frame_decrement = None
+        self._last_vertspeed_arrow = None
 
     @Animator.KeyFrame.add(0)
     def a_clear_screen(self):
@@ -7910,6 +7969,7 @@ class Display(
         calendar_info_now = 'CALENDAR'
         wx1_now = idle_data_2.get('WX_1', 'NO WEATHER DATA')
         wx2_now = idle_data_2.get('WX_2', 'NO WEATHER DATA')
+        range_stats_now = idle_data_2.get('RangeStats', 'Avg: 0.0 Max:  0')
         if CLOCK_CENTER_ROW['ROW1'] == 3 or CLOCK_CENTER_ROW['ROW2'] == 3:
             month_name = strip_accents(
                 self.time_now.strftime('%b')[:3],
@@ -7933,6 +7993,8 @@ class Display(
                 row1_data = wx1_now
             case 5:
                 row1_data = wx2_now
+            case 6:
+                row1_data = range_stats_now
             case _:
                 row1_data = ""
         match CLOCK_CENTER_ROW['ROW2']:
@@ -7946,6 +8008,8 @@ class Display(
                 row2_data = wx1_now
             case 5:
                 row2_data = wx2_now
+            case 6:
+                row2_data = range_stats_now
             case _:
                 row2_data = ""
 
@@ -8726,6 +8790,46 @@ class Display(
 
         return True
 
+    """ Altitude change arrow that goes next to the ALT text """
+    @Animator.KeyFrame.add(base_refresh_speed)
+    def oo_active_header(self, count): # Subaru Oozora?
+        if not self.active_plane_display: return True
+
+        HEADER_TEXT_FONT = fonts.microscopic
+        ACTIVE_TEXT_Y = 25
+        ACTIVE_TEXT_X = 14
+        ALTITUDE_HEADING_COLOR = colors.altitude_heading_color
+        vertspeed_now: str = active_data.get('VertSpeed')
+        if vertspeed_now.startswith('V+'):
+            arrow_str = "▲"
+        elif vertspeed_now.startswith('V-'):
+            arrow_str = "▼"
+        else:
+            arrow_str = ""
+
+        if self._last_vertspeed_arrow != arrow_str:
+            if self._last_vertspeed_arrow is not None:
+                _ = graphics.DrawText(
+                    self.canvas,
+                    HEADER_TEXT_FONT,
+                    ACTIVE_TEXT_X,
+                    ACTIVE_TEXT_Y,
+                    colors.BLACK,
+                    self._last_vertspeed_arrow
+                )
+            self._last_vertspeed_arrow = arrow_str
+
+        _ = graphics.DrawText(
+            self.canvas,
+            HEADER_TEXT_FONT,
+            ACTIVE_TEXT_X,
+            ACTIVE_TEXT_Y,
+            ALTITUDE_HEADING_COLOR,
+            arrow_str
+        )
+
+        return True
+
     """ Our active stats readout. Always includes altitude and speed;
     RSSI and ground track are also handled here, based on what mode is being seen. """
     @Animator.KeyFrame.add(base_refresh_speed)
@@ -9461,6 +9565,9 @@ def main() -> None:
     try:
         while True: #keep-alive
             time.sleep(1)
+            if not main_stuff.is_alive(): # bad, we need to leave
+                main_logger.critical("Main processing thread has crashed! Cannot continue.")
+                abnormal_handler(signal.SIGABRT,"")
     except ImportError: # catch the display driver (if loaded) exiting and relay it
         sigterm_handler(signal.SIGTERM,"")
 

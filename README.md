@@ -368,7 +368,7 @@ Refer to [this document](./docs/using-this-on-a-Raspberry-Pi-5.md). For RPi5, ru
 
 When FlightGazer is running, it writes a JSON to `/run/FlightGazer/current_state.json` and updates every `LOOP_INTERVAL` (2 seconds by default).<br>
 Additionally, if you're using the web-app, this same JSON is also available at the `/data/current_state.json` endpoint.<br>
-You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack or as a Home Assistant integration) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
+You can poll this data for your own use (e.g. a InfluxDB/Telegraf/Grafana stack, a Home Assistant integration, MQTT, etc.) and get stats like aircraft details, how long aircraft are in your area, FlightGazer's operating performance, and more.
 
 See the [JSON details](./docs/state-file-schema.md) for a full explanation of this data.
 

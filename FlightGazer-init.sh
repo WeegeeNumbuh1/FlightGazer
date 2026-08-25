@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.6.2
+# Version = v.11.7.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -633,7 +633,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 			-e python3-numpy \
 			-e libjpeg-dev \
 			-e tmux \
-			| xargs apt-get install -y
+			| xargs apt-get install -y -o Acquire::http::Timeout="5" -o Acquire::https::Timeout="5" -o Acquire::ftp::Timeout="5" -o Acquire::Retries="2"
 		else
 			apt-cache --generate pkgnames | \
 			grep --line-regexp --fixed-strings \
@@ -642,7 +642,7 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 			-e python3-numpy \
 			-e libjpeg-dev \
 			-e tmux \
-			| xargs apt-get install -y >/dev/null
+			| xargs apt-get install -y -o Acquire::http::Timeout="5" -o Acquire::https::Timeout="5" -o Acquire::ftp::Timeout="5" -o Acquire::Retries="2" >/dev/null
 		fi
 		echo -e "${FADE}"
 		if [ -d "$VENVPATH" ]; then
@@ -773,6 +773,10 @@ CHECKMARK="${GREEN}${FADE} [ Done ]${NC}"
 if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	echo ""
 	echo -e "${NC}> Packages check:${FADE}"
+	export PIP_TIMEOUT=10
+	export PIP_RETRIES=2
+	export PIP_QUIET=1
+	export PIP_RESUME_RETRIES=2
 	if [ -f "${VENVPATH}/bin/uv" ]; then
 		VENVCMD="${VENVPATH}/bin/uv pip"
 	else
@@ -800,42 +804,42 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 		echo -e "${CHECKMARK}"
 
 		echo -e "${FADE}${VERB_TEXT}requests"
-		"${VENVCMD}" install --upgrade requests --quiet >/dev/null
+		"${VENVCMD}" install --upgrade requests >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 17
 
 		echo -e "${FADE}${VERB_TEXT}pydispatcher"
-		"${VENVCMD}" install pydispatcher==2.0.7 --quiet >/dev/null
+		"${VENVCMD}" install pydispatcher==2.0.7 >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 20
 
 		echo -e "${FADE}${VERB_TEXT}schedule"
-		"${VENVCMD}" install schedule==1.2.2 --quiet >/dev/null
+		"${VENVCMD}" install schedule==1.2.2 >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 23
 
 		echo -e "${FADE}${VERB_TEXT}suntime"
-		"${VENVCMD}" install suntime==1.3.2 --quiet >/dev/null
+		"${VENVCMD}" install suntime==1.3.2 >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 26
 
 		echo -e "${FADE}${VERB_TEXT}psutil"
-		"${VENVCMD}" install --upgrade psutil --quiet >/dev/null
+		"${VENVCMD}" install --upgrade psutil >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 29
 
 		echo -e "${FADE}${VERB_TEXT}yaml"
-		"${VENVCMD}" install ruamel.yaml==0.19.1 --quiet >/dev/null
+		"${VENVCMD}" install ruamel.yaml==0.19.1 >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 32
 
 		echo -e "${FADE}${VERB_TEXT}orjson"
-		"${VENVCMD}" install --upgrade orjson --quiet >/dev/null
+		"${VENVCMD}" install --upgrade orjson >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 35
 
 		echo -e "${FADE}${VERB_TEXT}BeautifulSoup"
-		"${VENVCMD}" install --upgrade beautifulsoup4 --quiet >/dev/null
+		"${VENVCMD}" install --upgrade beautifulsoup4 >/dev/null
 		echo -e "${CHECKMARK}"
 		update_progress 38
 
@@ -854,12 +858,12 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 			systemctl stop flightgazer-webapp >/dev/null 2>&1
 			echo "(Web-app service stopped, it will be restarted after this.)"
 			echo "${VERB_TEXT}Flask"
-			"${VENVCMD}" install --upgrade Flask==3.1.3 --quiet >/dev/null
+			"${VENVCMD}" install --upgrade Flask==3.1.3 >/dev/null
 			echo -e "${CHECKMARK}"
 			update_progress 48
 
 			echo -e "${FADE}${VERB_TEXT}gunicorn"
-			"${VENVCMD}" install gunicorn==26.0.0 --quiet >/dev/null
+			"${VENVCMD}" install gunicorn==26.0.0 >/dev/null
 			echo -e "${CHECKMARK}"
 			update_progress 51
 

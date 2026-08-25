@@ -33,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 224 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.11.3.0 and newer*
+> *There are a total of 226 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.11.7.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -100,8 +100,8 @@ Short dictionary describing the receiver's computed statistics.
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `Gain` | Receiver gain (unitless value as reported from the receiver) | float, null | 32.8 |
-| `Noise` | Measured noise floor in decibels (negative value) | float, null | -28.6 |
-| `Strong` | Percent of packets deemed strong (>3dBFS) as a percentage. If `is_airspy` is true, then `Strong` is overloaded and represents the detected preamble filter value. | float, null | 0.046 |
+| `Noise` | Measured noise floor in decibels (negative value unless an Airspy is being used) | float, null | -28.6 |
+| `Strong` | Percent of packets deemed strong (>3dBFS) as a percentage. If `is_airspy` is true, then `Strong` is overloaded and represents the detected preamble filter value. | float, int, null | 0.046 |
 
 > *3 keys*
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -113,6 +113,7 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | --- | --- | --- | --- |
 | `currently_tracking` | Total number of aircraft currently being tracked by the receiver | int | 246 |
 | `current_range` | Distance of the farthest aircraft currently detected by the receiver | float | 316.24 |
+| `current_range_rms` | Root mean square of all aircraft distances currently being tracked (used to give more weight to farther aircraft compared to using an arithmetic mean) | float | 123.45 |
 | `flybys_today` | Number of aircraft that were tracked in the configured tracking area today (resets at midnight) | int | 98 |
 | `last_unique_plane` | Record for the last aircraft seen today - see the `last_unique_plane` section below | object, null | {"ID": "a00002", "Time": 4780.658841, "Flyby": 98} |
 | `aircraft_selections` | Total times the aircraft selection algorithm has changed the focused aircraft | int | 1260 |
@@ -123,6 +124,7 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | `algorithm_use_today` | Total time the selection algorithm has been used today (HH:MM:SS) | str | "02:12:31" |
 | `distant_detected_today` | True if an aircraft was detected farther than typical ADS-B range, else false | bool | true |
 | `distant_time_today` | Time spent detecting aircraft outside of typical ADS-B range (HH:MM:SS) | str | "00:02:34" |
+| `peak_distance_today` | Distance of farthest aircraft detected today | float | 478.45 |
 | `no_filter` | Whether FlightGazer is currently running in `NOFILTER` mode | bool | false |
 | `focus_plane_iter` | How many cycles the selection algorithm is active, 0 if no aircraft are present | int | 21 |
 | `focus_plane_screen_time_sec` | How long the current focus aircraft has been displayed, in seconds | int | 48 |
@@ -134,7 +136,7 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | `in_range` | Number of relevant aircraft in the current `relevant_planes` array | int | 3 |
 | `relevant_planes` | Detailed list of nested objects describing each tracked aircraft the tracking area, null if `NOFILTER` mode is enabled | array, null | (see `relevant_planes` subkey below) |
 
-> *21 keys, 1 depreciated*
+> *23 keys, 1 depreciated*
 
 ### `relevant_planes` subkey
 An array of nested objects which represents current data for each aircraft considered for detailed tracking. The array is empty when there are no aircraft available. This key is null if running in `NOFILTER` mode.
@@ -155,8 +157,8 @@ An array of nested objects which represents current data for each aircraft consi
 | `RSSI` | Average signal strength in dBFS | float | -18.1 |
 | `Elevation` | Calculated elevation angle of the aircraft from the site in degrees | float | 34.257 |
 | `SlantRange` | Direct line-of-sight distance from the site in selected units | float | 1.47882 |
-| `Operator` | Airline operator based on data from the Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3, or null if unknown | str, null | "REPUBLIC AIRLINES, INC. (INDIANAPOLIS, IN)" |
-| `Telephony` | Operator's telephony based on data from Federal Aviation Administration, Directive No. JO 7340.2N, Chapter 3, Section 3; null if unknown | str, null | "BRICKYARD" |
+| `Operator` | Airline operator based on data from the Federal Aviation Administration, Directive No. JO 7340.2, Chapter 3, Section 3, or null if unknown | str, null | "REPUBLIC AIRLINES, INC. (INDIANAPOLIS, IN)" |
+| `Telephony` | Operator's telephony based on data from Federal Aviation Administration, Directive No. JO 7340.2, Chapter 3, Section 3; null if unknown | str, null | "BRICKYARD" |
 | `OperatorAKA` | More commonly known operator name; null if unknown | str, null | "Republic Airways" |
 | `Owner` | Registered owner of the aircraft, if available | str, null | "TVPX AIRCRAFT SOLUTIONS INC TRUSTEE" |
 | `ICAOType` | ICAO type code for the aircraft model, or "None" | str | "A320" |
@@ -196,7 +198,7 @@ Represents API-related information from FlightAware.
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `api_enabled` | Whether an API key is valid (and API calls are enabled) | bool | true |
-| `api_key` | Masked API key used for calls (last 5 characters visible) | str, null | "*****TCHYN" |
+| `api_key` | Masked API key used for calls (last 5 characters visible) | str, null | "\*\*\*\*\*TCHYN" |
 | `successful_calls` | Number of successful API calls for the current day | int | 80 |
 | `failed_calls` | Number of failed API calls for the current day | int | 0 |
 | `calls_with_no_data` | Number of calls that returned no data or where the aircraft was blocked from tracking | int | 2 |
@@ -346,7 +348,7 @@ Weather information returned by the OpenWeatherMap API for the site location.<br
 | key | description | schema | example |
 | --- | --- | --- | --- |
 | `site_name` | Location name of the site as reported by the API (usually city or region name) | str, null | "Townsville" |
-| `condition` | Short code for the prevailing weather condition, meant for the display; max length of 4 characters. Refer to the `output-reference` document on these abbreviatons. | str | "-RN" |
+| `condition` | Short code for the prevailing weather condition, meant for the display; max length of 4 characters. Refer to the [`output-reference`](output-reference.md) document on these abbreviatons. | str | "-RN" |
 | `condition_desc` | More detailed description of the current weather condition | str | "light rain" |
 | `temp` | Current air temperature (depends on `temp_unit`) or null if unavailable | float, null | 12.1 |
 | `humidity` | Current humidity percent, or null | int, null | 43 |

@@ -9,7 +9,7 @@
 
 | Output | Meaning / Cause | Remedy / Information |
 |---|---|---|
-| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   N/A  N/A</code><br>\- or \-<br><code>FLYBY TRKG RNGE</code><br><code>123   N/A  N/A</code> | - Failed to connect to receiver at startup\.<br>- Communication with the receiver has temporarily stopped due to instability\. | - Receiver service (<code>dump1090</code>) is not running/stopped\. Check for errors for that service\.<br>- The SDR hardware or its connection (USB port, cables, etc.) may be degraded. Check on these components\.<br>- The current system may be overloaded\. Check on the system\.<br>- If operating on a remote instance of dump1090, check the network or remote system\.<br>- Additionally, check the FlightGazer logs\.<br>- After fixing the underlying issue, restart FlightGazer\. |
+| **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   N/A  N/A</code><br>\- or \-<br><code>FLYBY TRKG RNGE</code><br><code>123   N/A  N/A</code> | - Failed to connect to receiver at startup\.<br>- Communication with the receiver has temporarily stopped due to instability\. | - Receiver service (<code>dump1090</code>) is not running/stopped\. Check for errors for that service\.<br>- The SDR hardware or its connection (USB port, cables, etc.) may be degraded. Check on these components\.<br>- Additionally, check for undervoltage if you're using a Raspberry Pi as this may affect stability.<br>- The current system may be overloaded\. Check on the system\.<br>- If operating on a remote instance of dump1090, check the network or remote system\.<br>- Additionally, check the FlightGazer logs\.<br>- After fixing the underlying issue, restart FlightGazer\. |
 | **Clock**<br><code>FLYBY TRKG RNGE</code><br><code>N/A   123  N/A</code> | Location is not set in receiver\. | - Set your location for dump1090\. Then, restart FlightGazer\.<br>- Advanced: if using a GPS receiver on the system, check to see if the service is running and has obtained a GPS fix\. |
 | **Journey**<br><code>--- ▶ ---</code> | - Waiting for API to send a result\.<br>- API is not in use\.<br>- An API limit has been reached\.<br>- Aircraft is on the ground\. | Normal occurrence\. |
 | **Journey**<br><code>N/A ▶ ---</code> | - Aircraft blocked from tracking\.<br>- Aircraft detected before API was able to\. | For aircraft that are not blocked from tracking: try using a lower FLYBY_STALENESS value\. |
@@ -25,7 +25,7 @@
 | **Show Even More Info**<br>"TIS-B Contact" | Traffic Information Service – Broadcast - broadcast information sent by ground stations corresponding to an aircraft; cannot be tied to a registration or aircraft type and is used for collision avoidance. | [More Information](https://en.wikipedia.org/wiki/Traffic_information_service_%E2%80%93_broadcast) |
 
 ## Clock Center Row and Abbreviations
-*Valid for FlightGazer v.11.3.0 and newer*
+*Valid for FlightGazer v.11.7.0 and newer*
 
 | Layout | Description |
 | --- | --- |
@@ -34,6 +34,7 @@
 | `ABC wk## d###` | `ABC` = Month abbreviation<br>`wk` = Week number of the year<br>`d` = Day number of the year<br> |
 | `##.#° ABCD ▼##` | Outside temperature (Celcius or Fahrenheit)<br>`ABCD` = Prevailing weather condition<br>Wind direction and speed (knots, mph, or m/s) |
 | `D##° V#.# C####` | `D` = Dew point (same unit as temperature)<br>`V` = Visibility (miles or kilometers)<br>`C` = Estimated cloud base (feet or meters) |
+| `Avg:### Max:###` | Current average (root mean square) of aircraft distances<br>Farthest distance detected today |
 
 ### Weather condition meanings
 *Modifiers:*

@@ -34,7 +34,21 @@ Example: `http://192.168.xxx.xxx:8978`<br><br>
 If dump1090 is running on the same system FlightGazer is running off of, leave `PREFER_LOCAL` to `true`.<br><br>
 FlightGazer was designed to handle reading from both a local dump1090 instance and a remote dump978 system at the same time.
 However, if your network goes down or the dump978 system disconnects, this will cause FlightGazer to pause its processing as if dump1090 failed as well.<br><br>
-Also important to note, if your dump978 instance uses a different set location than your dump1090 one, the distance data for UAT aircraft will be overridden by your dump1090 location.
+Also important to note, if your dump978 instance uses a different set location than your dump1090 one, the distance data for UAT aircraft will be overridden by your dump1090 location, as dump1090 has priority.
+
+</details>
+
+<details name="tech-tips"><summary><b>Using FlightGazer to power other services (Home Assistant, MQTT, etc)</b></summary>
+<br>
+
+Wouldn't it be cool to ask your smart speaker, "*Hey X, what's flying around me?*"
+and get something like "*American Airlines 123, a Boeing 747, is on its way from X to Y and has been flying for 10 hours.
+There's also a Cessna 172 with registration Nxxxx about 2.6 nautical miles to the south and headed east at 150 knots.*"?<br>
+
+You'll need to devise a way to poll and interpret FlightGazer's state file, then you'll need a way to feed the appropriate service(s).
+How to achieve this is left as an exercise to the reader.<br>
+Refer to the [state file schema](/docs/state-file-schema.md).<br>
+If you don't have a display and you're only after FlightGazer's data, just enable `NO_DISPLAY_MODE` (the `-d` flag) at script startup, and make sure the webapp is installed so you can access this data across a network.<br><br>
 
 </details>
 

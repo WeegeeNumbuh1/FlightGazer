@@ -5,6 +5,20 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.7.0 - 2026-08-25
+    - NEW: Range statistics is now an option for the center row
+        - This option shows the current average (root mean square) distances of aircraft along with the
+          farthest distance detected so far for the day
+    - Next to the ALT text in the active aircraft display, a small arrow now appears to indicate
+      if the aircraft is ascending or descending, much like tar1090 does so
+        - This feature was initially planned in the v.8.x.x days
+    - Additional resilience improvements
+    - Reduced startup stalling during initialization when checking for python package updates with poor
+      internet connections or if the package repository is experiencing interruptions
+    - 7500 squawks are now a higher priority in the event log
+    - Operators database updater now cleans up after itself (backups get removed)
+    - Operators database update
+
 v.11.6.2 - 2026-08-20
     - Improved flyby stats file load-in to handle some edge cases
 
