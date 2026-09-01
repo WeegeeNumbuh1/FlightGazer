@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.7.0 --- 2026-08-25'
+VERSION: str = 'v.11.8.0 --- 2026-08-31'
 import os
 import argparse
 import sys
@@ -165,6 +165,9 @@ def systemd_notify(message: str) -> None:
         sock.sendto(message.encode(), notify_socket)
 
 systemd_notify(f'MAINPID={THIS_PID}')
+
+EXIT_EVENT = threading.Event()
+""" Another exit signal (actually important) """
 
 # setup logging
 main_logger = logging.getLogger("FlightGazer")
@@ -332,6 +335,13 @@ if EVENTLOG.exists() and EVENTLOG.stat().st_size == 0:
 if VERBOSE_MODE:
     # functionality like < v.11.6.0
     main_logger.info("Notice: The event logger will have its logs included in this log as VERBOSE_MODE is set.")
+
+def preinit_handler(signum, frame):
+    """ Meant for handling exit signals before the main loop starts """
+    main_logger.critical("Caught Ctrl+C, exiting...")
+    EXIT_EVENT.set()
+    systemd_notify(f'STATUS=Startup canceled.')
+    raise KeyboardInterrupt
 
 main_logger.debug("Loading modules...")
 # external imports
@@ -1140,6 +1150,8 @@ def has_key(book, key) -> bool:
 def cleanup() -> None:
     """ Shutdown procedures taken before we exit. Needs to be run inside of a signal handler. """
     exit_time = datetime.datetime.now()
+    clean_start = time.perf_counter()
+    wait_limit = 0.1 # sec
     end_time = round(time.monotonic() - START_TIME, 3)
     systemd_notify('STATUS=Shutdown.')
     systemd_notify('STOPPING=1')
@@ -1153,6 +1165,7 @@ def cleanup() -> None:
     # shutdown all threads
     dispatcher.send(message='', signal=END_THREADS, sender=sigterm_handler)
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
+    EXIT_EVENT.set()
     session.close()
     if API_KEY: API_session.close()
     # final cleanup
@@ -1174,6 +1187,10 @@ def cleanup() -> None:
         os.write(sys.stdout.fileno(), b"Done.\n")
     except OSError:
         pass
+    clean_end = time.perf_counter()
+    finish = wait_limit - (clean_end - clean_start)
+    if finish > 0:
+        time.sleep(finish)
     main_logger.info("FlightGazer is shutdown.")
 
 def sigterm_handler(signum, frame):
@@ -1543,6 +1560,8 @@ def probe1090() -> tuple[str | None, str | None]:
     ]
 
     for json_1090 in locations:
+        if EXIT_EVENT.is_set():
+            break
         if not json_1090:
             continue
         try:
@@ -1580,6 +1599,8 @@ def probe978() -> str | None:
     ]
 
     for json_978 in locations:
+        if EXIT_EVENT.is_set():
+            break
         if not json_978:
             continue
         try:
@@ -1598,6 +1619,10 @@ def dump1090_check() -> None:
         main_logger.info(f"Custom dump1090 location is set: \'{CUSTOM_DUMP1090_LOCATION}\'")
 
     attempts = 4
+    sleep_sec = 10
+    sleep_tick = 0.25
+    sleep_step = int(sleep_sec // sleep_tick)
+    sleep_count = 0
     for wait in range(1, attempts + 1):
         tries = attempts - wait
         DUMP1090_JSON, URL = probe1090()
@@ -1615,7 +1640,15 @@ def dump1090_check() -> None:
             if tries > 0:
                 main_logger.info("Could not find dump1090 json. dump1090 may not be loaded yet. "
                                 f"Waiting 10 seconds and trying {tries} more time(s).")
-                time.sleep(10)
+                while (not EXIT_EVENT.is_set() and sleep_count < sleep_step):
+                    time.sleep(sleep_tick)
+                    if EXIT_EVENT.is_set():
+                        break
+                    sleep_count += 1
+                if EXIT_EVENT.is_set():
+                    main_logger.debug("Quitting dump1090 search...")
+                    return
+                sleep_count = 0
 
     if DUMP1090_JSON is None:
         DUMP1090_IS_AVAILABLE = False
@@ -1633,6 +1666,10 @@ def dump978_check() -> None:
         main_logger.info(f"Custom dump978 location is set: \'{CUSTOM_DUMP978_LOCATION}\'")
 
     attempts = 3
+    sleep_sec = 10
+    sleep_tick = 0.25
+    sleep_step = int(sleep_sec // sleep_tick)
+    sleep_count = 0
     for wait in range(1, attempts + 1):
         tries = attempts - wait
         json_978 = probe978()
@@ -1655,7 +1692,15 @@ def dump978_check() -> None:
             if tries > 0:
                 main_logger.info("Could not find dump978 json. dump978 may not be loaded yet. "
                                 f"Waiting 10 seconds and trying {tries} more time(s).")
-                time.sleep(10)
+                while (not EXIT_EVENT.is_set() and sleep_count < sleep_step):
+                    time.sleep(sleep_tick)
+                    if EXIT_EVENT.is_set():
+                        break
+                    sleep_count += 1
+                if EXIT_EVENT.is_set():
+                    main_logger.debug("Quitting dump978 search...")
+                    return
+                sleep_count = 0
 
     if not json_978:
         main_logger.info("Failed to find dump978. No UAT data will be used this session.")
@@ -2120,7 +2165,7 @@ def configuration_check_api() -> None:
                 main_logger.info("Setting ENHANCED_READOUT or ENHANCED_READOUT_AS_FALLBACK to \'true\' is highly recommended.")
             elif not ENHANCED_READOUT and ENHANCED_READOUT_AS_FALLBACK:
                 ENHANCED_READOUT = True
-                main_logger.info("ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
+                main_logger.info("API not in use and ENHANCED_READOUT_AS_FALLBACK enabled, ENHANCED_READOUT is now forced to \'True\'.")
     else:
         main_logger.info("No Filter mode is enabled. API will not be used.")
         API_KEY = ""
@@ -4732,7 +4777,6 @@ class APIFetcher:
                 main_logger.info(f"API daily limit ({API_DAILY_LIMIT}) reached. "
                                  "No more API calls will occur until the next day.")
                 API_daily_limit_reached = True
-                process_time[2] = 0
             return
 
         # We use a 1 cent buffer just to account for any kind of calculation difference between
@@ -4745,7 +4789,6 @@ class APIFetcher:
             main_logger.warning(f"API cost limit (${API_COST_LIMIT}) reached. Disabling API usage.")
             main_logger.info(f"Estimated cost today: ${estimated_api_cost:.2f}")
             API_cost_limit_reached = True
-            process_time[2] = 0
             return
 
         if 'enhanced_readout_wait_condition' in globals():
@@ -5289,9 +5332,9 @@ class DisplayFeeder:
             current_average = f"{a_now:.0f}"
         elif 9.95 <= a_now < 99.5:
             current_average = f"{a_now:.1f}"
-        elif 0 < r_now < 9.95:
+        elif 0 < a_now < 9.95:
             current_average = f"{a_now:.2f}"
-        elif r_now == 0:
+        elif a_now == 0:
             current_average = "0"
         # Max: just use integers, 3 characters
         max_now = general_stats['Max']
@@ -7111,7 +7154,7 @@ class wx_API():
         conditions = wx_id_to_string(current_weather.get('id'))
         # probably the rarest easter egg you can encounter here
         if conditions == '!TRN':
-            main_logger.error(
+            event_logger.critical(
                 "\"I've a feeling we\'re not in Kansas anymore...\" "
                 "(You should probably seek shelter right now)"
             )
@@ -7312,6 +7355,7 @@ class Display(
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.8.0: Finally better exit signal handling
     - v.11.7.0: Support new range stats for center row and add altitude change arrow
     - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information
@@ -7340,7 +7384,7 @@ class Display(
     - v.0.9.0: The Clock works
     - v.0.8.0: Borrow logic framework from Collin Waddell's `its-a-plane` project and lay groundwork for this class
     """
-    def __init__(self):
+    def __init__(self, exit_handler: threading.Event):
 
         # Setup Display
         options = RGBMatrixOptions()
@@ -7397,6 +7441,8 @@ class Display(
             except Exception:
                 main_logger.debug(f"Failed to set attribute \'{attr}\' for display.")
         self.matrix = RGBMatrix(options=options)
+
+        self.exit_signal = exit_handler
 
         # Setup canvas
         self.canvas = self.matrix.CreateFrameCanvas()
@@ -7462,7 +7508,7 @@ class Display(
         self._enhanced_readout_last = ENHANCED_READOUT_INIT
 
         # Initialize animator
-        super().__init__()
+        super().__init__(self.exit_signal)
 
         # Overwrite any default settings from Animator
         self.framerate = 10
@@ -9207,7 +9253,7 @@ class Display(
 
     def run_screen(self):
         global DISPLAY_IS_VALID
-        while True:
+        while not self.exit_signal.is_set():
             try:
                 # Start loop
                 self.play()
@@ -9248,6 +9294,10 @@ class Display(
                 self.a_clear_screen()
                 time.sleep(5)
                 continue # restart
+
+        self.a_clear_screen()
+        self.reset_scene()
+        main_logger.debug("Display exited.")
 
 # =========== Initialization II ============
 # ==========================================
@@ -9308,7 +9358,7 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         main_logger.critical("FlightGazer has exited.")
         sys.exit(1)
     try:
-        display = Display()
+        display = Display(EXIT_EVENT)
         display_stuff = threading.Thread(target=display.run_screen, name='Display-Driver', daemon=True)
         display_fps_thread = threading.Thread(target=display_FPS_counter, name='FPS-Counter', args=(display,), daemon=True)
         brightness_stuff = threading.Thread(target=brightness_controller, name='Brightness-Controller', daemon=True)
@@ -9328,6 +9378,10 @@ if DISPLAY_IS_VALID and not NODISPLAY_MODE:
         time.sleep(5)
 if not DISPLAY_IS_VALID and not NODISPLAY_MODE:
     write_bad_state_semaphore(True)
+
+# do this after display init
+signal.signal(signal.SIGINT, preinit_handler)
+signal.signal(signal.SIGTERM, preinit_handler)
 
 get_ip()
 HOSTNAME = socket.gethostname()
@@ -9371,9 +9425,25 @@ try:
                 search_thread_executor.submit(dump1090_check),
                 search_thread_executor.submit(dump978_check)
                 ]
-            for search_future in CF.as_completed(search_futures):
-                _ = search_future.result()
-except (ImportError, KeyboardInterrupt):
+            try:
+                while search_futures:
+                    done, pending = CF.wait(
+                        search_futures,
+                        timeout=0.1,
+                        return_when=CF.FIRST_COMPLETED
+                    )
+                    if EXIT_EVENT.is_set():
+                        main_logger.debug("Canceling search")
+                        for fut in pending:
+                            fut.cancel()
+                        search_thread_executor.shutdown(wait=False, cancel_futures=True)
+                        raise KeyboardInterrupt
+                    search_futures = list(pending)
+            except KeyboardInterrupt:
+                EXIT_EVENT.set()
+                raise
+except KeyboardInterrupt:
+    time.sleep(0.1)
     main_logger.critical("Exit commanded before full initialization could complete.")
     sys.exit(1)
 
@@ -9413,7 +9483,7 @@ if DATABASE_FILE.exists():
         main_logger.warning("Failed to load required database handler. "
                             "Some additional aircraft info may not be available.")
 else:
-    main_logger.info("Aircraft database is unavailable.")
+    main_logger.warning("Aircraft database is unavailable as it could not be found.")
 
 if API_KEY and API_PERSISTENT_CACHE:
     main_logger.info("API persistent cache feature is enabled, loading features...")
@@ -9499,13 +9569,13 @@ def main() -> None:
                 interactive_wait_time -= 5
                 time.sleep(5)
                 print("\x1b[3mProtip\x1b[0m: If you're not using a physical RBG-Matrix display,\n"
-                    "------- use RGBMatrixEmulator to see the display on a webpage instead!")
+                    "        use RGBMatrixEmulator to see the display on a webpage instead!")
             if random.randint(0,1) == 1:
                 interactive_wait_time -= 5
                 time.sleep(5)
                 if random.randint(0,1) == 1:
                     print("\n\x1b[3mDid you know?\x1b[0m The color gradient in the FlightGazer logo comes from the\n"
-                        "------------- color scale used on the dump1090 map that corresponds to plane altitude.")
+                        "              color scale used on the dump1090 map that corresponds to plane altitude.")
                 else:
                     print("\nCheck the FlightGazer logo closely. Notice something?")
             if random.randint(0,1) == 1:
@@ -9515,7 +9585,8 @@ def main() -> None:
 
             time.sleep(interactive_wait_time)
             del interactive_wait_time
-        except (ImportError, KeyboardInterrupt):
+        except KeyboardInterrupt:
+            time.sleep(0.1)
             main_logger.critical("FlightGazer start aborted.")
             sys.exit(1)
 
@@ -9562,14 +9633,11 @@ def main() -> None:
         main_logger.info(">>> Please check your settings, network connection, "
                          "and/or the status of dump1090. Then, restart FlightGazer.")
 
-    try:
-        while True: #keep-alive
-            time.sleep(1)
-            if not main_stuff.is_alive(): # bad, we need to leave
-                main_logger.critical("Main processing thread has crashed! Cannot continue.")
-                abnormal_handler(signal.SIGABRT,"")
-    except ImportError: # catch the display driver (if loaded) exiting and relay it
-        sigterm_handler(signal.SIGTERM,"")
+    while True: #keep-alive
+        time.sleep(1)
+        if not main_stuff.is_alive(): # bad, we need to leave
+            main_logger.critical("Main processing thread has crashed! Cannot continue.")
+            abnormal_handler(signal.SIGABRT,"")
 
 # finally
 if __name__ == '__main__': main()

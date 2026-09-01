@@ -3,7 +3,7 @@
 # It's assumed that this is started very early in the boot process (right after filesystems are available).
 # This file must be in the utilities directory to work properly.
 # Repurposed from the original FlightGazer splash screen.
-# Last updated: v.11.3.0
+# Last updated: v.11.8.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -17,6 +17,7 @@ from time import sleep, monotonic
 
 def sigterm_handler(signum, frame):
     signal.signal(signum, signal.SIG_IGN)
+    image_scroller.clear()
     print(f"{log_prefix}successfully stopped (SIGTERM'd). Runtime: {monotonic() - starttime:.3f} seconds.")
     sys.exit(0)
 
@@ -247,6 +248,9 @@ class SplashText():
                 pass
         self.matrix = RGBMatrix(options=options)
 
+    def clear(self):
+        self.matrix.Clear()
+
     def run(self):
 
         self.double_buffer = self.matrix.CreateFrameCanvas()
@@ -381,4 +385,5 @@ if __name__ == "__main__":
         image_scroller.run()
     except KeyboardInterrupt:
         print(f"{log_prefix}successfully stopped. Runtime: {monotonic() - starttime:.3f} seconds")
+        image_scroller.clear()
         sys.exit(0)

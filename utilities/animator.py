@@ -1,24 +1,13 @@
 """ Our Animator controller for our RGB display.
-Originally designed by Colin Waddell for his its-a-plane-python project, but adapted and extended for FlightGazer. """
+Originally designed by Colin Waddell for his `its-a-plane-python` (v1) project,
+but adapted and extended for FlightGazer. """
 from time import sleep, perf_counter
-import sys, os
-import signal
 import logging
 
+ANIMATOR_VERSION = '11.8.0'
 DELAY_DEFAULT = 0.01
 animator_logger = logging.getLogger("DisplayDriver")
-
-def sigterm_handler(signum, frame):
-    # this module can steal signals from our main thread, so we cascade our exit starting from here
-    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
-    os.write(sys.stdout.fileno(), b"\nDisplay Driver: Exit signal received, shutting down now.\n")
-    animator_logger.info("Exit signal received, shutting down now.")
-    animator_logger.debug(f"Rendered {getattr(Animator, 'frame', 'N/A')} frames.")
-    raise ImportError # hacky
-    """ We don't use SystemExit because we will need to try-except it, and the main thread
-    will catch the same signal from the main system when we call for external termination or a KeyboardInterrupt,
-    which depends on how the main script was initiated. It will cause the signal handler to be called twice,
-    which is undesirable. """
+animator_logger.debug(f"Loaded in Animator module version \'{ANIMATOR_VERSION}\'")
 
 class Animator(object):
     class KeyFrame(object):
@@ -29,7 +18,8 @@ class Animator(object):
                 return func
             return wrapper
 
-    def __init__(self):
+    def __init__(self, exit_signal):
+        self.exit_signal = exit_signal
         self.keyframes = []
         self.frame = 0
         self._delay = DELAY_DEFAULT
@@ -44,10 +34,6 @@ class Animator(object):
         self._register_keyframes()
 
         super().__init__()
-
-        # break out of this loop if the system calls for our termination
-        signal.signal(signal.SIGINT, sigterm_handler)
-        signal.signal(signal.SIGTERM, sigterm_handler)
 
     def _register_keyframes(self):
         # Some introspection to setup keyframes
@@ -65,12 +51,12 @@ class Animator(object):
         animator_logger.info("Display started!")
         self._polling_window_start = perf_counter()
         try:
-            while True:
+            while not self.exit_signal.is_set():
                 frame_timer_start = perf_counter()
                 for keyframe in self.keyframes:
                     # If divisor == 0 then only run once on first loop
                     if self.frame == 0 and keyframe.properties["divisor"] == 0:
-                            keyframe()
+                        keyframe()
 
                     # Otherwise perform normal operation
                     if (
@@ -100,6 +86,9 @@ class Animator(object):
                 self._reset_scene = False
                 self.frame += 1
                 sleep(self._delay)
+
+            animator_logger.debug(f"Animator thread shutdown. Rendered {self.frame} frames.")
+            return
 
         except KeyboardInterrupt:
             print("Screen animator exiting...")

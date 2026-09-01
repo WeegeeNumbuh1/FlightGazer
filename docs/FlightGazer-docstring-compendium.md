@@ -243,6 +243,7 @@ If you'd like to see descriptions for all the globals used in the script, those 
     ...
 
     Major additions/changes to this class (living document):
+    - v.11.8.0: Finally better exit signal handling
     - v.11.7.0: Support new range stats for center row and add altitude change arrow
     - v.11.0.0: Adapted progress bar to handle new selection algorithm
     - v.9.6.0: Add support for weather information

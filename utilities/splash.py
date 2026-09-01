@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.11.3.0
+# Last updated: v.11.8.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -245,6 +245,9 @@ class ImageScroller():
                 indicator_color.blue
             )
 
+    def clear(self):
+        self.matrix.Clear()
+
     def run(self):
         if not 'image' in self.__dict__:
             try:
@@ -341,4 +344,5 @@ if __name__ == "__main__":
         image_scroller = ImageScroller()
         image_scroller.run()
     except (KeyboardInterrupt, SystemExit):
+        image_scroller.clear()
         sys.exit(0)

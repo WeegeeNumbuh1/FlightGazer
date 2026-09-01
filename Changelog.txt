@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.8.0 - 2026-08-31
+    - Reworked internal signaling methods that existed since v.1.1.1 for cleaner shutdown
+    - The splash screens and main script now attempt to clear the display before stopping
+        - Designed to mitigate rare cases when the display ends up with "stuck" pixels when exiting
+    - Minor fix to average distance calculation for the display when the value is <10
+
 v.11.7.0 - 2026-08-25
     - NEW: Range statistics is now an option for the center row
         - This option shows the current average (root mean square) distances of aircraft along with the
