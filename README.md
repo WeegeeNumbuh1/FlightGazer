@@ -10,8 +10,9 @@
 <!-- end title section -->
 
 ## About
-This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python), but entirely driven by **real-time [ADS-B](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)** (and optionally UAT) data emitted by aircraft. It was originally conceived as a way to log aircraft flyby counts and to get a glance at ADS-B receiver site metrics without the need to fire up a webpage.<br>
-Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an internal database for airline lookup by callsign.<br>
+This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python) (v1), but entirely driven by **real-time [ADS-B](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)** (and optionally UAT) data emitted by aircraft. It was originally conceived as a way to log aircraft flyby counts and to get a glance at ADS-B receiver site metrics without the need to fire up a webpage.
+
+Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an [internal database](https://github.com/WeegeeNumbuh1/FlightGazer-airlines-db) for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
 
 Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can run on other setups (your mileage may vary).
@@ -22,8 +23,10 @@ Designed primarily to run on a Raspberry Pi and Raspberry Pi OS, but can run on 
 > Every text-based line in this project was typed by hand (beside the fonts and databases), including [documentation](./docs/).<br>
 > <b>*No LLM-generated code whatsoever.*</b> (I prefer thinking with my own flesh and blood)
 
-<details open>
-<summary><b>Table of Contents</b></summary>
+### Table of Contents
+
+<details>
+<summary><b>(Show/Hide)</b></summary></h3>
 
 - [About](#about)
 - [What it looks like](#what-it-looks-like)
@@ -95,10 +98,10 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
   - ***NOT*** reliant on [APIs for live aircraft data](https://github.com/ColinWaddell/FlightTracker/issues/33)
 - **It's a neat looking clock that displays your ADS-B site stats when there aren't any aircraft flying overhead**
   - Shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
-  - Display sunrise and sunset times, detailed signal stats for your ADS-B receiver, extended calendar info, and even local weather info
+  - Display sunrise and sunset times, detailed signal and range stats for your ADS-B receiver, extended calendar info, and even local weather info
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp#what-it-looks-like)
-- Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - [Repurpose/analyze FlightGazer's own realtime data](#using-flightgazers-data) for use elsewhere
+- Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
 - Built to work with existing setups like [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Airplanes.Live](https://airplanes.live/image-guide/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), [ADSB.im](https://adsb.im/home), and likely even more
@@ -137,7 +140,7 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 - Runs from a initialization script that handles everything such as initial setup and running the python script (Linux only)
   - Set up to automatically start on boot via `systemd`
   - Keeps databases updated over time without having to update to the latest version of FlightGazer
-- Easily update to latest builds here on Github
+- Easily update to latest builds here on GitHub
   - Automagically migrate settings, even if new options appear or are removed in the future
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Automatically tracks aircraft which report distress signals
@@ -558,13 +561,13 @@ If your question isn't listed in the FAQ's, open an issue here on GitHub.
 ## Known Issues, Shortcomings, and Reporting Issues
 >[!WARNING]
 > FlightGazer must constantly run as root.
-- This is unavoidable due to the need to interact with low-level hardware to drive the RGB display.
+- This is unavoidable due to the need to interact with low-level hardware to drive the RGB display. It's recommended to dedicate a single system for FlightGazer.
 <details><summary>More details</summary>
 
 - The rgbmatrix library is capable of dropping root privleges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
   - Additionally, not running as root will reduce performance, which we need the most of since this is all based on Python.
-- The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority.
-- Related processes like the web-app must also run as root since it needs to be able to start or stop the FlightGazer service.
+- The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority, along with the initialization script handling required system-level resources depending on the update.
+- Related processes like the web-app must also run as root since it needs to be able to start or stop the main service.
 - Even though the emulator does not need to run as root, it will still inherit root permissions due to the way FlightGazer runs.
   - Same goes for running in `NO_DISPLAY` mode (`-d`).
 </details>

@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.8.0 --- 2026-08-31'
+VERSION: str = 'v.11.8.1 --- 2026-09-14'
 import os
 import argparse
 import sys
@@ -1370,7 +1370,7 @@ def dxing_log() -> None:
     dis = super_far_plane['Distance'] / distance_multiplier
     if dis >= 450:
         data0.append("*** Frame this and tell everyone! *** ")
-    if 400 <= dis < 450:
+    elif 400 <= dis < 450:
         data0.append("Call yourself the DXing master, ")
     elif 340 < dis < 400:
         data0.append("Absolutely insane! ")
@@ -1382,11 +1382,10 @@ def dxing_log() -> None:
     data0.append(f"{super_far_plane['Datetime'].strftime('%Y-%m-%d %H:%M:%S')}.")
     if dis >= 450:
         event_logger.error(f"{''.join(data0)}")
-    if 400 <= dis < 450:
+    elif 400 <= dis < 450:
         event_logger.warning(f"{''.join(data0)}")
     else:
         event_logger.info(f"{''.join(data0)}")
-    event_logger.info("This is beyond the typical limit for detecting ADS-B signals and was the farthest aircraft detected today.")
     dx_altitude = super_far_plane['Altitude'] / altitude_multiplier
     if dx_altitude < 10000:
         event_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
@@ -6754,12 +6753,12 @@ class DistantDeterminator():
             super_far_plane = farthest
         # preemptive logging for a really far plane
         if (
-            self.last_max_distance / distance_multiplier >= 425
+            self.last_max_distance / distance_multiplier >= 400
             and (not self._really_really_far_plane or preempt_log_bypass)
             and not combined_feed
             ):
             self._really_really_far_plane = True
-            event_logger.info(f"Detected an exceptional DXing event so far today! This result is preliminary until confirmed at the end of the day.")
+            event_logger.warning(f"Detected an exceptional DXing event so far today! This result is preliminary until confirmed at the end of the day.")
             freeze_frame_packet(super_far_plane, show_distance=True)
             event_logger.info("Time spent detecting distant aircraft as of now: "
                     f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")

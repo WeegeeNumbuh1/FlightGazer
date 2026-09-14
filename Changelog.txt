@@ -5,6 +5,9 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.8.1 - 2026-09-14
+    - Minor dxing logging tweaks for very well-sited setups
+
 v.11.8.0 - 2026-08-31
     - Reworked internal signaling methods that existed since v.1.1.1 for cleaner shutdown
     - The splash screens and main script now attempt to clear the display before stopping
