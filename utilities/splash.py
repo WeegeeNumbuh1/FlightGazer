@@ -3,7 +3,7 @@
 # The splash screen is designed to scroll across the screen rather than being static (because fancy)
 # This is expected to only be run by the FlightGazer-init.sh script
 # Additionally this file must be in the utilities directory to work properly.
-# Last updated: v.11.8.0
+# Last updated: v.11.9.0
 # By: WeegeeNumbuh1
 
 import sys
@@ -94,6 +94,8 @@ config_default = {
     'GPIO_SLOWDOWN': 2,
     'HAT_PWM_ENABLED': True,
     'LED_PWM_BITS': 8,
+    'DISPLAY_ROTATE': False,
+    'PANEL_COLOR_ORDER': 0,
 }
 config_advanced = {
     "ADV_LED_PWM_LSB": 130,
@@ -123,6 +125,21 @@ if (CONFIG_FILE := Path(CURRENT_DIR, '..', 'config.yaml')).exists() and can_load
                 or config[key] is None
             ):
                 config[key] = config_default[key]
+        if config['DISPLAY_ROTATE']:
+            config_advanced['ADV_LED_PIXEL_MAPPER_CONFIG'] = 'Rotate:180'
+        match config['PANEL_COLOR_ORDER']:
+            case 1:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'RBG'
+            case 2:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'BGR'
+            case 3:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'BRG'
+            case 4:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'GBR'
+            case 5:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'GRB'
+            case _:
+                config_advanced['ADV_LED_RGB_SEQUENCE'] = 'RGB'
         for advanced_key in config_advanced:
             try:
                 config_advanced[advanced_key] = config[advanced_key]

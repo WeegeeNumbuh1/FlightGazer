@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.8.1 # do not modify this
+CONFIG_VERSION: v.11.9.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -312,6 +312,12 @@ WRITE_STATE: true
 
 # ============== RGB-Matrix settings ===============
 # ==================================================
+# Note: the splash screens will also use these settings as well.
+
+DISPLAY_ROTATE: false
+# [true/false]
+# Set to true to rotate the display 180 degrees.
+# Useful for cases due to cable routing or peculiar designs.
 
 GPIO_SLOWDOWN: 2
 # [Integer: 0 ~ 4]
@@ -320,18 +326,32 @@ GPIO_SLOWDOWN: 2
 
 HAT_PWM_ENABLED: true
 # [true/false]
-# If you set the quality modification for the RGB-Matrix hat, set to true. If not, set to false.
+# If you're using the quality modification for the Adafruit RGB-Matrix hat, set to true. If not, set to false.
 
 LED_PWM_BITS: 8
 # [Integer: 2 ~ 11]
 # Lower decreases color depth but increases refresh rate. Adjust to taste. '8' works well in most cases.
 
+PANEL_COLOR_ORDER: 0
+# [integer; 0 ~ 5]
+# Most panels are RGB, however some are wired differently.
+# If the colors look swapped, experiment with this value until the colors look correct.
+# You can also use this feature to lazily change the color "theme" of the display.
+# 0, null, or empty = RGB [default]
+# 1 = RBG
+# 2 = BGR
+# 3 = BRG
+# 4 = GBR
+# 5 = GRB
+
 # ========== Advanced RGB-Matrix settings ==========
 # ==================================================
-# Only enable the below settings if you know what you're doing!
+# Only enable these settings if you know what you're doing!
 # Remove the leading '#' to enable the setting.
-# There will be no support if something breaks when using these settings.
-# Refer to https://github.com/hzeller/rpi-rgb-led-matrix for valid values.
+# There will be no support if something breaks when using these.
+# You can refer to the following resources for valid values:
+# - https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/include/led-matrix.h
+# - https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/lib#readme
 
 # ADV_LED_PWM_LSB: 130
 # ADV_LED_HARDWARE_MAPPING: 'regular'
@@ -340,11 +360,9 @@ LED_PWM_BITS: 8
 # ADV_LED_SCAN_MODE: 0
 # ADV_LED_DISABLE_HARDWARE_PULSING: false
 # ADV_LED_INVERSE_COLORS: false
-# ADV_LED_RGB_SEQUENCE: 'RGB'
 # ADV_LED_PANEL_TYPE: ''
 # ADV_LED_LIMIT_REFRESH_RATE: 0
 # ADV_LED_PIXEL_MAPPER_CONFIG: ''
-# ADV_LED_LIMIT_REFRESH_RATE: 0
 # ADV_LED_DISABLE_BUSY_WAITING: false
 # ADV_LED_PWM_DITHER_BITS: 0
 

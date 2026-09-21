@@ -5,6 +5,14 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.9.0 - 2026-09-20
+    - More configurable display options with new settings DISPLAY_ROTATE and PANEL_COLOR_ORDER
+        - Underlying support for the functionality used by these settings has existed since
+          v.8.2.0 but it's now easier to understand and apply
+        - These settings will also apply to the splash screens as well
+        - A neat trick with using PANEL_COLOR_ORDER is to lazily change the existing
+          color palette/theme of the display
+
 v.11.8.1 - 2026-09-14
     - Minor dxing logging tweaks for very well-sited setups
 

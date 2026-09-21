@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.8.1 --- 2026-09-14'
+VERSION: str = 'v.11.9.0 --- 2026-09-20'
 import os
 import argparse
 import sys
@@ -679,6 +679,8 @@ SCROLLING_SPEED: int = 30
 API_PERSISTENT_CACHE: bool = False
 IGNORE_AIRCRAFT_ICAOS: set | str = ''
 NO_DUMP978_SEARCH: bool = True
+DISPLAY_ROTATE: bool = False # new setting!
+PANEL_COLOR_ORDER: int|None = 0 # new setting!
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -753,6 +755,8 @@ default_settings: dict = {
     "API_PERSISTENT_CACHE": API_PERSISTENT_CACHE,
     "IGNORE_AIRCRAFT_ICAOS": IGNORE_AIRCRAFT_ICAOS,
     "NO_DUMP978_SEARCH": NO_DUMP978_SEARCH,
+    "DISPLAY_ROTATE": DISPLAY_ROTATE,
+    "PANEL_COLOR_ORDER": PANEL_COLOR_ORDER,
 }
 """ Dict of default settings """
 
@@ -764,7 +768,6 @@ advanced_LED_settings: dict = {
     "ADV_LED_SCAN_MODE": ADV_LED_SCAN_MODE,
     "ADV_LED_DISABLE_HARDWARE_PULSING": ADV_LED_DISABLE_HARDWARE_PULSING,
     "ADV_LED_INVERSE_COLORS": ADV_LED_INVERSE_COLORS,
-    "ADV_LED_RGB_SEQUENCE": ADV_LED_RGB_SEQUENCE,
     "ADV_LED_PANEL_TYPE": ADV_LED_PANEL_TYPE,
     "ADV_LED_PIXEL_MAPPER_CONFIG": ADV_LED_PIXEL_MAPPER_CONFIG,
     "ADV_LED_LIMIT_REFRESH_RATE": ADV_LED_LIMIT_REFRESH_RATE,
@@ -1796,7 +1799,7 @@ def configuration_check() -> None:
     global RANGE, HEIGHT_LIMIT, FLYBY_STATS_ENABLED, FLYBY_STALENESS, LOCATION_TIMEOUT, FOLLOW_THIS_AIRCRAFT
     global BRIGHTNESS, BRIGHTNESS_2, ACTIVE_PLANE_DISPLAY_BRIGHTNESS
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
-    global LED_PWM_BITS, SCROLLING_SPEED
+    global LED_PWM_BITS, ADV_LED_RGB_SEQUENCE, SCROLLING_SPEED
     global UNITS_WX, OPENWEATHER_API_KEY
     global IGNORE_AIRCRAFT_ICAOS
     global database_lookup_cache, focus_plane_api_results, plane_latch_times
@@ -1893,6 +1896,25 @@ def configuration_check() -> None:
             main_logger.warning("LED_PWM_BITS is out of bounds or not an integer.")
             main_logger.info(f">>> Setting to default ({default_settings['LED_PWM_BITS']})")
             LED_PWM_BITS = default_settings['LED_PWM_BITS']
+
+        match PANEL_COLOR_ORDER:
+            case 1:
+                ADV_LED_RGB_SEQUENCE = 'RBG'
+            case 2:
+                ADV_LED_RGB_SEQUENCE = 'BGR'
+            case 3:
+                ADV_LED_RGB_SEQUENCE = 'BRG'
+            case 4:
+                ADV_LED_RGB_SEQUENCE = 'GBR'
+            case 5:
+                ADV_LED_RGB_SEQUENCE = 'GRB'
+            case _:
+                ADV_LED_RGB_SEQUENCE = 'RGB'
+        if ADV_LED_RGB_SEQUENCE != 'RGB':
+            main_logger.info(f"Using display color order of \'{ADV_LED_RGB_SEQUENCE}\'.")
+
+        if DISPLAY_ROTATE:
+            main_logger.info("Display is rotated 180 degrees.")
 
         if (
             SCROLLING_SPEED is None
@@ -7416,7 +7438,11 @@ class Display(
             'brightness': BRIGHTNESS, # initial brightness, this can change at runtime
             'pwm_lsb_nanoseconds': ADV_LED_PWM_LSB,
             'led_rgb_sequence': ADV_LED_RGB_SEQUENCE,
-            'pixel_mapper_config': ADV_LED_PIXEL_MAPPER_CONFIG,
+            'pixel_mapper_config': (
+                ADV_LED_PIXEL_MAPPER_CONFIG
+                if ADV_LED_PIXEL_MAPPER_CONFIG
+                else ('Rotate:180' if DISPLAY_ROTATE else '')
+            ),
             'show_refresh_rate': 0,
             'pwm_bits': LED_PWM_BITS,
             'gpio_slowdown': GPIO_SLOWDOWN,
