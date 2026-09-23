@@ -5,6 +5,12 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.9.1 - 2026-09-22
+    - Initialization speedup when the API is enabled
+    - Limit internal maximum distance and average calculation to 1000 nmi
+      to handle edge case of misbehaving MLAT feeds
+    - Handle very rare edge case that may occur during shutdown
+
 v.11.9.0 - 2026-09-20
     - More configurable display options with new settings DISPLAY_ROTATE and PANEL_COLOR_ORDER
         - Underlying support for the functionality used by these settings has existed since

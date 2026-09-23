@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.9.0 --- 2026-09-20'
+VERSION: str = 'v.11.9.1 --- 2026-09-22'
 import os
 import argparse
 import sys
@@ -679,8 +679,8 @@ SCROLLING_SPEED: int = 30
 API_PERSISTENT_CACHE: bool = False
 IGNORE_AIRCRAFT_ICAOS: set | str = ''
 NO_DUMP978_SEARCH: bool = True
-DISPLAY_ROTATE: bool = False # new setting!
-PANEL_COLOR_ORDER: int|None = 0 # new setting!
+DISPLAY_ROTATE: bool = False
+PANEL_COLOR_ORDER: int|None = 0
 
 # Advanced options for LED Matrix setups that don't use the Adafruit Bonnet
 ADV_LED_PWM_LSB = 130
@@ -1021,9 +1021,11 @@ Controlled by `AirplaneParser()` """
 combined_feed: bool = False
 """ True if it's determined this dump1090 instance is being used with multiple sites.
 Controlled by `DistantDeterminator()` """
+EXITED: bool = False
+""" Flag used to prevent the cleanup routine running again in the extra rare case multiple signal handlers run. """
 #--- API stuff
 # Note: capital "API" in the leading position indicate bools, lowercase "api" are other types
-api_hits: list[int] = [0, 0, 0 ,0]
+api_hits: list[int] = [0, 0, 0, 0]
 """ [successful API returns, failed API returns, no data returned, cache hits] """
 API_daily_limit_reached: bool = False
 """ This flag will be set to True if we reach `API_DAILY_LIMIT`. """
@@ -1035,6 +1037,13 @@ API_cost_limit_reached: bool = False
 """ Flag to indicate we hit the defined cost limit. """
 API_schedule_triggered: bool = False
 """ Flag that indicates that the API should not be called at the current time. (True = no API calls) """
+api_cache = None
+""" Cache handler object for interfacing with the long-term API results database.
+Initialized to `None` until the API is confirmed to work """
+api_session = requests.Session()
+""" Session used for the FA API """
+api_init_wait_event = threading.Event()
+""" Tell the main thread to wait until the API is validated to work. """
 WX_API_data: dict = {}
 """ Results from the weather API. Empty dict if API is not in use, fails at start, or data gets invalidated.
 Keys (prepare to handle `None` for all of these):
@@ -1152,6 +1161,13 @@ def has_key(book, key) -> bool:
 
 def cleanup() -> None:
     """ Shutdown procedures taken before we exit. Needs to be run inside of a signal handler. """
+    global EXITED
+    if not EXITED:
+        EXITED = True
+    else:
+        main_logger.critical("Shutdown routine already ran, nothing to do. FlightGazer should exit shortly...")
+        return
+
     exit_time = datetime.datetime.now()
     clean_start = time.perf_counter()
     wait_limit = 0.1 # sec
@@ -1170,7 +1186,7 @@ def cleanup() -> None:
     if USING_THREADPOOL: data_threadpool.shutdown(wait=False, cancel_futures=True)
     EXIT_EVENT.set()
     session.close()
-    if API_KEY: API_session.close()
+    if API_KEY: api_session.close()
     # final cleanup
     flyby_stats()
     if DATABASE_CONNECTED: db.close()
@@ -1194,19 +1210,28 @@ def cleanup() -> None:
     finish = wait_limit - (clean_end - clean_start)
     if finish > 0:
         time.sleep(finish)
-    main_logger.info("FlightGazer is shutdown.")
+    main_logger.info("FlightGazer is shut down.")
 
 def sigterm_handler(signum, frame):
     """ Exiting normally. """
     signal.signal(signum, signal.SIG_IGN) # ignore additional signals
+    # unlink the other handler
+    if is_posix:
+        signal.signal(signal.SIGHUP, signal.SIG_DFL)
     cleanup()
     systemd_notify('EXIT_STATUS=0')
     sys.exit(0)
 
 def abnormal_handler(signum, frame):
     """ Not exiting cleanly, something upstream probably stopped working """
-    signal.signal(signum, signal.SIG_IGN) # ignore additional signals
-    main_logger.critical(f"Caught signal {signum} or a SIGHUP, attempting to cleanly shutdown...")
+    signal.signal(signum, signal.SIG_IGN)
+    # don't let the other handler catch these as we're already exiting
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    if is_posix:
+        signal.signal(signal.SIGHUP, signal.SIG_DFL)
+    sigdesc = signal.Signals(signum).name
+    main_logger.critical(f"Caught signal {sigdesc} ({signum}), attempting to cleanly shut down...")
     cleanup()
     systemd_notify('EXIT_STATUS=1')
     sys.exit(1)
@@ -2107,6 +2132,7 @@ def configuration_check_api() -> None:
     parts of this program will use that to determine if the API is even available. """
     global API_KEY, API_DAILY_LIMIT, api_usage_cost_baseline, API_COST_LIMIT, API_cost_limit_reached
     global ENHANCED_READOUT, ENHANCED_READOUT_INIT
+    global api_cache, API_cache_present
 
     # check the API config
     main_logger.info("Checking API settings...")
@@ -2149,7 +2175,7 @@ def configuration_check_api() -> None:
         if API_KEY:
             api_use = None
             api_cost = None
-            api_use, api_cost = probe_API()
+            api_use, api_cost = probe_API() # our biggest blocker, usually takes a few seconds
 
             if api_use is None:
                 main_logger.error("API will not be used; provided API Key failed to return a valid response.")
@@ -2192,6 +2218,24 @@ def configuration_check_api() -> None:
         API_KEY = ""
 
     ENHANCED_READOUT_INIT = ENHANCED_READOUT
+    api_scheduling_thread.start()
+
+    if API_KEY and API_PERSISTENT_CACHE:
+        main_logger.info("API persistent cache feature is enabled, loading features...")
+        try:
+            from utilities.API_db_cache import APICacheHandler
+            api_cache = APICacheHandler(database_location=API_CACHE_DATABASE, timeout=LOOP_INTERVAL, stale=30)
+            API_cache_present = api_cache.connect()
+            if api_cache.is_connected():
+                api_cache.prune()
+                main_logger.info(f"Successfully connected to \'{API_CACHE_DATABASE}\'")
+            else:
+                main_logger.error("Could not connect to the database.")
+        except ImportError:
+            main_logger.warning("Failed to load required database handler. "
+                                "API functionality remains unaffected, but the persistent cache is unavailable.")
+
+    api_init_wait_event.set()
 
     main_logger.info("API check complete.")
 
@@ -4126,14 +4170,21 @@ def main_loop_generator() -> None:
             avg_range = 0.
         else:
             max_range = round(max(ranges), 2)
-            avg_range = round(
+            avg_range_ = round(
                 math.sqrt(
                     sum(x**2 for x in ranges) / len(ranges)
                 ), 2
             )
+            avg_range = (
+                avg_range_ if (avg_range_ / distance_multiplier < 1000)
+                else (1000 * distance_multiplier)
+            )
 
         current_max = general_stats['Max']
-        max_to_copy = current_max
+        max_to_copy = (
+            current_max if (current_max / distance_multiplier < 1000)
+            else (1000 * distance_multiplier)
+        )
         if combined_feed:
             max_to_copy = 0
         elif max_range > current_max:
@@ -5021,7 +5072,7 @@ class APIFetcher:
         if not cache_result:
             try:
                 start_time = time.perf_counter()
-                response = API_session.get(base_url, headers=auth_header, params=params, timeout=5)
+                response = api_session.get(base_url, headers=auth_header, params=params, timeout=5)
                 process_time[2] = round((time.perf_counter() - start_time) * 1000, 3)
                 runtime_sizes[2] += len(response.content)
                 if response.status_code == 200: # check if service to the API call was valid
@@ -9420,11 +9471,9 @@ if not CURRENT_IP:
 
 flyby_stats() # initialize the stats writer
 
-configuration_check_api() # must be run after display init
-if API_KEY:
-    API_session = requests.Session()
 api_scheduling_thread = threading.Thread(target=API_Scheduler, name='API-Scheduler', daemon=True)
-api_scheduling_thread.start()
+# the API init check must be run after display init; runs in the background while we do other things
+threading.Thread(target=configuration_check_api, name='API-init', daemon=True).start()
 
 # define our scheduled tasks (our "one-shot" functions)
 # NB: order matters in how these are registered as these run sequentially when asked to run at the same time
@@ -9510,22 +9559,9 @@ if DATABASE_FILE.exists():
 else:
     main_logger.warning("Aircraft database is unavailable as it could not be found.")
 
-if API_KEY and API_PERSISTENT_CACHE:
-    main_logger.info("API persistent cache feature is enabled, loading features...")
-    try:
-        from utilities.API_db_cache import APICacheHandler
-        api_cache = APICacheHandler(database_location=API_CACHE_DATABASE, timeout=LOOP_INTERVAL, stale=30)
-        API_cache_present = api_cache.connect()
-        if api_cache.is_connected():
-            api_cache.prune()
-            main_logger.info(f"Successfully connected to \'{API_CACHE_DATABASE}\'")
-        else:
-            main_logger.error("Could not connect to the database.")
-    except ImportError:
-        main_logger.warning("Failed to load required database handler. "
-                            "API functionality remains unaffected, but the persistent cache is unavailable.")
-
 # the below must be done after reading the location
+# we don't bother trying to set this up in another background thread since
+# this takes less than a second and we already did the setup for all the other stuff
 if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
     if LOCATION_IS_SET:
         if CLOCK_CENTER_ENABLED and (
@@ -9551,14 +9587,20 @@ if OPENWEATHER_API_KEY and DISPLAY_IS_VALID:
                 main_scheduler.every().hour.at(":30").do(WX_stuff.get_weather)
                 main_scheduler.every().hour.at(":45").do(WX_stuff.get_weather)
             else:
-                main_logger.info("OpenWeather API failed. Weather information will be unavailable.")
+                main_logger.warning("Call to OpenWeather API failed. Weather information will be unavailable.")
         else:
-            main_logger.info("OpenWeather API key is present, "
-                            "but the option to show weather information "
-                            "on the clock is not set. Not using the weather API.")
+            main_logger.warning(
+                "OpenWeather API key is present, "
+                "but the option to show weather information "
+                "on the clock is not set. Not using the weather API."
+            )
     else:
-        main_logger.info("OpenWeather API key is present but location is not set. "
-                         "Weather information will be unavailable.")
+        main_logger.warning(
+            "OpenWeather API key is present but location is not set. "
+            "Weather information will be unavailable."
+        )
+
+api_init_wait_event.wait(timeout=10)
 
 def main() -> None:
     """ Enters the main loop. """
