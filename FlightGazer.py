@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.9.1 --- 2026-09-22'
+VERSION: str = 'v.11.10.0 --- 2026-10-01'
 import os
 import argparse
 import sys
@@ -851,6 +851,8 @@ DUMP1090_JSON: str | None = None
 """ Where we're pulling dump1090 data from """
 DUMP978_JSON: str | None = None
 """ Where dump978 data is, if loaded """
+session = requests.Session()
+""" Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
 
 # active plane stuff
 relevant_planes: list[dict] = []
@@ -913,6 +915,8 @@ super_far_plane: dict = {}
 This is a dictionary with the same keys in `relevant_planes` with an added datetime
 accessible with the `Datetime` key. This dictionary remains empty if nothing meets the required criteria.
 This dictionary is reset at the end of the day with the `runtime_accumulators_reset()` function. """
+unique_distant_planes = set()
+""" Set of ICAO hexes of aircraft detected beyond `BEYOND_LOS_LIMIT`. """
 plane_load: list[float] = [0., 0.]
 """ Average amount of relevant planes as tracked by the selection algorithm [0],
 and average duration the algorithm is in an active state in seconds [1] """
@@ -1418,6 +1422,19 @@ def dxing_log() -> None:
     if dx_altitude < 10000:
         event_logger.info(">>> Note: The aircraft was at a low altitude, please cross-check with 3rd party sources to validate the position.")
     freeze_frame_packet(super_far_plane, show_distance=False)
+    event_logger.info(
+        "Time spent detecting distant aircraft today: "
+        f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}, "
+        f"total distant aircraft: {len(unique_distant_planes)}"
+    )
+    if 3600 <= determination_symphony < 7200:
+        event_logger.info("There was notably widespread atmospheric ducting this day!")
+    elif 7200 <= determination_symphony < 14400:
+        event_logger.info("There was extensively widespread atmospheric ducting this day!")
+    elif 14400 <= determination_symphony < 21600:
+        event_logger.info("There was absolutely insane ducting this day! Did the atmosphere open up a wormhole for you?")
+    elif determination_symphony >= 21600:
+        event_logger.warning("Incredible, it looks like you unlocked the atmosphere with how much ducting happened today!")
 
 def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
     """ Print the current plane data to the event log. """
@@ -1449,12 +1466,13 @@ def freeze_frame_packet(packet: dict, show_distance: bool) -> None:
 
     event_logger.info(f"{''.join(data1)}")
     if show_distance:
-        event_logger.info(f"   DIST: {round(packet['Distance'])} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
-    event_logger.info(f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
-                    f"DIR: {packet['DirectionDegrees']} ({packet['Direction'].strip()}) | ELV: {round(packet['Elevation'], 3)} deg | "
-                    f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
-                    f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
-                    )
+        event_logger.info(f"   DIST: {round(packet['Distance'], 3)} {distance_unit} ({packet['Latitude']}, {packet['Longitude']})")
+    event_logger.info(
+        f"   SPD: {packet['Speed']} {speed_unit} | HDG: {packet['Track']} | "
+        f"DIR: {packet['DirectionDegrees']} ({packet['Direction'].strip()}) | ELV: {round(packet['Elevation'], 3)} deg | "
+        f"ALT: {packet['Altitude']} {altitude_unit} ({packet['VertSpeed']} {altitude_unit}/min)"
+        f" | RSSI: {packet['RSSI']} dBFS ({packet['Source']})"
+    )
 
 def extract_API_results(API_results: list, ID: str, no_trigger=True) -> dict | None:
     """ Extract the API result corresponding to the given `ID` and with a
@@ -1742,7 +1760,7 @@ def read_1090_config() -> None:
             with open(Path(URL, "receiver.json"), 'rb') as receiver_file:
                 receiver = json.load(receiver_file)
         else:
-            receiver_req = requests.get(URL + '/data/receiver.json', headers=USER_AGENT, timeout=5)
+            receiver_req = session.get(URL + '/data/receiver.json', headers=USER_AGENT, timeout=5)
             receiver_req.raise_for_status()
             receiver = receiver_req.json()
 
@@ -1756,11 +1774,11 @@ def read_1090_config() -> None:
             if version_last:
                 main_logger.info("Detected a different ADS-B receiver version.")
             main_logger.info(f"ADS-B receiver version: \'{dump1090_receiver_version}\'")
-            if 'wiedehopf' in dump1090_receiver_version:
+            if 'wiedehopf' in (dump1090_receiver_version or '').lower():
                 is_readsb = True
                 main_logger.debug("Connected to readsb!")
         elif not has_key(receiver, 'version'):
-            main_logger.warning("Connected to an unknown ADS-B decoder.")
+            main_logger.warning("Connected to an unknown ADS-B decoder type. (could not determine version)")
 
         if has_key(receiver,'lat'): #if location is set
             LOCATION_IS_SET = True
@@ -1772,12 +1790,18 @@ def read_1090_config() -> None:
         else:
             rlat = rlon = None
             LOCATION_IS_SET = False
-            main_logger.warning("Location has not been set! "
-                                "This program will not be able to determine any nearby aircraft or calculate range!")
-            main_logger.warning(">>> Please set location in dump1090 to disable this message.")
+            if rlat_last is None:
+                main_logger.warning(
+                    "Location has not been set! "
+                    "This program will not be able to determine any nearby aircraft or calculate range!")
+                main_logger.warning(">>> Please set location in your dump1090 configuration, then restart FlightGazer.")
+            else:
+                main_logger.warning(
+                    "Location positioning has been lost! Please check your dump1090 configuration!"
+                )
 
-    except Exception:
-        main_logger.error("Cannot load receiver config.")
+    except Exception as e:
+        main_logger.error(f"Failed to load receiver config: {e}")
 
 def probe_API() -> tuple[int | None, float | None]:
     """ Checks if the provided API Key is valid, and if it is, pulls stats from the last 30 days.
@@ -1800,7 +1824,7 @@ def probe_API() -> tuple[int | None, float | None]:
     base_url = API_URL + "account/usage"
     params = {'start': date_month_iso}
     try:
-        response = requests.get(base_url, headers=auth_header, params=params, timeout=10)
+        response = api_session.get(base_url, headers=auth_header, params=params, timeout=10)
         response.raise_for_status()
         if response.status_code == 200:
             response_json = response.json()
@@ -1826,7 +1850,7 @@ def configuration_check() -> None:
     global CLOCK_CENTER_ROW, CLOCK_CENTER_ENABLED, CLOCK_CENTER_ROW_2ROWS
     global LED_PWM_BITS, ADV_LED_RGB_SEQUENCE, SCROLLING_SPEED
     global UNITS_WX, OPENWEATHER_API_KEY
-    global IGNORE_AIRCRAFT_ICAOS
+    global IGNORE_AIRCRAFT_ICAOS, CUSTOM_DUMP1090_LOCATION, CUSTOM_DUMP978_LOCATION
     global database_lookup_cache, focus_plane_api_results, plane_latch_times
 
     def switchtime_calc(num: float) -> tuple[int]:
@@ -1860,6 +1884,12 @@ def configuration_check() -> None:
             return maximum, mid_time, short_time
 
     main_logger.info("Checking settings configuration...")
+
+    # handle case a user ignores the directions to not include the trailing slash
+    if (CUSTOM_DUMP1090_LOCATION or '').endswith('/'):
+        CUSTOM_DUMP1090_LOCATION = CUSTOM_DUMP1090_LOCATION[:-1]
+    if (CUSTOM_DUMP978_LOCATION or '').endswith('/'):
+        CUSTOM_DUMP978_LOCATION = CUSTOM_DUMP978_LOCATION[:-1]
 
     if not NODISPLAY_MODE:
         if not CLOCK_CENTER_ROW_CYCLE:
@@ -1982,7 +2012,7 @@ def configuration_check() -> None:
         if RANGE > (20 * distance_multiplier):
             main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is out of bounds. "
                                 f"Limiting to {20 * distance_multiplier:.2f}{distance_unit}.")
-            main_logger.info(">>> If you would like to see more aircraft, consider \'No Filter\' mode. Use the \'-f\' flag.")
+            main_logger.info(">>> If you would like to see more aircraft, consider \'No Filter\' mode. Use or set the \'-f\' flag at startup.")
             RANGE = round(20 * distance_multiplier, 2)
         elif RANGE < (0.5 * distance_multiplier):
             main_logger.warning(f"Desired range ({RANGE}{distance_unit}) is too low. "
@@ -2058,7 +2088,7 @@ def configuration_check() -> None:
         ign_list = IGNORE_AIRCRAFT_ICAOS.split(",")
         ign_set = set()
         for icao_ in ign_list:
-            icao_i = icao_.strip()
+            icao_i = (icao_ or '').strip()
             if len(icao_i) != 6:
                 continue
             try:
@@ -2080,7 +2110,8 @@ def configuration_check() -> None:
     for setting_entry in brightness_list:
         try:
             imported_value = globals()[f"{setting_entry}"] # get current imported setting value
-            if setting_entry == "ACTIVE_PLANE_DISPLAY_BRIGHTNESS" and imported_value is None:
+            if setting_entry == "ACTIVE_PLANE_DISPLAY_BRIGHTNESS" and not imported_value:
+                globals()['ACTIVE_PLANE_DISPLAY_BRIGHTNESS'] = None
                 continue
             if not isinstance(imported_value, int) or (imported_value < 0 or imported_value > 100):
                 main_logger.warning(f"{setting_entry} is out of bounds or not an integer.")
@@ -2096,19 +2127,19 @@ def configuration_check() -> None:
         if SHOW_EVEN_MORE_INFO:
             main_logger.info("JOURNEY_PLUS and SHOW_EVEN_MORE_INFO enabled, behold peak FlightGazer form!")
         else:
-            main_logger.info("JOURNEY_PLUS mode is enabled, enjoy the additional info.")
+            main_logger.info("JOURNEY_PLUS mode enabled, enjoy the additional info.")
 
     if SHOW_EVEN_MORE_INFO and EXTENDED_DETAILS:
-        main_logger.info("EXTENDED_DETAILS is enabled, aircraft registration and squawk will be shown in the marquee.")
+        main_logger.info("EXTENDED_DETAILS enabled: aircraft registration, squawk, and airline telephonic callsign will be shown in the marquee.")
 
     if FASTER_REFRESH:
-        main_logger.info("FASTER_REFRESH enabled, dump1090 polling rate is now 1 second.")
+        main_logger.info("FASTER_REFRESH enabled: dump1090 polling rate is now 1 second.")
 
     if NO_GROUND_TRACKING and not NOFILTER_MODE:
-        main_logger.info("NO_GROUND_TRACKING is enabled, FlightGazer will ignore aircraft on the ground.")
+        main_logger.info("NO_GROUND_TRACKING enabled: FlightGazer will ignore aircraft on the ground.")
 
     if not NO_DUMP978_SEARCH:
-        main_logger.info("NO_DUMP978_SEARCH is disabled, FlightGazer will search for both dump1090 and dump978.")
+        main_logger.info("NO_DUMP978_SEARCH disabled: FlightGazer will search for both dump1090 and dump978.")
 
     if ORJSON_IMPORTED:
         main_logger.debug("orjson module imported and will be used for faster dump1090 json decoding.")
@@ -2516,7 +2547,7 @@ def runtime_accumulators_reset() -> None:
     global unique_planes_seen, selection_events, FOLLOW_THIS_AIRCRAFT_SPOTTED, high_priority_events
     global api_hits, API_daily_limit_reached, api_usage_cost_baseline, estimated_api_cost, API_cost_limit_reached
     global really_active_adsb_site, really_really_active_adsb_site, achievement_time, super_far_plane
-    global algorithm_daily_runtime, dump1090_failures, determination_symphony, general_stats
+    global algorithm_daily_runtime, dump1090_failures, determination_symphony, unique_distant_planes, general_stats
     total_plane_count = len(unique_planes_seen)
     timestamp = time.monotonic()
 
@@ -2617,14 +2648,6 @@ def runtime_accumulators_reset() -> None:
 
     if super_far_plane and not combined_feed:
         dxing_log()
-        event_logger.info("Time spent detecting distant aircraft today: "
-                          f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
-        if 3600 <= determination_symphony < 7200:
-            event_logger.info("There was notably widespread atmospheric ducting this day!")
-        elif 7200 <= determination_symphony < 14400:
-            event_logger.info("There was extensively widespread atmospheric ducting this day!")
-        elif determination_symphony >= 14400:
-            event_logger.info("There was absolutely insane ducting this day! Did the atmosphere open up a wormhole for you?")
 
     if sum(api_hits) > 0: # if we used the API at all
         main_logger.info(
@@ -2647,6 +2670,7 @@ def runtime_accumulators_reset() -> None:
     super_far_plane.clear()
     # reset the distance tracker for `DistantDeterminator`
     dispatcher.send(message='', signal=MIDNIGHT_RESET, sender=runtime_accumulators_reset)
+    unique_distant_planes.clear()
     general_stats['Max'] = 0.
     if FOLLOW_THIS_AIRCRAFT_SPOTTED:
         FOLLOW_THIS_AIRCRAFT_SPOTTED = False
@@ -2875,6 +2899,8 @@ class PrintToConsole:
                     filt_algo_str.append(f", ignoring {len(IGNORE_AIRCRAFT_ICAOS)} aircraft")
                 active_time = strfdelta(algorithm_daily_runtime, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')
                 filt_algo_str.append(f" | Active time today: {active_time}")
+                if VERBOSE_MODE:
+                    filt_algo_str.append(" | Verbose Mode")
                 filt_algo_str.append(f"{rst}")
                 print("".join(filt_algo_str))
             else:
@@ -3802,9 +3828,9 @@ def main_loop_generator() -> None:
                     loop_packet_dict['TrackingFlag'] = "LADD"
                 elif database_result['flags'] == 10:
                     if ( # heuristic for determining if a plane is operating under PIA (the cross-checked ICAOs have '10' as their flag in the database)
-                        loop_packet_dict['ID'].startswith('a') # PIA only operates in the United States
+                        (loop_packet_dict['ID'] or '').lower().startswith('a') # PIA only operates in the United States
                         # PIA aircraft operate under one of these companies' callsigns (DCM, FFL, FWR, XAA)
-                        and loop_packet_dict['Flight'].upper().startswith(('DCM', 'FFL', 'FWR', 'XAA'))
+                        and (loop_packet_dict['Flight'] or '').upper().startswith(('DCM', 'FFL', 'FWR', 'XAA'))
                     ):
                         loop_packet_dict['TrackingFlag'] = "PIA"
                         loop_packet_dict['Registration'] = None # can't tie or calculate a reg based off its ICAO
@@ -3916,6 +3942,11 @@ def main_loop_generator() -> None:
             # - never trigger the display or console output
             # - won't start the normal tracking routines
             # - still count towards the total tracking count
+
+            # fun edge case to deal with
+            real_far_exclusion_bypass = False
+            if really_far and (hex_ == FOLLOW_THIS_AIRCRAFT or is_distressed):
+                real_far_exclusion_bypass = True
 
             # ===== range and ground-detection filtering =====
             if bypass_all or normal_operation:
@@ -4062,10 +4093,16 @@ def main_loop_generator() -> None:
                     else:
                         flight = flight.strip() # callsigns have ending whitespace; we need to remove for polling the API
 
-                    if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                    if (
+                        (not NOFILTER_MODE and not really_far)
+                        or real_far_exclusion_bypass
+                        or NOFILTER_MODE
+                    ):
+                        append_to_relevant_planes = True
                         flyby_tracker(hex_)
                         flyby = flyby_extractor(hex_)
                     else: # do not append really far planes when operating normally
+                        append_to_relevant_planes = False
                         flyby = 0
 
                     loop_packet = {
@@ -4110,12 +4147,13 @@ def main_loop_generator() -> None:
 
                     if DATABASE_CONNECTED:
                         database_data = database_lookup(hex_)
-                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
-                            planes.append(data_arbitrator(loop_packet, database_data))
+                        arbitrated = data_arbitrator(loop_packet, database_data)
+                        if append_to_relevant_planes:
+                            planes.append(arbitrated)
                         if really_far:
-                            farplanes.append(data_arbitrator(loop_packet, database_data))
+                            farplanes.append(arbitrated)
                     else:
-                        if (not NOFILTER_MODE and not really_far) or NOFILTER_MODE:
+                        if append_to_relevant_planes:
                             planes.append(loop_packet)
                         if really_far:
                             farplanes.append(loop_packet)
@@ -4454,13 +4492,15 @@ class AirplaneParser:
 
             focus_plane_ids_discard.add(focus_plane_i) # add previously assigned focus plane to scratchpad of planes to ignore
             for entry in relevant_planes_local_copy:
+                # for distressed aircraft or the FOLLOW_THIS_AIRCRAFT, this tends to discard them first
                 if entry['FutureDistance'] and entry['FutureDistance'] > range_buffer:
                     focus_plane_ids_discard.add(entry['ID'])
-                    main_logger.debug(
-                        f"Detected aircraft \'{entry['Flight']}\' ({entry['ID']}) leaving area "
-                        f"(Est. next distance: {entry['FutureDistance']:.4f}) "
-                        "when we needed to select a new focus plane."
-                    )
+                    if not (entry['Distressed'] or entry['ID'] == FOLLOW_THIS_AIRCRAFT):
+                        main_logger.debug(
+                            f"Detected aircraft \'{entry['Flight']}\' ({entry['ID']}) leaving area "
+                            f"(Est. next distance: {entry['FutureDistance']:.4f}) "
+                            "when we needed to select a new focus plane."
+                        )
             discard_list = list(focus_plane_ids_discard)
             for id in discard_list: # remove all previously focused planes from the global list
                 focus_plane_ids_scratch.discard(id)
@@ -4571,6 +4611,11 @@ class AirplaneParser:
                             focus_plane = entry['ID']
                             update_ttl(focus_plane)
                             break
+                        # idk how these features still worked before doing this, but lmao
+                        if follow_flag or self._distressed_latch:
+                            focus_plane = entry['ID']
+                            update_ttl(focus_plane)
+                            break
                     else:
                         focus_plane = ''
                         main_logger.debug("Focus loop started, but no aircraft were predicted to remain inside area on next refresh.")
@@ -4678,7 +4723,7 @@ class AirplaneParser:
                     main_logger.warning("might be too large for the aircraft activity in your area. ***")
                     main_logger.warning(f"Reason: {warn_reason}")
                     main_logger.warning("************************************************************")
-                    main_logger.info(">>> Consider reducing RANGE and/or the HEIGHT_LIMIT and/or enabling the NO_GROUND_TRACKING setting.")
+                    main_logger.info(">>> Consider reducing RANGE, HEIGHT_LIMIT, and/or LOCATION_TIMEOUT, and/or enabling the NO_GROUND_TRACKING setting.")
                     self._range_too_large = True
                     range_too_large = self._range_too_large
 
@@ -5670,6 +5715,8 @@ class DisplayFeeder:
                 if part1: aircraft_str_.append(" | ")
                 if focus_plane_stats['OperatorAKA']:
                     aircraft_str_.append(f"{focus_plane_stats['OperatorAKA']}")
+                    if EXTENDED_DETAILS and focus_plane_stats['Telephony']:
+                        aircraft_str_.append(f' \"{focus_plane_stats['Telephony']}\"')
                 else:
                     if len(focus_plane_stats['Operator']) <= 60:
                         aircraft_str_.append(f"{focus_plane_stats['Operator']}")
@@ -6091,6 +6138,7 @@ class WriteState:
                                                  fmt='{H:02}:{M:02}:{S:02}',
                                                  inputtype='s'),
                 'peak_distance_today': general_stats['Max'] if general_stats else 0,
+                'total_distant_aircraft': len(unique_distant_planes),
                 'no_filter': NOFILTER_MODE,
                 'focus_plane_iter': focus_plane_iter,
                 'focus_plane_screen_time_sec': focus_plane_infocus * LOOP_INTERVAL,
@@ -6523,6 +6571,8 @@ class synchronizer():
         self.json_age_data = deque([], maxlen=self.deque_size)
         self.json_age_data_window = deque([], maxlen=10)
         self.processing_times = deque([], maxlen=self.deque_size)
+        self._drift_corrections = deque(maxlen=self.deque_size) # track if we get stuck trying to correct to an unachievable point
+        self.avg_correction = 0.
         self.phase_stage = 0
         self.time_difference = 0. # for debug analysis
 
@@ -6600,6 +6650,7 @@ class synchronizer():
                 self.control_integral = 0
             else:
                 lockstep_corrector = control
+            self._drift_corrections.append(lockstep_corrector)
 
         def adjust_target() -> None:
             """ Change the setpoint """
@@ -6646,6 +6697,22 @@ class synchronizer():
                 self.max_json_age = max_json_age_this_loop
                 if min_last < (new_min := self.max_json_age - self.est_json_refresh):
                     self.min_json_age = new_min
+
+            # wait to evaluate how the corrections are doing until it's full
+            if len(self._drift_corrections) >= self.deque_size:
+                self.avg_correction = math.sqrt(
+                    sum(x**2 for x in self._drift_corrections)
+                    / len(self._drift_corrections)
+                )
+                if self.avg_correction >= self.max_step - 0.0002:
+                    main_logger.debug("Syncronizer stuck in a loop trying to reach an unachieveable setpoint!")
+                    main_logger.debug(f"Current age target: {self.age_target:.6f}s, avg corrector: {self.avg_correction:.6f}ms")
+                    adjust_target()
+                    main_logger.debug(f"Updated setpoint to: {self.age_target:.6f}s")
+                    self.json_age_data.clear()
+                    self._drift_corrections.clear()
+                    self.avg_correction = 0.
+            
             if triggered and len(self.json_age_data) > 20: # lock out the adjustment for these many samples
                 main_logger.debug(f"Detected need to change target {reason_text}:")
                 main_logger.debug("Min | Max (old bounds / new bounds / detected at this loop): "
@@ -6655,6 +6722,8 @@ class synchronizer():
                 self.max_uncorrectable = self.min_json_age - self.min_processing
                 adjust_target()
                 self.json_age_data.clear()
+                self._drift_corrections.clear()
+                self.avg_correction = 0.
                 determined_time_offset = self.est_uncorrectable
                 main_logger.debug(f"Correcting target to {self.age_target:.3f}s "
                                   f"({abs(self.age_target - self.min_json_age):.3f}s from minimum)"
@@ -6699,6 +6768,8 @@ class synchronizer():
             ):
                 main_logger.debug("Phase 2 complete. Average json age is within tolerance "
                                   f"({self.buffer_sec / 4:.3f}s) of targeted age.")
+                self._drift_corrections.clear()
+                self.avg_correction = 0.
                 self.phase_stage += 1
 
         elif self.phase_stage == 1:
@@ -6779,10 +6850,12 @@ class DistantDeterminator():
         self._far_time_increment = 0
         self._detected = False
         self._really_really_far_plane = False
+        self._widespread_notified = False
+        self._obviously_combined_increment = 0
         self.run_loop()
 
     def comparator(self, message: list[dict]):
-        global super_far_plane, combined_feed, determination_symphony
+        global super_far_plane, combined_feed, determination_symphony, unique_distant_planes
         if not message or not isinstance(message, list):
             self._detected = False
             return
@@ -6791,11 +6864,14 @@ class DistantDeterminator():
             main_logger.debug(f"Detected aircraft beyond normal line-of-sight limit ({BEYOND_LOS_LIMIT} nmi) for ADS-B!")
         message.sort(key=lambda x: x['Distance'], reverse=True) # sort by distance
         for packet in message:
+            unique_distant_planes.add(packet['ID'])
+        for packet in message:
             # heuristics for filtering out glitchy GA aircraft positions
             if packet['RSSI'] > -15:
                 continue
             if packet['Altitude'] == 0 or packet['OnGround']:
                 continue
+            # note this also filters out MLAT; useful for misbehaving MLAT clients
             if packet['NavigationAccuracy'] and packet['NavigationAccuracy'] < 4:
                 continue
             if packet['Speed'] and packet['Speed'] / speed_multiplier > 2000:
@@ -6804,12 +6880,22 @@ class DistantDeterminator():
             break
         else:
             return
+
+        # getting ADS-B signals at this distance is unheard of
+        if farthest['Distance'] / distance_multiplier >= 750:
+            self._obviously_combined_time += 1
+
         preempt_log_bypass = False
         self._far_time_increment += 1
         determination_symphony = self._far_time_increment * LOOP_INTERVAL
+        if determination_symphony >= 14400 and not self._widespread_notified:
+            event_logger.warning("Wow, there's some crazy atmospheric ducting today! (tracking distant aircraft for 4 hours)")
+            self._widespread_notified = True
+
         if (
-            # if we've detected really distant aircraft for longer than 9 hours
-            self._far_time_increment * LOOP_INTERVAL >= 32400 # this is really lenient to account for times of widespread ducting
+            # if we've detected really distant aircraft for longer than 12 hours
+            (self._far_time_increment * LOOP_INTERVAL >= 43200 # this is really lenient to account for times of widespread ducting
+             or self._obviously_combined_increment * LOOP_INTERVAL >= 2698) # 1 to 2 LOOP_INTERVAL(s) before 45 min
             and not combined_feed
         ):
             main_logger.warning(f"{dump1090} might be configured as a combined feed. FlightGazer is only meant for single site feeds.")
@@ -6817,6 +6903,7 @@ class DistantDeterminator():
             if DISPLAY_IS_VALID:
                 main_logger.warning("Maximum range shown on the display will be capped to 300nmi or the equivalent.")
             combined_feed = True
+
         if farthest['Distance'] > self.last_max_distance:
             # trigger the preemptive logging again if the max distance changes by this much
             if (farthest['Distance'] - self.last_max_distance) / distance_multiplier >= 15:
@@ -6835,7 +6922,7 @@ class DistantDeterminator():
             freeze_frame_packet(super_far_plane, show_distance=True)
             event_logger.info("Time spent detecting distant aircraft as of now: "
                     f"{strfdelta(determination_symphony, fmt='{H:02}:{M:02}:{S:02}', inputtype='s')}")
-            if determination_symphony > 2700:
+            if determination_symphony >= 2700:
                 event_logger.info("There has been significant atmospheric ducting in your area!")
 
     def reset_distance(self, message):
@@ -6848,6 +6935,7 @@ class DistantDeterminator():
         self._far_time_increment = 0
         determination_symphony = 0
         self._really_really_far_plane = False
+        self._widespread_notified = False
 
     def debug_switch(self, message):
         if self._detected:
@@ -9536,9 +9624,7 @@ if DUMP1090_JSON is None and not DISPLAY_IS_VALID:
 
 read_1090_config()
 if LOCATION_IS_SET:
-    main_scheduler.every().hour.do(read_1090_config) # in case we have GPS attached and are updating location
-session = requests.Session()
-""" Session object to be used for the dump1090 polling. (improves response times by ~1.25x) """
+    main_scheduler.every(10).minutes.do(read_1090_config) # in case we have GPS attached and are updating location
 suntimes()
 
 if DATABASE_FILE.exists():

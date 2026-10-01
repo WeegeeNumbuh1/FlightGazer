@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.9.1
+# Version = v.11.10.0
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -674,9 +674,10 @@ if [ ! -f "$CHECK_FILE" ] || [ "$CFLAG" = true ]; then
 			fi
 			echo -e "${NC}"
 			systemctl status flightgazer.service --no-pager
-			echo -e "\n${NC}${FADE}    > Service installed. FlightGazer will run at boot via systemd."
+			echo -e "\n${NC}    > Service installed.${FADE} FlightGazer will run at boot via systemd."
+			sleep 2s
 			echo -e "    ${WHITEHIGH}> Do not move the FlightGazer directory!${NC}${ORANGE} (${BASEDIR})${NC}"
-			echo -e "      Doing so will cause the service to fail!${NC}${FADE}"
+			echo -e "      Doing so will cause the service to fail and FlightGazer will not start!${NC}${FADE}"
 			sleep 5s
 			echo -e "    ${NC}> Don't want it there? Run the uninstall script,"
 			echo -e "      move this directory (${BASEDIR})"

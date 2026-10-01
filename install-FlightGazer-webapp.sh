@@ -2,7 +2,7 @@
 # Script to install FlightGazer's web interface.
 # This is bundled with the FlightGazer repository
 # and inherits its version number.
-# Last updated: v.11.4.7
+# Last updated: v.11.10.0
 # by: WeegeeNumbuh1
 
 BASEDIR="$(cd "$(dirname -- "$0")" && pwd)"
@@ -315,7 +315,7 @@ else
 	if [ $ADSBIM -eq 0 ]; then
 		echo -e "${ORANGE}>>> Neither nginx, Apache, nor Lighttpd detected.${NC}"
 		echo "Please configure your web server manually to proxy '/flightgazer' to 127.0.0.1:9898."
-		echo "You can still access the web interface at:"
+		echo -e "\nYou can still access the web interface at:"
 		echo -e "${WHITEHIGH}http://$NET_IP:9898/flightgazer${NC} or"
 		echo -e "${WHITEHIGH}http://$HOSTNAME.local:9898/flightgazer${NC}"
 	fi
@@ -323,15 +323,15 @@ fi
 
 echo -e "${GREEN}>>> Creating systemd service...${NC}${FADE}"
 service_file
-systemctl enable flightgazer-webapp.service 2>&1
 echo "Starting service..."
+systemctl enable flightgazer-webapp.service 2>&1
 systemctl start flightgazer-webapp.service
-echo "Service status:"
-systemctl status flightgazer-webapp.service --no-pager
+# echo "Service status:"
+# systemctl status flightgazer-webapp.service --no-pager
 echo ""
-echo -e "${NC}> Service installed. The FlightGazer web interface will run at boot via systemd.\n"
+echo -e "${NC}> Service installed. The FlightGazer web interface will start at boot via systemd.\n"
 echo -e "${RED}> Do not move the FlightGazer directory (${ORANGE}${BASEDIR}${RED})!"
-echo -e "  Doing so will cause the service to fail!${NC}"
+echo -e "  Doing so will cause the service to fail and you will not have a web interface!${NC}"
 sleep 5s
 
 echo -e "${GREEN}>>> Install complete.${NC}"

@@ -1,6 +1,6 @@
 # Configuration file for FlightGazer
 
-CONFIG_VERSION: v.11.9.1 # do not modify this
+CONFIG_VERSION: v.11.10.0 # do not modify this
 
 # ================ General settings ================
 # ==================================================
@@ -127,9 +127,9 @@ SCROLLING_SPEED: 30
 
 EXTENDED_DETAILS: false
 # [true/false]
-# When SHOW_EVEN_MORE_INFO is enabled, add an aircraft's registration and its current transponder code to
-# the readout. The aircraft's registration is only shown when the aircraft is not using its registration
-# as its callsign.
+# When SHOW_EVEN_MORE_INFO is enabled, add an aircraft's registration, its current transponder code, 
+# and an airline's telephonic callsign to the readout, when these are available.
+# The aircraft's registration is only shown when the aircraft is not using its registration as its callsign.
 
 CLOCK_CENTER_ROW:
   ROW1: 1
@@ -180,7 +180,7 @@ BRIGHTNESS: 65
 # Set the default LED brightness.
 
 ACTIVE_PLANE_DISPLAY_BRIGHTNESS: 100
-# [Integer: 0 ~ 100, null, or empty]
+# [Integer: 0 ~ 100, null, '', or empty]
 # When there is an active aircraft, use a different brightness level. Useful for grabbing attention.
 # Overrides all other brightness settings when an aircraft is being tracked.
 # This value does not depend if ENABLE_TWO_BRIGHTNESS is enabled.
@@ -250,6 +250,7 @@ NO_DUMP978_SEARCH: true
 CUSTOM_DUMP1090_LOCATION: ''
 # [String]
 # URL of your dump1090 install if it's in a different location or on a different network device.
+# This is usually the webpage where you can see live aircraft locations on a map.
 # ex: http://localhost/custom_name_here or http://192.168.xxx.xxx:8080 (no trailing /)
 
 CUSTOM_DUMP978_LOCATION: ''

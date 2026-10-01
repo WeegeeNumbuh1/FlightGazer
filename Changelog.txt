@@ -5,6 +5,21 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.10.0 - 2026-10-01
+    - NEW: The EXTENDED_DETAILS setting now shows an airline's telephonic callsign
+        - (ex: Republic Airways "BRICKYARD")
+    - Fix edge case when an aircraft detected in the dxing regime is part of FOLLOW_MODE or is distressed
+    - Various logging text tweaks and message changes for clarity
+    - Improved combined feed heuristics
+    - Faster location updating when location is provided by GPS
+    - Total count of unique distant aircraft is now tracked and reported in the daily summary or on exit
+    - Small optimizations when fetching ancillary API and dump1090 receiver data over a network
+    - Handle configuration set by the webapp when ACTIVE_PLANE_BRIGHTNESS is disabled
+    - Minor improvements to text output from initialization/install scripts during a first time install
+    - The synchronizer is now able to break out of the edge case when it ends up setting
+      an unachievable target time
+    - Release bump; originally intended to be v.11.9.2
+
 v.11.9.1 - 2026-09-22
     - Initialization speedup when the API is enabled
     - Limit internal maximum distance and average calculation to 1000 nmi

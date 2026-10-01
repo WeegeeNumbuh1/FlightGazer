@@ -33,8 +33,8 @@ As a beneficial side-effect, this document also serves as a reference for the me
 - [`runtime_status`](#runtime_status)
 - [`time_now`](#time_now)
 
-> *There are a total of 226 available keys, not counting the root keys.*<br>
-> *Valid for FlightGazer v.11.7.0 and newer*
+> *There are a total of 227 available keys, not counting the root keys.*<br>
+> *Valid for FlightGazer v.11.10.0 and newer*
 
 ## `FlightGazer`
 Represents overall state and the current main settings.
@@ -125,6 +125,7 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | `distant_detected_today` | True if an aircraft was detected farther than typical ADS-B range, else false | bool | true |
 | `distant_time_today` | Time spent detecting aircraft outside of typical ADS-B range (HH:MM:SS) | str | "00:02:34" |
 | `peak_distance_today` | Distance of farthest aircraft detected today | float | 478.45 |
+| `total_distant_aircraft` | Total count of unique, distant aircraft tracked today | int | 3 |
 | `no_filter` | Whether FlightGazer is currently running in `NOFILTER` mode | bool | false |
 | `focus_plane_iter` | How many cycles the selection algorithm is active, 0 if no aircraft are present | int | 21 |
 | `focus_plane_screen_time_sec` | How long the current focus aircraft has been displayed, in seconds | int | 48 |
@@ -136,7 +137,7 @@ Represents aircraft-specific and selection algorithm stats. Any aircraft within 
 | `in_range` | Number of relevant aircraft in the current `relevant_planes` array | int | 3 |
 | `relevant_planes` | Detailed list of nested objects describing each tracked aircraft the tracking area, null if `NOFILTER` mode is enabled | array, null | (see `relevant_planes` subkey below) |
 
-> *23 keys, 1 depreciated*
+> *24 keys, 1 depreciated*
 
 ### `relevant_planes` subkey
 An array of nested objects which represents current data for each aircraft considered for detailed tracking. The array is empty when there are no aircraft available. This key is null if running in `NOFILTER` mode.
