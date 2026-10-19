@@ -10,7 +10,7 @@
 <!-- end title section -->
 
 ## About
-This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python) (v1), but entirely driven by **real-time [ADS-B](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)** (and optionally UAT) data emitted by aircraft. It was originally conceived as a way to log aircraft flyby counts and to get a glance at ADS-B receiver site metrics without the need to fire up a webpage.
+This is a personal/hobbyist project that was heavily inspired by [Colin Waddell's project](https://github.com/ColinWaddell/its-a-plane-python) (v1), but entirely driven by **real-time [ADS-B](https://aviation.stackexchange.com/questions/205/what-is-ads-b-and-who-needs-it/213#213)** (and optionally UAT) data emitted by aircraft. It was originally conceived as a way to log aircraft flyby counts and to get a glance at ADS-B receiver site metrics without the need to fire up a webpage, along with being an alternative to existing "flight tracking displays" with *zero* reliance on external APIs for aircraft position or identity.
 
 Uses the [tar1090 database](https://github.com/wiedehopf/tar1090-db) for aircraft type and owner along with an [internal database](https://github.com/WeegeeNumbuh1/FlightGazer-airlines-db) for airline lookup by callsign.<br>
 Uses the FlightAware API to get an aircraft's departure and destination airports.
@@ -89,23 +89,27 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 ***The [Changelog](Changelog.txt) has all the details, but as a bulleted list:***
 
 ### Summary
-- **Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!**
+- <details open><summary><b>Visualize and figure out what aircraft are flying nearby your location, in a cool-looking way!</b></summary>
+
   - Shows an aircraft's callsign (or registration as fallback), distance and direction from your location, the aircraft's country of registration, current altitude, and speed, all provided from `dump1090`
   - With FlightAware API access you also can also get the origin and destination airport, as well as how long the aircraft has been flying
   - If you don't want to use the API, there's an available "Enhanced Readout" mode that shows even more aircraft info from `dump1090`, such as latitude, longitude, ground track, vertical speed, and aircraft signal strength
   - Additional info like aircraft type, airline, and owner, is available without needing any API access
   - There are a total of [3 different layouts for aircraft info](#screen-layout)!
-  - ***NOT*** reliant on [APIs for live aircraft data](https://github.com/ColinWaddell/FlightTracker/issues/33)
-- **It's a neat looking clock that displays your ADS-B site stats when there aren't any aircraft flying overhead**
+</details>
+
+- <details open><summary><b>It's a neat looking clock that displays your ADS-B site stats when there aren't any aircraft flying overhead</b></summary>
+
   - Shows overall stats like how many aircraft you're tracking at the moment, how many aircraft flew by today, and the farthest aircraft you can detect
   - Display sunrise and sunset times, detailed signal and range stats for your ADS-B receiver, extended calendar info, and even local weather info
+</details>
+
 - Easily configured, controlled, monitored, and updated [within a web browser](https://github.com/WeegeeNumbuh1/FlightGazer-webapp#what-it-looks-like)
 - [Repurpose/analyze FlightGazer's own realtime data](#using-flightgazers-data) for use elsewhere
 - Does not rely on a physical RGB Matrix display and can be [fully emulated](#the-emulator) in a browser
 - Extensive logging and [terminal output](#interactive-mode) capabilities as a core function
 - Works offline once initial setup is complete (albeit, with no API functionality and as long as `dump1090` is running on the same system)
-- Built to work with existing setups like [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Airplanes.Live](https://airplanes.live/image-guide/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), [ADSB.im](https://adsb.im/home), and likely even more
-  - Setups that were initially built around using AirNav Radar's `rbfeeder` or Flightradar24's [`Pi24`](https://www.flightradar24.com/build-your-own) need a single settings change (see [Tips](#tricks--tips))
+- Built to work with existing setups like [PiAware](https://www.flightaware.com/adsb/piaware/build)/[FlightFeeder](https://www.flightaware.com/adsb/flightfeeder/), [ADSBExchange](https://www.adsbexchange.com/sd-card-docs/), [Airplanes.Live](https://airplanes.live/image-guide/), [Ultrafeeder](https://github.com/sdr-enthusiasts/docker-adsb-ultrafeeder), [ADSB.im](https://adsb.im/home), [Flightradar24's Pi24](https://www.flightradar24.com/build-your-own), and likely even more
 - Robust and stable enough for 24/7/365 operation
 
 <details><summary><b>More Features!</b> (Show/Hide)</summary>
@@ -145,7 +149,7 @@ Like what you see above? I can make you a tracking box just like it. *(link comi
 - Logs events when you detect aircraft beyond typical ADS-B range limits (DXing)
 - Automatically tracks aircraft which report distress signals
 - [Unique tools](./utilities/) and [custom-developed fonts](./fonts/) that can be used in other projects (don't forget to credit me)
-- Integration with adsb.im images/docker containers
+- Integrates with adsb.im images/app installs
 - Adequate documentation
 
 </details>
@@ -564,7 +568,7 @@ If your question isn't listed in the FAQ's, open an issue here on GitHub.
 - This is unavoidable due to the need to interact with low-level hardware to drive the RGB display. It's recommended to dedicate a single system for FlightGazer.
 <details><summary>More details</summary>
 
-- The rgbmatrix library is capable of dropping root privleges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
+- The rgbmatrix library is capable of dropping root privileges, however doing so will cause [essential write operations to fail](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#user).
   - Additionally, not running as root will reduce performance, which we need the most of since this is all based on Python.
 - The FlightGazer service is designed to be a *system service* and starts the main script with higher CPU and disk priority, along with the initialization script handling required system-level resources depending on the update.
 - Related processes like the web-app must also run as root since it needs to be able to start or stop the main service.

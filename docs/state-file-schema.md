@@ -5,7 +5,7 @@
 ## Preface
 The `current_state.json` file is written to `/run/FlightGazer` when the main FlightGazer python script is running, by default.<br>
 It is updated at the end of each update interval `LOOP_INTERVAL` (by default 2 seconds, can be 1 if `FASTER_REFRESH` is set).
-Atomicity is not guaranteed.
+Atomicity is not guaranteed when running FlightGazer versions before v.11.10.1.
 
 This file will not be present if:
 - FlightGazer is not running

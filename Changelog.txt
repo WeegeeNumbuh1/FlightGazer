@@ -5,6 +5,11 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.10.1 - 2026-10-19
+    - Make writes to the state file atomic
+    - Ignore airline lookups for ground vehicles (based on ADS-B category)
+    - Improved reliablity when writing flyby stats
+
 v.11.10.0 - 2026-10-01
     - NEW: The EXTENDED_DETAILS setting now shows an airline's telephonic callsign
         - (ex: Republic Airways "BRICKYARD")

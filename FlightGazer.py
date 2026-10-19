@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.10.0 --- 2026-10-01'
+VERSION: str = 'v.11.10.1 --- 2026-10-19'
 import os
 import argparse
 import sys
@@ -2815,6 +2815,8 @@ def flyby_stats() -> None:
         try:
             with open(FLYBY_STATS_FILE, 'a') as stats:
                 stats.write(f"{date_now_str},{len(unique_planes_seen)},{api_hits[0]},{api_hits[1]},{api_hits[2]}\n")
+                stats.flush()
+                os.fsync(stats.fileno())
         except Exception:
             main_logger.error(f"Cannot write to \'{FLYBY_STATS_FILE}\'. Data for {date_now_str} has been lost.")
 
@@ -4046,7 +4048,8 @@ def main_loop_generator() -> None:
                         futlon = round(futlon, 6)
                     else:
                         futdis = None
-                    emitter = category_description.get(a.get('category'), "None")
+                    emit_cat: str = a.get('category', "None")
+                    emitter = category_description.get(emit_cat)
                     iso_code = getICAO(hex_).upper()
                     # Grab some stuff from readsb-generated jsons if we're not using
                     # our own database
@@ -4067,7 +4070,10 @@ def main_loop_generator() -> None:
                         registration = reg_lookup(hex_)
 
                     # see if we can lookup who runs this plane
-                    if (operator_result := operator_lookup(flight)) is not None:
+                    if (
+                        not emit_cat.upper().startswith('C') # ignore ground vehicles that aren't aircraft
+                        and (operator_result := operator_lookup(flight)) is not None
+                    ):
                         if not (operator := operator_result['Company']):
                             operator = None
                         if not (telephony := operator_result['Telephony']):
@@ -6021,6 +6027,7 @@ class WriteState:
         self.can_run_flag: bool = True
         # self.run_dir = CURRENT_DIR # debug on Windows and comment out the OS check block below
         self.json_file = Path(self.run_dir, "current_state.json")
+        self.json_file_tmp = Path(self.run_dir, "current_state.tmp")
         if (
             not WRITE_STATE
             or not is_posix
@@ -6293,11 +6300,13 @@ class WriteState:
                     'time_now': time_now.strftime("%Y-%m-%dT%H:%M:%S"),
                 }
 
-            with open(self.json_file, 'w') as f:
+            with open(self.json_file_tmp, 'w') as f:
                 if ORJSON_IMPORTED:
                     f.write(orjson.dumps(output, option=orjson.OPT_INDENT_2).decode())
                 else:
                     f.write(json.dumps(output)) # no indentation, it's like 50x slower than orjson (from the orjson docs)
+            # no fsync (we should be in memory anyways)
+            os.replace(self.json_file_tmp, self.json_file)
             process_time2[3] = round((time.perf_counter() - export_start) * 1000, 3)
 
         except Exception as e:
