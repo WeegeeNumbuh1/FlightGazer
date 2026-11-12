@@ -2,7 +2,7 @@
 # Initialization/bootstrap script for FlightGazer.py
 # Repurposed from my other project, "UNRAID Status Screen"
 # For changelog, check the 'changelog.txt' file.
-# Version = v.11.10.1
+# Version = v.11.10.2
 # by: WeegeeNumbuh1
 export DEBIAN_FRONTEND="noninteractive"
 STARTTIME=$(date '+%s')
@@ -21,6 +21,7 @@ CHECK_FILE="${VENVPATH}/first_run_complete"
 CHECK_FILE2="${VENVPATH}/sys_dependencies_checked"
 THIS_FILE="${BASEDIR}/FlightGazer-init.sh"
 LOGFILE="${BASEDIR}/FlightGazer-log.log"
+EVENTSFILE="${BASEDIR}/FlightGazer-events.log"
 DB_DOWNLOADER="${BASEDIR}/utilities/aircraft_db_fetcher.py"
 OP_DOWNLOADER="${BASEDIR}/utilities/operators_generator.py"
 INTERNET_STAT=0 # think return codes
@@ -897,6 +898,8 @@ if [ $SKIP_CHECK -eq 0 ] || [ "$CFLAG" = true ]; then
 	touch "$LOGFILE"
 	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$LOGFILE" >/dev/null 2>&1
 	chmod -f 644 "${LOGFILE}" >/dev/null 2>&1
+	chown -f ${OWNER_OF_FGDIR}:${GROUP_OF_FGDIR} "$EVENTSFILE" >/dev/null 2>&1
+	chmod -f 644 "${EVENTSFILE}" >/dev/null 2>&1
 	STAGEB=$(cat /proc/uptime | awk '{print $1}')
 	STAGEBDELTA=$(awk "BEGIN {print $STAGEB - $STAGEA}")
 	echo -e "${NC}Stage 2 of setup took ${STAGEBDELTA} seconds.${FADE}"

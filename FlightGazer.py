@@ -39,7 +39,7 @@ import time
 START_TIME: float = time.monotonic()
 import datetime
 STARTED_DATE: datetime = datetime.datetime.now()
-VERSION: str = 'v.11.10.1 --- 2026-10-19'
+VERSION: str = 'v.11.10.2 --- 2026-11-11'
 import os
 import argparse
 import sys
@@ -320,14 +320,13 @@ if FAULTDUMP.is_file() and FAULTDUMP.stat().st_size > 0:
         with open(LOGFILE, 'a') as lf:
             lf.write("***** BEGIN FLIGHTGAZER CRASH DUMP *****\n")
             for i, df_ in enumerate(df):
-                ln = df_.strip()
                 if i >= 199:
                     break
-                lf.write(ln)
+                lf.write(df_)
             if i >= 199:
                 lf.write("\n...the output of this crash has been truncated.\n")
             lf.write("\n***** END OF CRASH DUMP *****\n")
-    del df, df_, lf, ln, i
+    del df, df_, lf, i
     FAULTDUMP.unlink()
 if EVENTLOG.exists() and EVENTLOG.stat().st_size == 0:
     main_logger.info(f"Created new events log at \'{EVENTLOG}\'")
@@ -456,13 +455,14 @@ if not NODISPLAY_MODE:
                 os.environ['RGBME_SUPPRESS_ADAPTER_LOAD_ERRORS'] = "True"
                 from RGBMatrixEmulator.emulation.options import RGBMatrixEmulatorConfig
                 RGBMatrixEmulatorConfig.CONFIG_PATH = EMULATOR_CONFIG
-                match emu_adapter_type:
-                    case 'browser':
-                        main_logger.info("Emulator will be loaded using the browser adapter.")
-                    case 'raw':
-                        main_logger.warning("Emulator will be loaded with the raw display adapter. This is untested.")
-                    case _:
-                        main_logger.warning("Emulator will be loaded using a different adapter type. This is not supported!")
+                if emu_adapter_type:
+                    match emu_adapter_type:
+                        case 'browser':
+                            main_logger.info("Emulator will be loaded using the browser adapter.")
+                        case 'raw':
+                            main_logger.warning("Emulator will be loaded with the raw display adapter. This is untested.")
+                        case _:
+                            main_logger.warning("Emulator will be loaded using a different adapter type. This is not supported!")
                 from RGBMatrixEmulator import graphics
                 # the below line monkey patches imports to use the emulator even if rgbmatrix is installed
                 sys.modules['rgbmatrix'] = types.SimpleNamespace(graphics=graphics)
@@ -1160,9 +1160,6 @@ match UNITS:
 # =========== Program Setup I ==============
 # =============( Utilities )================
 
-def has_key(book, key) -> bool:
-    return (key in book)
-
 def cleanup() -> None:
     """ Shutdown procedures taken before we exit. Needs to be run inside of a signal handler. """
     global EXITED
@@ -1267,6 +1264,41 @@ def timedelta_clean(timeinput: datetime.datetime) -> str:
     """ Cleans up time deltas without the microseconds. """
     delta_time = datetime.timedelta(seconds=timeinput)
     return f"{delta_time}".split(".")[0]
+
+def relative_direction(**kwargs) -> tuple[str, float]:
+    """ Gets us the plane's relative cardinal direction in respect to our location. Also returns actual degrees.
+    Supply a `rdir` angle value to skip internal calculation. If `rdir` is None, supply `lat0`, `lon0`, `lat1`, `lon1`.
+    Sourced from here: https://gist.github.com/RobertSudwarts/acf8df23a16afdb5837f?permalink_comment_id=3070256#gistcomment-3070256 """
+    dirs = ['N ', 'NE', 'E ', 'SE', 'S ', 'SW', 'W ', 'NW'] # note the spaces for 1 letter directions, don't remove
+    d = kwargs.get('rdir')
+    if d is None:
+        try:
+            d = math.atan2(
+                (kwargs['lon1'] - kwargs['lon0']),
+                (kwargs['lat1'] - kwargs['lat0'])
+                ) * (180 / math.pi)
+        except Exception:
+            return "", 0.
+    ix = round(d / (360. / len(dirs)))
+    return dirs[ix % len(dirs)], round(d % 360, 1)
+
+def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
+    """ Calculates distance between two points on Earth based on their latitude and longitude.
+    (returns value based on selected units) """
+    # NB: it's slighty faster to not use `math.radians()`
+    lat0 = lat0 * math.pi / 180.0
+    lon0 = lon0 * math.pi / 180.0
+    lat1 = lat1 * math.pi / 180.0
+    lon1 = lon1 * math.pi / 180.0
+    # Earth arithmetic mean radius defined by the IUGG in nautical miles = 3440
+    earth_radius = 3440 * distance_multiplier
+    return round(
+        earth_radius
+        * math.acos(
+            math.sin(lat0) * math.sin(lat1)
+            + math.cos(lat0) * math.cos(lat1) * math.cos(abs(lon1 - lon0))
+        ), 6
+    )
 
 def strfdelta(tdelta, fmt='{D:02}d {H:02}h {M:02}m {S:02}s', inputtype='timedelta') -> str:
     """Convert a datetime.timedelta object or a regular number to a custom-
@@ -1751,8 +1783,9 @@ def dump978_check() -> None:
         main_logger.info("Failed to find dump978. No UAT data will be used this session.")
     DUMP978_JSON = json_978
 
-def read_1090_config() -> None:
-    """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to. """
+def read_1090_config(initialize: bool = True) -> None:
+    """ Gets us our location (if it's configured) and what ADS-B decoder we're attached to.
+    Not passing a bool assumes this is the first time this function is run (at startup) """
     global rlat, rlon, dump1090_receiver_version, is_readsb, LOCATION_IS_SET
     if not DUMP1090_IS_AVAILABLE: return
     try:
@@ -1769,7 +1802,7 @@ def read_1090_config() -> None:
         version_last = dump1090_receiver_version
 
         # avoid printing this every time we run this function
-        if has_key(receiver, 'version') and receiver['version'] != version_last:
+        if 'version' in receiver and receiver['version'] != version_last:
             dump1090_receiver_version = receiver['version']
             if version_last:
                 main_logger.info("Detected a different ADS-B receiver version.")
@@ -1777,28 +1810,33 @@ def read_1090_config() -> None:
             if 'wiedehopf' in (dump1090_receiver_version or '').lower():
                 is_readsb = True
                 main_logger.debug("Connected to readsb!")
-        elif not has_key(receiver, 'version'):
+        elif not 'version' in receiver:
             main_logger.warning("Connected to an unknown ADS-B decoder type. (could not determine version)")
 
-        if has_key(receiver,'lat'): #if location is set
+        if 'lat' in receiver: # should be present if location is set
             LOCATION_IS_SET = True
             if receiver['lat'] != rlat_last or receiver['lon'] != rlon_last:
                 rlat = float(receiver['lat'])
                 rlon = float(receiver['lon'])
                 main_logger.info("Location updated.")
                 main_logger.debug(f">>> ({rlat}, {rlon})")
+                if rlat_last is not None:
+                    d_move = greatcircle(rlat_last, rlon_last, rlat, rlon)
+                    d_cardinal, d_bear = relative_direction(rlat_last, rlon_last, rlat, rlon)
+                    main_logger.info(f"Moved {d_move:.3f}{distance_unit}, bearing of {d_bear} ({d_cardinal})")
         else:
             rlat = rlon = None
             LOCATION_IS_SET = False
-            if rlat_last is None:
+            if initialize:
                 main_logger.warning(
                     "Location has not been set! "
                     "This program will not be able to determine any nearby aircraft or calculate range!")
                 main_logger.warning(">>> Please set location in your dump1090 configuration, then restart FlightGazer.")
             else:
-                main_logger.warning(
-                    "Location positioning has been lost! Please check your dump1090 configuration!"
-                )
+                if rlat_last is not None:
+                    main_logger.warning(
+                        "Location positioning has been lost! Please check your dump1090 configuration!"
+                    )
 
     except Exception as e:
         main_logger.error(f"Failed to load receiver config: {e}")
@@ -2335,7 +2373,7 @@ def read_receiver_stats() -> None:
                         else:
                             stats = json.loads(receiver_data)
 
-                    if has_key(stats, 'last1min'):
+                    if 'last1min' in stats:
                         try:
                             noise_now = stats['last1min']['local']['noise']
                         except KeyError:
@@ -2353,7 +2391,7 @@ def read_receiver_stats() -> None:
                         noise_now = None
                         loud_percentage = None
 
-                    if has_key(stats, 'gain_db'):
+                    if 'gain_db' in stats:
                         gain_now = stats['gain_db']
                     else:
                         gain_now = None
@@ -3472,42 +3510,6 @@ def main_loop_generator() -> None:
                 return entry['Flyby']
         return 0
 
-    def relative_direction(**kwargs) -> tuple[str, float]:
-        """ Gets us the plane's relative cardinal direction in respect to our location. Also returns actual degrees.
-        Supply a `rdir` angle value to skip internal calculation. If `rdir` is None, supply `lat0`, `lon0`, `lat1`, `lon1`.
-        Sourced from here: https://gist.github.com/RobertSudwarts/acf8df23a16afdb5837f?permalink_comment_id=3070256#gistcomment-3070256 """
-        dirs = ['N ', 'NE', 'E ', 'SE', 'S ', 'SW', 'W ', 'NW'] # note the spaces for 1 letter directions
-        # dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
-        d = kwargs.get('rdir')
-        if d is None:
-            try:
-                d = math.atan2(
-                    (kwargs['lon1'] - kwargs['lon0']),
-                    (kwargs['lat1'] - kwargs['lat0'])
-                    ) * (180 / math.pi)
-            except Exception:
-                return "", 0.
-        ix = round(d / (360. / len(dirs)))
-        return dirs[ix % len(dirs)], round(d % 360, 1)
-
-    def greatcircle(lat0: float, lon0: float, lat1: float, lon1: float) -> float:
-        """ Calculates distance between two points on Earth based on their latitude and longitude.
-        (returns value based on selected units) """
-        # NB: it's slighty faster to not use `math.radians()`
-        lat0 = lat0 * math.pi / 180.0
-        lon0 = lon0 * math.pi / 180.0
-        lat1 = lat1 * math.pi / 180.0
-        lon1 = lon1 * math.pi / 180.0
-        # Earth arithmetic mean radius defined by the IUGG in nautical miles = 3440
-        earth_radius = 3440 * distance_multiplier
-        return round(
-            earth_radius
-            * math.acos(
-                math.sin(lat0) * math.sin(lat1)
-                + math.cos(lat0) * math.cos(lat1) * math.cos(abs(lon1 - lon0))
-            ), 6
-        )
-
     def elevation_and_slant(greatcircle_dist: float, altitude: float) -> tuple[float, float]:
         """ Calculates elevation angle and slant range based on given distance and altitude.
         NB: this function assumes the site elevation is 0 relative to the target, eg,
@@ -3857,6 +3859,10 @@ def main_loop_generator() -> None:
         # (approach rate and future position calculations) isn't used
         reference_time = time.monotonic()
 
+        # in case location updates mid-processing
+        rlat_ = rlat
+        rlon_ = rlon
+
         if not NOFILTER_MODE: # insert priority values into the data for use in the deduplication algorithm
             for i, dict_ in enumerate(dump1090_data):
                 dump1090_data[i]['priority'] = priority_lookup.get(
@@ -3906,7 +3912,7 @@ def main_loop_generator() -> None:
                 # distance for each plane on every loop.
                 # From testing, using the current layout is now up to 1.5x faster over time, as long as we're connected to readsb.
                 if distance is None:
-                    distance = greatcircle(rlat, rlon, lat, lon)
+                    distance = greatcircle(rlat_, rlon_, lat, lon)
                 else: # don't forget to scale to the selected units if we're reading directly from readsb
                     distance = distance * distance_multiplier
             else:
@@ -3998,7 +4004,7 @@ def main_loop_generator() -> None:
                         vs = round(vs * 0.00508, 1)
                     track = a.get('track', 0)
                     gs = round(gs * speed_multiplier, 3)
-                    if has_key(a, 'uat_version'):
+                    if 'uat_version' in a:
                         source = 'UAT'
                     else:
                         source = 'ADS-B'
@@ -4006,8 +4012,8 @@ def main_loop_generator() -> None:
                         # readsb also does this calculation, try to use it first and have the fallback ready
                         direc, direcd = relative_direction(
                             rdir = a.get('r_dir'),
-                            lat0 = rlat,
-                            lon0 = rlon,
+                            lat0 = rlat_,
+                            lon0 = rlon_,
                             lat1 = lat,
                             lon1 = lon
                         )
@@ -4043,7 +4049,7 @@ def main_loop_generator() -> None:
                     else:
                         futlat = futlon = None
                     if futlat is not None and futlon is not None:
-                        futdis = greatcircle(rlat, rlon, futlat, futlon)
+                        futdis = greatcircle(rlat_, rlon_, futlat, futlon)
                         futlat = round(futlat, 6)
                         futlon = round(futlon, 6)
                     else:
@@ -9632,8 +9638,7 @@ if DUMP1090_JSON is None and not DISPLAY_IS_VALID:
     sys.exit(1)
 
 read_1090_config()
-if LOCATION_IS_SET:
-    main_scheduler.every(10).minutes.do(read_1090_config) # in case we have GPS attached and are updating location
+main_scheduler.every(10).minutes.do(read_1090_config, initialize=False) # check for position changes and receiver updates
 suntimes()
 
 if DATABASE_FILE.exists():

@@ -1,12 +1,12 @@
 STARTFONT 2.1
-COMMENT 
-COMMENT Based from the "3x5.bdf" font from the FlightGazer project but with different glyphs 
+COMMENT
+COMMENT Based from the "3x5.bdf" font from the FlightGazer project but with different glyphs
 COMMENT similar to those used by the Texas Instruments TI-83/84 calculator.
-COMMENT 
+COMMENT
 FONT -NMRFoundry-3by5-Alt-Medium-R-Normal--5-50-72-72-P-32-ISO10646-1
 SIZE 5 72 72
 FONTBOUNDINGBOX 3 5 0 0
-STARTPROPERTIES 19
+STARTPROPERTIES 18
 FOUNDRY "NMRFoundry"
 FAMILY_NAME "3by5-Alt"
 WEIGHT_NAME "Medium"

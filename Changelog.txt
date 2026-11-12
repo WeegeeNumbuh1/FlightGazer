@@ -5,6 +5,20 @@ v.V.R.U - Release date
   | `--- Release
   `----- Version
 
+v.11.10.2 - 2026-11-11
+    - Wow, the second-year anniversary of this project hitting v.1.0.0
+        - This release will mark 66 updates since last year (v.9.4.0)
+        - It's still code lasagna all around, the chef in me still got it
+
+    - FlightGazer no longer needs to be restarted to pick up an updated location if at startup
+      no location was detected and it's updated in dump1090/readsb
+    - When GPS is connected, messages in the log will now display the distance change and the bearing
+    - Fix permissions for events log
+    - Crash dump no longer writes as a single line
+    - Minor processing optimizations
+    - Fix metadata for some fonts
+    - Operators database update
+
 v.11.10.1 - 2026-10-19
     - Make writes to the state file atomic
     - Ignore airline lookups for ground vehicles (based on ADS-B category)
